@@ -1,0 +1,16 @@
+# Build directories
+skeletons/*/build/
+build/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Editor / OS
+.DS_Store
+*.swp
+
+# Obsidian workspace state (keep shared config, drop per-user layout)
+.obsidian/workspace.json
