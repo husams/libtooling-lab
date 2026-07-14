@@ -14,3 +14,6 @@ compile_commands.json
 
 # Obsidian workspace state (keep shared config, drop per-user layout)
 .obsidian/workspace.json
+
+# generated symbol-table DB from visitor-tool
+symbols.db

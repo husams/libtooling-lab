@@ -27,4 +27,6 @@ endif()
 
 add_executable(visitor-tool main.cpp)
 # clang-cpp is the monolithic Clang dylib; LLVM is the monolithic LLVM dylib.
-target_link_libraries(visitor-tool PRIVATE clang-cpp LLVM)
+# sqlite3 (from the macOS SDK) backs the symbol-table store.
+find_library(SQLITE3_LIB sqlite3)
+target_link_libraries(visitor-tool PRIVATE clang-cpp LLVM ${SQLITE3_LIB})
