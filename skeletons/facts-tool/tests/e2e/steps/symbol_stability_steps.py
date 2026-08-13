@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from support.bdd import then, when
+from pytest_bdd import then, when
 from support.database import file_snapshot, require, scalar, symbol_snapshot
 from support.scenario import FactsToolContext
 

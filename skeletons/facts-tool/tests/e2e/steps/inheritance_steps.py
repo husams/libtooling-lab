@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from support.bdd import Table, table_records, then
+from pytest_bdd import then
 from support.database import query, require
 from support.scenario import FactsToolContext
+from support.table import Table, table_records
 
 
 def direct_inheritance_relations(context: FactsToolContext) -> set[tuple]:
@@ -21,7 +22,7 @@ def direct_inheritance_relations(context: FactsToolContext) -> set[tuple]:
 
 @then("the persisted direct inheritance fields include")
 def then_direct_inheritance_relations_include(
-    context: FactsToolContext, table: Table
+    context: FactsToolContext, datatable: Table
 ) -> None:
     expected = {
         (
@@ -35,7 +36,7 @@ def then_direct_inheritance_relations_include(
             int(row["is_lexical"]),
             int(row["count"]),
         )
-        for row in table_records(table)
+        for row in table_records(datatable)
     }
     require(
         expected <= direct_inheritance_relations(context),

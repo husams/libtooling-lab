@@ -107,13 +107,16 @@ include(CTest)
 if(BUILD_TESTING)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "import pytest"
+    COMMAND ${Python3_EXECUTABLE} -c "import pytest, pytest_bdd"
     RESULT_VARIABLE FACTS_TOOL_PYTEST_IMPORT_RESULT
     OUTPUT_QUIET
     ERROR_QUIET
   )
   if(NOT FACTS_TOOL_PYTEST_IMPORT_RESULT EQUAL 0)
-    message(FATAL_ERROR "pytest is required when BUILD_TESTING is enabled")
+    message(FATAL_ERROR
+      "pytest and pytest-bdd are required when BUILD_TESTING is enabled; "
+      "install tests/e2e/requirements.txt"
+    )
   endif()
 
   add_executable(fact-store-test tests/FactStoreTest.cpp)

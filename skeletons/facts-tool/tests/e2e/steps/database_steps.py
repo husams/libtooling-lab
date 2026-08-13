@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from support.bdd import Table, table_records, then
+from pytest_bdd import then
 from support.database import query, require, table_names
 from support.scenario import FactsToolContext
+from support.table import Table, table_records
 
 
 @then("the facts database contains these tables")
 def then_facts_database_contains_tables(
-    context: FactsToolContext, table: Table
+    context: FactsToolContext, datatable: Table
 ) -> None:
-    expected = {row["table"] for row in table_records(table)}
+    expected = {row["table"] for row in table_records(datatable)}
     actual = table_names(context.facts_database_path)
     require(expected <= actual, f"facts schema is missing: {expected - actual}")
 
@@ -47,9 +48,9 @@ def then_no_facts_table_stores_packed_flags(context: FactsToolContext) -> None:
 
 @then("the files database contains only these tables")
 def then_files_database_contains_only_tables(
-    context: FactsToolContext, table: Table
+    context: FactsToolContext, datatable: Table
 ) -> None:
-    expected = {row["table"] for row in table_records(table)}
+    expected = {row["table"] for row in table_records(datatable)}
     actual = table_names(context.files_database_path)
     require(actual == expected, f"unexpected files database tables: {actual}")
 

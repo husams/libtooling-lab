@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from support.bdd import given, when
+from pytest_bdd import given, when
 from support.scenario import FactsToolContext
 
 

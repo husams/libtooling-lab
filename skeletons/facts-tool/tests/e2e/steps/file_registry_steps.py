@@ -2,19 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from support.bdd import Table, table_records, then
+from pytest_bdd import then
 from support.database import file_snapshot, query, require
 from support.scenario import FactsToolContext
+from support.table import Table, table_records
 
 
 @then("the file registry contains these canonical fixture paths")
 def then_registry_contains_canonical_fixture_paths(
-    context: FactsToolContext, table: Table
+    context: FactsToolContext, datatable: Table
 ) -> None:
     files = file_snapshot(context.files_database_path)
     expected_paths = {
         str((context.fixture_root / row["fixture"]).resolve(strict=True))
-        for row in table_records(table)
+        for row in table_records(datatable)
     }
     actual_paths = {path for _, path in files}
     require(actual_paths == expected_paths, f"unexpected file registry: {files}")

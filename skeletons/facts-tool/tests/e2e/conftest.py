@@ -6,6 +6,18 @@ import pytest
 
 from support.scenario import FactsToolContext
 
+pytest_plugins = (
+    "steps.common_steps",
+    "steps.database_steps",
+    "steps.file_registry_steps",
+    "steps.inheritance_steps",
+    "steps.parameter_steps",
+    "steps.record_steps",
+    "steps.symbol_identity_steps",
+    "steps.symbol_inventory_steps",
+    "steps.symbol_stability_steps",
+)
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("facts-tool e2e")
@@ -16,7 +28,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 @pytest.fixture
-def facts_tool_context(pytestconfig: pytest.Config) -> FactsToolContext:
+def context(pytestconfig: pytest.Config) -> FactsToolContext:
     return FactsToolContext.create(
         facts_tool=pytestconfig.getoption("--facts-tool"),
         fixture_root=pytestconfig.getoption("--fixture-root"),

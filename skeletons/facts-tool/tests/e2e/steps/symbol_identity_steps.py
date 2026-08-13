@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from support.bdd import Table, table_records, then
+from pytest_bdd import then
 from support.database import query, require, scalar, symbol_snapshot
 from support.scenario import FactsToolContext
+from support.table import Table, table_records
 
 
 def symbols_by_file(context: FactsToolContext) -> dict[int, list[tuple[int, int]]]:
@@ -53,9 +54,9 @@ def then_allocators_point_to_next_index(context: FactsToolContext) -> None:
 
 @then("these repeated declarations have one nonempty USR each")
 def then_repeated_declarations_have_one_usr(
-    context: FactsToolContext, table: Table
+    context: FactsToolContext, datatable: Table
 ) -> None:
-    expected = {row["qualified_name"] for row in table_records(table)}
+    expected = {row["qualified_name"] for row in table_records(datatable)}
     symbols = {
         qualified_name: (symbol_id, file_id, file_index, node, usr)
         for symbol_id, file_id, file_index, node, usr, qualified_name in symbol_snapshot(

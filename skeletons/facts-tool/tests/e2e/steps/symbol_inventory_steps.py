@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from support.bdd import Table, table_records, then
+from pytest_bdd import then
 from support.database import parameters_by_function, query, require
 from support.scenario import FactsToolContext
+from support.table import Table, table_records
 
 
 @then("the symbol inventory includes")
-def then_symbol_inventory_includes(context: FactsToolContext, table: Table) -> None:
+def then_symbol_inventory_includes(context: FactsToolContext, datatable: Table) -> None:
     expected = {
-        (int(row["node"]), row["qualified_name"]) for row in table_records(table)
+        (int(row["node"]), row["qualified_name"]) for row in table_records(datatable)
     }
     actual = set(
         query(
@@ -23,8 +24,8 @@ def then_symbol_inventory_includes(context: FactsToolContext, table: Table) -> N
 
 
 @then("the defined functions include")
-def then_defined_functions_include(context: FactsToolContext, table: Table) -> None:
-    expected = {row["qualified_name"] for row in table_records(table)}
+def then_defined_functions_include(context: FactsToolContext, datatable: Table) -> None:
+    expected = {row["qualified_name"] for row in table_records(datatable)}
     actual = {
         name
         for (name,) in query(
@@ -40,8 +41,8 @@ def then_defined_functions_include(context: FactsToolContext, table: Table) -> N
 
 
 @then("the parameters for e2e::transform are")
-def then_transform_parameters_are(context: FactsToolContext, table: Table) -> None:
-    expected = [(int(row["position"]), row["name"]) for row in table_records(table)]
+def then_transform_parameters_are(context: FactsToolContext, datatable: Table) -> None:
+    expected = [(int(row["position"]), row["name"]) for row in table_records(datatable)]
     actual = [
         (position, name)
         for position, name, _, _ in parameters_by_function(context.facts_database_path)[
@@ -52,14 +53,16 @@ def then_transform_parameters_are(context: FactsToolContext, table: Table) -> No
 
 
 @then("the parameters for e2e::headerHelper are")
-def then_header_helper_parameters_are(context: FactsToolContext, table: Table) -> None:
+def then_header_helper_parameters_are(
+    context: FactsToolContext, datatable: Table
+) -> None:
     expected = [
         (
             int(row["position"]),
             row["name"],
             int(row["has_default"]),
         )
-        for row in table_records(table)
+        for row in table_records(datatable)
     ]
     actual = [
         (position, name, has_default)
