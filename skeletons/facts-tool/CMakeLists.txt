@@ -149,7 +149,7 @@ if(BUILD_TESTING)
     NAME facts-tool-e2e
     COMMAND
       ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/FactsToolScenario.py
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/FactsToolFeatures.py
       --facts-tool $<TARGET_FILE:facts-tool>
       --fixture-root ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/e2e
       --compiler ${CMAKE_CXX_COMPILER}
