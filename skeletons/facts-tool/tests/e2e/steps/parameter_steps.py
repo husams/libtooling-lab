@@ -5,20 +5,16 @@ from support.database import parameters_by_function, query, require, scalar
 from support.scenario import FactsToolContext
 
 
-def boolean(value: str) -> int:
-    return 1 if value == "yes" else 0
-
-
-@then("the parameters for e2e::userDefinedTypes include")
+@then("the persisted parameters for e2e::userDefinedTypes include")
 def then_user_defined_parameters_include(
     context: FactsToolContext, table: Table
 ) -> None:
     rows = table_records(table)
     symbol_ids = {
-        row["symbol"]: scalar(
+        row["type_qualified_name"]: scalar(
             context.facts_database_path,
             "SELECT id FROM symbol WHERE qualified_name=?",
-            (row["symbol"],),
+            (row["type_qualified_name"],),
         )
         for row in rows
     }
@@ -34,8 +30,8 @@ def then_user_defined_parameters_include(
         (
             int(row["position"]),
             row["name"],
-            symbol_ids[row["symbol"]],
-            *(boolean(row[field]) for field in semantic_fields),
+            symbol_ids[row["type_qualified_name"]],
+            *(int(row[field]) for field in semantic_fields),
         )
         for row in rows
     ]
@@ -70,7 +66,7 @@ def primitive_parameters(context: FactsToolContext) -> list[tuple]:
     return parameters_by_function(context.facts_database_path)["e2e::primitiveTypes"]
 
 
-@then("the primitive parameters for e2e::primitiveTypes are")
+@then("the persisted primitive parameter fields for e2e::primitiveTypes are")
 def then_primitive_parameters_are(context: FactsToolContext, table: Table) -> None:
     semantic_fields = (
         "is_pointer",
@@ -84,7 +80,7 @@ def then_primitive_parameters_are(context: FactsToolContext, table: Table) -> No
         (
             int(row["position"]),
             row["name"],
-            *(boolean(row[field]) for field in semantic_fields),
+            *(int(row[field]) for field in semantic_fields),
         )
         for row in table_records(table)
     ]

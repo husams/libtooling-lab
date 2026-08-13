@@ -57,7 +57,7 @@ def then_header_helper_parameters_are(context: FactsToolContext, table: Table) -
         (
             int(row["position"]),
             row["name"],
-            1 if row["has_default"] == "yes" else 0,
+            int(row["has_default"]),
         )
         for row in table_records(table)
     ]

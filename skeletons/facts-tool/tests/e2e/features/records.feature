@@ -1,5 +1,6 @@
 Feature: C++ record declarations and definitions
   Structs, unions, and classes share record storage while retaining definition state.
+  Integer boolean values are shown exactly as persisted by SQLite: 0 or 1.
 
   Background:
     Given realistic shared-header declarations, definitions, parameters, and relations
@@ -20,17 +21,17 @@ Feature: C++ record declarations and definitions
       | e2e::PublicWidget    | 2    |
       | e2e::Widget          | 2    |
 
-  Scenario Outline: Store <qualified_name> definition state as <defined>
-    Then the record definition states are
-      | qualified_name   | defined   |
-      | <qualified_name> | <defined> |
+  Scenario Outline: Store <qualified_name> is_definition as <is_definition>
+    Then the persisted record symbol fields include
+      | qualified_name   | is_definition   |
+      | <qualified_name> | <is_definition> |
 
     Examples:
-      | qualified_name       | defined |
-      | e2e::CompositeWidget | yes     |
-      | e2e::Deferred        | no      |
-      | e2e::Payload         | yes     |
-      | e2e::Policy          | yes     |
-      | e2e::PrivateWidget   | yes     |
-      | e2e::PublicWidget    | yes     |
-      | e2e::Widget          | yes     |
+      | qualified_name       | is_definition |
+      | e2e::CompositeWidget | 1             |
+      | e2e::Deferred        | 0             |
+      | e2e::Payload         | 1             |
+      | e2e::Policy          | 1             |
+      | e2e::PrivateWidget   | 1             |
+      | e2e::PublicWidget    | 1             |
+      | e2e::Widget          | 1             |

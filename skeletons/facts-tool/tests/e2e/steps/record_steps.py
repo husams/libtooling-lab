@@ -22,18 +22,22 @@ def then_record_symbols_are(context: FactsToolContext, table: Table) -> None:
     require(actual == expected, f"unexpected C++ record symbols: {actual}")
 
 
-@then("the record definition states are")
-def then_record_definition_states_are(context: FactsToolContext, table: Table) -> None:
+@then("the persisted record symbol fields include")
+def then_persisted_record_symbol_fields_include(
+    context: FactsToolContext, table: Table
+) -> None:
     expected = {
-        row["qualified_name"]: row["defined"] == "yes" for row in table_records(table)
+        (row["qualified_name"], int(row["is_definition"]))
+        for row in table_records(table)
     }
-    defined = {
-        name
-        for (name,) in query(
+    names = tuple(name for name, _ in expected)
+    placeholders = ",".join("?" for _ in names)
+    actual = set(
+        query(
             context.facts_database_path,
-            "SELECT s.qualified_name FROM definition d "
-            "JOIN symbol s ON s.id=d.symbol_id",
+            "SELECT qualified_name,is_definition FROM symbol "
+            f"WHERE qualified_name IN ({placeholders})",
+            names,
         )
-    }
-    actual = {name: name in defined for name in expected}
-    require(actual == expected, f"unexpected record definition states: {actual}")
+    )
+    require(actual == expected, f"unexpected persisted record fields: {actual}")

@@ -42,8 +42,8 @@ Feature: Extracted symbol and fact inventory
       | 1        | factor |
     And the parameters for e2e::headerHelper are
       | position | name  | has_default |
-      | 0        | input | no          |
-      | 1        | delta | yes         |
+      | 0        | input | 0           |
+      | 1        | delta | 1           |
 
   Scenario: Typed facts and relations retain referential integrity
     Then the facts database has no foreign-key violations

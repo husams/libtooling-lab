@@ -19,7 +19,7 @@ def direct_inheritance_relations(context: FactsToolContext) -> set[tuple]:
     )
 
 
-@then("the direct inheritance relations include")
+@then("the persisted direct inheritance fields include")
 def then_direct_inheritance_relations_include(
     context: FactsToolContext, table: Table
 ) -> None:
@@ -30,9 +30,9 @@ def then_direct_inheritance_relations_include(
             int(row["kind"]),
             int(row["position"]),
             row["access"],
-            1 if row["is_virtual_base"] == "yes" else 0,
-            1 if row["is_implicit"] == "yes" else 0,
-            1 if row["is_lexical"] == "yes" else 0,
+            int(row["is_virtual_base"]),
+            int(row["is_implicit"]),
+            int(row["is_lexical"]),
             int(row["count"]),
         )
         for row in table_records(table)
