@@ -44,12 +44,12 @@ def then_direct_inheritance_relations_include(
     )
 
 
-@then("exactly 4 direct inheritance relations are stored")
-def then_four_direct_inheritance_relations_are_stored(
+@then("exactly 5 direct inheritance relations are stored")
+def then_five_direct_inheritance_relations_are_stored(
     context: FactsToolContext,
 ) -> None:
     relations = direct_inheritance_relations(context)
     require(
-        len(relations) == 4,
-        f"expected 4 direct inheritance relations: {relations}",
+        len(relations) == 5,
+        f"expected 5 direct inheritance relations: {relations}",
     )

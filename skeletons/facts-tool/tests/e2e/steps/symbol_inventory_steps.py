@@ -6,7 +6,7 @@ from support.scenario import FactsToolContext
 from support.table import Table, table_records
 
 
-@then("the symbol inventory includes")
+@then("the complete symbol inventory is")
 def then_symbol_inventory_includes(context: FactsToolContext, datatable: Table) -> None:
     expected = {
         (int(row["node"]), row["qualified_name"]) for row in table_records(datatable)
@@ -17,10 +17,7 @@ def then_symbol_inventory_includes(context: FactsToolContext, datatable: Table) 
             "SELECT node,qualified_name FROM symbol",
         )
     )
-    require(
-        expected <= actual,
-        f"symbol inventory is missing: {expected - actual}",
-    )
+    require(actual == expected, f"unexpected complete symbol inventory: {actual}")
 
 
 @then("the defined functions include")

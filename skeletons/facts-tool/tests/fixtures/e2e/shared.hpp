@@ -11,6 +11,10 @@ struct Widget {
   int value;
 };
 
+struct MyRecord {
+  int s;
+};
+
 union Payload {
   int integral;
   double fractional;

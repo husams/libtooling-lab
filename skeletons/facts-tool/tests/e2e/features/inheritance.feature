@@ -10,7 +10,7 @@ Feature: C++ record inheritance
     Then the persisted direct inheritance fields include
       | source   | destination   | kind   | position   | access   | is_virtual_base   | is_implicit   | is_lexical   | count   |
       | <source> | <destination> | <kind> | <position> | <access> | <is_virtual_base> | <is_implicit> | <is_lexical> | <count> |
-    And exactly 4 direct inheritance relations are stored
+    And exactly 5 direct inheritance relations are stored
 
     Examples:
       | source               | destination | kind | position | access    | is_virtual_base | is_implicit | is_lexical | count |

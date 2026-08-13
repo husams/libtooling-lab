@@ -10,6 +10,7 @@ pytest_plugins = (
     "steps.common_steps",
     "steps.database_steps",
     "steps.file_registry_steps",
+    "steps.header_defined_type_steps",
     "steps.inheritance_steps",
     "steps.parameter_steps",
     "steps.record_steps",
