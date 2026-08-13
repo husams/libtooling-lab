@@ -1,9 +1,11 @@
 Feature: Extracted symbol and fact inventory
   Supported declarations, definitions, parameters, and references are captured together.
 
-  Scenario: Supported declarations use their concrete node kinds
+  Background:
     Given realistic shared-header declarations, definitions, parameters, and relations
     When the real facts-tool indexes both translation units using compile_commands.json
+
+  Scenario: Supported declarations use their concrete node kinds
     Then the symbol inventory includes
       | node | qualified_name         |
       | 1    | e2e::headerHelper      |
@@ -28,8 +30,6 @@ Feature: Extracted symbol and fact inventory
       | 6    | e2e::Count             |
 
   Scenario: Function definitions and parameter metadata are captured
-    Given realistic shared-header declarations, definitions, parameters, and relations
-    When the real facts-tool indexes both translation units using compile_commands.json
     Then the defined functions include
       | qualified_name    |
       | e2e::headerHelper |
@@ -46,7 +46,5 @@ Feature: Extracted symbol and fact inventory
       | 1        | delta | yes         |
 
   Scenario: Typed facts and relations retain referential integrity
-    Given realistic shared-header declarations, definitions, parameters, and relations
-    When the real facts-tool indexes both translation units using compile_commands.json
     Then the facts database has no foreign-key violations
     And every relation references captured source and destination symbols

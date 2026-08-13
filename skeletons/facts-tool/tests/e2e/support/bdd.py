@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -24,6 +25,14 @@ class Step:
 class Scenario:
     name: str
     steps: tuple[Step, ...]
+
+
+@dataclass(frozen=True)
+class ScenarioTemplate:
+    name: str
+    steps: tuple[Step, ...]
+    outline: bool
+    examples: Table
 
 
 @dataclass(frozen=True)
@@ -61,11 +70,26 @@ def then(text: str) -> Callable[[StepDefinition], StepDefinition]:
 def parse_feature(path: Path) -> Feature:
     feature_name: Optional[str] = None
     background: list[Step] = []
-    scenarios: list[Scenario] = []
+    templates: list[ScenarioTemplate] = []
     scenario_name: Optional[str] = None
     scenario_steps: list[Step] = []
+    scenario_outline = False
+    examples: list[tuple[str, ...]] = []
+    reading_examples = False
     destination: Optional[list[Step]] = None
     definition_keyword: Optional[str] = None
+
+    def append_scenario() -> None:
+        if scenario_name is None:
+            return
+        templates.append(
+            ScenarioTemplate(
+                scenario_name,
+                tuple(scenario_steps),
+                scenario_outline,
+                tuple(examples),
+            )
+        )
 
     for line_number, raw_line in enumerate(
         path.read_text(encoding="utf-8").splitlines(), start=1
@@ -79,14 +103,26 @@ def parse_feature(path: Path) -> Feature:
         if line == "Background:":
             destination = background
             definition_keyword = None
+            reading_examples = False
             continue
-        if line.startswith("Scenario:"):
-            if scenario_name is not None:
-                scenarios.append(Scenario(scenario_name, tuple(scenario_steps)))
-            scenario_name = line.removeprefix("Scenario:").strip()
+        if line.startswith("Scenario Outline:") or line.startswith("Scenario:"):
+            append_scenario()
+            scenario_outline = line.startswith("Scenario Outline:")
+            prefix = "Scenario Outline:" if scenario_outline else "Scenario:"
+            scenario_name = line.removeprefix(prefix).strip()
             scenario_steps = []
+            examples = []
+            reading_examples = False
             destination = scenario_steps
             definition_keyword = None
+            continue
+        if line == "Examples:":
+            if scenario_name is None or not scenario_outline:
+                raise ValueError(
+                    f"{path}:{line_number}: Examples requires a Scenario Outline"
+                )
+            reading_examples = True
+            destination = None
             continue
 
         keyword, separator, text = line.partition(" ")
@@ -102,9 +138,12 @@ def parse_feature(path: Path) -> Feature:
             destination.append(Step(keyword, definition_keyword, text, line_number))
             continue
         if line.startswith("|") and line.endswith("|"):
+            row = tuple(cell.strip() for cell in line[1:-1].split("|"))
+            if reading_examples:
+                examples.append(row)
+                continue
             if destination is None or not destination:
                 raise ValueError(f"{path}:{line_number}: table has no preceding step")
-            row = tuple(cell.strip() for cell in line[1:-1].split("|"))
             destination[-1] = replace(
                 destination[-1], table=(*destination[-1].table, row)
             )
@@ -116,13 +155,52 @@ def parse_feature(path: Path) -> Feature:
                 f"{path}:{line_number}: unrecognized scenario line: {line}"
             )
 
-    if scenario_name is not None:
-        scenarios.append(Scenario(scenario_name, tuple(scenario_steps)))
+    append_scenario()
     if not feature_name:
         raise ValueError(f"{path}: missing Feature declaration")
-    if not scenarios:
+    if not templates:
         raise ValueError(f"{path}: no scenarios")
+    scenarios = tuple(
+        scenario for template in templates for scenario in expand_scenario(template)
+    )
     return Feature(feature_name, tuple(background), tuple(scenarios))
+
+
+def expand_scenario(template: ScenarioTemplate) -> tuple[Scenario, ...]:
+    if not template.outline:
+        if template.examples:
+            raise ValueError(f"Scenario has unexpected examples: {template.name}")
+        return (Scenario(template.name, template.steps),)
+    if not template.examples:
+        raise ValueError(f"Scenario Outline has no examples: {template.name}")
+
+    return tuple(
+        Scenario(
+            substitute_examples(template.name, values),
+            tuple(
+                replace(
+                    step,
+                    text=substitute_examples(step.text, values),
+                    table=tuple(
+                        tuple(substitute_examples(cell, values) for cell in row)
+                        for row in step.table
+                    ),
+                )
+                for step in template.steps
+            ),
+        )
+        for values in table_records(template.examples)
+    )
+
+
+def substitute_examples(text: str, values: dict[str, str]) -> str:
+    def replace_placeholder(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name not in values:
+            raise ValueError(f"unknown example placeholder <{name}> in: {text}")
+        return values[name]
+
+    return re.sub(r"<([^>]+)>", replace_placeholder, text)
 
 
 def table_records(table: Table) -> list[dict[str, str]]:

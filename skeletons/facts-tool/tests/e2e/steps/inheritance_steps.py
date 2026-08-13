@@ -5,11 +5,8 @@ from support.database import query, require
 from support.scenario import FactsToolContext
 
 
-@then("the direct inheritance relations are")
-def then_direct_inheritance_relations_are(
-    context: FactsToolContext, table: Table
-) -> None:
-    relations = set(
+def direct_inheritance_relations(context: FactsToolContext) -> set[tuple]:
+    return set(
         query(
             context.facts_database_path,
             "SELECT source.qualified_name,destination.qualified_name,"
@@ -19,6 +16,12 @@ def then_direct_inheritance_relations_are(
             "WHERE r.kind=2",
         )
     )
+
+
+@then("the direct inheritance relations include")
+def then_direct_inheritance_relations_include(
+    context: FactsToolContext, table: Table
+) -> None:
     expected = {
         (
             row["source"],
@@ -31,6 +34,17 @@ def then_direct_inheritance_relations_are(
         for row in table_records(table)
     }
     require(
-        relations == expected,
-        f"unexpected direct inheritance relations: {relations}",
+        expected <= direct_inheritance_relations(context),
+        f"missing direct inheritance relations: {expected}",
+    )
+
+
+@then("exactly 4 direct inheritance relations are stored")
+def then_four_direct_inheritance_relations_are_stored(
+    context: FactsToolContext,
+) -> None:
+    relations = direct_inheritance_relations(context)
+    require(
+        len(relations) == 4,
+        f"expected 4 direct inheritance relations: {relations}",
     )

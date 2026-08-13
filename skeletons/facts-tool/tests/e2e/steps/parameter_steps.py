@@ -5,8 +5,10 @@ from support.database import parameters_by_function, require, scalar
 from support.scenario import FactsToolContext
 
 
-@then("the parameters for e2e::userDefinedTypes are")
-def then_user_defined_parameters_are(context: FactsToolContext, table: Table) -> None:
+@then("the parameters for e2e::userDefinedTypes include")
+def then_user_defined_parameters_include(
+    context: FactsToolContext, table: Table
+) -> None:
     rows = table_records(table)
     symbol_ids = {
         row["symbol"]: scalar(
@@ -26,9 +28,22 @@ def then_user_defined_parameters_are(context: FactsToolContext, table: Table) ->
         )["e2e::userDefinedTypes"]
     ]
     require(
-        actual == expected,
+        all(parameter in actual for parameter in expected),
         "user-defined struct, union, class, pointer, reference, array, enum, "
         f"and alias types did not resolve to their SymbolIds: {actual}",
+    )
+
+
+@then("e2e::userDefinedTypes has exactly 8 parameters")
+def then_user_defined_types_has_eight_parameters(
+    context: FactsToolContext,
+) -> None:
+    parameters = parameters_by_function(context.facts_database_path)[
+        "e2e::userDefinedTypes"
+    ]
+    require(
+        len(parameters) == 8,
+        f"expected 8 user-defined type parameters: {parameters}",
     )
 
 
