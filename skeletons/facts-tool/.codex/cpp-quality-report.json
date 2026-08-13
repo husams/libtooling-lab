@@ -1,0 +1,163 @@
+{
+  "dry_run": false,
+  "finished_at": "2026-08-12T15:10:44+00:00",
+  "passed": true,
+  "plan": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/.codex/cpp-quality-plan.json",
+  "project_root": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+  "results": [
+    {
+      "argv": [
+        "cmake",
+        "-S",
+        ".",
+        "-B",
+        "build",
+        "-G",
+        "Ninja",
+        "-DCMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm",
+        "-DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++"
+      ],
+      "cwd": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.17,
+      "kind": "configure",
+      "name": "configure-ninja",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "",
+      "stdout": "-- Building against LLVM 22.1.8 at /opt/homebrew/opt/llvm/lib/cmake/llvm\n-- Configuring done (0.1s)\n-- Generating done (0.0s)\n-- Build files have been written to: /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/build\n"
+    },
+    {
+      "argv": [
+        "cmake",
+        "--build",
+        "build",
+        "-j",
+        "8"
+      ],
+      "cwd": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.01,
+      "kind": "build",
+      "name": "build",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "",
+      "stdout": "ninja: no work to do.\n"
+    },
+    {
+      "argv": [
+        "ctest",
+        "--test-dir",
+        "build",
+        "--output-on-failure"
+      ],
+      "cwd": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.134,
+      "kind": "test",
+      "name": "tests",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "",
+      "stdout": "Test project /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/build\n    Start 1: fact-store\n1/4 Test #1: fact-store .......................   Passed    0.02 sec\n    Start 2: file-manager\n2/4 Test #2: file-manager .....................   Passed    0.02 sec\n    Start 3: compilation-files\n3/4 Test #3: compilation-files ................   Passed    0.02 sec\n    Start 4: multi-tu-file-registry\n4/4 Test #4: multi-tu-file-registry ...........   Passed    0.07 sec\n\n100% tests passed out of 4\n\nTotal Test time (real) =   0.13 sec\n"
+    },
+    {
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/clang-format",
+        "--dry-run",
+        "--Werror",
+        "src/model/FileRecord.h",
+        "src/model/SymbolId.h",
+        "src/storage/FactStore.h",
+        "src/storage/FactStore.cpp",
+        "src/storage/FileManager.h",
+        "src/storage/FileManager.cpp",
+        "src/storage/FileDatabase.h",
+        "src/storage/FileDatabase.cpp",
+        "src/storage/FileSchema.h",
+        "src/tooling/CompilationFiles.h",
+        "src/tooling/CompilationFiles.cpp",
+        "src/storage/Schema.h",
+        "src/ast/extractors/File.h",
+        "src/ast/extractors/File.cpp",
+        "src/ast/extractors/Extraction.h",
+        "src/ast/extractors/Location.cpp",
+        "src/ast/FactExtractor.cpp",
+        "src/ast/visitors/Traversal.h",
+        "src/ast/visitors/Traversal.cpp",
+        "src/ast/visitors/SymbolVisitor.h",
+        "src/ast/visitors/SymbolVisitor.cpp",
+        "src/main.cpp",
+        "tests/FactStoreTest.cpp",
+        "tests/FileManagerTest.cpp",
+        "tests/CompilationFilesTest.cpp"
+      ],
+      "cwd": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.036,
+      "kind": "format",
+      "name": "format-check",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/clang-tidy",
+        "-p",
+        "build",
+        "src/storage/FactStore.cpp",
+        "src/storage/FileManager.cpp",
+        "src/storage/FileDatabase.cpp",
+        "src/tooling/CompilationFiles.cpp",
+        "src/ast/extractors/File.cpp",
+        "src/ast/FactExtractor.cpp",
+        "src/ast/visitors/Traversal.cpp",
+        "src/ast/visitors/SymbolVisitor.cpp",
+        "tests/FactStoreTest.cpp",
+        "tests/FileManagerTest.cpp",
+        "tests/CompilationFilesTest.cpp"
+      ],
+      "cwd": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 8.024,
+      "kind": "static-analysis",
+      "name": "clang-tidy",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "[1/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/src/storage/FactStore.cpp.\n[2/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/src/storage/FileManager.cpp.\n[3/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/src/storage/FileDatabase.cpp.\n[4/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/src/tooling/CompilationFiles.cpp.\n[5/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/src/ast/extractors/File.cpp.\n[6/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/src/ast/FactExtractor.cpp.\n[7/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/src/ast/visitors/Traversal.cpp.\n[8/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/src/ast/visitors/SymbolVisitor.cpp.\n[9/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/tests/FactStoreTest.cpp.\n[10/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/tests/FileManagerTest.cpp.\n[11/11] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/tests/CompilationFilesTest.cpp.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "./build/facts-tool",
+        "--facts-out",
+        "build/quality-smoke-facts.sqlite",
+        "--files-out",
+        "build/quality-smoke-files.sqlite",
+        "sample/sample.cpp",
+        "--",
+        "-std=c++23"
+      ],
+      "cwd": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.29,
+      "kind": "custom",
+      "name": "smoke-extraction",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "facts-tool: 23 symbol(s) recorded from 1 file(s)\n",
+      "stdout": ""
+    }
+  ],
+  "started_at": "2026-08-12T15:10:35+00:00",
+  "summary": {
+    "failed": 0,
+    "not_found": 0,
+    "passed": 6,
+    "planned": 0,
+    "timeout": 0
+  }
+}

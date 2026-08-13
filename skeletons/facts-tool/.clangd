@@ -1,0 +1,4 @@
+CompileFlags:
+  CompilationDatabase: build
+  # sample/ files are not in the compilation database; parse them as C++23 too.
+  Add: [-std=c++23]

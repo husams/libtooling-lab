@@ -1,0 +1,13 @@
+# facts-tool formatting. clang-format only handles layout — the naming rules
+# (camelCase, trailing _ on private members) live in .clang-tidy next to this.
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+ColumnLimit: 80
+IndentWidth: 2
+PointerAlignment: Right
+SeparateDefinitionBlocks: Always
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+AlwaysBreakTemplateDeclarations: Yes
+FixNamespaceComments: true
