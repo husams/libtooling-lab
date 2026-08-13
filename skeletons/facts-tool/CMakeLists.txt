@@ -106,6 +106,15 @@ target_link_libraries(facts-tool PRIVATE
 include(CTest)
 if(BUILD_TESTING)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  execute_process(
+    COMMAND ${Python3_EXECUTABLE} -c "import pytest"
+    RESULT_VARIABLE FACTS_TOOL_PYTEST_IMPORT_RESULT
+    OUTPUT_QUIET
+    ERROR_QUIET
+  )
+  if(NOT FACTS_TOOL_PYTEST_IMPORT_RESULT EQUAL 0)
+    message(FATAL_ERROR "pytest is required when BUILD_TESTING is enabled")
+  endif()
 
   add_executable(fact-store-test tests/FactStoreTest.cpp)
   target_link_libraries(fact-store-test PRIVATE facts-storage facts-model
@@ -158,8 +167,9 @@ if(BUILD_TESTING)
   add_test(
     NAME facts-tool-e2e
     COMMAND
-      ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/FactsToolFeatures.py
+      ${Python3_EXECUTABLE} -m pytest
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/test_facts_tool_features.py
+      --verbose
       --facts-tool $<TARGET_FILE:facts-tool>
       --fixture-root ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/e2e
       --compiler ${CMAKE_CXX_COMPILER}

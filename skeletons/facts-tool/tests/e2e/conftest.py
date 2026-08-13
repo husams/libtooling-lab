@@ -1,0 +1,25 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from support.scenario import FactsToolContext
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    group = parser.getgroup("facts-tool e2e")
+    group.addoption("--facts-tool", type=Path, required=True)
+    group.addoption("--fixture-root", type=Path, required=True)
+    group.addoption("--compiler", type=Path, required=True)
+    group.addoption("--output-root", type=Path, required=True)
+
+
+@pytest.fixture
+def facts_tool_context(pytestconfig: pytest.Config) -> FactsToolContext:
+    return FactsToolContext.create(
+        facts_tool=pytestconfig.getoption("--facts-tool"),
+        fixture_root=pytestconfig.getoption("--fixture-root"),
+        compiler=pytestconfig.getoption("--compiler"),
+        output_root=pytestconfig.getoption("--output-root"),
+    )

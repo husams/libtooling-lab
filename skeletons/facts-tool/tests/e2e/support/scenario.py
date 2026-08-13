@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import concurrent.futures
 import json
 import os
@@ -29,17 +28,23 @@ class FactsToolContext:
     extracted: bool = False
 
     @classmethod
-    def from_args(cls, args: argparse.Namespace) -> FactsToolContext:
-        fixture_root = args.fixture_root.resolve(strict=True)
+    def create(
+        cls,
+        facts_tool: Path,
+        fixture_root: Path,
+        compiler: Path,
+        output_root: Path,
+    ) -> FactsToolContext:
+        fixture_root = fixture_root.resolve(strict=True)
         sources = tuple(
             (fixture_root / name).resolve(strict=True)
             for name in ("one.cpp", "two.cpp")
         )
         return cls(
-            facts_tool=args.facts_tool.resolve(strict=True),
+            facts_tool=facts_tool.resolve(strict=True),
             fixture_root=fixture_root,
-            compiler=args.compiler.resolve(strict=True),
-            output_root=args.output_root.resolve(),
+            compiler=compiler.resolve(strict=True),
+            output_root=output_root.resolve(),
             sources=(sources[0], sources[1]),
         )
 

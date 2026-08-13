@@ -42,6 +42,17 @@ class Feature:
     scenarios: tuple[Scenario, ...]
 
 
+@dataclass(frozen=True)
+class ScenarioCase:
+    path: Path
+    feature: Feature
+    scenario: Scenario
+
+    @property
+    def test_id(self) -> str:
+        return f"{self.path.stem}: {self.scenario.name}"
+
+
 def _register_step(
     keyword: str, text: str
 ) -> Callable[[StepDefinition], StepDefinition]:
@@ -214,45 +225,40 @@ def table_records(table: Table) -> list[dict[str, str]]:
     return [dict(zip(header, row)) for row in table[1:]]
 
 
-def run_features(feature_root: Path, context_factory: Callable[[], Any]) -> None:
+def collect_scenarios(feature_root: Path) -> tuple[ScenarioCase, ...]:
     paths = sorted(feature_root.glob("*.feature"))
     if not paths:
         raise ValueError(f"no feature files found in {feature_root}")
-    for path in paths:
-        _run_feature(path, parse_feature(path), context_factory)
+    return tuple(
+        ScenarioCase(path, feature, scenario)
+        for path in paths
+        for feature in (parse_feature(path),)
+        for scenario in feature.scenarios
+    )
 
 
-def _run_feature(
-    path: Path, feature: Feature, context_factory: Callable[[], Any]
-) -> None:
-    print(f"Feature: {feature.name}", flush=True)
-    for scenario in feature.scenarios:
-        context = context_factory()
-        print(f"  Scenario: {scenario.name}", flush=True)
-        for current_step in (*feature.background, *scenario.steps):
-            print(f"    {current_step.keyword} {current_step.text}", flush=True)
-            for row in current_step.table:
-                print(f"      | {' | '.join(row)} |", flush=True)
-            definition = _STEP_DEFINITIONS.get(
-                (current_step.definition_keyword, current_step.text)
+def run_scenario(case: ScenarioCase, context: Any) -> None:
+    for current_step in (*case.feature.background, *case.scenario.steps):
+        definition = _STEP_DEFINITIONS.get(
+            (current_step.definition_keyword, current_step.text)
+        )
+        if definition is None:
+            raise ValueError(
+                f"{case.path}:{current_step.line}: undefined "
+                f"{current_step.definition_keyword} step: {current_step.text}"
             )
-            if definition is None:
-                raise ValueError(
-                    f"{path}:{current_step.line}: undefined "
-                    f"{current_step.definition_keyword} step: {current_step.text}"
-                )
-            try:
-                if current_step.table:
-                    definition(context, current_step.table)
-                else:
-                    definition(context)
-            except Exception as error:
-                location = (
-                    f"feature step: {path}:{current_step.line} "
-                    f"({scenario.name}: {current_step.text})"
-                )
-                if hasattr(error, "add_note"):
-                    error.add_note(location)
-                else:
-                    print(location, flush=True)
-                raise
+        try:
+            if current_step.table:
+                definition(context, current_step.table)
+            else:
+                definition(context)
+        except Exception as error:
+            location = (
+                f"feature step: {case.path}:{current_step.line} "
+                f"({case.scenario.name}: {current_step.text})"
+            )
+            if hasattr(error, "add_note"):
+                error.add_note(location)
+            else:
+                print(location, flush=True)
+            raise
