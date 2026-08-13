@@ -206,6 +206,9 @@ def rows_by_name(scenario: Scenario) -> dict[str, tuple]:
 def then_repeated_declarations_reuse_usr_identity(scenario: Scenario) -> None:
     expected_repeated = {
         "e2e",
+        "e2e::Deferred",
+        "e2e::Payload",
+        "e2e::Policy",
         "e2e::Widget",
         "e2e::headerHelper",
         "e2e::transform",
@@ -225,6 +228,57 @@ def then_repeated_declarations_reuse_usr_identity(scenario: Scenario) -> None:
         "SELECT usr,COUNT(*) FROM symbol WHERE usr<>'' GROUP BY usr HAVING COUNT(*)<>1",
     )
     require(not duplicates, f"duplicate logical symbols: {duplicates}")
+
+
+def then_cpp_record_kinds_use_record_facts(scenario: Scenario) -> None:
+    expected = {
+        "e2e::CompositeWidget",
+        "e2e::Deferred",
+        "e2e::Payload",
+        "e2e::Policy",
+        "e2e::PrivateWidget",
+        "e2e::PublicWidget",
+        "e2e::Widget",
+    }
+    records = {
+        qualified_name: node
+        for qualified_name, node in query(
+            scenario.facts_database,
+            "SELECT qualified_name,node FROM symbol WHERE qualified_name IN (?,?,?,?,?,?,?)",
+            tuple(sorted(expected)),
+        )
+    }
+    require(
+        records.keys() == expected,
+        f"missing C++ record kinds: {expected - records.keys()}",
+    )
+    require(
+        all(node == 2 for node in records.values()),
+        f"struct, union, and class must use Record storage: {records}",
+    )
+
+
+def then_direct_inheritance_relations_are_stored(scenario: Scenario) -> None:
+    relations = set(
+        query(
+            scenario.facts_database,
+            "SELECT source.qualified_name,destination.qualified_name,"
+            "r.kind,r.position,r.flags,r.count FROM relation r "
+            "JOIN symbol source ON source.id=r.source_id "
+            "JOIN symbol destination ON destination.id=r.destination_id "
+            "WHERE r.kind=2",
+        )
+    )
+    expected = {
+        ("e2e::CompositeWidget", "e2e::Policy", 2, 1, 5, 1),
+        ("e2e::CompositeWidget", "e2e::Widget", 2, 0, 0, 1),
+        ("e2e::PrivateWidget", "e2e::Widget", 2, 0, 2, 1),
+        ("e2e::PublicWidget", "e2e::Widget", 2, 0, 0, 1),
+    }
+    require(
+        relations == expected,
+        f"unexpected direct inheritance relations: {relations}",
+    )
 
 
 def require_node(scenario: Scenario, node: int, expected_names: Iterable[str]) -> None:
@@ -266,7 +320,19 @@ def then_concrete_symbols_and_supported_facts_are_present(scenario: Scenario) ->
             "e2e::userDefinedTypes",
         },
     )
-    require_node(scenario, 2, {"e2e::Widget"})
+    require_node(
+        scenario,
+        2,
+        {
+            "e2e::CompositeWidget",
+            "e2e::Deferred",
+            "e2e::Payload",
+            "e2e::Policy",
+            "e2e::PrivateWidget",
+            "e2e::PublicWidget",
+            "e2e::Widget",
+        },
+    )
     require_node(scenario, 3, {"e2e::Mode"})
     require_node(
         scenario,
@@ -284,12 +350,19 @@ def then_concrete_symbols_and_supported_facts_are_present(scenario: Scenario) ->
         )
     }
     expected_definitions = {
+        "e2e::CompositeWidget",
         "e2e::headerHelper",
+        "e2e::Payload",
+        "e2e::Policy",
+        "e2e::PrivateWidget",
+        "e2e::PublicWidget",
         "e2e::transform",
         "e2e::useOne",
         "e2e::useTwo",
+        "e2e::Widget",
     }
     require(expected_definitions <= defined, f"missing definitions: {expected_definitions - defined}")
+    require("e2e::Deferred" not in defined, "forward-only record must not have a definition")
 
     parameters = parameters_by_function(scenario)
     require(
@@ -323,7 +396,16 @@ def then_concrete_symbols_and_supported_facts_are_present(scenario: Scenario) ->
 
 def then_user_defined_parameter_types_use_symbol_ids(scenario: Scenario) -> None:
     parameters = parameters_by_function(scenario)["e2e::userDefinedTypes"]
-    expected_names = ["value", "pointer", "reference", "values", "mode", "count"]
+    expected_names = [
+        "value",
+        "pointer",
+        "reference",
+        "values",
+        "mode",
+        "count",
+        "payload",
+        "policy",
+    ]
     require(
         [name for _, name, _, _ in parameters] == expected_names,
         f"unexpected user-defined type parameters: {parameters}",
@@ -341,10 +423,28 @@ def then_user_defined_parameter_types_use_symbol_ids(scenario: Scenario) -> None
         scenario.facts_database,
         "SELECT id FROM symbol WHERE qualified_name='e2e::Count'",
     )
+    payload_id = scalar(
+        scenario.facts_database,
+        "SELECT id FROM symbol WHERE qualified_name='e2e::Payload'",
+    )
+    policy_id = scalar(
+        scenario.facts_database,
+        "SELECT id FROM symbol WHERE qualified_name='e2e::Policy'",
+    )
     require(
         [type_id for _, _, type_id, _ in parameters]
-        == [widget_id, widget_id, widget_id, widget_id, mode_id, count_id],
-        f"user-defined value, pointer, reference, array, enum, and alias types "
+        == [
+            widget_id,
+            widget_id,
+            widget_id,
+            widget_id,
+            mode_id,
+            count_id,
+            payload_id,
+            policy_id,
+        ],
+        f"user-defined struct, union, class, pointer, reference, array, enum, "
+        f"and alias types "
         f"did not resolve to their SymbolIds: {parameters}",
     )
 
@@ -429,6 +529,12 @@ def main() -> int:
     then_symbol_ids_are_per_file_and_sequential(scenario)
     announce("Then repeated declarations and translation units reuse each USR's SymbolId")
     then_repeated_declarations_reuse_usr_identity(scenario)
+    announce(
+        "Then struct, union, and class declarations and definitions use record facts"
+    )
+    then_cpp_record_kinds_use_record_facts(scenario)
+    announce("Then direct inheritance uses SymbolId relations with access and virtual flags")
+    then_direct_inheritance_relations_are_stored(scenario)
     announce("Then concrete symbol types, definitions, parameters, and supported relations are present")
     then_concrete_symbols_and_supported_facts_are_present(scenario)
     announce("Then user-defined parameter forms resolve to their captured SymbolIds")

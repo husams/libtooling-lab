@@ -4,11 +4,15 @@
 #include "ast/extractors/Symbol.h"
 #include "model/Symbol.h"
 
+#include <string>
+
 namespace clang {
 class NamedDecl;
 } // namespace clang
 
 namespace facts {
+
+ExtractionResult<std::string> extractUsr(const clang::NamedDecl &node);
 
 template <>
 ExtractionResult<Symbol> extractSymbol<Symbol, clang::NamedDecl>(

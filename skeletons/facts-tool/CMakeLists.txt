@@ -45,6 +45,7 @@ add_library(facts-storage STATIC
   src/storage/Function.cpp
   src/storage/Parameter.cpp
   src/storage/Record.cpp
+  src/storage/Relation.cpp
   src/storage/Sqlite.cpp
   src/storage/Storage.cpp
   src/storage/Symbol.cpp
@@ -66,13 +67,16 @@ target_link_libraries(facts-tooling PRIVATE facts-clang)
 
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
+  src/ast/extractors/Definition.cpp
   src/ast/extractors/File.cpp
   src/ast/extractors/FunctionDecl.cpp
   src/ast/extractors/Location.cpp
   src/ast/extractors/NamedDecl.cpp
   src/ast/extractors/ParmVarDecl.cpp
   src/ast/extractors/Parameters.cpp
+  src/ast/extractors/RecordDecl.cpp
   src/ast/extractors/Type.cpp
+  src/ast/visitors/SymbolCollector.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
 )

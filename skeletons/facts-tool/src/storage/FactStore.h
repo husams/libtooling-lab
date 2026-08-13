@@ -79,6 +79,11 @@ public:
   std::expected<std::optional<SymbolId>, std::error_code>
   findId(std::string_view usr);
 
+  std::expected<void, std::error_code>
+  addRelations(std::span<const Relation> relations) {
+    return storage_.addRelations(relations);
+  }
+
   bool contains(std::string_view usr) const;
 
   std::size_t cachedIdCount() const { return idsByUsr_.size(); }

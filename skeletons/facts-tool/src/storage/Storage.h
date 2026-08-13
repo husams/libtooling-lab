@@ -2,6 +2,7 @@
 #define FACTS_TOOL_STORAGE_STORAGE_H
 
 #include "model/AnySymbol.h"
+#include "model/Relation.h"
 
 #include <concepts>
 #include <cstdint>
@@ -40,6 +41,9 @@ public:
 
   std::expected<std::optional<SymbolId>, std::error_code>
   findId(std::string_view usr);
+
+  std::expected<void, std::error_code>
+  addRelations(std::span<const Relation> relations);
 
   template <typename Model>
     requires std::derived_from<Model, Symbol>

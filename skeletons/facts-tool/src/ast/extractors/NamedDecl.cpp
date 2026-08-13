@@ -11,7 +11,6 @@
 #include <string>
 
 namespace facts {
-namespace {
 
 ExtractionResult<std::string> extractUsr(const clang::NamedDecl &node) {
   llvm::SmallString<128> usr;
@@ -20,8 +19,6 @@ ExtractionResult<std::string> extractUsr(const clang::NamedDecl &node) {
   }
   return std::string{usr};
 }
-
-} // namespace
 
 template <>
 ExtractionResult<Symbol> extractSymbol<Symbol, clang::NamedDecl>(

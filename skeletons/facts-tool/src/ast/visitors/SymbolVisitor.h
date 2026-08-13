@@ -10,9 +10,11 @@ class FileManager;
 class SymbolVisitor final : public clang::RecursiveASTVisitor<SymbolVisitor> {
 public:
   SymbolVisitor(clang::ASTContext &context, FileManager &files,
-                FactStore &store);
+                FactStore &store)
+      : context_(context), files_(files), store_(store) {}
 
   bool TraverseParmVarDecl(clang::ParmVarDecl *decl);
+  bool VisitCXXRecordDecl(clang::CXXRecordDecl *decl);
   bool VisitFunctionDecl(clang::FunctionDecl *decl);
   bool VisitNamedDecl(clang::NamedDecl *decl);
 
