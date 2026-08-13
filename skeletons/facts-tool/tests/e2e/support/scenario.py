@@ -20,7 +20,6 @@ class FactsToolContext:
     compiler: Path
     output_root: Path
     sources: tuple[Path, Path]
-    header: Path
     run_root: Optional[Path] = None
     facts_database: Optional[Path] = None
     files_database: Optional[Path] = None
@@ -28,7 +27,6 @@ class FactsToolContext:
     initial_symbols: list[tuple] = field(default_factory=list)
     prepared: bool = False
     extracted: bool = False
-    stability_checked: bool = False
 
     @classmethod
     def from_args(cls, args: argparse.Namespace) -> FactsToolContext:
@@ -43,7 +41,6 @@ class FactsToolContext:
             compiler=args.compiler.resolve(strict=True),
             output_root=args.output_root.resolve(),
             sources=(sources[0], sources[1]),
-            header=(fixture_root / "shared.hpp").resolve(strict=True),
         )
 
     def prepare(self) -> None:

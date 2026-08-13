@@ -1,27 +1,39 @@
 from __future__ import annotations
 
-from support.bdd import step
+from support.bdd import Table, table_records, then
 from support.database import require, table_names
 from support.scenario import FactsToolContext
 
 
-@step("file identity and captured facts remain in separate databases")
-def then_files_and_facts_databases_are_separate(context: FactsToolContext) -> None:
+@then("the facts database contains these tables")
+def then_facts_database_contains_tables(
+    context: FactsToolContext, table: Table
+) -> None:
+    expected = {row["table"] for row in table_records(table)}
+    actual = table_names(context.facts_database_path)
+    require(expected <= actual, f"facts schema is missing: {expected - actual}")
+
+
+@then("the facts database excludes the file table")
+def then_facts_database_excludes_file_table(context: FactsToolContext) -> None:
     facts_tables = table_names(context.facts_database_path)
-    files_tables = table_names(context.files_database_path)
     require(
         "file" not in facts_tables,
         f"file registry leaked into facts database: {facts_tables}",
     )
-    require(
-        files_tables == {"file"},
-        f"facts leaked into files database: {files_tables}",
-    )
-    require(
-        {"symbol", "symbol_allocator", "definition", "parameter", "relation"}
-        <= facts_tables,
-        f"facts schema is incomplete: {facts_tables}",
-    )
+
+
+@then("the files database contains only these tables")
+def then_files_database_contains_only_tables(
+    context: FactsToolContext, table: Table
+) -> None:
+    expected = {row["table"] for row in table_records(table)}
+    actual = table_names(context.files_database_path)
+    require(actual == expected, f"unexpected files database tables: {actual}")
+
+
+@then("the facts and files databases use different paths")
+def then_database_paths_are_different(context: FactsToolContext) -> None:
     require(
         context.facts_database_path != context.files_database_path,
         "database paths must differ",

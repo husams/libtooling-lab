@@ -2,21 +2,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from support.bdd import step
+from support.bdd import Table, table_records, then
 from support.database import file_snapshot, query, require
 from support.scenario import FactsToolContext
 
 
-@step("every source path is canonical and every symbol uses a preimported FileId")
-def then_paths_are_canonical_and_preimported(context: FactsToolContext) -> None:
+@then("the file registry contains these canonical fixture paths")
+def then_registry_contains_canonical_fixture_paths(
+    context: FactsToolContext, table: Table
+) -> None:
     files = file_snapshot(context.files_database_path)
     expected_paths = {
-        str(context.header),
-        *(str(source) for source in context.sources),
+        str((context.fixture_root / row["fixture"]).resolve(strict=True))
+        for row in table_records(table)
     }
     actual_paths = {path for _, path in files}
     require(actual_paths == expected_paths, f"unexpected file registry: {files}")
-    require(all(file_id > 0 for file_id, _ in files), "FileId 0 is reserved")
     require(
         all(
             Path(path).is_absolute() and Path(path).resolve(strict=True) == Path(path)
@@ -25,7 +26,18 @@ def then_paths_are_canonical_and_preimported(context: FactsToolContext) -> None:
         f"non-canonical source path: {files}",
     )
 
-    imported_ids = {file_id for file_id, _ in files}
+
+@then("every registered FileId is greater than zero")
+def then_registered_file_ids_are_nonzero(context: FactsToolContext) -> None:
+    files = file_snapshot(context.files_database_path)
+    require(all(file_id > 0 for file_id, _ in files), "FileId 0 is reserved")
+
+
+@then("every captured symbol uses a registered nonzero FileId")
+def then_symbols_use_registered_file_ids(context: FactsToolContext) -> None:
+    imported_ids = {
+        file_id for file_id, _ in file_snapshot(context.files_database_path)
+    }
     symbol_file_ids = {
         file_id
         for (file_id,) in query(

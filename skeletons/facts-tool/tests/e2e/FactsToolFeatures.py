@@ -22,9 +22,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     load_step_definitions()
-    context = FactsToolContext.from_args(args)
-    run_features(Path(__file__).with_name("features"), context)
-    print(f"Scenario artifacts: {context.run_root}", flush=True)
+    run_features(
+        Path(__file__).with_name("features"),
+        lambda: FactsToolContext.from_args(args),
+    )
+    print(f"Scenario artifacts root: {args.output_root.resolve()}", flush=True)
     return 0
 
 

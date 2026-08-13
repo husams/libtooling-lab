@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from support.bdd import step
+from support.bdd import Table, table_records, then
 from support.database import query, require
 from support.scenario import FactsToolContext
 
 
-@step("direct inheritance uses SymbolId relations with access and virtual flags")
-def then_direct_inheritance_relations_are_stored(context: FactsToolContext) -> None:
+@then("the direct inheritance relations are")
+def then_direct_inheritance_relations_are(
+    context: FactsToolContext, table: Table
+) -> None:
     relations = set(
         query(
             context.facts_database_path,
@@ -18,10 +20,15 @@ def then_direct_inheritance_relations_are_stored(context: FactsToolContext) -> N
         )
     )
     expected = {
-        ("e2e::CompositeWidget", "e2e::Policy", 2, 1, 5, 1),
-        ("e2e::CompositeWidget", "e2e::Widget", 2, 0, 0, 1),
-        ("e2e::PrivateWidget", "e2e::Widget", 2, 0, 2, 1),
-        ("e2e::PublicWidget", "e2e::Widget", 2, 0, 0, 1),
+        (
+            row["source"],
+            row["destination"],
+            int(row["kind"]),
+            int(row["position"]),
+            int(row["flags"]),
+            int(row["count"]),
+        )
+        for row in table_records(table)
     }
     require(
         relations == expected,

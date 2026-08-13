@@ -1,77 +1,31 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-
-from support.bdd import step
+from support.bdd import Table, table_records, then
 from support.database import parameters_by_function, query, require
 from support.scenario import FactsToolContext
 
 
-def require_node(
-    context: FactsToolContext, node: int, expected_names: Iterable[str]
-) -> None:
-    actual = {
-        name
-        for (name,) in query(
-            context.facts_database_path,
-            "SELECT qualified_name FROM symbol WHERE node=?",
-            (node,),
-        )
+@then("the symbol inventory includes")
+def then_symbol_inventory_includes(context: FactsToolContext, table: Table) -> None:
+    expected = {
+        (int(row["node"]), row["qualified_name"]) for row in table_records(table)
     }
-    expected = set(expected_names)
+    actual = set(
+        query(
+            context.facts_database_path,
+            "SELECT node,qualified_name FROM symbol",
+        )
+    )
     require(
         expected <= actual,
-        f"node {node} missing {expected - actual}; actual={actual}",
+        f"symbol inventory is missing: {expected - actual}",
     )
 
 
-@step("concrete supported symbol types are present")
-def then_concrete_symbols_are_present(context: FactsToolContext) -> None:
-    require_node(
-        context,
-        1,
-        {
-            "e2e::headerHelper",
-            "e2e::primitiveTypes",
-            "e2e::transform",
-            "e2e::useOne",
-            "e2e::useTwo",
-            "e2e::userDefinedTypes",
-        },
-    )
-    require_node(
-        context,
-        2,
-        {
-            "e2e::CompositeWidget",
-            "e2e::Deferred",
-            "e2e::Payload",
-            "e2e::Policy",
-            "e2e::PrivateWidget",
-            "e2e::PublicWidget",
-            "e2e::Widget",
-        },
-    )
-    require_node(context, 3, {"e2e::Mode"})
-    require_node(
-        context,
-        4,
-        {
-            "e2e::Widget::value",
-            "e2e::Mode::Fast",
-            "e2e::Mode::Slow",
-            "e2e::sharedCounter",
-        },
-    )
-    require_node(context, 5, {"e2e"})
-    require_node(context, 6, {"e2e::Count"})
-
-
-@step("function definitions, parameter names, and defaults are present")
-def then_function_definitions_and_parameters_are_present(
-    context: FactsToolContext,
-) -> None:
-    defined = {
+@then("the defined functions include")
+def then_defined_functions_include(context: FactsToolContext, table: Table) -> None:
+    expected = {row["qualified_name"] for row in table_records(table)}
+    actual = {
         name
         for (name,) in query(
             context.facts_database_path,
@@ -79,37 +33,53 @@ def then_function_definitions_and_parameters_are_present(
             "JOIN symbol s ON s.id=d.symbol_id",
         )
     }
-    expected_definitions = {
-        "e2e::headerHelper",
-        "e2e::transform",
-        "e2e::useOne",
-        "e2e::useTwo",
-    }
     require(
-        expected_definitions <= defined,
-        f"missing function definitions: {expected_definitions - defined}",
-    )
-
-    parameters = parameters_by_function(context.facts_database_path)
-    require(
-        [name for _, name, _, _ in parameters["e2e::transform"]]
-        == ["widget", "factor"],
-        f"unexpected transform parameters: {parameters['e2e::transform']}",
-    )
-    helper_parameters = parameters["e2e::headerHelper"]
-    require(
-        [name for _, name, _, _ in helper_parameters] == ["input", "delta"]
-        and helper_parameters[1][3] == 1,
-        f"default parameter was not captured: {helper_parameters}",
+        expected <= actual,
+        f"missing function definitions: {expected - actual}",
     )
 
 
-@step("typed facts and relations reference captured symbols")
-def then_typed_facts_and_relations_are_valid(context: FactsToolContext) -> None:
+@then("the parameters for e2e::transform are")
+def then_transform_parameters_are(context: FactsToolContext, table: Table) -> None:
+    expected = [(int(row["position"]), row["name"]) for row in table_records(table)]
+    actual = [
+        (position, name)
+        for position, name, _, _ in parameters_by_function(context.facts_database_path)[
+            "e2e::transform"
+        ]
+    ]
+    require(actual == expected, f"unexpected transform parameters: {actual}")
+
+
+@then("the parameters for e2e::headerHelper are")
+def then_header_helper_parameters_are(context: FactsToolContext, table: Table) -> None:
+    expected = [
+        (
+            int(row["position"]),
+            row["name"],
+            1 if row["has_default"] == "yes" else 0,
+        )
+        for row in table_records(table)
+    ]
+    actual = [
+        (position, name, has_default)
+        for position, name, _, has_default in parameters_by_function(
+            context.facts_database_path
+        )["e2e::headerHelper"]
+    ]
+    require(actual == expected, f"unexpected headerHelper parameters: {actual}")
+
+
+@then("the facts database has no foreign-key violations")
+def then_database_has_no_foreign_key_violations(context: FactsToolContext) -> None:
     require(
         not query(context.facts_database_path, "PRAGMA foreign_key_check"),
         "facts database has broken typed or relation references",
     )
+
+
+@then("every relation references captured source and destination symbols")
+def then_relations_reference_captured_symbols(context: FactsToolContext) -> None:
     require(
         not query(
             context.facts_database_path,

@@ -1,43 +1,32 @@
 from __future__ import annotations
 
-from support.bdd import step
+from support.bdd import Table, table_records, then
 from support.database import query, require
 from support.scenario import FactsToolContext
 
-_RECORDS = {
-    "e2e::CompositeWidget",
-    "e2e::Deferred",
-    "e2e::Payload",
-    "e2e::Policy",
-    "e2e::PrivateWidget",
-    "e2e::PublicWidget",
-    "e2e::Widget",
-}
 
-
-@step("struct, union, and class declarations and definitions use record facts")
-def then_cpp_record_kinds_use_record_facts(context: FactsToolContext) -> None:
-    records = {
+@then("the record symbols are")
+def then_record_symbols_are(context: FactsToolContext, table: Table) -> None:
+    rows = table_records(table)
+    expected = {row["qualified_name"]: int(row["node"]) for row in rows}
+    placeholders = ",".join("?" for _ in expected)
+    actual = {
         qualified_name: node
         for qualified_name, node in query(
             context.facts_database_path,
-            "SELECT qualified_name,node FROM symbol "
-            "WHERE qualified_name IN (?,?,?,?,?,?,?)",
-            tuple(sorted(_RECORDS)),
+            f"SELECT qualified_name,node FROM symbol "
+            f"WHERE qualified_name IN ({placeholders})",
+            tuple(expected),
         )
     }
-    require(
-        records.keys() == _RECORDS,
-        f"missing C++ record kinds: {_RECORDS - records.keys()}",
-    )
-    require(
-        all(node == 2 for node in records.values()),
-        f"struct, union, and class must use Record storage: {records}",
-    )
+    require(actual == expected, f"unexpected C++ record symbols: {actual}")
 
 
-@step("defined records have definitions and forward-only records do not")
-def then_record_definition_state_is_stored(context: FactsToolContext) -> None:
+@then("the record definition states are")
+def then_record_definition_states_are(context: FactsToolContext, table: Table) -> None:
+    expected = {
+        row["qualified_name"]: row["defined"] == "yes" for row in table_records(table)
+    }
     defined = {
         name
         for (name,) in query(
@@ -46,12 +35,5 @@ def then_record_definition_state_is_stored(context: FactsToolContext) -> None:
             "JOIN symbol s ON s.id=d.symbol_id",
         )
     }
-    expected_definitions = _RECORDS - {"e2e::Deferred"}
-    require(
-        expected_definitions <= defined,
-        f"missing record definitions: {expected_definitions - defined}",
-    )
-    require(
-        "e2e::Deferred" not in defined,
-        "forward-only record must not have a definition",
-    )
+    actual = {name: name in defined for name in expected}
+    require(actual == expected, f"unexpected record definition states: {actual}")
