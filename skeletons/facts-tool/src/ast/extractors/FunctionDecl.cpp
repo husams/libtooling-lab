@@ -37,7 +37,7 @@ addDefinitionRegion(Symbol symbol, const clang::FunctionDecl &node,
 
 ExtractionResult<Symbol>
 addParameters(Symbol symbol, const clang::FunctionDecl &node,
-              const clang::SourceManager &sourceManager) {
+              const clang::SourceManager &sourceManager, FactStore &store) {
   auto toSymbol =
       [symbol = std::move(symbol)](std::vector<Parameter> parameters) mutable
       -> ExtractionResult<Symbol> {
@@ -45,20 +45,19 @@ addParameters(Symbol symbol, const clang::FunctionDecl &node,
     return std::move(symbol);
   };
 
-  return extractParameters(node, sourceManager) | std::move(toSymbol);
+  return extractParameters(node, sourceManager, store) | std::move(toSymbol);
 }
 
 } // namespace
 
-template <>
-ExtractionResult<Function> extractSymbol<Function, clang::FunctionDecl>(
-    const clang::FunctionDecl &node,
-    const clang::SourceManager &sourceManager) {
+ExtractionResult<Function>
+extractFunction(const clang::FunctionDecl &node,
+                const clang::SourceManager &sourceManager, FactStore &store) {
   const auto addDefinition = [&](Symbol symbol) {
     return addDefinitionRegion(std::move(symbol), node, sourceManager);
   };
   const auto addParameterList = [&](Symbol symbol) {
-    return addParameters(std::move(symbol), node, sourceManager);
+    return addParameters(std::move(symbol), node, sourceManager, store);
   };
 
   return (extractSymbol<Symbol, clang::NamedDecl>(node, sourceManager) |

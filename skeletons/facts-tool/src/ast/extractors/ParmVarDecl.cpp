@@ -1,6 +1,7 @@
 #include "ast/extractors/ParmVarDecl.h"
 
 #include "ast/extractors/Location.h"
+#include "ast/extractors/Type.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
@@ -71,18 +72,23 @@ std::uint8_t extractParameterFlags(const clang::ParmVarDecl &node) {
 
 ExtractionResult<Parameter>
 extractParameter(const clang::ParmVarDecl &node,
-                 const clang::SourceManager &sourceManager) {
+                 const clang::SourceManager &sourceManager, FactStore &store) {
   const auto toParameter = [&](Location location) {
     const auto withRegion =
         [&, location](Region region) -> ExtractionResult<Parameter> {
-      return Parameter{
-          .name = node.getNameAsString(),
-          .type = node.getType().getAsString(),
-          .loc = location,
-          .region = region,
-          .flags = extractParameterFlags(node),
-          .hasDefault = node.hasDefaultArg(),
-      };
+      return extractType(node.getType(), store)
+          .transform_error(
+              [](std::error_code) { return ExtractionError::InvalidType; })
+          .transform([&](SymbolId type) {
+            return Parameter{
+                .name = node.getNameAsString(),
+                .type = type,
+                .loc = location,
+                .region = region,
+                .flags = extractParameterFlags(node),
+                .hasDefault = node.hasDefaultArg(),
+            };
+          });
     };
 
     return extractRegion(sourceManager, node.getASTContext().getLangOpts(),

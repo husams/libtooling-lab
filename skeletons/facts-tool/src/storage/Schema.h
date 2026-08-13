@@ -73,13 +73,13 @@ CREATE TABLE IF NOT EXISTS definition (
   size      INTEGER NOT NULL
 );
 
--- Symbol::parameters. The current model stores the rendered type directly;
--- there is no parallel TypeId allocation.
+-- Symbol::parameters. Type is a packed SymbolId; FileId zero identifies
+-- predefined compiler types.
 CREATE TABLE IF NOT EXISTS parameter (
   symbol_id    INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
   position     INTEGER NOT NULL,
   name         TEXT NOT NULL,
-  type         TEXT NOT NULL,
+  type         INTEGER NOT NULL,
   line         INTEGER NOT NULL,
   col          INTEGER NOT NULL,
   offset       INTEGER NOT NULL,

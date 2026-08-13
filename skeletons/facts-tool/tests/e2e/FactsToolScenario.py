@@ -240,11 +240,31 @@ def require_node(scenario: Scenario, node: int, expected_names: Iterable[str]) -
     require(expected <= actual, f"node {node} missing {expected - actual}; actual={actual}")
 
 
+def parameters_by_function(scenario: Scenario) -> dict[str, list[tuple]]:
+    parameters = query(
+        scenario.facts_database,
+        "SELECT s.qualified_name,p.position,p.name,p.type,p.has_default "
+        "FROM parameter p JOIN symbol s ON s.id=p.symbol_id "
+        "ORDER BY s.qualified_name,p.position",
+    )
+    result: dict[str, list[tuple]] = defaultdict(list)
+    for function, position, name, type_id, has_default in parameters:
+        result[function].append((position, name, type_id, has_default))
+    return result
+
+
 def then_concrete_symbols_and_supported_facts_are_present(scenario: Scenario) -> None:
     require_node(
         scenario,
         1,
-        {"e2e::headerHelper", "e2e::transform", "e2e::useOne", "e2e::useTwo"},
+        {
+            "e2e::headerHelper",
+            "e2e::primitiveTypes",
+            "e2e::transform",
+            "e2e::useOne",
+            "e2e::useTwo",
+            "e2e::userDefinedTypes",
+        },
     )
     require_node(scenario, 2, {"e2e::Widget"})
     require_node(scenario, 3, {"e2e::Mode"})
@@ -271,25 +291,19 @@ def then_concrete_symbols_and_supported_facts_are_present(scenario: Scenario) ->
     }
     require(expected_definitions <= defined, f"missing definitions: {expected_definitions - defined}")
 
-    parameters = query(
-        scenario.facts_database,
-        "SELECT s.qualified_name,p.position,p.name,p.type,p.has_default "
-        "FROM parameter p JOIN symbol s ON s.id=p.symbol_id "
-        "ORDER BY s.qualified_name,p.position",
-    )
-    parameters_by_function: dict[str, list[tuple]] = defaultdict(list)
-    for function, position, name, type_name, has_default in parameters:
-        parameters_by_function[function].append((position, name, type_name, has_default))
+    parameters = parameters_by_function(scenario)
     require(
-        [name for _, name, _, _ in parameters_by_function["e2e::transform"]] == ["widget", "factor"],
-        f"unexpected transform parameters: {parameters_by_function['e2e::transform']}",
+        [name for _, name, _, _ in parameters["e2e::transform"]]
+        == ["widget", "factor"],
+        f"unexpected transform parameters: {parameters['e2e::transform']}",
     )
-    helper_parameters = parameters_by_function["e2e::headerHelper"]
+    helper_parameters = parameters["e2e::headerHelper"]
     require(
         [name for _, name, _, _ in helper_parameters] == ["input", "delta"]
         and helper_parameters[1][3] == 1,
         f"default parameter was not captured: {helper_parameters}",
     )
+
 
     require(
         not query(scenario.facts_database, "PRAGMA foreign_key_check"),
@@ -304,6 +318,53 @@ def then_concrete_symbols_and_supported_facts_are_present(scenario: Scenario) ->
             "WHERE s.id IS NULL OR d.id IS NULL",
         ),
         "relation rows must reference captured symbols",
+    )
+
+
+def then_user_defined_parameter_types_use_symbol_ids(scenario: Scenario) -> None:
+    parameters = parameters_by_function(scenario)["e2e::userDefinedTypes"]
+    expected_names = ["value", "pointer", "reference", "values", "mode", "count"]
+    require(
+        [name for _, name, _, _ in parameters] == expected_names,
+        f"unexpected user-defined type parameters: {parameters}",
+    )
+
+    widget_id = scalar(
+        scenario.facts_database,
+        "SELECT id FROM symbol WHERE qualified_name='e2e::Widget'",
+    )
+    mode_id = scalar(
+        scenario.facts_database,
+        "SELECT id FROM symbol WHERE qualified_name='e2e::Mode'",
+    )
+    count_id = scalar(
+        scenario.facts_database,
+        "SELECT id FROM symbol WHERE qualified_name='e2e::Count'",
+    )
+    require(
+        [type_id for _, _, type_id, _ in parameters]
+        == [widget_id, widget_id, widget_id, widget_id, mode_id, count_id],
+        f"user-defined value, pointer, reference, array, enum, and alias types "
+        f"did not resolve to their SymbolIds: {parameters}",
+    )
+
+
+def then_primitive_parameter_types_use_predefined_ids(scenario: Scenario) -> None:
+    parameters = parameters_by_function(scenario)["e2e::primitiveTypes"]
+    expected_names = ["signedValue", "enabled", "ratio", "text", "payload"]
+    require(
+        [name for _, name, _, _ in parameters] == expected_names,
+        f"unexpected primitive type parameters: {parameters}",
+    )
+    type_ids = [type_id for _, _, type_id, _ in parameters]
+    require(
+        all(type_id > 0 and type_id >> 32 == 0 for type_id in type_ids),
+        f"primitive and primitive-pointer types must use predefined FileId-0 "
+        f"symbols: {parameters}",
+    )
+    require(
+        len(set(type_ids)) == len(type_ids),
+        f"distinct primitive types must use distinct predefined SymbolIds: {parameters}",
     )
 
 
@@ -370,6 +431,10 @@ def main() -> int:
     then_repeated_declarations_reuse_usr_identity(scenario)
     announce("Then concrete symbol types, definitions, parameters, and supported relations are present")
     then_concrete_symbols_and_supported_facts_are_present(scenario)
+    announce("Then user-defined parameter forms resolve to their captured SymbolIds")
+    then_user_defined_parameter_types_use_symbol_ids(scenario)
+    announce("Then primitive parameter forms use distinct predefined FileId-0 SymbolIds")
+    then_primitive_parameter_types_use_predefined_ids(scenario)
     announce("Then file identity and captured facts remain in separate databases")
     then_files_and_facts_databases_are_separate(scenario)
 

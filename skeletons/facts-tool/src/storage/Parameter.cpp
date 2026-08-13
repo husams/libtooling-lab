@@ -9,6 +9,16 @@
 #include <ranges>
 
 namespace facts {
+namespace {
+
+SymbolId unpackSymbolId(std::uint64_t packed) {
+  return {
+      static_cast<FileId>(packed >> 32U),
+      static_cast<std::uint32_t>(packed),
+  };
+}
+
+} // namespace
 
 std::expected<std::vector<Parameter>, std::error_code>
 Storage::loadParameters(SymbolId id) {
@@ -26,7 +36,7 @@ Storage::loadParameters(SymbolId id) {
   while (step == SQLITE_ROW) {
     parameters.push_back(Parameter{
         storage::columnText(statement->get(), 0),
-        storage::columnText(statement->get(), 1),
+        unpackSymbolId(sqlite3_column_int64(statement->get(), 1)),
         {static_cast<unsigned>(sqlite3_column_int64(statement->get(), 2)),
          static_cast<unsigned>(sqlite3_column_int64(statement->get(), 3)),
          static_cast<unsigned>(sqlite3_column_int64(statement->get(), 4))},
@@ -65,7 +75,8 @@ Storage::replaceParameters(SymbolId id, std::span<const Parameter> parameters) {
         !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
         !storage::bindInteger(statement->get(), 2, position) ||
         !storage::bindText(statement->get(), 3, parameter.name) ||
-        !storage::bindText(statement->get(), 4, parameter.type) ||
+        !storage::bindInteger(statement->get(), 4,
+                              storage::packSymbolId(parameter.type)) ||
         !storage::bindInteger(statement->get(), 5, parameter.loc.line) ||
         !storage::bindInteger(statement->get(), 6, parameter.loc.column) ||
         !storage::bindInteger(statement->get(), 7, parameter.loc.offset) ||

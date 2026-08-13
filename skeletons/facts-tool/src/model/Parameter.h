@@ -2,6 +2,7 @@
 #define FACTS_TOOL_MODEL_PARAMETER_H
 
 #include "model/Location.h"
+#include "model/SymbolId.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -24,7 +25,7 @@ inline constexpr std::uint8_t bit(ParameterBit position) {
 
 struct Parameter {
   std::string name;
-  std::string type;
+  SymbolId type;
   Location loc;
   Region region;
   // ParameterBit values may overlap; a forwarding reference is also rvalue.

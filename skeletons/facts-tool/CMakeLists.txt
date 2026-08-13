@@ -72,6 +72,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/NamedDecl.cpp
   src/ast/extractors/ParmVarDecl.cpp
   src/ast/extractors/Parameters.cpp
+  src/ast/extractors/Type.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
 )

@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
   assert(shared.id == facts::SymbolId{});
   shared.definition = facts::Region{20, 30};
   shared.parameters.push_back(
-      facts::Parameter{"value", "int", {3, 4, 5}, {6, 7}, 0, true});
+      facts::Parameter{"value", {0, 1}, {3, 4, 5}, {6, 7}, 0, true});
   const auto firstSymbol = first.save(7, shared);
   constexpr facts::SymbolId expectedShared{7, 0};
   assert(firstSymbol && *firstSymbol == expectedShared);
@@ -140,6 +140,8 @@ int main(int argc, char **argv) {
   assert(loadedShared->definition->size == 30);
   assert(loadedShared->parameters.size() == 1);
   assert(loadedShared->parameters.front().name == "value");
+  constexpr facts::SymbolId expectedParameterType{0, 1};
+  assert(loadedShared->parameters.front().type == expectedParameterType);
   assert(loadedShared->parameters.front().hasDefault);
 
   facts::AnySymbol anySymbol{*loadedShared};

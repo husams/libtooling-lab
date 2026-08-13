@@ -13,6 +13,7 @@ enum class ExtractionError {
   SystemHeader,
   InvalidPresumedLocation,
   InvalidUsr,
+  InvalidType,
 };
 
 template <typename ValueT>

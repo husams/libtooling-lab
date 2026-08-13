@@ -12,12 +12,13 @@ class SourceManager;
 } // namespace clang
 
 namespace facts {
+class FactStore;
 
 // Extracts parameters from FunctionDecl or any of its subclasses, including
 // CXXMethodDecl, while preserving source order.
 ExtractionResult<std::vector<Parameter>>
 extractParameters(const clang::FunctionDecl &node,
-                  const clang::SourceManager &sourceManager);
+                  const clang::SourceManager &sourceManager, FactStore &store);
 
 } // namespace facts
 

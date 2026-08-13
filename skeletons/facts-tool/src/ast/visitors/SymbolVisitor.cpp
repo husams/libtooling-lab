@@ -14,10 +14,9 @@
 namespace facts {
 namespace {
 
-template <typename Model, typename Node>
-void extractAndStore(Node &node, clang::ASTContext &context, FileManager &files,
-                     FactStore &store) {
-  auto symbol = extractSymbol<Model>(node, context.getSourceManager());
+void extractAndStore(clang::FunctionDecl &node, clang::ASTContext &context,
+                     FileManager &files, FactStore &store) {
+  auto symbol = extractFunction(node, context.getSourceManager(), store);
   if (!symbol) {
     return;
   }
@@ -66,7 +65,7 @@ SymbolVisitor::SymbolVisitor(clang::ASTContext &context, FileManager &files,
 bool SymbolVisitor::TraverseParmVarDecl(clang::ParmVarDecl *) { return true; }
 
 bool SymbolVisitor::VisitFunctionDecl(clang::FunctionDecl *decl) {
-  extractAndStore<Function>(*decl, context_, files_, store_);
+  extractAndStore(*decl, context_, files_, store_);
   return true;
 }
 
