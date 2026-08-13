@@ -1,31 +1,27 @@
 #ifndef FACTS_TOOL_STORAGE_SQLITE_QUERY_H
 #define FACTS_TOOL_STORAGE_SQLITE_QUERY_H
 
-// A coroutine front end for SQLite queries.
-//
-// The C API is a cursor: prepare, bind, step until SQLITE_DONE, finalize.
-// Every caller that wants rows has to reimplement that loop and remember to
-// finalize on each exit path. rows() and select() move the cursor into a
-// coroutine frame and hand back a lazy input range instead, so callers write
-//
-//   for (auto row : sql::rows(db, "SELECT id, path FROM file")) ...
-//
-// and the statement is finalized when the range dies -- including on an early
-// break, or when an exception unwinds the loop.
-//
-// Errors stay values: the element type is std::expected, matching FactStore
-// and FileDatabase. The first failure is yielded once and ends the stream.
+// The cursor half of the coroutine query API: row access, parameter binding,
+// and the two generators storage::Database hands out. It is built on the
+// primitives in Sqlite.h -- prepare(), bindText(), columnText(), sqliteError()
+// -- and adds no SQLite handling of its own. Nothing here is meant to be
+// called directly; go through Database, which owns the connection.
 //
 // Two lifetime rules the coroutine imposes:
 //   * The sql string and the bind arguments are taken *by value*, so they are
 //     copied into the frame. Reference parameters would dangle, because the
 //     body does not start running until the first iteration.
 //   * A Row is a view of the cursor's current position, and text() points into
-//     SQLite's own buffer. Both are invalidated by the next step. Copy out
-//     anything that must outlive the loop body -- that is what select() does.
+//     SQLite's own buffer. Both are invalidated by the next step, which is why
+//     Database::query() maps each row to an owned value while it is still
+//     alive -- and why that is the form to reach for when composing views.
+//
+// Errors are thrown as QueryError while iterating, so a stream stays a stream
+// of plain values and pipes into std::ranges cleanly. collect() turns that
+// back into the std::expected the rest of the storage layer speaks.
 
 #include "storage/Generator.h"
-#include "storage/SqliteConnection.h"
+#include "storage/Sqlite.h"
 
 #include <sqlite3.h>
 
@@ -35,7 +31,7 @@
 #include <cstdint>
 #include <expected>
 #include <functional>
-#include <memory>
+#include <optional>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -44,9 +40,17 @@
 #include <utility>
 #include <vector>
 
-namespace facts::sql {
+namespace facts::storage {
 
-using Statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
+class QueryError : public std::system_error {
+public:
+  QueryError(std::error_code code, const std::string &message)
+      : std::system_error(code, message) {}
+};
+
+[[noreturn]] inline void raiseQueryError(sqlite3 *database) {
+  throw QueryError(sqliteError(database), sqlite3_errmsg(database));
+}
 
 // A non-owning view of the row the cursor currently sits on.
 class Row {
@@ -67,7 +71,7 @@ public:
     return sqlite3_column_double(statement_, column);
   }
 
-  // Valid until the next step; copy it if it has to outlive the loop body.
+  // Valid until the next step; use string() if it has to outlive the loop body.
   std::string_view text(int column) const noexcept {
     const auto *bytes = sqlite3_column_text(statement_, column);
     if (bytes == nullptr) {
@@ -77,103 +81,160 @@ public:
             static_cast<std::size_t>(sqlite3_column_bytes(statement_, column))};
   }
 
-  std::string string(int column) const { return std::string(text(column)); }
+  std::string string(int column) const {
+    return columnText(statement_, column);
+  }
 
 private:
   sqlite3_stmt *statement_;
 };
 
+namespace detail {
+
 // Bind parameters are 1-based. Constrained overloads keep an `int` argument
 // from being ambiguous between the integer and floating-point forms.
-template <std::integral Value>
-int bindOne(sqlite3_stmt *statement, int index, Value value) {
-  return sqlite3_bind_int64(statement, index,
-                            static_cast<sqlite3_int64>(value));
+template <typename Value>
+  requires std::integral<Value> || std::is_enum_v<Value>
+bool bindOne(sqlite3_stmt *statement, int position, Value value) {
+  return bindInteger(statement, position, value);
 }
 
 template <std::floating_point Value>
-int bindOne(sqlite3_stmt *statement, int index, Value value) {
-  return sqlite3_bind_double(statement, index, static_cast<double>(value));
+bool bindOne(sqlite3_stmt *statement, int position, Value value) {
+  return sqlite3_bind_double(statement, position,
+                             static_cast<double>(value)) == SQLITE_OK;
 }
 
-inline int bindOne(sqlite3_stmt *statement, int index, std::string_view value) {
-  return sqlite3_bind_text(statement, index, value.data(),
-                           static_cast<int>(value.size()), SQLITE_TRANSIENT);
+inline bool bindOne(sqlite3_stmt *statement, int position,
+                    std::string_view value) {
+  return bindText(statement, position, value);
 }
 
-inline int bindOne(sqlite3_stmt *statement, int index, std::nullptr_t) {
-  return sqlite3_bind_null(statement, index);
+inline bool bindOne(sqlite3_stmt *statement, int position, std::nullptr_t) {
+  return sqlite3_bind_null(statement, position) == SQLITE_OK;
 }
 
-// Streams a result set. Nothing is prepared until the first iteration.
-template <typename... Binds>
-Generator<std::expected<Row, std::error_code>>
-rows(sqlite3 *database, std::string sql, Binds... binds) {
-  sqlite3_stmt *raw = nullptr;
-  if (sqlite3_prepare_v2(database, sql.c_str(),
-                         static_cast<int>(sql.size()) + 1, &raw,
-                         nullptr) != SQLITE_OK) {
-    co_yield std::unexpected(lastError(database));
-    co_return;
+inline bool bindOne(sqlite3_stmt *statement, int position, std::nullopt_t) {
+  return sqlite3_bind_null(statement, position) == SQLITE_OK;
+}
+
+// A symbol id is one 64-bit key on the wire, the same packing the schema uses.
+inline bool bindOne(sqlite3_stmt *statement, int position, SymbolId id) {
+  return bindInteger(statement, position, packSymbolId(id));
+}
+
+// The customization point: a model type binds itself by declaring
+//
+//   bool bindValue(sqlite3_stmt *, int, const T &);
+//
+// in its own namespace. ADL finds it here, so nothing in this header has to
+// know about the type.
+template <typename Value>
+concept SelfBinding = requires(sqlite3_stmt *statement, int position,
+                               const Value &value) {
+  { bindValue(statement, position, value) } -> std::same_as<bool>;
+};
+
+template <SelfBinding Value>
+bool bindOne(sqlite3_stmt *statement, int position, const Value &value) {
+  return bindValue(statement, position, value);
+}
+
+// Declared last so the overloads above are all visible to the recursive call:
+// an engaged optional binds as its underlying type, an empty one as NULL.
+template <typename Value>
+bool bindOne(sqlite3_stmt *statement, int position,
+             const std::optional<Value> &value) {
+  return value ? bindOne(statement, position, *value)
+               : sqlite3_bind_null(statement, position) == SQLITE_OK;
+}
+
+// Anything one of the overloads above accepts can be passed as a parameter.
+// Constraining the pack turns a wrong argument type into one short error at
+// the call site instead of a template instantiation dump.
+template <typename Value>
+concept Bindable = requires(sqlite3_stmt *statement, int position,
+                            const Value &value) {
+  { bindOne(statement, position, value) } -> std::same_as<bool>;
+};
+
+// Streams a result set. Nothing is prepared until the first iteration, and the
+// statement is finalized when the generator dies -- including on an early
+// break, or when an exception unwinds the loop.
+template <Bindable... Binds>
+Generator<Row> rowStream(sqlite3 *database, std::string sql, Binds... binds) {
+  auto statement = prepare(database, sql);
+  if (!statement) {
+    raiseQueryError(database);
   }
-  const Statement statement(raw, sqlite3_finalize);
 
-  int index = 0;
-  const std::array<int, sizeof...(Binds)> bindStatuses{
-      bindOne(statement.get(), ++index, binds)...};
-  for (const int status : bindStatuses) {
-    if (status != SQLITE_OK) {
-      co_yield std::unexpected(lastError(database));
-      co_return;
+  // Catch `?2` in the sql with one argument passed, which SQLite would other-
+  // wise bind to NULL and answer with a silently empty result set.
+  if (sqlite3_bind_parameter_count(statement->get()) !=
+      static_cast<int>(sizeof...(Binds))) {
+    throw QueryError(std::make_error_code(std::errc::invalid_argument),
+                     "expected " +
+                         std::to_string(sqlite3_bind_parameter_count(
+                             statement->get())) +
+                         " bind argument(s), got " +
+                         std::to_string(sizeof...(Binds)) + ": " + sql);
+  }
+
+  int position = 0;
+  const std::array<bool, sizeof...(Binds)> bound{
+      bindOne(statement->get(), ++position, binds)...};
+  for (const bool ok : bound) {
+    if (!ok) {
+      raiseQueryError(database);
     }
   }
 
-  const Row row(statement.get());
+  Row row(statement->get());
   while (true) {
-    const int status = sqlite3_step(statement.get());
+    const int status = sqlite3_step(statement->get());
     if (status == SQLITE_DONE) {
       co_return;
     }
     if (status != SQLITE_ROW) {
-      co_yield std::unexpected(lastError(database));
-      co_return;
+      raiseQueryError(database);
     }
     co_yield row;
   }
 }
 
-// Same stream, mapped through `map` while the row is still alive, so callers
-// never see a sqlite3 type or a dangling string_view.
-template <typename Map, typename... Binds>
-auto select(sqlite3 *database, std::string sql, Map map, Binds... binds)
-    -> Generator<std::expected<std::invoke_result_t<Map &, const Row &>,
-                               std::error_code>> {
-  for (const auto &result : rows(database, std::move(sql), std::move(binds)...)) {
-    if (!result) {
-      co_yield std::unexpected(result.error());
-      co_return;
-    }
-    co_yield std::invoke(map, *result);
+// Same stream, mapped while the row is still alive, so what comes out owns
+// itself and survives the next step.
+template <typename Map, Bindable... Binds>
+auto valueStream(sqlite3 *database, std::string sql, Map map, Binds... binds)
+    -> Generator<std::invoke_result_t<Map &, const Row &>> {
+  for (const Row &row :
+       rowStream(database, std::move(sql), std::move(binds)...)) {
+    co_yield std::invoke(map, row);
   }
 }
 
-// Drains a stream of expected values into one expected vector, stopping at the
-// first error -- the eager counterpart for callers that do want everything.
-template <std::ranges::input_range Results>
-auto collect(Results &&results) -> std::expected<
-    std::vector<typename std::ranges::range_value_t<Results>::value_type>,
-    typename std::ranges::range_value_t<Results>::error_type> {
-  using Result = std::ranges::range_value_t<Results>;
-  std::vector<typename Result::value_type> values;
-  for (const auto &result : results) {
-    if (!result) {
-      return std::unexpected<typename Result::error_type>(result.error());
+} // namespace detail
+
+// Drains a stream into one vector, converting QueryError back into the
+// std::expected the storage layer uses at its boundaries.
+template <std::ranges::input_range Rows>
+auto collect(Rows &&rows)
+    -> std::expected<std::vector<std::ranges::range_value_t<Rows>>,
+                     std::error_code> {
+  static_assert(!std::is_same_v<std::ranges::range_value_t<Rows>, Row>,
+                "collecting rows() would store views of a statement that is "
+                "finalized on the way out -- map them with query() instead");
+  std::vector<std::ranges::range_value_t<Rows>> values;
+  try {
+    for (auto &&value : rows) {
+      values.push_back(std::forward<decltype(value)>(value));
     }
-    values.push_back(*result);
+  } catch (const QueryError &error) {
+    return std::unexpected(error.code());
   }
   return values;
 }
 
-} // namespace facts::sql
+} // namespace facts::storage
 
 #endif // FACTS_TOOL_STORAGE_SQLITE_QUERY_H

@@ -8,20 +8,25 @@
 //
 //   LLVM=$(brew --prefix llvm)
 //   $LLVM/bin/clang++ -std=c++23 -I src examples/sqlite_generator_demo.cpp \
-//     -lsqlite3 -o build/sqlite-generator-demo
+//     src/storage/Sqlite.cpp -lsqlite3 -o build/sqlite-generator-demo
 //   ./build/sqlite-generator-demo <files.sqlite>
 
 #include "model/FileRecord.h"
-#include "storage/SqliteConnection.h"
-#include "storage/SqliteQuery.h"
+#include "storage/SqliteDatabase.h"
 
+#include <algorithm>
 #include <print>
+#include <ranges>
 #include <string>
 
 namespace {
 
-facts::FileRecord toRecord(const facts::sql::Row &row) {
+facts::FileRecord toRecord(const facts::storage::Row &row) {
   return {static_cast<facts::FileId>(row.integer(0)), row.string(1)};
+}
+
+bool isHeader(const facts::FileRecord &record) {
+  return record.path.ends_with(".h");
 }
 
 } // namespace
@@ -32,45 +37,46 @@ int main(int argc, const char **argv) {
     return 2;
   }
 
-  auto connection = facts::sql::Connection::open(argv[1]);
-  if (!connection) {
+  auto database = facts::storage::Database::open(argv[1]);
+  if (!database) {
     std::println(stderr, "cannot open {}: {}", argv[1],
-                 connection.error().message());
+                 database.error().message());
     return 1;
   }
-  auto *database = connection->handle();
 
-  // 1. The raw stream: rows arrive one at a time, nothing is materialised.
+  // 1. Rows straight from the database object — no handle, no statement, no
+  //    result codes. The cursor lives in the generator's frame.
   std::println("all files");
-  for (const auto &row : facts::sql::rows(
-           database, "SELECT id, path FROM file ORDER BY id")) {
-    if (!row) {
-      std::println(stderr, "query failed: {}", row.error().message());
-      return 1;
-    }
-    std::println("  {:>3}  {}", row->integer(0), row->text(1));
+  for (const auto &row : database->rows("SELECT id, path FROM file "
+                                        "ORDER BY id")) {
+    std::println("  {:>3}  {}", row.integer(0), row.text(1));
   }
 
-  // 2. Mapped to a domain type, with a bound parameter. Breaking out early
-  //    destroys the generator, which finalises the statement mid-result-set —
-  //    the case the hand-written loop usually gets wrong.
-  std::println("first header");
+  // 2. query() maps each row while it is still valid, so what comes out owns
+  //    itself and composes with views like any other range. Taking two and
+  //    stopping destroys the generator, which finalizes the statement
+  //    mid-result-set — the case a hand-written loop usually gets wrong.
+  std::println("first two headers, by path");
   for (const auto &record :
-       facts::sql::select(database,
-                          "SELECT id, path FROM file "
-                          "WHERE path LIKE ?1 ORDER BY path",
-                          toRecord, std::string("%.h"))) {
-    if (!record) {
-      std::println(stderr, "query failed: {}", record.error().message());
-      return 1;
-    }
-    std::println("  {:>3}  {}", record->id, record->path);
-    break;
+       database->query("SELECT id, path FROM file ORDER BY path", toRecord) |
+           std::views::filter(isHeader) | std::views::take(2)) {
+    std::println("  {:>3}  {}", record.id, record.path);
   }
 
-  // 3. And the eager form, for callers that really do want the whole vector.
-  const auto all = facts::sql::collect(facts::sql::select(
-      database, "SELECT id, path FROM file", toRecord));
+  // 3. Binds are ordinary arguments, and the stream still pipes.
+  const auto deepest =
+      std::ranges::max(database->query("SELECT id, path FROM file "
+                                       "WHERE id >= ?1",
+                                       toRecord, facts::firstPhysicalFileId) |
+                           std::views::transform(&facts::FileRecord::path),
+                       {}, &std::string::size);
+  std::println("longest path: {}", deepest);
+
+  // 4. And the eager form, for callers that want a vector and an error value
+  //    instead of a stream.
+  const auto all =
+      facts::storage::collect(database->query("SELECT id, path FROM file",
+                                              toRecord));
   if (!all) {
     std::println(stderr, "query failed: {}", all.error().message());
     return 1;
