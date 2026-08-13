@@ -2,67 +2,76 @@
   "version": 1,
   "steps": [
     {
-      "name": "configure-ninja",
+      "name": "fresh-configure",
       "kind": "configure",
       "argv": [
         "cmake",
+        "-G",
+        "Ninja",
         "-S",
         ".",
         "-B",
-        "build",
-        "-G",
-        "Ninja",
+        "/tmp/facts-tool-queryable-storage-build",
         "-DCMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm",
-        "-DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++"
+        "-DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang",
+        "-DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++",
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
       ],
       "timeout_seconds": 600
     },
     {
-      "name": "build",
+      "name": "fresh-build",
       "kind": "build",
-      "argv": ["cmake", "--build", "build", "-j", "8"],
+      "argv": [
+        "cmake",
+        "--build",
+        "/tmp/facts-tool-queryable-storage-build",
+        "--parallel"
+      ],
       "timeout_seconds": 1200
     },
     {
-      "name": "tests",
+      "name": "focused-tests",
       "kind": "test",
-      "argv": ["ctest", "--test-dir", "build", "--output-on-failure"],
-      "timeout_seconds": 1200
+      "argv": [
+        "ctest",
+        "--test-dir",
+        "/tmp/facts-tool-queryable-storage-build",
+        "-R",
+        "^(storage-schema|facts-tool-e2e)$",
+        "--output-on-failure"
+      ],
+      "timeout_seconds": 300
     },
     {
-      "name": "format-check",
+      "name": "full-tests",
+      "kind": "test",
+      "argv": [
+        "ctest",
+        "--test-dir",
+        "/tmp/facts-tool-queryable-storage-build",
+        "--output-on-failure"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "name": "clang-format",
       "kind": "format",
       "argv": [
         "/opt/homebrew/opt/llvm/bin/clang-format",
         "--dry-run",
         "--Werror",
-        "src/model/FileRecord.h",
-        "src/model/SymbolId.h",
-        "src/storage/FactStore.h",
-        "src/storage/FactStore.cpp",
-        "src/storage/FileManager.h",
-        "src/storage/FileManager.cpp",
-        "src/storage/FileDatabase.h",
-        "src/storage/FileDatabase.cpp",
-        "src/storage/FileSchema.h",
-        "src/tooling/CompilationFiles.h",
-        "src/tooling/CompilationFiles.cpp",
-        "src/storage/Schema.h",
-        "src/ast/extractors/File.h",
-        "src/ast/extractors/File.cpp",
-        "src/ast/extractors/Extraction.h",
-        "src/ast/extractors/Location.cpp",
-        "src/ast/FactExtractor.cpp",
-        "src/ast/visitors/Traversal.h",
-        "src/ast/visitors/Traversal.cpp",
-        "src/ast/visitors/SymbolVisitor.h",
-        "src/ast/visitors/SymbolVisitor.cpp",
-        "src/main.cpp",
-        "tests/FactStoreTest.cpp",
-        "tests/FileManagerTest.cpp",
-        "tests/CompilationFilesTest.cpp"
+        "src/storage/Parameter.cpp",
+        "src/storage/Relation.cpp",
+        "src/storage/SchemaMigration.cpp",
+        "src/storage/SchemaMigration.h",
+        "src/storage/SemanticProperties.h",
+        "src/storage/Storage.cpp",
+        "src/storage/Symbol.cpp",
+        "tests/StorageSchemaTest.cpp"
       ],
-      "timeout_seconds": 300
+      "timeout_seconds": 120
     },
     {
       "name": "clang-tidy",
@@ -70,35 +79,31 @@
       "argv": [
         "/opt/homebrew/opt/llvm/bin/clang-tidy",
         "-p",
-        "build",
-        "src/storage/FactStore.cpp",
-        "src/storage/FileManager.cpp",
-        "src/storage/FileDatabase.cpp",
-        "src/tooling/CompilationFiles.cpp",
-        "src/ast/extractors/File.cpp",
-        "src/ast/FactExtractor.cpp",
-        "src/ast/visitors/Traversal.cpp",
-        "src/ast/visitors/SymbolVisitor.cpp",
-        "tests/FactStoreTest.cpp",
-        "tests/FileManagerTest.cpp",
-        "tests/CompilationFilesTest.cpp"
+        "/tmp/facts-tool-queryable-storage-build",
+        "src/storage/Parameter.cpp",
+        "src/storage/Relation.cpp",
+        "src/storage/SchemaMigration.cpp",
+        "src/storage/Storage.cpp",
+        "src/storage/Symbol.cpp",
+        "tests/StorageSchemaTest.cpp"
       ],
       "timeout_seconds": 600
     },
     {
-      "name": "smoke-extraction",
+      "name": "python-syntax",
       "kind": "custom",
       "argv": [
-        "./build/facts-tool",
-        "--facts-out",
-        "build/quality-smoke-facts.sqlite",
-        "--files-out",
-        "build/quality-smoke-files.sqlite",
-        "sample/sample.cpp",
-        "--",
-        "-std=c++23"
+        "python3",
+        "-c",
+        "import ast, pathlib; [ast.parse(pathlib.Path(path).read_text()) for path in ['tests/e2e/steps/database_steps.py','tests/e2e/steps/inheritance_steps.py','tests/e2e/steps/parameter_steps.py']]"
       ],
-      "timeout_seconds": 600
+      "timeout_seconds": 120
+    },
+    {
+      "name": "diff-check",
+      "kind": "custom",
+      "argv": ["git", "diff", "--check"],
+      "timeout_seconds": 120
     }
   ]
 }

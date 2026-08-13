@@ -46,6 +46,7 @@ add_library(facts-storage STATIC
   src/storage/Parameter.cpp
   src/storage/Record.cpp
   src/storage/Relation.cpp
+  src/storage/SchemaMigration.cpp
   src/storage/Sqlite.cpp
   src/storage/Storage.cpp
   src/storage/Symbol.cpp
@@ -131,6 +132,15 @@ if(BUILD_TESTING)
     COMMAND compilation-files-test
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_one.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures
+  )
+  add_executable(storage-schema-test tests/StorageSchemaTest.cpp)
+  target_link_libraries(storage-schema-test PRIVATE facts-storage facts-model
+                                                    SQLite3::SQLite3)
+  add_test(
+    NAME storage-schema
+    COMMAND storage-schema-test
+            ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-fresh.sqlite
+            ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-legacy.sqlite
   )
   add_test(
     NAME multi-tu-file-registry

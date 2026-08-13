@@ -10,7 +10,8 @@ def direct_inheritance_relations(context: FactsToolContext) -> set[tuple]:
         query(
             context.facts_database_path,
             "SELECT source.qualified_name,destination.qualified_name,"
-            "r.kind,r.position,r.flags,r.count FROM relation r "
+            "r.kind,r.position,r.access,r.is_virtual_base,r.is_implicit,"
+            "r.is_lexical,r.count FROM relation r "
             "JOIN symbol source ON source.id=r.source_id "
             "JOIN symbol destination ON destination.id=r.destination_id "
             "WHERE r.kind=2",
@@ -28,7 +29,10 @@ def then_direct_inheritance_relations_include(
             row["destination"],
             int(row["kind"]),
             int(row["position"]),
-            int(row["flags"]),
+            row["access"],
+            1 if row["is_virtual_base"] == "yes" else 0,
+            1 if row["is_implicit"] == "yes" else 0,
+            1 if row["is_lexical"] == "yes" else 0,
             int(row["count"]),
         )
         for row in table_records(table)

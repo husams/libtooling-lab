@@ -1,6 +1,7 @@
 #include "storage/Storage.h"
 
 #include "storage/Schema.h"
+#include "storage/SchemaMigration.h"
 #include "storage/Sqlite.h"
 
 #include <sqlite3.h>
@@ -23,9 +24,9 @@ struct Storage::Connection {
     sqlite3_busy_timeout(database, 10000);
 
     auto initialized =
-        storage::execute(database, "PRAGMA foreign_keys=ON;").and_then([this] {
-          return storage::execute(database, schemaSql);
-        });
+        storage::execute(database, "PRAGMA foreign_keys=ON;")
+            .and_then([this] { return storage::migrateSchema(database); })
+            .and_then([this] { return storage::execute(database, schemaSql); });
     if (!initialized) {
       const std::string message = sqlite3_errmsg(database);
       close();

@@ -14,6 +14,7 @@ Feature: Facts and file storage boundaries
       | parameter        |
       | relation         |
     And the facts database excludes the file table
+    And no facts table stores opaque packed flags
     And the files database contains only these tables
       | table |
       | file  |

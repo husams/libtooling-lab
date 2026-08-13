@@ -1,5 +1,6 @@
 #include "storage/Storage.h"
 
+#include "storage/SemanticProperties.h"
 #include "storage/Sqlite.h"
 
 #include <sqlite3.h>
@@ -24,8 +25,10 @@ std::expected<std::vector<Parameter>, std::error_code>
 Storage::loadParameters(SymbolId id) {
   auto statement = storage::prepare(
       handle(),
-      "SELECT name,type,line,col,offset,region_offset,region_size,flags,"
-      "has_default FROM parameter WHERE symbol_id=?1 ORDER BY position");
+      "SELECT name,type,line,col,offset,region_offset,region_size,is_pointer,"
+      "is_lvalue_reference,is_rvalue_reference,is_forwarding_reference,"
+      "is_const,is_pack,has_default FROM parameter WHERE symbol_id=?1 "
+      "ORDER BY position");
   if (!statement ||
       !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id))) {
     return std::unexpected(storage::sqliteError(handle()));
@@ -42,8 +45,16 @@ Storage::loadParameters(SymbolId id) {
          static_cast<unsigned>(sqlite3_column_int64(statement->get(), 4))},
         {static_cast<unsigned>(sqlite3_column_int64(statement->get(), 5)),
          static_cast<unsigned>(sqlite3_column_int64(statement->get(), 6))},
-        static_cast<std::uint8_t>(sqlite3_column_int64(statement->get(), 7)),
-        sqlite3_column_int64(statement->get(), 8) != 0,
+        storage::parameterFlags({
+            .isPointer = sqlite3_column_int64(statement->get(), 7) != 0,
+            .isLValueReference = sqlite3_column_int64(statement->get(), 8) != 0,
+            .isRValueReference = sqlite3_column_int64(statement->get(), 9) != 0,
+            .isForwardingReference =
+                sqlite3_column_int64(statement->get(), 10) != 0,
+            .isConst = sqlite3_column_int64(statement->get(), 11) != 0,
+            .isPack = sqlite3_column_int64(statement->get(), 12) != 0,
+        }),
+        sqlite3_column_int64(statement->get(), 13) != 0,
     });
     step = sqlite3_step(statement->get());
   }
@@ -65,11 +76,14 @@ Storage::replaceParameters(SymbolId id, std::span<const Parameter> parameters) {
 
   constexpr auto sql =
       "INSERT INTO parameter(symbol_id, position, name, type, line, col, "
-      "offset, region_offset, region_size, flags, has_default) "
-      "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)";
+      "offset, region_offset, region_size, is_pointer, is_lvalue_reference, "
+      "is_rvalue_reference, is_forwarding_reference, is_const, is_pack, "
+      "has_default) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,"
+      "?14,?15,?16)";
   for (const auto position :
        std::views::iota(std::size_t{0}, parameters.size())) {
     const auto &parameter = parameters[position];
+    const auto properties = storage::parameterProperties(parameter.flags);
     auto statement = storage::prepare(handle(), sql);
     if (!statement ||
         !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
@@ -82,8 +96,16 @@ Storage::replaceParameters(SymbolId id, std::span<const Parameter> parameters) {
         !storage::bindInteger(statement->get(), 7, parameter.loc.offset) ||
         !storage::bindInteger(statement->get(), 8, parameter.region.offset) ||
         !storage::bindInteger(statement->get(), 9, parameter.region.size) ||
-        !storage::bindInteger(statement->get(), 10, parameter.flags) ||
-        !storage::bindInteger(statement->get(), 11, parameter.hasDefault) ||
+        !storage::bindInteger(statement->get(), 10, properties.isPointer) ||
+        !storage::bindInteger(statement->get(), 11,
+                              properties.isLValueReference) ||
+        !storage::bindInteger(statement->get(), 12,
+                              properties.isRValueReference) ||
+        !storage::bindInteger(statement->get(), 13,
+                              properties.isForwardingReference) ||
+        !storage::bindInteger(statement->get(), 14, properties.isConst) ||
+        !storage::bindInteger(statement->get(), 15, properties.isPack) ||
+        !storage::bindInteger(statement->get(), 16, parameter.hasDefault) ||
         sqlite3_step(statement->get()) != SQLITE_DONE) {
       return std::unexpected(storage::sqliteError(handle()));
     }

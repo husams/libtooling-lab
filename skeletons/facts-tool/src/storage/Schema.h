@@ -50,7 +50,28 @@ CREATE TABLE IF NOT EXISTS symbol (
   line           INTEGER NOT NULL,  -- Symbol::loc — where it was declared;
   col            INTEGER NOT NULL,  -- the file is already the top half of id
   offset         INTEGER NOT NULL,
-  flags          INTEGER NOT NULL,  -- access in bits 0-1, SymbolBit above it
+  access         TEXT NOT NULL CHECK(access IN ('none','public','protected','private')),
+  is_definition  INTEGER NOT NULL CHECK(is_definition IN (0,1)),
+  is_implicit    INTEGER NOT NULL CHECK(is_implicit IN (0,1)),
+  is_static      INTEGER NOT NULL CHECK(is_static IN (0,1)),
+  is_virtual     INTEGER NOT NULL CHECK(is_virtual IN (0,1)),
+  is_const       INTEGER NOT NULL CHECK(is_const IN (0,1)),
+  is_inline      INTEGER NOT NULL CHECK(is_inline IN (0,1)),
+  is_pure        INTEGER NOT NULL CHECK(is_pure IN (0,1)),
+  ref_qualifier  TEXT NOT NULL CHECK(ref_qualifier IN ('none','lvalue','rvalue')),
+  is_override    INTEGER NOT NULL CHECK(is_override IN (0,1)),
+  has_internal_linkage INTEGER NOT NULL CHECK(has_internal_linkage IN (0,1)),
+  is_external    INTEGER NOT NULL CHECK(is_external IN (0,1)),
+  is_variadic    INTEGER NOT NULL CHECK(is_variadic IN (0,1)),
+  is_deleted     INTEGER NOT NULL CHECK(is_deleted IN (0,1)),
+  is_defaulted   INTEGER NOT NULL CHECK(is_defaulted IN (0,1)),
+  is_explicit    INTEGER NOT NULL CHECK(is_explicit IN (0,1)),
+  is_final       INTEGER NOT NULL CHECK(is_final IN (0,1)),
+  is_abstract    INTEGER NOT NULL CHECK(is_abstract IN (0,1)),
+  is_polymorphic INTEGER NOT NULL CHECK(is_polymorphic IN (0,1)),
+  constant_evaluation TEXT NOT NULL
+    CHECK(constant_evaluation IN ('none','constexpr','consteval','constinit')),
+  is_noexcept    INTEGER NOT NULL CHECK(is_noexcept IN (0,1)),
   UNIQUE(file_id, file_index),
   UNIQUE(file_id, identity)
 );
@@ -85,7 +106,13 @@ CREATE TABLE IF NOT EXISTS parameter (
   offset       INTEGER NOT NULL,
   region_offset INTEGER NOT NULL,
   region_size   INTEGER NOT NULL,
-  flags         INTEGER NOT NULL,
+  is_pointer    INTEGER NOT NULL CHECK(is_pointer IN (0,1)),
+  is_lvalue_reference INTEGER NOT NULL CHECK(is_lvalue_reference IN (0,1)),
+  is_rvalue_reference INTEGER NOT NULL CHECK(is_rvalue_reference IN (0,1)),
+  is_forwarding_reference INTEGER NOT NULL
+    CHECK(is_forwarding_reference IN (0,1)),
+  is_const      INTEGER NOT NULL CHECK(is_const IN (0,1)),
+  is_pack       INTEGER NOT NULL CHECK(is_pack IN (0,1)),
   has_default   INTEGER NOT NULL,
   PRIMARY KEY (symbol_id, position)
 ) WITHOUT ROWID;
@@ -99,7 +126,9 @@ CREATE TABLE IF NOT EXISTS template_argument (
   position  INTEGER NOT NULL,
   name      TEXT NOT NULL,     -- 'T', 'U', 'N'
   type_id   INTEGER NOT NULL,  -- a non-type slot's own type; 0 for builtins
-  flags     INTEGER NOT NULL,  -- TemplateArgumentBit
+  is_parameter_pack INTEGER NOT NULL CHECK(is_parameter_pack IN (0,1)),
+  is_non_type       INTEGER NOT NULL CHECK(is_non_type IN (0,1)),
+  is_template_template INTEGER NOT NULL CHECK(is_template_template IN (0,1)),
   PRIMARY KEY (symbol_id, position)
 ) WITHOUT ROWID;
 
@@ -110,7 +139,13 @@ CREATE TABLE IF NOT EXISTS template_parameter (
   position   INTEGER NOT NULL,
   value      TEXT NOT NULL,     -- '4', 'Mode::Write'; '' for a type value
   type_id    INTEGER NOT NULL,
-  flags      INTEGER NOT NULL,  -- the same ParameterMode / ParameterBit layout
+  is_pointer INTEGER NOT NULL CHECK(is_pointer IN (0,1)),
+  is_lvalue_reference INTEGER NOT NULL CHECK(is_lvalue_reference IN (0,1)),
+  is_rvalue_reference INTEGER NOT NULL CHECK(is_rvalue_reference IN (0,1)),
+  is_forwarding_reference INTEGER NOT NULL
+    CHECK(is_forwarding_reference IN (0,1)),
+  is_const   INTEGER NOT NULL CHECK(is_const IN (0,1)),
+  is_pack    INTEGER NOT NULL CHECK(is_pack IN (0,1)),
   kind       INTEGER NOT NULL,  -- TemplateParameterKind
   pack_index INTEGER NOT NULL,
   PRIMARY KEY (symbol_id, position)
@@ -131,7 +166,10 @@ CREATE TABLE IF NOT EXISTS relation (
   destination_id INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
   kind           INTEGER NOT NULL,  -- RelationKind
   position       INTEGER NOT NULL,  -- 0 when the kind is unordered
-  flags          INTEGER NOT NULL,  -- base access in bits 0-1, RelationBit above
+  access         TEXT NOT NULL CHECK(access IN ('none','public','protected','private')),
+  is_virtual_base INTEGER NOT NULL CHECK(is_virtual_base IN (0,1)),
+  is_implicit    INTEGER NOT NULL CHECK(is_implicit IN (0,1)),
+  is_lexical     INTEGER NOT NULL CHECK(is_lexical IN (0,1)),
   count          INTEGER NOT NULL,
   PRIMARY KEY (source_id, destination_id, kind, position)
 ) WITHOUT ROWID;
@@ -140,6 +178,8 @@ CREATE TABLE IF NOT EXISTS relation (
 -- derives from this -- needs its own.
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
+
+PRAGMA user_version=1;
 
 )sql";
 

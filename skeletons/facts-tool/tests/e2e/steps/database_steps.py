@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from support.bdd import Table, table_records, then
-from support.database import require, table_names
+from support.database import query, require, table_names
 from support.scenario import FactsToolContext
 
 
@@ -21,6 +21,28 @@ def then_facts_database_excludes_file_table(context: FactsToolContext) -> None:
         "file" not in facts_tables,
         f"file registry leaked into facts database: {facts_tables}",
     )
+
+
+@then("no facts table stores opaque packed flags")
+def then_no_facts_table_stores_packed_flags(context: FactsToolContext) -> None:
+    tables = (
+        "symbol",
+        "parameter",
+        "relation",
+        "template_argument",
+        "template_parameter",
+    )
+    packed_columns = {
+        table
+        for table in tables
+        if any(
+            name == "flags"
+            for _, name, *_ in query(
+                context.facts_database_path, f"PRAGMA table_info({table})"
+            )
+        )
+    }
+    require(not packed_columns, f"packed flags remain in: {packed_columns}")
 
 
 @then("the files database contains only these tables")

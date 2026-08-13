@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from support.bdd import Table, table_records, then
-from support.database import parameters_by_function, require, scalar
+from support.database import parameters_by_function, query, require, scalar
 from support.scenario import FactsToolContext
+
+
+def boolean(value: str) -> int:
+    return 1 if value == "yes" else 0
 
 
 @then("the parameters for e2e::userDefinedTypes include")
@@ -18,15 +22,30 @@ def then_user_defined_parameters_include(
         )
         for row in rows
     }
+    semantic_fields = (
+        "is_pointer",
+        "is_lvalue_reference",
+        "is_rvalue_reference",
+        "is_forwarding_reference",
+        "is_const",
+        "is_pack",
+    )
     expected = [
-        (int(row["position"]), row["name"], symbol_ids[row["symbol"]]) for row in rows
+        (
+            int(row["position"]),
+            row["name"],
+            symbol_ids[row["symbol"]],
+            *(boolean(row[field]) for field in semantic_fields),
+        )
+        for row in rows
     ]
-    actual = [
-        (position, name, type_id)
-        for position, name, type_id, _ in parameters_by_function(
-            context.facts_database_path
-        )["e2e::userDefinedTypes"]
-    ]
+    actual = query(
+        context.facts_database_path,
+        "SELECT p.position,p.name,p.type,p.is_pointer,p.is_lvalue_reference,"
+        "p.is_rvalue_reference,p.is_forwarding_reference,p.is_const,p.is_pack "
+        "FROM parameter p JOIN symbol s ON s.id=p.symbol_id "
+        "WHERE s.qualified_name='e2e::userDefinedTypes' ORDER BY p.position",
+    )
     require(
         all(parameter in actual for parameter in expected),
         "user-defined struct, union, class, pointer, reference, array, enum, "
@@ -53,10 +72,29 @@ def primitive_parameters(context: FactsToolContext) -> list[tuple]:
 
 @then("the primitive parameters for e2e::primitiveTypes are")
 def then_primitive_parameters_are(context: FactsToolContext, table: Table) -> None:
-    expected = [(int(row["position"]), row["name"]) for row in table_records(table)]
-    actual = [
-        (position, name) for position, name, _, _ in primitive_parameters(context)
+    semantic_fields = (
+        "is_pointer",
+        "is_lvalue_reference",
+        "is_rvalue_reference",
+        "is_forwarding_reference",
+        "is_const",
+        "is_pack",
+    )
+    expected = [
+        (
+            int(row["position"]),
+            row["name"],
+            *(boolean(row[field]) for field in semantic_fields),
+        )
+        for row in table_records(table)
     ]
+    actual = query(
+        context.facts_database_path,
+        "SELECT p.position,p.name,p.is_pointer,p.is_lvalue_reference,"
+        "p.is_rvalue_reference,p.is_forwarding_reference,p.is_const,p.is_pack "
+        "FROM parameter p JOIN symbol s ON s.id=p.symbol_id "
+        "WHERE s.qualified_name='e2e::primitiveTypes' ORDER BY p.position",
+    )
     require(actual == expected, f"unexpected primitive type parameters: {actual}")
 
 

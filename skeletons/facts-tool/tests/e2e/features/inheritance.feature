@@ -7,13 +7,13 @@ Feature: C++ record inheritance
 
   Scenario Outline: Store direct inheritance from <source> to <destination>
     Then the direct inheritance relations include
-      | source   | destination   | kind   | position   | flags   | count   |
-      | <source> | <destination> | <kind> | <position> | <flags> | <count> |
+      | source   | destination   | kind   | position   | access   | is_virtual_base   | is_implicit   | is_lexical   | count   |
+      | <source> | <destination> | <kind> | <position> | <access> | <is_virtual_base> | <is_implicit> | <is_lexical> | <count> |
     And exactly 4 direct inheritance relations are stored
 
     Examples:
-      | source               | destination | kind | position | flags | count |
-      | e2e::CompositeWidget | e2e::Widget | 2    | 0        | 0     | 1     |
-      | e2e::CompositeWidget | e2e::Policy | 2    | 1        | 5     | 1     |
-      | e2e::PrivateWidget   | e2e::Widget | 2    | 0        | 2     | 1     |
-      | e2e::PublicWidget    | e2e::Widget | 2    | 0        | 0     | 1     |
+      | source               | destination | kind | position | access    | is_virtual_base | is_implicit | is_lexical | count |
+      | e2e::CompositeWidget | e2e::Widget | 2    | 0        | public    | no              | no          | no         | 1     |
+      | e2e::CompositeWidget | e2e::Policy | 2    | 1        | protected | yes             | no          | no         | 1     |
+      | e2e::PrivateWidget   | e2e::Widget | 2    | 0        | private   | no              | no          | no         | 1     |
+      | e2e::PublicWidget    | e2e::Widget | 2    | 0        | public    | no              | no          | no         | 1     |
