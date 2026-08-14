@@ -32,7 +32,8 @@ enum class RelationKind : std::uint8_t {
   Contains,       // source scope (namespace, class, function) declares dest
   Specializes,    // source is an explicit or partial specialization of the
                   // template destination
-  Instantiates,   // source is an implicit instantiation of the template dest
+  Instantiates,   // source is an implicit or explicit instantiation of the
+                  // template destination
   Overrides,      // source method overrides the virtual method destination
   Uses,           // source names destination without calling it — the catch-all
                   // reference edge, and the second most common one
