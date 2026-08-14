@@ -1,14 +1,19 @@
 #include "ast/extractors/NamedDecl.h"
 
 #include "ast/extractors/Location.h"
+#include "ast/extractors/TemplatePattern.h"
+#include "ast/extractors/Type.h"
 
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/Index/IndexSymbol.h"
 #include "clang/Index/USRGeneration.h"
 
 #include <llvm/ADT/SmallString.h>
+#include <llvm/Support/Casting.h>
 
 #include <string>
+#include <vector>
 
 namespace facts {
 
@@ -18,6 +23,22 @@ ExtractionResult<std::string> extractUsr(const clang::NamedDecl &node) {
     return std::unexpected(ExtractionError::InvalidUsr);
   }
   return std::string{usr};
+}
+
+std::expected<SymbolId, std::error_code>
+extractAliasTarget(const clang::TypedefNameDecl &node, FactStore &store) {
+  return extractType(node.getUnderlyingType(), store);
+}
+
+ExtractionResult<std::vector<TemplateArgument>>
+extractAliasTemplateArguments(const clang::TypedefNameDecl &node,
+                              FactStore &store) {
+  const auto *alias = llvm::dyn_cast<clang::TypeAliasDecl>(&node);
+  if (alias == nullptr || alias->getDescribedAliasTemplate() == nullptr) {
+    return std::vector<TemplateArgument>{};
+  }
+  return extractTemplateArguments(
+      *alias->getDescribedAliasTemplate()->getTemplateParameters(), store);
 }
 
 template <>

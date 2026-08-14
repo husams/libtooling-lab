@@ -48,7 +48,10 @@ Feature: Extracted symbol and fact inventory
       | 4    | e2e::Widget::value      |
       | 4    | e2e::sharedCounter      |
       | 5    | e2e                     |
-      | 6    | e2e::Count              |
+      | 5    | e2e::Count              |
+      | 5    | e2e::StructAlias        |
+      | 5    | e2e::WidgetAlias        |
+      | 5    | e2e::WidgetTypedef      |
 
   Scenario: Function definitions and parameter metadata are captured
     Then the defined functions include

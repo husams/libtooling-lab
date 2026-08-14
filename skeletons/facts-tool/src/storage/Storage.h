@@ -46,6 +46,9 @@ public:
 
   std::expected<void, std::error_code>
   addRelations(std::span<const Relation> relations);
+  std::expected<void, std::error_code>
+  addTemplateArguments(SymbolId id,
+                       std::span<const TemplateArgument> arguments);
 
   template <typename Model>
     requires std::derived_from<Model, Symbol>
@@ -76,7 +79,6 @@ private:
     Enumeration,
     Variable,
     Symbol,
-    TypeAlias,
   };
 
   struct SymbolFacts {
@@ -111,9 +113,6 @@ private:
   replaceParameters(SymbolId id, std::span<const Parameter> parameters);
   std::expected<std::vector<Parameter>, std::error_code>
   loadParameters(SymbolId id);
-  std::expected<void, std::error_code>
-  addTemplateArguments(SymbolId id,
-                       std::span<const TemplateArgument> arguments);
   std::expected<void, std::error_code>
   addTemplateParameters(SymbolId id,
                         std::span<const TemplateParameter> parameters);
@@ -164,7 +163,6 @@ private:
 #include "storage/RecordInstance.h"
 #include "storage/RecordTemplate.h"
 #include "storage/Symbol.h"
-#include "storage/TypeAlias.h"
 #include "storage/Variable.h"
 
 #endif

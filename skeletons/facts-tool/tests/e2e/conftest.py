@@ -7,6 +7,7 @@ import pytest
 from support.scenario import FactsToolContext
 
 pytest_plugins = (
+    "steps.alias_steps",
     "steps.common_steps",
     "steps.database_steps",
     "steps.field_steps",
