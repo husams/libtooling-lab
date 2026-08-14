@@ -7,6 +7,20 @@ union Payload;
 class Policy;
 class Deferred;
 
+template <typename T, template <typename> class Container>
+class ClassTemplate {};
+
+template <typename T, int N> struct StructTemplate {};
+
+template <typename... Ts> union UnionTemplate {};
+
+template <typename T, int N> int functionTemplate() { return N; }
+
+class MethodTemplateFixture {
+public:
+  template <typename T> int methodTemplate() const { return sizeof(T); }
+};
+
 struct Widget {
   int value;
 };

@@ -9,6 +9,7 @@ Feature: Extracted symbol and fact inventory
     Then the complete symbol inventory is
       | node | qualified_name          |
       | 1    | e2e::fun                |
+      | 1    | e2e::functionTemplate   |
       | 1    | e2e::headerHelper       |
       | 1    | e2e::CompositeWidget::apply |
       | 1    | e2e::MethodFixture::deletedMethod |
@@ -16,6 +17,7 @@ Feature: Extracted symbol and fact inventory
       | 1    | e2e::MethodFixture::operator== |
       | 1    | e2e::MethodFixture::outOfLineMethod |
       | 1    | e2e::MethodFixture::pureMethod |
+      | 1    | e2e::MethodTemplateFixture::methodTemplate |
       | 1    | e2e::Policy::apply      |
       | 1    | e2e::primitiveTypes     |
       | 1    | e2e::transform          |
@@ -23,13 +25,17 @@ Feature: Extracted symbol and fact inventory
       | 1    | e2e::useTwo             |
       | 1    | e2e::userDefinedTypes   |
       | 2    | e2e::CompositeWidget    |
+      | 2    | e2e::ClassTemplate      |
       | 2    | e2e::Deferred           |
       | 2    | e2e::MethodFixture      |
+      | 2    | e2e::MethodTemplateFixture |
       | 2    | e2e::MyRecord           |
       | 2    | e2e::Payload            |
       | 2    | e2e::Policy             |
       | 2    | e2e::PrivateWidget      |
       | 2    | e2e::PublicWidget       |
+      | 2    | e2e::StructTemplate     |
+      | 2    | e2e::UnionTemplate      |
       | 2    | e2e::Widget             |
       | 2    | e2e::X                  |
       | 3    | e2e::Mode               |

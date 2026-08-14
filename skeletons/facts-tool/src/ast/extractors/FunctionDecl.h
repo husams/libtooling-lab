@@ -3,9 +3,13 @@
 
 #include "ast/extractors/Extraction.h"
 #include "model/Function.h"
+#include "model/TemplateArgument.h"
+
+#include <vector>
 
 namespace clang {
 class FunctionDecl;
+class TemplateParameterList;
 } // namespace clang
 
 namespace facts {
@@ -14,6 +18,10 @@ class FactStore;
 ExtractionResult<Function>
 extractFunction(const clang::FunctionDecl &node,
                 const clang::SourceManager &sourceManager, FactStore &store);
+
+ExtractionResult<std::vector<TemplateArgument>>
+extractTemplateArguments(const clang::TemplateParameterList &parameters,
+                         FactStore &store);
 
 } // namespace facts
 

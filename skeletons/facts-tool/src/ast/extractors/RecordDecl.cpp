@@ -2,13 +2,16 @@
 #include "ast/StoreExtracted.h"
 
 #include "ast/extractors/Definition.h"
+#include "ast/extractors/FunctionDecl.h"
 #include "ast/extractors/NamedDecl.h"
 #include "ast/visitors/SymbolCollector.h"
 #include "model/AnySymbol.h"
+#include "model/RecordTemplate.h"
 #include "model/Relation.h"
 #include "storage/FactStore.h"
 
 #include <clang/AST/DeclCXX.h>
+#include <clang/AST/DeclTemplate.h>
 #include <clang/AST/Type.h>
 
 #include <algorithm>
@@ -122,6 +125,25 @@ void collectSymbol(clang::CXXRecordDecl &node, clang::ASTContext &context,
     return isDefinition ? storeInheritanceRelations(node, source, store)
                         : std::expected<void, std::error_code>{};
   };
+  if (const auto *templateDeclaration = node.getDescribedClassTemplate()) {
+    const auto toTemplate = [&](Record record) {
+      return extractTemplateArguments(
+                 *templateDeclaration->getTemplateParameters(), store)
+          .transform([record = std::move(record)](
+                         std::vector<TemplateArgument> arguments) mutable {
+            RecordTemplate result;
+            static_cast<Record &>(result) = std::move(record);
+            result.templateArguments = std::move(arguments);
+            return result;
+          });
+    };
+
+    storeExtracted(node,
+                   extractRecord(node, context.getSourceManager()) | toTemplate,
+                   context, files, store, storeRelations);
+    return;
+  }
+
   storeExtracted(node, extractRecord(node, context.getSourceManager()), context,
                  files, store, storeRelations);
 }
