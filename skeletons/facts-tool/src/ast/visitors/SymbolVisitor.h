@@ -13,6 +13,8 @@ public:
                 FactStore &store)
       : context_(context), files_(files), store_(store) {}
 
+  bool shouldVisitTemplateInstantiations() const { return true; }
+
   bool TraverseCXXMethodDecl(clang::CXXMethodDecl *decl);
   bool TraverseFieldDecl(clang::FieldDecl *decl);
   bool TraverseParmVarDecl(clang::ParmVarDecl *decl);
