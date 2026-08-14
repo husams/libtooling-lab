@@ -49,6 +49,12 @@ struct Widget {
   int value;
 };
 
+typedef Widget WidgetTypedef;
+using WidgetAlias = Widget;
+
+template <int N>
+using StructAlias = StructTemplate<Widget, N>;
+
 class MethodFixture {
 public:
   virtual int inlineMethod() const { return 1; }

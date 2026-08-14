@@ -151,13 +151,6 @@ CREATE TABLE IF NOT EXISTS template_parameter (
   PRIMARY KEY (symbol_id, position)
 ) WITHOUT ROWID;
 
--- TypeAlias::underlyingType. One column, so it could have been a nullable
--- field on symbol, but an alias is a handful of rows in a table of millions.
-CREATE TABLE IF NOT EXISTS type_alias (
-  symbol_id     INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
-  underlying_id INTEGER NOT NULL
-) WITHOUT ROWID;
-
 -- Every edge. position is in the key because an ordered kind can join the same
 -- pair twice -- a function taking Widget at position 1 and again at 3 is two
 -- ParamType edges, not one with count 2.

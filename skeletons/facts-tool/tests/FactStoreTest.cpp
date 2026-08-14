@@ -214,12 +214,11 @@ int main(int argc, char **argv) {
   roundTrip.template operator()<facts::Record>("c:@S@Record");
   roundTrip.template operator()<facts::Enumeration>("c:@E@Enumeration");
   roundTrip.template operator()<facts::Symbol>("c:@N@namespace");
-  roundTrip.template operator()<facts::TypeAlias>("c:@T@Alias");
   roundTrip.template operator()<facts::Symbol>("c:@M@other");
 
   sqlite3 *database = nullptr;
   assert(sqlite3_open(databasePath.c_str(), &database) == SQLITE_OK);
-  assert(scalar(database, "SELECT COUNT(*) FROM symbol") == 15);
+  assert(scalar(database, "SELECT COUNT(*) FROM symbol") == 14);
   assert(scalar(database, "SELECT COUNT(DISTINCT file_id) FROM symbol") == 2);
   assert(
       scalar(database,

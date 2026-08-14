@@ -5,7 +5,6 @@
 #include "model/Function.h"
 #include "model/Record.h"
 #include "model/Symbol.h"
-#include "model/TypeAlias.h"
 #include "model/Variable.h"
 
 #include <utility>
@@ -13,8 +12,7 @@
 
 namespace facts {
 
-using AnySymbol =
-    std::variant<Symbol, Function, Record, Enumeration, Variable, TypeAlias>;
+using AnySymbol = std::variant<Symbol, Function, Record, Enumeration, Variable>;
 
 template <typename Model>
 Model toSymbolModel(Symbol symbol) {
@@ -49,8 +47,6 @@ inline AnySymbol classifySymbol(Symbol symbol) {
   case clang::index::SymbolKind::StaticProperty:
   case clang::index::SymbolKind::Parameter:
     return toSymbolModel<Variable>(std::move(symbol));
-  case clang::index::SymbolKind::TypeAlias:
-    return toSymbolModel<TypeAlias>(std::move(symbol));
   default:
     return symbol;
   }

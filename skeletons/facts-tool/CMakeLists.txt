@@ -55,7 +55,6 @@ add_library(facts-storage STATIC
   src/storage/Storage.cpp
   src/storage/Symbol.cpp
   src/storage/SymbolIdentity.cpp
-  src/storage/TypeAlias.cpp
   src/storage/Variable.cpp
 )
 target_include_directories(facts-storage PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
