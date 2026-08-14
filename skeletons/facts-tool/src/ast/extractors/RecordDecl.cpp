@@ -2,8 +2,9 @@
 #include "ast/StoreExtracted.h"
 
 #include "ast/extractors/Definition.h"
-#include "ast/extractors/FunctionDecl.h"
 #include "ast/extractors/NamedDecl.h"
+#include "ast/extractors/RecordInstance.h"
+#include "ast/extractors/TemplatePattern.h"
 #include "ast/visitors/SymbolCollector.h"
 #include "model/AnySymbol.h"
 #include "model/RecordTemplate.h"
@@ -125,6 +126,23 @@ void collectSymbol(clang::CXXRecordDecl &node, clang::ASTContext &context,
     return isDefinition ? storeInheritanceRelations(node, source, store)
                         : std::expected<void, std::error_code>{};
   };
+
+  if (const auto *instance =
+          llvm::dyn_cast<clang::ClassTemplateSpecializationDecl>(&node)) {
+    const auto storeInstanceRelations =
+        [&](SymbolId source) -> std::expected<void, std::error_code> {
+      return storeRelations(source).and_then([&] {
+        return storeRecordInstanceRelations(*instance, source, store);
+      });
+    };
+
+    storeExtracted(
+        node,
+        extractRecordInstance(*instance, context.getSourceManager(), store),
+        context, files, store, storeInstanceRelations);
+    return;
+  }
+
   if (const auto *templateDeclaration = node.getDescribedClassTemplate()) {
     const auto toTemplate = [&](Record record) {
       return extractTemplateArguments(

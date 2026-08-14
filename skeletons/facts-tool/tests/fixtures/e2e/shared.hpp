@@ -10,16 +10,40 @@ class Deferred;
 template <typename T, template <typename> class Container>
 class ClassTemplate {};
 
-template <typename T, int N> struct StructTemplate {};
+template <typename T, int N>
+struct StructTemplate {};
 
-template <typename... Ts> union UnionTemplate {};
+template <typename T, int N>
+struct StructTemplate<T *, N> {};
 
-template <typename T, int N> int functionTemplate() { return N; }
+template <>
+struct StructTemplate<Policy, 3> {};
+
+template <typename... Ts>
+union UnionTemplate {};
+
+template <typename T, int N>
+int functionTemplate() {
+  return N;
+}
+
+template <>
+inline int functionTemplate<Policy, 5>() {
+  return 5;
+}
 
 class MethodTemplateFixture {
 public:
-  template <typename T> int methodTemplate() const { return sizeof(T); }
+  template <typename T>
+  int methodTemplate() const {
+    return sizeof(T);
+  }
 };
+
+template <>
+inline int MethodTemplateFixture::methodTemplate<Policy>() const {
+  return 5;
+}
 
 struct Widget {
   int value;

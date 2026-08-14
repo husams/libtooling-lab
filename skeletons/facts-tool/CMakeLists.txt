@@ -43,9 +43,11 @@ add_library(facts-storage STATIC
   src/storage/Enumeration.cpp
   src/storage/FactStore.cpp
   src/storage/Function.cpp
+  src/storage/FunctionInstance.cpp
   src/storage/FunctionTemplate.cpp
   src/storage/Parameter.cpp
   src/storage/Record.cpp
+  src/storage/RecordInstance.cpp
   src/storage/RecordTemplate.cpp
   src/storage/Relation.cpp
   src/storage/SchemaMigration.cpp
@@ -74,11 +76,16 @@ add_library(facts-ast STATIC
   src/ast/extractors/FieldDecl.cpp
   src/ast/extractors/File.cpp
   src/ast/extractors/FunctionDecl.cpp
+  src/ast/extractors/FunctionTemplate.cpp
   src/ast/extractors/Location.cpp
+  src/ast/extractors/MethodDecl.cpp
   src/ast/extractors/NamedDecl.cpp
   src/ast/extractors/ParmVarDecl.cpp
   src/ast/extractors/Parameters.cpp
   src/ast/extractors/RecordDecl.cpp
+  src/ast/extractors/RecordInstance.cpp
+  src/ast/extractors/TemplatePattern.cpp
+  src/ast/extractors/TemplateSpecialization.cpp
   src/ast/extractors/Type.cpp
   src/ast/visitors/SymbolCollector.cpp
   src/ast/visitors/SymbolVisitor.cpp
