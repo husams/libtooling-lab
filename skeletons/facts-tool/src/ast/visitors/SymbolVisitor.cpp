@@ -4,6 +4,10 @@
 
 namespace facts {
 
+bool SymbolVisitor::TraverseCXXMethodDecl(clang::CXXMethodDecl *decl) {
+  return decl == nullptr || WalkUpFromCXXMethodDecl(decl);
+}
+
 bool SymbolVisitor::TraverseParmVarDecl(clang::ParmVarDecl *) { return true; }
 
 bool SymbolVisitor::VisitFunctionDecl(clang::FunctionDecl *decl) {

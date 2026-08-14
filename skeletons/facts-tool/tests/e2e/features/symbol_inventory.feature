@@ -10,6 +10,13 @@ Feature: Extracted symbol and fact inventory
       | node | qualified_name          |
       | 1    | e2e::fun                |
       | 1    | e2e::headerHelper       |
+      | 1    | e2e::CompositeWidget::apply |
+      | 1    | e2e::MethodFixture::deletedMethod |
+      | 1    | e2e::MethodFixture::inlineMethod |
+      | 1    | e2e::MethodFixture::operator== |
+      | 1    | e2e::MethodFixture::outOfLineMethod |
+      | 1    | e2e::MethodFixture::pureMethod |
+      | 1    | e2e::Policy::apply      |
       | 1    | e2e::primitiveTypes     |
       | 1    | e2e::transform          |
       | 1    | e2e::useOne             |
@@ -17,6 +24,7 @@ Feature: Extracted symbol and fact inventory
       | 1    | e2e::userDefinedTypes   |
       | 2    | e2e::CompositeWidget    |
       | 2    | e2e::Deferred           |
+      | 2    | e2e::MethodFixture      |
       | 2    | e2e::MyRecord           |
       | 2    | e2e::Payload            |
       | 2    | e2e::Policy             |

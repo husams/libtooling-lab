@@ -27,12 +27,6 @@ bool hasSpecializedExtractor(const clang::NamedDecl &decl) {
 
 } // namespace
 
-void collectSymbol(clang::FunctionDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store) {
-  storeExtracted(node, extractFunction(node, context.getSourceManager(), store),
-                 context, files, store);
-}
-
 void collectSymbol(clang::NamedDecl &node, clang::ASTContext &context,
                    FileManager &files, FactStore &store) {
   if (hasSpecializedExtractor(node)) {

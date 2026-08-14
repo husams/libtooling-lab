@@ -11,6 +11,16 @@ struct Widget {
   int value;
 };
 
+class MethodFixture {
+public:
+  virtual int inlineMethod() const { return 1; }
+
+  virtual int pureMethod() const = 0;
+  void deletedMethod() = delete;
+  bool operator==(const MethodFixture &) const = default;
+  int outOfLineMethod(int value) const;
+};
+
 struct MyRecord {
   int s;
 };
@@ -22,6 +32,8 @@ union Payload {
 
 class Policy {
 public:
+  virtual int apply() const { return multiplier; }
+
   int multiplier = 1;
 };
 
@@ -29,7 +41,10 @@ struct PublicWidget : Widget {};
 
 class PrivateWidget : Widget {};
 
-class CompositeWidget : public Widget, protected virtual Policy {};
+class CompositeWidget : public Widget, protected virtual Policy {
+public:
+  int apply() const override { return multiplier; }
+};
 
 enum class Mode { Fast, Slow };
 
