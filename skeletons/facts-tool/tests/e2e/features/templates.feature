@@ -66,3 +66,7 @@ Feature: C++ templates
     And the persisted instance method ownership relations include
       | source                                     | destination                | kind |
       | e2e::MethodTemplateFixture::methodTemplate | e2e::MethodTemplateFixture | 9    |
+
+  Scenario: Partial record specializations retain selected-instance provenance
+    Then a partial record specialization points to its primary template
+    And a concrete record instance selected through the partial specialization points to it

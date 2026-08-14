@@ -201,3 +201,73 @@ def then_instance_method_ownership_relations_include(
         expected <= actual,
         f"missing instance method ownership relations: {expected - actual}",
     )
+
+
+@then("a partial record specialization points to its primary template")
+def then_partial_record_specialization_points_to_primary(
+    context: FactsToolContext,
+) -> None:
+    [(count,)] = query(
+        context.facts_database_path,
+        "SELECT COUNT(*) FROM relation specialization "
+        "JOIN symbol partial ON partial.id=specialization.source_id "
+        "JOIN symbol primary_template "
+        "ON primary_template.id=specialization.destination_id "
+        "WHERE specialization.kind=4 "
+        "AND partial.qualified_name='e2e::StructTemplate' "
+        "AND primary_template.qualified_name='e2e::StructTemplate' "
+        "AND EXISTS (SELECT 1 FROM template_argument open_slot "
+        "            WHERE open_slot.symbol_id=partial.id) "
+        "AND EXISTS (SELECT 1 FROM template_parameter pattern_argument "
+        "            WHERE pattern_argument.symbol_id=partial.id) "
+        "AND EXISTS (SELECT 1 FROM template_argument primary_slot "
+        "            WHERE primary_slot.symbol_id=primary_template.id) "
+        "AND NOT EXISTS (SELECT 1 FROM template_parameter primary_argument "
+        "                WHERE primary_argument.symbol_id=primary_template.id)",
+    )
+    require(
+        count == 1,
+        f"expected one partial-to-primary specialization relation, found {count}",
+    )
+
+
+@then(
+    "a concrete record instance selected through the partial specialization "
+    "points to it"
+)
+def then_concrete_record_instance_points_to_partial(
+    context: FactsToolContext,
+) -> None:
+    [(count,)] = query(
+        context.facts_database_path,
+        "SELECT COUNT(*) FROM relation instantiation "
+        "JOIN symbol concrete ON concrete.id=instantiation.source_id "
+        "JOIN symbol partial ON partial.id=instantiation.destination_id "
+        "WHERE instantiation.kind=5 "
+        "AND concrete.qualified_name='e2e::StructTemplate' "
+        "AND partial.qualified_name='e2e::StructTemplate' "
+        "AND EXISTS (SELECT 1 FROM template_parameter concrete_type "
+        "            JOIN symbol concrete_type_symbol "
+        "              ON concrete_type_symbol.id=concrete_type.type_id "
+        "            WHERE concrete_type.symbol_id=concrete.id "
+        "              AND concrete_type.position=0 "
+        "              AND concrete_type.is_pointer=1 "
+        "              AND concrete_type_symbol.qualified_name='e2e::Widget') "
+        "AND EXISTS (SELECT 1 FROM template_parameter concrete_value "
+        "            WHERE concrete_value.symbol_id=concrete.id "
+        "              AND concrete_value.position=1 "
+        "              AND concrete_value.value='7') "
+        "AND EXISTS (SELECT 1 FROM template_argument open_slot "
+        "            WHERE open_slot.symbol_id=partial.id) "
+        "AND EXISTS (SELECT 1 FROM template_parameter pattern_argument "
+        "            WHERE pattern_argument.symbol_id=partial.id "
+        "              AND pattern_argument.position=0 "
+        "              AND pattern_argument.is_pointer=1) "
+        "AND EXISTS (SELECT 1 FROM relation specialization "
+        "            WHERE specialization.source_id=partial.id "
+        "              AND specialization.kind=4)",
+    )
+    require(
+        count == 1,
+        f"expected one concrete-to-partial instantiation relation, found {count}",
+    )
