@@ -69,6 +69,7 @@ target_link_libraries(facts-tooling PRIVATE facts-clang)
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
   src/ast/extractors/Definition.cpp
+  src/ast/extractors/FieldDecl.cpp
   src/ast/extractors/File.cpp
   src/ast/extractors/FunctionDecl.cpp
   src/ast/extractors/Location.cpp

@@ -14,8 +14,10 @@ public:
       : context_(context), files_(files), store_(store) {}
 
   bool TraverseCXXMethodDecl(clang::CXXMethodDecl *decl);
+  bool TraverseFieldDecl(clang::FieldDecl *decl);
   bool TraverseParmVarDecl(clang::ParmVarDecl *decl);
   bool VisitCXXRecordDecl(clang::CXXRecordDecl *decl);
+  bool VisitFieldDecl(clang::FieldDecl *decl);
   bool VisitFunctionDecl(clang::FunctionDecl *decl);
   bool VisitNamedDecl(clang::NamedDecl *decl);
 

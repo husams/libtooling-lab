@@ -1,11 +1,26 @@
 #include "ast/visitors/SymbolVisitor.h"
 
+#include "ast/extractors/FieldDecl.h"
 #include "ast/visitors/SymbolCollector.h"
 
 namespace facts {
 
 bool SymbolVisitor::TraverseCXXMethodDecl(clang::CXXMethodDecl *decl) {
   return decl == nullptr || WalkUpFromCXXMethodDecl(decl);
+}
+
+bool SymbolVisitor::TraverseFieldDecl(clang::FieldDecl *decl) {
+  if (decl == nullptr || !VisitFieldDecl(decl)) {
+    return decl == nullptr;
+  }
+
+  if (auto *bitWidth = decl->getBitWidth();
+      bitWidth != nullptr && !TraverseStmt(bitWidth)) {
+    return false;
+  }
+
+  auto *initializer = decl->getInClassInitializer();
+  return initializer == nullptr || TraverseStmt(initializer);
 }
 
 bool SymbolVisitor::TraverseParmVarDecl(clang::ParmVarDecl *) { return true; }
@@ -18,6 +33,11 @@ bool SymbolVisitor::VisitFunctionDecl(clang::FunctionDecl *decl) {
 bool SymbolVisitor::VisitCXXRecordDecl(clang::CXXRecordDecl *decl) {
   collectSymbol(*decl, context_, files_, store_,
                 decl->isThisDeclarationADefinition());
+  return true;
+}
+
+bool SymbolVisitor::VisitFieldDecl(clang::FieldDecl *decl) {
+  collectSymbol(*decl, context_, files_, store_);
   return true;
 }
 
