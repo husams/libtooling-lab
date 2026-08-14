@@ -19,6 +19,7 @@ pytest_plugins = (
     "steps.symbol_identity_steps",
     "steps.symbol_inventory_steps",
     "steps.symbol_stability_steps",
+    "steps.template_steps",
 )
 
 

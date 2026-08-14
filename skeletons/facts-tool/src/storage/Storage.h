@@ -3,6 +3,7 @@
 
 #include "model/AnySymbol.h"
 #include "model/Relation.h"
+#include "model/TemplateArgument.h"
 
 #include <concepts>
 #include <cstdint>
@@ -109,6 +110,9 @@ private:
   replaceParameters(SymbolId id, std::span<const Parameter> parameters);
   std::expected<std::vector<Parameter>, std::error_code>
   loadParameters(SymbolId id);
+  std::expected<void, std::error_code>
+  addTemplateArguments(SymbolId id,
+                       std::span<const TemplateArgument> arguments);
 
   template <typename Model>
   std::expected<SymbolId, std::error_code>
@@ -150,7 +154,9 @@ private:
 
 #include "storage/Enumeration.h"
 #include "storage/Function.h"
+#include "storage/FunctionTemplate.h"
 #include "storage/Record.h"
+#include "storage/RecordTemplate.h"
 #include "storage/Symbol.h"
 #include "storage/TypeAlias.h"
 #include "storage/Variable.h"

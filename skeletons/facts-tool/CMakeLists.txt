@@ -43,8 +43,10 @@ add_library(facts-storage STATIC
   src/storage/Enumeration.cpp
   src/storage/FactStore.cpp
   src/storage/Function.cpp
+  src/storage/FunctionTemplate.cpp
   src/storage/Parameter.cpp
   src/storage/Record.cpp
+  src/storage/RecordTemplate.cpp
   src/storage/Relation.cpp
   src/storage/SchemaMigration.cpp
   src/storage/Sqlite.cpp

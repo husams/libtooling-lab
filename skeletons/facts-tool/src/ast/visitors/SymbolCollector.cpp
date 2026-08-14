@@ -10,6 +10,7 @@
 #include "storage/FileManager.h"
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/DeclTemplate.h>
 #include <clang/Basic/SourceManager.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/raw_ostream.h>
@@ -22,7 +23,10 @@ namespace {
 bool hasSpecializedExtractor(const clang::NamedDecl &decl) {
   return llvm::isa<clang::CXXRecordDecl>(decl) ||
          llvm::isa<clang::FunctionDecl>(decl) ||
-         llvm::isa<clang::ParmVarDecl>(decl);
+         llvm::isa<clang::ParmVarDecl>(decl) ||
+         llvm::isa<clang::TemplateDecl>(decl) ||
+         llvm::isa<clang::TemplateTypeParmDecl, clang::NonTypeTemplateParmDecl,
+                   clang::TemplateTemplateParmDecl>(decl);
 }
 
 } // namespace
