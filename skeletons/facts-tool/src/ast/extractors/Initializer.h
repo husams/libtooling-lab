@@ -1,7 +1,7 @@
 #ifndef FACTS_TOOL_AST_EXTRACTORS_INITIALIZER_H
 #define FACTS_TOOL_AST_EXTRACTORS_INITIALIZER_H
 
-#include "model/Variable.h"
+#include "model/Initializer.h"
 
 #include <optional>
 
@@ -14,7 +14,7 @@ class SourceManager;
 
 namespace facts {
 
-std::optional<VariableInitializer>
+std::optional<Initializer>
 extractInitializer(const clang::Expr *expression,
                    const clang::QualType &declaredType,
                    const clang::ASTContext &context,

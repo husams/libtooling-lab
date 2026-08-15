@@ -116,6 +116,9 @@ extern int sharedCounter;
 
 inline int headerHelper(int input, int delta = 1) { return input + delta; }
 
+void defaultArguments(int count = 2 + 3, bool enabled = true,
+                      const char *label = "ready", Widget widget = Widget{7});
+
 int transform(const Widget &widget, Count factor = 2);
 void userDefinedTypes(Widget value, Widget *pointer, Widget &reference,
                       Widget values[], Mode mode, Count count, Payload payload,

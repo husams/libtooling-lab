@@ -123,8 +123,22 @@ int main(int argc, char **argv) {
   auto shared = makeSymbol<facts::Function>("c:@S@Shared", "Shared");
   assert(shared.id == facts::SymbolId{});
   shared.definition = facts::Region{20, 30};
-  shared.parameters.push_back(
-      facts::Parameter{"value", {0, 1}, {3, 4, 5}, {6, 7}, 0, true});
+  shared.parameters.push_back(facts::Parameter{
+      .name = "value",
+      .type = {0, 1},
+      .loc = {3, 4, 5},
+      .region = {6, 7},
+      .hasDefault = true,
+      .defaultValue =
+          facts::Initializer{
+              .expression = "2 + 3",
+              .evaluated =
+                  facts::EvaluatedValue{
+                      .kind = facts::EvaluatedValueKind::Integer,
+                      .value = "5",
+                  },
+          },
+  });
   const auto firstSymbol = first.save(7, shared);
   constexpr facts::SymbolId expectedShared{7, 0};
   assert(firstSymbol && *firstSymbol == expectedShared);
@@ -143,6 +157,11 @@ int main(int argc, char **argv) {
   constexpr facts::SymbolId expectedParameterType{0, 1};
   assert(loadedShared->parameters.front().type == expectedParameterType);
   assert(loadedShared->parameters.front().hasDefault);
+  assert(loadedShared->parameters.front().defaultValue);
+  assert(loadedShared->parameters.front().defaultValue->expression == "2 + 3");
+  assert(loadedShared->parameters.front().defaultValue->evaluated);
+  assert(loadedShared->parameters.front().defaultValue->evaluated->value ==
+         "5");
 
   facts::AnySymbol anySymbol{*loadedShared};
   const auto variantSymbol = first.save(std::move(anySymbol));
@@ -163,7 +182,7 @@ int main(int argc, char **argv) {
   auto otherDefinition = makeSymbol<facts::Variable>("c:@V@other", "other");
   otherDefinition.flags |= facts::bit(facts::DefinitionBit);
   otherDefinition.definition = facts::Region{40, 5};
-  otherDefinition.initializer = facts::VariableInitializer{
+  otherDefinition.initializer = facts::Initializer{
       .expression = "\"stored\"",
       .evaluated =
           facts::EvaluatedValue{
@@ -176,9 +195,21 @@ int main(int argc, char **argv) {
   assert(first.cachedIdCount() == 2);
 
   auto sharedDeclaration = makeSymbol<facts::Function>("c:@S@Shared", "Shared");
+  sharedDeclaration.parameters.push_back(facts::Parameter{
+      .name = "value",
+      .type = {0, 1},
+      .loc = {3, 4, 5},
+      .region = {6, 7},
+  });
   const auto sharedDeclarationId = first.save(9, std::move(sharedDeclaration));
   assert(sharedDeclarationId == firstSymbol);
   assert(first.cachedIdCount() == 2);
+
+  const auto mergedShared = first.load<facts::Function>(*firstSymbol);
+  assert(mergedShared && mergedShared->parameters.size() == 1);
+  assert(mergedShared->parameters.front().hasDefault);
+  assert(mergedShared->parameters.front().defaultValue);
+  assert(mergedShared->parameters.front().defaultValue->expression == "2 + 3");
 
   const auto updatedSymbol = first.save(7, std::move(shared));
   assert(updatedSymbol == firstSymbol);

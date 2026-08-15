@@ -13,6 +13,7 @@ Feature: Extracted symbol and fact inventory
       | 1    | e2e::headerHelper       |
       | 1    | e2e::CompositeWidget::apply |
       | 1    | e2e::ConstClass::ConstClass |
+      | 1    | e2e::defaultArguments   |
       | 1    | e2e::MethodFixture::deletedMethod |
       | 1    | e2e::MethodFixture::inlineMethod |
       | 1    | e2e::MethodFixture::operator== |

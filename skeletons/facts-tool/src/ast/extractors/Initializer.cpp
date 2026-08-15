@@ -75,7 +75,7 @@ evaluatedValue(const clang::Expr &expression,
 
 } // namespace
 
-std::optional<VariableInitializer>
+std::optional<Initializer>
 extractInitializer(const clang::Expr *expression,
                    const clang::QualType &declaredType,
                    const clang::ASTContext &context,
@@ -83,7 +83,7 @@ extractInitializer(const clang::Expr *expression,
   if (expression == nullptr) {
     return std::nullopt;
   }
-  return VariableInitializer{
+  return Initializer{
       .expression = initializerExpression(*expression, context, sourceManager),
       .evaluated = evaluatedValue(*expression, declaredType, context),
   };

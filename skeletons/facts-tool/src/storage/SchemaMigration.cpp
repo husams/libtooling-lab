@@ -175,6 +175,26 @@ CREATE INDEX IF NOT EXISTS idx_variable_initializer_evaluated
 PRAGMA user_version=2;
 )sql";
 
+inline constexpr auto parameterDefaultMigrationSql = R"sql(
+CREATE TABLE IF NOT EXISTS parameter_default (
+  symbol_id       INTEGER NOT NULL,
+  position        INTEGER NOT NULL,
+  expression      TEXT NOT NULL,
+  evaluated_kind  TEXT NOT NULL
+    CHECK(evaluated_kind IN ('none','integer','floating','boolean','string')),
+  evaluated_value TEXT,
+  PRIMARY KEY (symbol_id, position),
+  FOREIGN KEY (symbol_id, position) REFERENCES parameter(symbol_id, position)
+    ON DELETE CASCADE,
+  CHECK((evaluated_kind='none' AND evaluated_value IS NULL) OR
+        (evaluated_kind<>'none' AND evaluated_value IS NOT NULL))
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_parameter_default_evaluated
+  ON parameter_default(evaluated_kind,evaluated_value)
+  WHERE evaluated_kind<>'none';
+PRAGMA user_version=3;
+)sql";
+
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
@@ -192,6 +212,13 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
               return schemaVersion(database).and_then([database](int version) {
                 return version < 2 ? execute(database, initializerMigrationSql)
                                    : std::expected<void, std::error_code>{};
+              });
+            })
+            .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 3
+                           ? execute(database, parameterDefaultMigrationSql)
+                           : std::expected<void, std::error_code>{};
               });
             });
       });

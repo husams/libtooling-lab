@@ -1,11 +1,13 @@
 #ifndef FACTS_TOOL_MODEL_PARAMETER_H
 #define FACTS_TOOL_MODEL_PARAMETER_H
 
+#include "model/Initializer.h"
 #include "model/Location.h"
 #include "model/SymbolId.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace facts {
@@ -31,6 +33,7 @@ struct Parameter {
   // ParameterBit values may overlap; a forwarding reference is also rvalue.
   std::uint8_t flags = 0;
   bool hasDefault = false;
+  std::optional<Initializer> defaultValue;
 };
 
 } // namespace facts
