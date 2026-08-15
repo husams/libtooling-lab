@@ -49,6 +49,24 @@ struct Widget {
   int value;
 };
 
+struct ConstClass {
+  constexpr explicit ConstClass(int value) : value(value) {}
+
+  int value;
+};
+
+struct InitializerFixture {
+  int count = 2 + 3;
+  bool enabled = true;
+  const char *label = "ready";
+  int values[3] = {1, 2, 3};
+  static constexpr int limit = 6 * 7;
+  static const char *name;
+};
+
+extern int mergedGlobal;
+inline constexpr int inlineGlobal = 14;
+
 typedef Widget WidgetTypedef;
 using WidgetAlias = Widget;
 

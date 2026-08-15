@@ -76,6 +76,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/File.cpp
   src/ast/extractors/FunctionDecl.cpp
   src/ast/extractors/FunctionTemplate.cpp
+  src/ast/extractors/Initializer.cpp
   src/ast/extractors/Location.cpp
   src/ast/extractors/MethodDecl.cpp
   src/ast/extractors/NamedDecl.cpp
@@ -86,6 +87,8 @@ add_library(facts-ast STATIC
   src/ast/extractors/TemplatePattern.cpp
   src/ast/extractors/TemplateSpecialization.cpp
   src/ast/extractors/Type.cpp
+  src/ast/extractors/ValueDecl.cpp
+  src/ast/extractors/VarDecl.cpp
   src/ast/visitors/SymbolCollector.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp

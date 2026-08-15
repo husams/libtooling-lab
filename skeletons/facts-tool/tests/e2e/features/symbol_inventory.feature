@@ -12,6 +12,7 @@ Feature: Extracted symbol and fact inventory
       | 1    | e2e::functionTemplate   |
       | 1    | e2e::headerHelper       |
       | 1    | e2e::CompositeWidget::apply |
+      | 1    | e2e::ConstClass::ConstClass |
       | 1    | e2e::MethodFixture::deletedMethod |
       | 1    | e2e::MethodFixture::inlineMethod |
       | 1    | e2e::MethodFixture::operator== |
@@ -26,9 +27,11 @@ Feature: Extracted symbol and fact inventory
       | 1    | e2e::userDefinedTypes   |
       | 2    | e2e::CompositeWidget    |
       | 2    | e2e::ClassTemplate      |
+      | 2    | e2e::ConstClass         |
       | 2    | e2e::Deferred           |
       | 2    | e2e::MethodFixture      |
       | 2    | e2e::MethodTemplateFixture |
+      | 2    | e2e::InitializerFixture |
       | 2    | e2e::MyRecord           |
       | 2    | e2e::Payload            |
       | 2    | e2e::Policy             |
@@ -42,10 +45,24 @@ Feature: Extracted symbol and fact inventory
       | 4    | e2e::Mode::Fast         |
       | 4    | e2e::Mode::Slow         |
       | 4    | e2e::MyRecord::s        |
+      | 4    | e2e::ConstClass::value  |
+      | 4    | e2e::InitializerFixture::count |
+      | 4    | e2e::InitializerFixture::enabled |
+      | 4    | e2e::InitializerFixture::label |
+      | 4    | e2e::InitializerFixture::limit |
+      | 4    | e2e::InitializerFixture::name |
+      | 4    | e2e::InitializerFixture::values |
       | 4    | e2e::Payload::fractional |
       | 4    | e2e::Payload::integral  |
       | 4    | e2e::Policy::multiplier |
       | 4    | e2e::Widget::value      |
+      | 4    | e2e::constinitGlobal    |
+      | 4    | e2e::constructedClass   |
+      | 4    | e2e::constructedWidget  |
+      | 4    | e2e::globalValues       |
+      | 4    | e2e::inlineGlobal       |
+      | 4    | e2e::internalGlobal     |
+      | 4    | e2e::mergedGlobal       |
       | 4    | e2e::sharedCounter      |
       | 5    | e2e                     |
       | 5    | e2e::Count              |

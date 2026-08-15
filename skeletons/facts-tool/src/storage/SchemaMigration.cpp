@@ -28,9 +28,18 @@ hasColumn(sqlite3 *database, std::string_view table, std::string_view column) {
                              : std::unexpected(sqliteError(database));
 }
 
-inline constexpr auto migrationSql = R"sql(
-BEGIN IMMEDIATE;
+std::expected<int, std::error_code> schemaVersion(sqlite3 *database) {
+  auto statement = prepare(database, "PRAGMA user_version");
+  if (!statement) {
+    return std::unexpected(statement.error());
+  }
+  if (sqlite3_step(statement->get()) != SQLITE_ROW) {
+    return std::unexpected(sqliteError(database));
+  }
+  return sqlite3_column_int(statement->get(), 0);
+}
 
+inline constexpr auto migrationSql = R"sql(
 ALTER TABLE symbol ADD COLUMN access TEXT NOT NULL DEFAULT 'none'
   CHECK(access IN ('none','public','protected','private'));
 ALTER TABLE symbol ADD COLUMN is_definition INTEGER NOT NULL DEFAULT 0 CHECK(is_definition IN (0,1));
@@ -52,6 +61,7 @@ ALTER TABLE symbol ADD COLUMN is_explicit INTEGER NOT NULL DEFAULT 0 CHECK(is_ex
 ALTER TABLE symbol ADD COLUMN is_final INTEGER NOT NULL DEFAULT 0 CHECK(is_final IN (0,1));
 ALTER TABLE symbol ADD COLUMN is_abstract INTEGER NOT NULL DEFAULT 0 CHECK(is_abstract IN (0,1));
 ALTER TABLE symbol ADD COLUMN is_polymorphic INTEGER NOT NULL DEFAULT 0 CHECK(is_polymorphic IN (0,1));
+ALTER TABLE symbol ADD COLUMN has_extern_storage INTEGER NOT NULL DEFAULT 0 CHECK(has_extern_storage IN (0,1));
 ALTER TABLE symbol ADD COLUMN constant_evaluation TEXT NOT NULL DEFAULT 'none'
   CHECK(constant_evaluation IN ('none','constexpr','consteval','constinit'));
 ALTER TABLE symbol ADD COLUMN is_noexcept INTEGER NOT NULL DEFAULT 0 CHECK(is_noexcept IN (0,1));
@@ -75,6 +85,7 @@ UPDATE symbol SET
   is_final=(flags >> 18) & 1,
   is_abstract=(flags >> 19) & 1,
   is_polymorphic=(flags >> 20) & 1,
+  has_extern_storage=(flags >> 21) & 1,
   constant_evaluation=CASE ((flags >> 22) & 3) WHEN 1 THEN 'constexpr' WHEN 2 THEN 'consteval' WHEN 3 THEN 'constinit' ELSE 'none' END,
   is_noexcept=(flags >> 24) & 1;
 ALTER TABLE symbol DROP COLUMN flags;
@@ -130,17 +141,59 @@ UPDATE template_parameter SET
   is_pack=(flags >> 5) & 1;
 ALTER TABLE template_parameter DROP COLUMN flags;
 
-PRAGMA user_version=1;
-COMMIT;
+CREATE TABLE IF NOT EXISTS variable_initializer (
+  symbol_id       INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  expression      TEXT NOT NULL,
+  evaluated_kind  TEXT NOT NULL
+    CHECK(evaluated_kind IN ('none','integer','floating','boolean','string')),
+  evaluated_value TEXT,
+  CHECK((evaluated_kind='none' AND evaluated_value IS NULL) OR
+        (evaluated_kind<>'none' AND evaluated_value IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_variable_initializer_evaluated
+  ON variable_initializer(evaluated_kind,evaluated_value)
+  WHERE evaluated_kind<>'none';
+
+PRAGMA user_version=2;
+)sql";
+
+inline constexpr auto initializerMigrationSql = R"sql(
+ALTER TABLE symbol ADD COLUMN has_extern_storage INTEGER NOT NULL DEFAULT 0
+  CHECK(has_extern_storage IN (0,1));
+CREATE TABLE IF NOT EXISTS variable_initializer (
+  symbol_id       INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  expression      TEXT NOT NULL,
+  evaluated_kind  TEXT NOT NULL
+    CHECK(evaluated_kind IN ('none','integer','floating','boolean','string')),
+  evaluated_value TEXT,
+  CHECK((evaluated_kind='none' AND evaluated_value IS NULL) OR
+        (evaluated_kind<>'none' AND evaluated_value IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_variable_initializer_evaluated
+  ON variable_initializer(evaluated_kind,evaluated_value)
+  WHERE evaluated_kind<>'none';
+PRAGMA user_version=2;
 )sql";
 
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
-  return hasColumn(database, "symbol", "flags")
-      .and_then([database](bool legacy) {
-        return legacy ? execute(database, migrationSql)
-                      : std::expected<void, std::error_code>{};
+  return hasColumn(database, "symbol", "id")
+      .and_then([database](bool existing) {
+        if (!existing) {
+          return std::expected<void, std::error_code>{};
+        }
+        return hasColumn(database, "symbol", "flags")
+            .and_then([database](bool legacy) {
+              return legacy ? execute(database, migrationSql)
+                            : std::expected<void, std::error_code>{};
+            })
+            .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 2 ? execute(database, initializerMigrationSql)
+                                   : std::expected<void, std::error_code>{};
+              });
+            });
       });
 }
 

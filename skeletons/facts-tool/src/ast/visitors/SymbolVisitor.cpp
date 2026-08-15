@@ -1,6 +1,7 @@
 #include "ast/visitors/SymbolVisitor.h"
 
 #include "ast/extractors/FieldDecl.h"
+#include "ast/extractors/VarDecl.h"
 #include "ast/visitors/SymbolCollector.h"
 
 namespace facts {
@@ -37,6 +38,11 @@ bool SymbolVisitor::VisitCXXRecordDecl(clang::CXXRecordDecl *decl) {
 }
 
 bool SymbolVisitor::VisitFieldDecl(clang::FieldDecl *decl) {
+  collectSymbol(*decl, context_, files_, store_);
+  return true;
+}
+
+bool SymbolVisitor::VisitVarDecl(clang::VarDecl *decl) {
   collectSymbol(*decl, context_, files_, store_);
   return true;
 }

@@ -25,8 +25,13 @@ struct Storage::Connection {
 
     auto initialized =
         storage::execute(database, "PRAGMA foreign_keys=ON;")
-            .and_then([this] { return storage::migrateSchema(database); })
-            .and_then([this] { return storage::execute(database, schemaSql); });
+            .and_then([this] { return storage::Transaction::write(database); })
+            .and_then([this](storage::Transaction transaction) {
+              return storage::migrateSchema(database)
+                  .and_then(
+                      [this] { return storage::execute(database, schemaSql); })
+                  .and_then([&transaction] { return transaction.commit(); });
+            });
     if (!initialized) {
       const std::string message = sqlite3_errmsg(database);
       close();
