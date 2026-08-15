@@ -13,13 +13,6 @@
 namespace facts {
 namespace {
 
-SymbolId unpackSymbolId(std::uint64_t packed) {
-  return {
-      static_cast<FileId>(packed >> 32U),
-      static_cast<std::uint32_t>(packed),
-  };
-}
-
 std::expected<void, std::error_code>
 storeParameterDefault(sqlite3 *database, SymbolId id, std::size_t position,
                       const std::optional<Initializer> &defaultValue) {
@@ -67,7 +60,8 @@ Storage::loadParameters(SymbolId id) {
   while (step == SQLITE_ROW) {
     parameters.push_back(Parameter{
         .name = storage::columnText(statement->get(), 0),
-        .type = unpackSymbolId(sqlite3_column_int64(statement->get(), 1)),
+        .type =
+            storage::unpackSymbolId(sqlite3_column_int64(statement->get(), 1)),
         .loc =
             {static_cast<unsigned>(sqlite3_column_int64(statement->get(), 2)),
              static_cast<unsigned>(sqlite3_column_int64(statement->get(), 3)),

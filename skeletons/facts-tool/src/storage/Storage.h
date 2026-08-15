@@ -79,6 +79,7 @@ private:
     Enumeration,
     Variable,
     Symbol,
+    Enumerator,
   };
 
   struct SymbolFacts {
@@ -124,6 +125,14 @@ private:
                              const std::optional<Initializer> &initializer);
   std::expected<std::optional<Initializer>, std::error_code>
   loadVariableInitializer(SymbolId id);
+  std::expected<void, std::error_code>
+  replaceEnumerationDetails(SymbolId id, const Enumeration &enumeration);
+  std::expected<Enumeration, std::error_code>
+  loadEnumerationDetails(Enumeration enumeration);
+  std::expected<void, std::error_code>
+  replaceEnumeratorDetails(SymbolId id, const Enumerator &enumerator);
+  std::expected<Enumerator, std::error_code>
+  loadEnumeratorDetails(Enumerator enumerator);
   std::expected<void, std::error_code>
   addTemplateParameters(SymbolId id,
                         std::span<const TemplateParameter> parameters);

@@ -108,7 +108,7 @@ public:
   int apply() const override { return multiplier; }
 };
 
-enum class Mode { Fast, Slow };
+enum class Mode : unsigned char { Fast, Slow = 5, Later };
 
 using Count = int;
 

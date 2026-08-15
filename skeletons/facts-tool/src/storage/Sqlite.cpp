@@ -44,6 +44,13 @@ std::string columnText(sqlite3_stmt *statement, int column) {
 
 std::uint64_t packSymbolId(SymbolId id) { return id.packed(); }
 
+SymbolId unpackSymbolId(std::uint64_t packed) {
+  return {
+      static_cast<FileId>(packed >> 32U),
+      static_cast<std::uint32_t>(packed),
+  };
+}
+
 std::expected<Transaction, std::error_code>
 Transaction::read(sqlite3 *database) {
   return begin(database, "BEGIN");

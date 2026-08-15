@@ -41,6 +41,7 @@ add_library(facts-storage STATIC
   src/storage/FileManager.cpp
   src/storage/Definition.cpp
   src/storage/Enumeration.cpp
+  src/storage/Enumerator.cpp
   src/storage/FactStore.cpp
   src/storage/Function.cpp
   src/storage/FunctionInstance.cpp
@@ -73,6 +74,8 @@ target_link_libraries(facts-tooling PRIVATE facts-clang)
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
   src/ast/extractors/Definition.cpp
+  src/ast/extractors/EnumConstantDecl.cpp
+  src/ast/extractors/EnumDecl.cpp
   src/ast/extractors/FieldDecl.cpp
   src/ast/extractors/File.cpp
   src/ast/extractors/FunctionDecl.cpp

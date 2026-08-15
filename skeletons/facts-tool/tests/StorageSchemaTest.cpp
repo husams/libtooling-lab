@@ -75,6 +75,8 @@ bool verifyFreshSchema(const std::string &path) {
 
   facts::SymbolId functionId;
   facts::SymbolId destinationId;
+  facts::SymbolId enumerationId;
+  facts::SymbolId enumeratorId;
   facts::SymbolId variableId;
   {
     facts::Storage storage{path};
@@ -140,6 +142,37 @@ bool verifyFreshSchema(const std::string &path) {
     }
     variableId = *savedVariable;
 
+    facts::Enumeration enumeration;
+    enumeration.id.file = 1;
+    enumeration.usr = "c:@E@Mode";
+    enumeration.qualifiedName = "Mode";
+    enumeration.loc = {.line = 4, .column = 1, .offset = 50};
+    enumeration.flags = facts::bit(facts::DefinitionBit);
+    enumeration.definition = facts::Region{50, 30};
+    enumeration.underlyingType = {.file = 0, .index = 7};
+    enumeration.isScoped = true;
+    enumeration.hasFixedUnderlyingType = true;
+    auto savedEnumeration = storage.save(enumeration);
+    if (!require(savedEnumeration.has_value(), "failed to save enumeration")) {
+      return false;
+    }
+    enumerationId = *savedEnumeration;
+
+    facts::Enumerator enumerator;
+    enumerator.id.file = 1;
+    enumerator.usr = "c:@E@Mode@Fast";
+    enumerator.qualifiedName = "Mode::Fast";
+    enumerator.loc = {.line = 4, .column = 20, .offset = 69};
+    enumerator.flags = facts::bit(facts::DefinitionBit);
+    enumerator.definition = facts::Region{69, 8};
+    enumerator.value = "5";
+    enumerator.initializerExpression = "5";
+    auto savedEnumerator = storage.save(enumerator);
+    if (!require(savedEnumerator.has_value(), "failed to save enumerator")) {
+      return false;
+    }
+    enumeratorId = *savedEnumerator;
+
     const auto relationFlags = static_cast<std::uint16_t>(
         clang::AS_protected | facts::bit(facts::VirtualBaseBit) |
         facts::bit(facts::ImplicitEdgeBit) | facts::bit(facts::LexicalBit));
@@ -151,6 +184,17 @@ bool verifyFreshSchema(const std::string &path) {
     }};
     if (!require(storage.addRelations(relations).has_value(),
                  "failed to save relation")) {
+      return false;
+    }
+
+    const std::array enumRelations{facts::Relation{
+        .source = enumerationId,
+        .destination = enumeratorId,
+        .kind = facts::RelationKind::Contains,
+        .flags = static_cast<std::uint16_t>(facts::bit(facts::LexicalBit)),
+    }};
+    if (!require(storage.addRelations(enumRelations).has_value(),
+                 "failed to save enum ownership")) {
       return false;
     }
 
@@ -171,6 +215,23 @@ bool verifyFreshSchema(const std::string &path) {
                 loaded->parameters.front().defaultValue->evaluated->value ==
                     "5",
             "parameter evaluated default did not round trip")) {
+      return false;
+    }
+
+    auto loadedEnumeration = storage.load<facts::Enumeration>(enumerationId);
+    auto loadedEnumerator = storage.load<facts::Enumerator>(enumeratorId);
+    if (!require(loadedEnumeration.has_value(), "failed to load enumeration") ||
+        !require(loadedEnumeration->underlyingType ==
+                     enumeration.underlyingType,
+                 "enumeration underlying type did not round trip") ||
+        !require(loadedEnumeration->isScoped &&
+                     loadedEnumeration->hasFixedUnderlyingType,
+                 "enumeration flags did not round trip") ||
+        !require(loadedEnumerator.has_value(), "failed to load enumerator") ||
+        !require(loadedEnumerator->value == "5",
+                 "enumerator value did not round trip") ||
+        !require(loadedEnumerator->initializerExpression == "5",
+                 "enumerator initializer did not round trip")) {
       return false;
     }
   }
@@ -201,6 +262,19 @@ bool verifyFreshSchema(const std::string &path) {
                          "evaluated_kind='integer' AND evaluated_value='5'") ==
                   1,
               "variable initializer columns are incorrect") &&
+      require(
+          scalar(database, "SELECT COUNT(*) FROM enumeration WHERE symbol_id=" +
+                               std::to_string(packed(enumerationId)) +
+                               " AND underlying_type=" +
+                               std::to_string(packed({.file = 0, .index = 7})) +
+                               " AND is_scoped=1 AND "
+                               "has_fixed_underlying_type=1") == 1,
+          "enumeration columns are incorrect") &&
+      require(scalar(database,
+                     "SELECT COUNT(*) FROM enumerator WHERE symbol_id=" +
+                         std::to_string(packed(enumeratorId)) +
+                         " AND value='5' AND initializer_expression='5'") == 1,
+              "enumerator columns are incorrect") &&
       require(scalar(database,
                      "SELECT COUNT(*) FROM parameter WHERE symbol_id=" +
                          std::to_string(functionKey) +
@@ -316,7 +390,7 @@ bool verifyVersionOneMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version one") &&
-      require(scalar(database, "PRAGMA user_version") == 3,
+      require(scalar(database, "PRAGMA user_version") == 4,
               "version-one migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -359,7 +433,7 @@ bool verifyVersionTwoMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version two") &&
-      require(scalar(database, "PRAGMA user_version") == 3,
+      require(scalar(database, "PRAGMA user_version") == 4,
               "version-two migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -416,7 +490,13 @@ bool verifyMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default schema was not migrated") &&
-      require(scalar(database, "PRAGMA user_version") == 3,
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
+                               "'enumeration')") == 4,
+              "enumeration schema was not migrated") &&
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
+                               "'enumerator')") == 3,
+              "enumerator schema was not migrated") &&
+      require(scalar(database, "PRAGMA user_version") == 4,
               "migration version was not recorded");
   sqlite3_close(database);
   return valid;

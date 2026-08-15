@@ -43,8 +43,6 @@ Feature: Extracted symbol and fact inventory
       | 2    | e2e::Widget             |
       | 2    | e2e::X                  |
       | 3    | e2e::Mode               |
-      | 4    | e2e::Mode::Fast         |
-      | 4    | e2e::Mode::Slow         |
       | 4    | e2e::MyRecord::s        |
       | 4    | e2e::ConstClass::value  |
       | 4    | e2e::InitializerFixture::count |
@@ -70,6 +68,9 @@ Feature: Extracted symbol and fact inventory
       | 5    | e2e::StructAlias        |
       | 5    | e2e::WidgetAlias        |
       | 5    | e2e::WidgetTypedef      |
+      | 6    | e2e::Mode::Fast         |
+      | 6    | e2e::Mode::Later        |
+      | 6    | e2e::Mode::Slow         |
 
   Scenario: Function definitions and parameter metadata are captured
     Then the defined functions include

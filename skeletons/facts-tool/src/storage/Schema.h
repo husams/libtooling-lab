@@ -95,6 +95,23 @@ CREATE TABLE IF NOT EXISTS definition (
   size      INTEGER NOT NULL
 );
 
+-- Enum-only facts. The underlying type is a packed SymbolId rather than a
+-- relation target because compiler-provided builtin types use FileId zero and
+-- deliberately have no symbol row.
+CREATE TABLE IF NOT EXISTS enumeration (
+  symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  underlying_type INTEGER NOT NULL,
+  is_scoped INTEGER NOT NULL CHECK(is_scoped IN (0,1)),
+  has_fixed_underlying_type INTEGER NOT NULL
+    CHECK(has_fixed_underlying_type IN (0,1))
+);
+
+CREATE TABLE IF NOT EXISTS enumerator (
+  symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  value TEXT NOT NULL,
+  initializer_expression TEXT NOT NULL
+);
+
 -- A value declaration's written initializer is always retained. The evaluated
 -- columns are populated only for scalar and string constants Clang can fold.
 CREATE TABLE IF NOT EXISTS variable_initializer (
@@ -207,7 +224,7 @@ CREATE TABLE IF NOT EXISTS relation (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=3;
+PRAGMA user_version=4;
 
 )sql";
 
