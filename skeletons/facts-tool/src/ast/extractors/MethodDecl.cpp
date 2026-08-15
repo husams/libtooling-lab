@@ -38,6 +38,7 @@ ExtractionResult<Function> addMethodFlags(Function function,
 
   function.flags |=
       static_cast<std::uint32_t>(method->getAccess()) |
+      flagWhen(StaticBit, method->isStatic()) |
       flagWhen(VirtualBit, method->isVirtual()) |
       flagWhen(PureBit, method->isPureVirtual()) |
       flagWhen(OverrideBit, method->size_overridden_methods() != 0) |
