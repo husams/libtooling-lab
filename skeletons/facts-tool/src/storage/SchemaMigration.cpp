@@ -195,6 +195,22 @@ CREATE INDEX IF NOT EXISTS idx_parameter_default_evaluated
 PRAGMA user_version=3;
 )sql";
 
+inline constexpr auto enumerationMigrationSql = R"sql(
+CREATE TABLE IF NOT EXISTS enumeration (
+  symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  underlying_type INTEGER NOT NULL,
+  is_scoped INTEGER NOT NULL CHECK(is_scoped IN (0,1)),
+  has_fixed_underlying_type INTEGER NOT NULL
+    CHECK(has_fixed_underlying_type IN (0,1))
+);
+CREATE TABLE IF NOT EXISTS enumerator (
+  symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  value TEXT NOT NULL,
+  initializer_expression TEXT NOT NULL
+);
+PRAGMA user_version=4;
+)sql";
+
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
@@ -219,6 +235,12 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
                 return version < 3
                            ? execute(database, parameterDefaultMigrationSql)
                            : std::expected<void, std::error_code>{};
+              });
+            })
+            .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 4 ? execute(database, enumerationMigrationSql)
+                                   : std::expected<void, std::error_code>{};
               });
             });
       });

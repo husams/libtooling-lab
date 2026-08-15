@@ -27,6 +27,8 @@ namespace {
 
 bool hasSpecializedExtractor(const clang::NamedDecl &decl) {
   return llvm::isa<clang::CXXRecordDecl>(decl) ||
+         llvm::isa<clang::EnumDecl>(decl) ||
+         llvm::isa<clang::EnumConstantDecl>(decl) ||
          llvm::isa<clang::FunctionDecl>(decl) ||
          llvm::isa<clang::ParmVarDecl>(decl) ||
          llvm::isa<clang::VarDecl>(decl) ||

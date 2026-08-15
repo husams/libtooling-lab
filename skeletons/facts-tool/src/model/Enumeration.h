@@ -4,7 +4,11 @@
 #include "model/Symbol.h"
 
 namespace facts {
-struct Enumeration : Symbol {};
+struct Enumeration : Symbol {
+  SymbolId underlyingType;
+  bool isScoped = false;
+  bool hasFixedUnderlyingType = false;
+};
 } // namespace facts
 
 #endif

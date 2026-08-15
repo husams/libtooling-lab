@@ -2,6 +2,8 @@
 #define FACTS_TOOL_AST_EXTRACTORS_DEFINITION_H
 
 #include "ast/extractors/Extraction.h"
+#include "model/Enumeration.h"
+#include "model/Enumerator.h"
 #include "model/Function.h"
 #include "model/Record.h"
 #include "model/Symbol.h"
@@ -20,6 +22,16 @@ addDefinitionRegion(Model model, const clang::Decl &node, bool isDefinition,
 
 extern template ExtractionResult<Function>
 addDefinitionRegion(Function model, const clang::Decl &node, bool isDefinition,
+                    const clang::SourceManager &sourceManager);
+
+extern template ExtractionResult<Enumeration>
+addDefinitionRegion(Enumeration model, const clang::Decl &node,
+                    bool isDefinition,
+                    const clang::SourceManager &sourceManager);
+
+extern template ExtractionResult<Enumerator>
+addDefinitionRegion(Enumerator model, const clang::Decl &node,
+                    bool isDefinition,
                     const clang::SourceManager &sourceManager);
 
 extern template ExtractionResult<Record>

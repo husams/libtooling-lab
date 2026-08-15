@@ -34,6 +34,16 @@ template ExtractionResult<Function>
 addDefinitionRegion(Function model, const clang::Decl &node, bool isDefinition,
                     const clang::SourceManager &sourceManager);
 
+template ExtractionResult<Enumeration>
+addDefinitionRegion(Enumeration model, const clang::Decl &node,
+                    bool isDefinition,
+                    const clang::SourceManager &sourceManager);
+
+template ExtractionResult<Enumerator>
+addDefinitionRegion(Enumerator model, const clang::Decl &node,
+                    bool isDefinition,
+                    const clang::SourceManager &sourceManager);
+
 template ExtractionResult<Record>
 addDefinitionRegion(Record model, const clang::Decl &node, bool isDefinition,
                     const clang::SourceManager &sourceManager);

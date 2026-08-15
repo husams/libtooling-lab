@@ -42,6 +42,7 @@ bool bindInteger(sqlite3_stmt *statement, int position, Value value) {
 std::string columnText(sqlite3_stmt *statement, int column);
 
 std::uint64_t packSymbolId(SymbolId id);
+SymbolId unpackSymbolId(std::uint64_t packed);
 
 class Transaction {
 public:
