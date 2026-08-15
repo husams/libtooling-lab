@@ -134,6 +134,24 @@ CREATE TABLE IF NOT EXISTS parameter (
   PRIMARY KEY (symbol_id, position)
 ) WITHOUT ROWID;
 
+CREATE TABLE IF NOT EXISTS parameter_default (
+  symbol_id       INTEGER NOT NULL,
+  position        INTEGER NOT NULL,
+  expression      TEXT NOT NULL,
+  evaluated_kind  TEXT NOT NULL
+    CHECK(evaluated_kind IN ('none','integer','floating','boolean','string')),
+  evaluated_value TEXT,
+  PRIMARY KEY (symbol_id, position),
+  FOREIGN KEY (symbol_id, position) REFERENCES parameter(symbol_id, position)
+    ON DELETE CASCADE,
+  CHECK((evaluated_kind='none' AND evaluated_value IS NULL) OR
+        (evaluated_kind<>'none' AND evaluated_value IS NOT NULL))
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_parameter_default_evaluated
+  ON parameter_default(evaluated_kind,evaluated_value)
+  WHERE evaluated_kind<>'none';
+
 -- The slots a template declares: `template <typename T, int N>`. Named the way
 -- the fact model names it, which is the opposite of the standard's wording and
 -- of cpp-indexer's template_param/template_arg tables -- here an argument is
@@ -189,7 +207,7 @@ CREATE TABLE IF NOT EXISTS relation (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=2;
+PRAGMA user_version=3;
 
 )sql";
 

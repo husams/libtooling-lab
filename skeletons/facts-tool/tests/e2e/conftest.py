@@ -16,6 +16,7 @@ pytest_plugins = (
     "steps.header_defined_type_steps",
     "steps.inheritance_steps",
     "steps.method_steps",
+    "steps.parameter_default_steps",
     "steps.parameter_steps",
     "steps.record_steps",
     "steps.symbol_identity_steps",

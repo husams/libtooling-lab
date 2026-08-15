@@ -119,9 +119,10 @@ private:
   replaceParameters(SymbolId id, std::span<const Parameter> parameters);
   std::expected<std::vector<Parameter>, std::error_code>
   loadParameters(SymbolId id);
-  std::expected<void, std::error_code> replaceVariableInitializer(
-      SymbolId id, const std::optional<VariableInitializer> &initializer);
-  std::expected<std::optional<VariableInitializer>, std::error_code>
+  std::expected<void, std::error_code>
+  replaceVariableInitializer(SymbolId id,
+                             const std::optional<Initializer> &initializer);
+  std::expected<std::optional<Initializer>, std::error_code>
   loadVariableInitializer(SymbolId id);
   std::expected<void, std::error_code>
   addTemplateParameters(SymbolId id,

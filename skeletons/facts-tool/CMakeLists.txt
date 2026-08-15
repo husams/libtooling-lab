@@ -45,6 +45,7 @@ add_library(facts-storage STATIC
   src/storage/Function.cpp
   src/storage/FunctionInstance.cpp
   src/storage/FunctionTemplate.cpp
+  src/storage/Initializer.cpp
   src/storage/Parameter.cpp
   src/storage/Record.cpp
   src/storage/RecordInstance.cpp

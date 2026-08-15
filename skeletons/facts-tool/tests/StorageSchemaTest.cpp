@@ -91,6 +91,15 @@ bool verifyFreshSchema(const std::string &path) {
         .region = {.offset = 9, .size = 5},
         .flags = parameterFlags,
         .hasDefault = true,
+        .defaultValue =
+            facts::Initializer{
+                .expression = "2 + 3",
+                .evaluated =
+                    facts::EvaluatedValue{
+                        .kind = facts::EvaluatedValueKind::Integer,
+                        .value = "5",
+                    },
+            },
     });
 
     auto savedFunction = storage.save(function);
@@ -117,7 +126,7 @@ bool verifyFreshSchema(const std::string &path) {
     variable.loc = {.line = 3, .column = 1, .offset = 30};
     variable.flags = facts::bit(facts::DefinitionBit);
     variable.definition = facts::Region{30, 12};
-    variable.initializer = facts::VariableInitializer{
+    variable.initializer = facts::Initializer{
         .expression = "2 + 3",
         .evaluated =
             facts::EvaluatedValue{
@@ -152,7 +161,16 @@ bool verifyFreshSchema(const std::string &path) {
         !require(loaded->parameters.size() == 1,
                  "parameters did not round trip") ||
         !require(loaded->parameters.front().flags == parameterFlags,
-                 "parameter flags did not round trip")) {
+                 "parameter flags did not round trip") ||
+        !require(loaded->parameters.front().defaultValue.has_value(),
+                 "parameter default did not round trip") ||
+        !require(loaded->parameters.front().defaultValue->expression == "2 + 3",
+                 "parameter default expression did not round trip") ||
+        !require(
+            loaded->parameters.front().defaultValue->evaluated &&
+                loaded->parameters.front().defaultValue->evaluated->value ==
+                    "5",
+            "parameter evaluated default did not round trip")) {
       return false;
     }
   }
@@ -191,6 +209,13 @@ bool verifyFreshSchema(const std::string &path) {
                          "is_forwarding_reference=0 AND is_const=1 AND "
                          "is_pack=1 AND has_default=1") == 1,
               "parameter semantic columns are incorrect") &&
+      require(scalar(database,
+                     "SELECT COUNT(*) FROM parameter_default WHERE symbol_id=" +
+                         std::to_string(functionKey) +
+                         " AND position=0 AND expression='2 + 3' AND "
+                         "evaluated_kind='integer' AND evaluated_value='5'") ==
+                  1,
+              "parameter default columns are incorrect") &&
       require(scalar(database,
                      "SELECT COUNT(*) FROM relation WHERE source_id=" +
                          std::to_string(functionKey) + " AND destination_id=" +
@@ -255,6 +280,8 @@ bool createVersionOneDatabase(const std::string &path) {
     return false;
   }
   const auto created = execute(database, R"sql(
+DROP INDEX IF EXISTS idx_parameter_default_evaluated;
+DROP TABLE parameter_default;
 DROP INDEX IF EXISTS idx_variable_initializer_evaluated;
 DROP TABLE variable_initializer;
 ALTER TABLE symbol DROP COLUMN has_extern_storage;
@@ -286,8 +313,54 @@ bool verifyVersionOneMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'variable_initializer')") == 4,
               "initializer table was not migrated from version one") &&
-      require(scalar(database, "PRAGMA user_version") == 2,
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
+                               "'parameter_default')") == 5,
+              "parameter default table was not migrated from version one") &&
+      require(scalar(database, "PRAGMA user_version") == 3,
               "version-one migration was not recorded");
+  sqlite3_close(database);
+  return valid;
+}
+
+bool createVersionTwoDatabase(const std::string &path) {
+  std::filesystem::remove(path);
+  {
+    facts::Storage current{path};
+  }
+
+  sqlite3 *database = nullptr;
+  if (sqlite3_open(path.c_str(), &database) != SQLITE_OK) {
+    return false;
+  }
+  const auto created = execute(database, R"sql(
+DROP INDEX IF EXISTS idx_parameter_default_evaluated;
+DROP TABLE parameter_default;
+PRAGMA user_version=2;
+)sql");
+  sqlite3_close(database);
+  return created;
+}
+
+bool verifyVersionTwoMigration(const std::string &path) {
+  if (!require(createVersionTwoDatabase(path),
+               "failed to create version-two database")) {
+    return false;
+  }
+  {
+    facts::Storage migrated{path};
+  }
+
+  sqlite3 *database = nullptr;
+  if (!require(sqlite3_open(path.c_str(), &database) == SQLITE_OK,
+               "failed to open version-two database")) {
+    return false;
+  }
+  const auto valid =
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
+                               "'parameter_default')") == 5,
+              "parameter default table was not migrated from version two") &&
+      require(scalar(database, "PRAGMA user_version") == 3,
+              "version-two migration was not recorded");
   sqlite3_close(database);
   return valid;
 }
@@ -340,7 +413,10 @@ bool verifyMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'variable_initializer')") == 4,
               "initializer schema was not migrated") &&
-      require(scalar(database, "PRAGMA user_version") == 2,
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
+                               "'parameter_default')") == 5,
+              "parameter default schema was not migrated") &&
+      require(scalar(database, "PRAGMA user_version") == 3,
               "migration version was not recorded");
   sqlite3_close(database);
   return valid;
@@ -354,7 +430,8 @@ int main(int argc, char **argv) {
     return 1;
   }
   return verifyFreshSchema(argv[1]) && verifyMigration(argv[2]) &&
-                 verifyVersionOneMigration(std::string{argv[2]} + ".v1")
+                 verifyVersionOneMigration(std::string{argv[2]} + ".v1") &&
+                 verifyVersionTwoMigration(std::string{argv[2]} + ".v2")
              ? 0
              : 1;
 }
