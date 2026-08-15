@@ -22,6 +22,7 @@ public:
   bool VisitFieldDecl(clang::FieldDecl *decl);
   bool VisitFunctionDecl(clang::FunctionDecl *decl);
   bool VisitNamedDecl(clang::NamedDecl *decl);
+  bool VisitVarDecl(clang::VarDecl *decl);
 
 private:
   clang::ASTContext &context_;

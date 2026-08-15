@@ -155,8 +155,24 @@ int main(int argc, char **argv) {
 
   auto other = makeSymbol<facts::Variable>("c:@V@other", "other");
   assert(other.id == facts::SymbolId{});
-  const auto otherSymbol = first.save(9, std::move(other));
+  other.flags |= facts::bit(facts::ExternStorageBit);
+  const auto otherSymbol = first.save(9, other);
   assert(otherSymbol && (*otherSymbol == facts::SymbolId{9, 0}));
+  assert(first.cachedIdCount() == 2);
+
+  auto otherDefinition = makeSymbol<facts::Variable>("c:@V@other", "other");
+  otherDefinition.flags |= facts::bit(facts::DefinitionBit);
+  otherDefinition.definition = facts::Region{40, 5};
+  otherDefinition.initializer = facts::VariableInitializer{
+      .expression = "\"stored\"",
+      .evaluated =
+          facts::EvaluatedValue{
+              .kind = facts::EvaluatedValueKind::String,
+              .value = "stored",
+          },
+  };
+  assert(first.save(10, std::move(otherDefinition)) == otherSymbol);
+  assert(first.save(9, std::move(other)) == otherSymbol);
   assert(first.cachedIdCount() == 2);
 
   auto sharedDeclaration = makeSymbol<facts::Function>("c:@S@Shared", "Shared");
@@ -192,6 +208,17 @@ int main(int argc, char **argv) {
 
   auto loadedOther = second.load<facts::Variable>(*otherSymbol);
   assert(loadedOther);
+  assert(loadedOther->definition);
+  assert(loadedOther->definitionFile == 10);
+  assert(loadedOther->definition->offset == 40);
+  assert(loadedOther->initializer);
+  assert(loadedOther->initializer->expression == "\"stored\"");
+  assert(loadedOther->initializer->evaluated);
+  assert(loadedOther->initializer->evaluated->kind ==
+         facts::EvaluatedValueKind::String);
+  assert(loadedOther->initializer->evaluated->value == "stored");
+  assert((loadedOther->flags & facts::bit(facts::DefinitionBit)) != 0);
+  assert((loadedOther->flags & facts::bit(facts::ExternStorageBit)) != 0);
   assert(second.cachedIdCount() == 2);
   const auto sameOther = second.save(std::move(*loadedOther));
   assert(sameOther == otherSymbol);
@@ -224,10 +251,18 @@ int main(int argc, char **argv) {
       scalar(database,
              "SELECT COUNT(DISTINCT file_index) FROM symbol WHERE file_id=7") ==
       9);
-  assert(scalar(database, "SELECT COUNT(*) FROM definition") == 1);
-  assert(scalar(database, "SELECT offset FROM definition") == 20);
+  assert(scalar(database, "SELECT COUNT(*) FROM definition") == 2);
+  assert(scalar(database, "SELECT COUNT(*) FROM definition WHERE file_id=7 AND "
+                          "offset=20 AND size=30") == 1);
+  assert(scalar(database,
+                "SELECT COUNT(*) FROM definition WHERE file_id=10 AND "
+                "offset=40 AND size=5") == 1);
   assert(scalar(database, "SELECT COUNT(*) FROM parameter") == 1);
   assert(scalar(database, "SELECT has_default FROM parameter") == 1);
+  assert(scalar(database, "SELECT COUNT(*) FROM variable_initializer WHERE "
+                          "expression='\"stored\"' AND "
+                          "evaluated_kind='string' AND "
+                          "evaluated_value='stored'") == 1);
   sqlite3_close(database);
 
   const auto cacheDatabasePath = databasePath.string() + ".cache";

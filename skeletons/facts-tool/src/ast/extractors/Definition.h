@@ -5,6 +5,7 @@
 #include "model/Function.h"
 #include "model/Record.h"
 #include "model/Symbol.h"
+#include "model/Variable.h"
 
 namespace clang {
 class Decl;
@@ -23,6 +24,10 @@ addDefinitionRegion(Function model, const clang::Decl &node, bool isDefinition,
 
 extern template ExtractionResult<Record>
 addDefinitionRegion(Record model, const clang::Decl &node, bool isDefinition,
+                    const clang::SourceManager &sourceManager);
+
+extern template ExtractionResult<Variable>
+addDefinitionRegion(Variable model, const clang::Decl &node, bool isDefinition,
                     const clang::SourceManager &sourceManager);
 
 } // namespace facts

@@ -40,6 +40,7 @@ struct SymbolProperties {
   bool isFinal;
   bool isAbstract;
   bool isPolymorphic;
+  bool hasExternStorage;
   std::string_view constantEvaluation;
   bool isNoexcept;
 };
@@ -173,6 +174,7 @@ constexpr SymbolProperties symbolProperties(std::uint32_t flags) {
       .isFinal = hasBit(flags, FinalBit),
       .isAbstract = hasBit(flags, AbstractBit),
       .isPolymorphic = hasBit(flags, PolymorphicBit),
+      .hasExternStorage = hasBit(flags, ExternStorageBit),
       .constantEvaluation = constantEvaluationName(flags),
       .isNoexcept = hasBit(flags, NoexceptBit),
   };
@@ -198,6 +200,7 @@ constexpr std::uint32_t symbolFlags(SymbolProperties properties) {
          flagWhen(FinalBit, properties.isFinal) |
          flagWhen(AbstractBit, properties.isAbstract) |
          flagWhen(PolymorphicBit, properties.isPolymorphic) |
+         flagWhen(ExternStorageBit, properties.hasExternStorage) |
          constantEvaluationFlags(properties.constantEvaluation) |
          flagWhen(NoexceptBit, properties.isNoexcept);
 }

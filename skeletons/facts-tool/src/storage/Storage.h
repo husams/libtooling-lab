@@ -86,6 +86,11 @@ private:
     bool parameters = false;
   };
 
+  struct DefinitionFacts {
+    FileId file;
+    Region region;
+  };
+
   struct Connection;
 
   sqlite3 *handle() const;
@@ -106,13 +111,18 @@ private:
                                                    SymbolFacts facts);
 
   std::expected<void, std::error_code>
-  replaceDefinition(SymbolId id, const std::optional<Region> &definition);
-  std::expected<std::optional<Region>, std::error_code>
+  replaceDefinition(SymbolId id, FileId file,
+                    const std::optional<Region> &definition);
+  std::expected<std::optional<DefinitionFacts>, std::error_code>
   loadDefinition(SymbolId id);
   std::expected<void, std::error_code>
   replaceParameters(SymbolId id, std::span<const Parameter> parameters);
   std::expected<std::vector<Parameter>, std::error_code>
   loadParameters(SymbolId id);
+  std::expected<void, std::error_code> replaceVariableInitializer(
+      SymbolId id, const std::optional<VariableInitializer> &initializer);
+  std::expected<std::optional<VariableInitializer>, std::error_code>
+  loadVariableInitializer(SymbolId id);
   std::expected<void, std::error_code>
   addTemplateParameters(SymbolId id,
                         std::span<const TemplateParameter> parameters);

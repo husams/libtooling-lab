@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS symbol (
   is_final       INTEGER NOT NULL CHECK(is_final IN (0,1)),
   is_abstract    INTEGER NOT NULL CHECK(is_abstract IN (0,1)),
   is_polymorphic INTEGER NOT NULL CHECK(is_polymorphic IN (0,1)),
+  has_extern_storage INTEGER NOT NULL CHECK(has_extern_storage IN (0,1)),
   constant_evaluation TEXT NOT NULL
     CHECK(constant_evaluation IN ('none','constexpr','consteval','constinit')),
   is_noexcept    INTEGER NOT NULL CHECK(is_noexcept IN (0,1)),
@@ -93,6 +94,22 @@ CREATE TABLE IF NOT EXISTS definition (
   offset    INTEGER NOT NULL,
   size      INTEGER NOT NULL
 );
+
+-- A value declaration's written initializer is always retained. The evaluated
+-- columns are populated only for scalar and string constants Clang can fold.
+CREATE TABLE IF NOT EXISTS variable_initializer (
+  symbol_id       INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  expression      TEXT NOT NULL,
+  evaluated_kind  TEXT NOT NULL
+    CHECK(evaluated_kind IN ('none','integer','floating','boolean','string')),
+  evaluated_value TEXT,
+  CHECK((evaluated_kind='none' AND evaluated_value IS NULL) OR
+        (evaluated_kind<>'none' AND evaluated_value IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_variable_initializer_evaluated
+  ON variable_initializer(evaluated_kind,evaluated_value)
+  WHERE evaluated_kind<>'none';
 
 -- Symbol::parameters. Type is a packed SymbolId; FileId zero identifies
 -- predefined compiler types.
@@ -172,7 +189,7 @@ CREATE TABLE IF NOT EXISTS relation (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=1;
+PRAGMA user_version=2;
 
 )sql";
 
