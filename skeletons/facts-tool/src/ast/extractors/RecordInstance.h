@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_AST_EXTRACTORS_RECORDINSTANCE_H
 #define FACTS_TOOL_AST_EXTRACTORS_RECORDINSTANCE_H
 
+#include "ast/Indexing.h"
 #include "ast/extractors/Extraction.h"
 #include "model/RecordInstance.h"
 
@@ -20,7 +21,7 @@ extractRecordInstance(const clang::ClassTemplateSpecializationDecl &node,
                       const clang::SourceManager &sourceManager,
                       FactStore &store);
 
-std::expected<void, std::error_code>
+IndexingResult
 storeRecordInstanceRelations(const clang::ClassTemplateSpecializationDecl &node,
                              SymbolId instance, FactStore &store);
 

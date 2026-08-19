@@ -15,41 +15,61 @@
 namespace facts {
 namespace {
 
-std::expected<void, std::error_code>
-storeFieldOwnerRelation(const clang::ValueDecl &node, SymbolId value,
-                        FactStore &store) {
+IndexingResult storeFieldOwnerRelation(const clang::ValueDecl &node,
+                                       SymbolId value, FactStore &store) {
   const auto *owner =
       llvm::dyn_cast<clang::CXXRecordDecl>(node.getDeclContext());
   if (owner == nullptr) {
     return {};
   }
 
+  const auto source = node.getQualifiedNameAsString();
+  const auto target = owner->getQualifiedNameAsString();
+  const auto failure = [&](std::string_view usr, std::string_view detail) {
+    return relationFailure("field_of", "source", source, "target", target, usr,
+                           detail);
+  };
   return extractUsr(*owner)
-      .transform_error([](ExtractionError) {
-        return std::make_error_code(std::errc::invalid_argument);
+      .transform_error([&](ExtractionError) {
+        return failure("<unavailable>", "owner USR is unavailable");
       })
-      .and_then([&store](std::string usr) { return store.findId(usr); })
-      .and_then([value, &store](std::optional<SymbolId> ownerId)
-                    -> std::expected<void, std::error_code> {
-        if (!ownerId) {
-          return std::unexpected(
-              std::make_error_code(std::errc::no_such_file_or_directory));
-        }
-        const std::array relations{Relation{
-            .source = value,
-            .destination = *ownerId,
-            .kind = RelationKind::FieldOf,
-        }};
-        return store.addRelations(relations);
+      .and_then([&](std::string usr) -> IndexingResult {
+        return store.findId(usr)
+            .transform_error([&](std::error_code error) {
+              return failure(usr, error.message());
+            })
+            .and_then([&](std::optional<SymbolId> ownerId) -> IndexingResult {
+              if (!ownerId) {
+                return std::unexpected(
+                    failure(usr, "target symbol is not persisted"));
+              }
+              const std::array relations{Relation{
+                  .source = value,
+                  .destination = *ownerId,
+                  .kind = RelationKind::FieldOf,
+              }};
+              return store.addRelations(relations).transform_error(
+                  [&](std::error_code error) {
+                    return failure(usr, error.message());
+                  });
+            });
       });
 }
 
-std::expected<void, std::error_code>
-storeTypeRelation(const clang::ValueDecl &node, SymbolId value,
-                  FactStore &store) {
+IndexingResult storeTypeRelation(const clang::ValueDecl &node, SymbolId value,
+                                 FactStore &store) {
+  const auto source = node.getQualifiedNameAsString();
+  const auto target = node.getType().getAsString();
+  const auto failure = [&](std::string_view detail) {
+    return relationFailure("of_type", "source", source, "target", target,
+                           "<unavailable>", detail);
+  };
   return extractType(node.getType(), store)
-      .and_then([value, &store](
-                    SymbolId type) -> std::expected<void, std::error_code> {
+      .transform_error([&](TypeResolutionError error) {
+        return relationFailure("of_type", "source", source, "target",
+                               error.target, error.usr, error.detail);
+      })
+      .and_then([value, &store, &failure](SymbolId type) -> IndexingResult {
         if (type.file == builtinFileId) {
           return {};
         }
@@ -58,15 +78,15 @@ storeTypeRelation(const clang::ValueDecl &node, SymbolId value,
             .destination = type,
             .kind = RelationKind::OfType,
         }};
-        return store.addRelations(relations);
+        return store.addRelations(relations).transform_error(
+            [&](std::error_code error) { return failure(error.message()); });
       });
 }
 
 } // namespace
 
-std::expected<void, std::error_code>
-storeValueRelations(const clang::ValueDecl &node, SymbolId value,
-                    FactStore &store) {
+IndexingResult storeValueRelations(const clang::ValueDecl &node, SymbolId value,
+                                   FactStore &store) {
   return storeFieldOwnerRelation(node, value, store).and_then([&] {
     return storeTypeRelation(node, value, store);
   });

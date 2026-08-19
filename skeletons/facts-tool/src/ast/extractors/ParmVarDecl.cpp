@@ -88,7 +88,7 @@ extractParameter(const clang::ParmVarDecl &node,
         [&, location](Region region) -> ExtractionResult<Parameter> {
       return extractType(node.getType(), store)
           .transform_error(
-              [](std::error_code) { return ExtractionError::InvalidType; })
+              [](TypeResolutionError) { return ExtractionError::InvalidType; })
           .transform([&](SymbolId type) {
             return Parameter{
                 .name = node.getNameAsString(),

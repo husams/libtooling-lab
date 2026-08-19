@@ -39,17 +39,26 @@ bool hasSpecializedExtractor(const clang::NamedDecl &decl) {
 
 using AliasFacts = std::pair<SymbolId, std::vector<TemplateArgument>>;
 
-std::expected<AliasFacts, std::error_code>
+std::expected<AliasFacts, IndexingError>
 extractAliasFacts(clang::TypedefNameDecl &node, FactStore &store) {
-  return extractAliasTarget(node, store).and_then([&](SymbolId target) {
-    return extractAliasTemplateArguments(node, store)
-        .transform([target](std::vector<TemplateArgument> arguments) {
-          return AliasFacts{target, std::move(arguments)};
-        })
-        .transform_error([](ExtractionError) {
-          return std::make_error_code(std::errc::invalid_argument);
-        });
-  });
+  const auto source = node.getQualifiedNameAsString();
+  const auto target = node.getUnderlyingType().getAsString();
+  return extractAliasTarget(node, store)
+      .transform_error([&](TypeResolutionError error) {
+        return relationFailure("alias_of", "source", source, "target",
+                               error.target, error.usr, error.detail);
+      })
+      .and_then([&](SymbolId targetId) {
+        return extractAliasTemplateArguments(node, store)
+            .transform([targetId](std::vector<TemplateArgument> arguments) {
+              return AliasFacts{targetId, std::move(arguments)};
+            })
+            .transform_error([&](ExtractionError error) {
+              return relationFailure("alias_of", "source", source, "target",
+                                     target, "<unavailable>",
+                                     extractionErrorName(error));
+            });
+      });
 }
 
 IndexingResult collectAlias(clang::TypedefNameDecl &node,
@@ -60,18 +69,31 @@ IndexingResult collectAlias(clang::TypedefNameDecl &node,
                          node.getQualifiedNameAsString() + "'")
       .and_then([&](AliasFacts facts) {
         auto [target, arguments] = std::move(facts);
-        const auto stored = [&store, target, arguments = std::move(arguments)](
-                                SymbolId source) {
+        const auto sourceName = node.getQualifiedNameAsString();
+        const auto targetName = node.getUnderlyingType().getAsString();
+        const auto stored = [&store, target, sourceName, targetName,
+                             arguments =
+                                 std::move(arguments)](SymbolId source) {
           if (target.file == builtinFileId) {
-            return std::expected<void, std::error_code>{};
+            return IndexingResult{};
           }
           const std::array relations{Relation{
               .source = source,
               .destination = target,
               .kind = RelationKind::AliasOf,
           }};
-          return store.addRelations(relations).and_then(
-              [&]() { return store.addTemplateArguments(source, arguments); });
+          return store.addRelations(relations)
+              .transform_error([&](std::error_code error) {
+                return relationFailure("alias_of", "source", sourceName,
+                                       "target", targetName, "<unavailable>",
+                                       error.message());
+              })
+              .and_then([&]() {
+                return withContext(
+                    store.addTemplateArguments(source, arguments),
+                    "cannot persist alias template arguments for '" +
+                        sourceName + "'");
+              });
         };
 
         return storeExtracted(

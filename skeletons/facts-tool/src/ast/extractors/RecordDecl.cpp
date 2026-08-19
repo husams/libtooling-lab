@@ -36,15 +36,14 @@ struct InheritanceRelation {
   std::string usr;
 };
 
-using RelationResult = std::expected<InheritanceRelation, IndexingError>;
+using RelationResult =
+    std::expected<std::optional<InheritanceRelation>, IndexingError>;
 
 IndexingError inheritanceFailure(std::string_view derived,
                                  std::string_view base, std::string_view usr,
                                  std::string_view detail) {
-  return IndexingError{"cannot persist relation=inheritance derived='" +
-                       std::string{derived} + "' base='" + std::string{base} +
-                       "' usr='" + std::string{usr} +
-                       "': " + std::string{detail}};
+  return relationFailure("inheritance", "derived", derived, "base", base, usr,
+                         detail);
 }
 
 std::expected<FileId, std::error_code>
@@ -96,6 +95,9 @@ RelationResult extractInheritanceRelation(
     FileManager &files, FactStore &store, std::string_view derivedName) {
   const auto *parent = base.getType()->getAsCXXRecordDecl();
   if (!parent) {
+    if (base.getType()->isDependentType()) {
+      return std::optional<InheritanceRelation>{};
+    }
     return std::unexpected(
         inheritanceFailure(derivedName, base.getType().getAsString(),
                            "<unavailable>", "base declaration is unavailable"));
@@ -131,7 +133,8 @@ RelationResult extractInheritanceRelation(
                                         error.message());
             })
             .transform([&](SymbolId destination) {
-              return toRelation(destination, std::move(usr));
+              return std::optional<InheritanceRelation>{
+                  toRelation(destination, std::move(usr))};
             });
       });
 }
@@ -179,26 +182,28 @@ storeInheritanceRelations(const clang::CXXRecordDecl &node, SymbolId source,
     return std::unexpected(failure->error());
   }
 
-  auto relations = relationResults |
-                   std::views::transform([](RelationResult &relation) {
-                     return std::move(relation).value();
-                   }) |
-                   std::ranges::to<std::vector>();
-  if (relations.empty()) {
-    return {};
-  }
-  auto relationValues =
-      relations |
-      std::views::transform([](const InheritanceRelation &relation) {
-        return relation.relation;
+  auto relations =
+      relationResults |
+      std::views::transform([](const RelationResult &relation) -> const auto & {
+        return relation.value();
       }) |
+      std::views::filter(
+          [](const auto &relation) { return relation.has_value(); }) |
+      std::views::transform([](const auto &relation) { return *relation; }) |
       std::ranges::to<std::vector>();
-  return store.addRelations(relationValues)
-      .transform_error([&](std::error_code error) {
-        const auto &relation = relations.front();
-        return inheritanceFailure(derivedName, relation.baseName, relation.usr,
-                                  error.message());
-      });
+
+  const auto persist = [&](IndexingResult result,
+                           const InheritanceRelation &relation) {
+    return std::move(result).and_then([&] {
+      const std::array values{relation.relation};
+      return store.addRelations(values).transform_error(
+          [&](std::error_code error) {
+            return inheritanceFailure(derivedName, relation.baseName,
+                                      relation.usr, error.message());
+          });
+    });
+  };
+  return std::ranges::fold_left(relations, IndexingResult{}, persist);
 }
 
 } // namespace

@@ -48,39 +48,48 @@ ExtractionResult<Function> addMethodFlags(Function function,
   return function;
 }
 
-std::expected<void, std::error_code>
-storeMethodRelation(const clang::FunctionDecl &node, SymbolId function,
-                    FactStore &store) {
+IndexingResult storeMethodRelation(const clang::FunctionDecl &node,
+                                   SymbolId function, FactStore &store) {
   const auto *method = supportedMethod(node);
   if (!method) {
     return {};
   }
 
-  const auto invalidUsr = [](ExtractionError) {
-    return std::make_error_code(std::errc::invalid_argument);
+  const auto source = node.getQualifiedNameAsString();
+  const auto target = method->getParent()->getQualifiedNameAsString();
+  const auto failure = [&](std::string_view usr, std::string_view detail) {
+    return relationFailure("method_of", "source", source, "target", target, usr,
+                           detail);
   };
-  const auto findOwner = [&store](std::string ownerUsr) {
-    return store.findId(ownerUsr);
+  const auto invalidUsr = [&](ExtractionError) {
+    return failure("<unavailable>", "owner USR is unavailable");
   };
-  const auto storeRelation = [function, &store](std::optional<SymbolId> owner)
-      -> std::expected<void, std::error_code> {
-    if (!owner) {
-      return std::unexpected(
-          std::make_error_code(std::errc::no_such_file_or_directory));
-    }
+  const auto findAndStore = [&](std::string usr) -> IndexingResult {
+    return store.findId(usr)
+        .transform_error([&](std::error_code error) {
+          return failure(usr, error.message());
+        })
+        .and_then([&](std::optional<SymbolId> owner) -> IndexingResult {
+          if (!owner) {
+            return std::unexpected(
+                failure(usr, "target symbol is not persisted"));
+          }
 
-    const std::array relations{Relation{
-        .source = function,
-        .destination = *owner,
-        .kind = RelationKind::MethodOf,
-    }};
-    return store.addRelations(relations);
+          const std::array relations{Relation{
+              .source = function,
+              .destination = *owner,
+              .kind = RelationKind::MethodOf,
+          }};
+          return store.addRelations(relations).transform_error(
+              [&](std::error_code error) {
+                return failure(usr, error.message());
+              });
+        });
   };
 
   return extractUsr(*method->getParent())
       .transform_error(invalidUsr)
-      .and_then(findOwner)
-      .and_then(storeRelation);
+      .and_then(findAndStore);
 }
 
 } // namespace facts

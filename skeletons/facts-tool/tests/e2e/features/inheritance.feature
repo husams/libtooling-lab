@@ -22,7 +22,22 @@ Feature: C++ record inheritance
   Scenario: Preserve a lightweight target for a filtered system-header base
     Then the external inheritance target is queryable without its header body
 
+  Scenario: Skip an unresolved dependent base without failing indexing
+    When the real facts-tool indexes a dependent-base template
+    Then the dependent-base indexing command succeeds without incomplete diagnostics
+    And the concrete dependent-base instance keeps its inheritance relation
+
   Scenario: Report a genuine post-save relation failure as incomplete indexing
     When relation persistence is forced to fail on a rerun
     Then the indexing command exits unsuccessfully
     And the relation failure diagnostic identifies both symbols and the base USR
+
+  Scenario: Report a non-inheritance relation failure with relation semantics
+    When field relation persistence is forced to fail on a rerun
+    Then the indexing command exits unsuccessfully
+    And the field relation failure diagnostic identifies its source and target
+
+  Scenario: Attribute a multi-base persistence failure to the failing base
+    When the second inheritance relation is forced to fail on a rerun
+    Then the indexing command exits unsuccessfully
+    And the inheritance diagnostic identifies the second base

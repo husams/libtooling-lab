@@ -19,7 +19,7 @@ ExtractionResult<SymbolId> extractUnderlyingType(const clang::EnumDecl &node,
   if (type.isNull()) {
     return SymbolId{};
   }
-  return extractType(type, store).transform_error([](std::error_code) {
+  return extractType(type, store).transform_error([](TypeResolutionError) {
     return ExtractionError::InvalidType;
   });
 }

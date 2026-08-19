@@ -27,6 +27,18 @@ inline IndexingError contextualize(std::string_view, IndexingError error) {
   return error;
 }
 
+inline IndexingError
+relationFailure(std::string_view relation, std::string_view sourceLabel,
+                std::string_view source, std::string_view targetLabel,
+                std::string_view target, std::string_view usr,
+                std::string_view detail) {
+  return IndexingError{"cannot persist relation=" + std::string{relation} +
+                       " " + std::string{sourceLabel} + "='" +
+                       std::string{source} + "' " + std::string{targetLabel} +
+                       "='" + std::string{target} + "' usr='" +
+                       std::string{usr} + "': " + std::string{detail}};
+}
+
 template <typename Value, typename Error>
 std::expected<Value, IndexingError>
 withContext(std::expected<Value, Error> result, std::string_view context) {

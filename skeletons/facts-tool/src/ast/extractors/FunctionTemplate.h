@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_AST_EXTRACTORS_FUNCTIONTEMPLATE_H
 #define FACTS_TOOL_AST_EXTRACTORS_FUNCTIONTEMPLATE_H
 
+#include "ast/Indexing.h"
 #include "ast/extractors/Extraction.h"
 #include "model/Function.h"
 #include "model/FunctionInstance.h"
@@ -26,9 +27,9 @@ ExtractionResult<FunctionInstance>
 toFunctionInstance(Function function, const clang::FunctionDecl &node,
                    FactStore &store);
 
-std::expected<void, std::error_code>
-storeFunctionInstanceRelations(const clang::FunctionDecl &node,
-                               SymbolId instance, FactStore &store);
+IndexingResult storeFunctionInstanceRelations(const clang::FunctionDecl &node,
+                                              SymbolId instance,
+                                              FactStore &store);
 
 } // namespace facts
 

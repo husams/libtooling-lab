@@ -1,5 +1,6 @@
 #include "ast/extractors/TemplateSpecialization.h"
 
+#include "ast/StoreExtracted.h"
 #include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/Type.h"
 #include "model/Parameter.h"
@@ -54,8 +55,12 @@ ExtractionResult<SymbolId> resolveType(clang::QualType type, FactStore &store) {
   if (type->isDependentType()) {
     return SymbolId{};
   }
-  return extractType(type, store).transform_error([](std::error_code) {
-    return ExtractionError::InvalidType;
+  return extractType(type, store).or_else([](TypeResolutionError error) {
+    if (error.targetMissing) {
+      return ExtractionResult<SymbolId>{SymbolId{}};
+    }
+    return ExtractionResult<SymbolId>{
+        std::unexpected(ExtractionError::InvalidType)};
   });
 }
 
@@ -181,19 +186,43 @@ relationKind(clang::TemplateSpecializationKind specializationKind) {
   return std::unexpected(std::make_error_code(std::errc::invalid_argument));
 }
 
-std::expected<SymbolId, std::error_code>
-findPattern(const clang::NamedDecl &pattern, FactStore &store) {
+struct PatternTarget {
+  SymbolId id;
+  std::string usr;
+};
+
+std::string_view relationName(RelationKind kind) {
+  return kind == RelationKind::Specializes ? "specializes" : "instantiates";
+}
+
+std::expected<PatternTarget, IndexingError>
+findPattern(std::string_view source, const clang::NamedDecl &pattern,
+            RelationKind kind, FactStore &store) {
+  const auto target = pattern.getQualifiedNameAsString();
+  const auto failure = [&](std::string_view usr, std::string_view detail) {
+    return relationFailure(relationName(kind), "source", source, "target",
+                           target, usr, detail);
+  };
+
   return extractUsr(pattern)
-      .transform_error([](ExtractionError) {
-        return std::make_error_code(std::errc::invalid_argument);
+      .transform_error([&](ExtractionError error) {
+        return failure("<unavailable>", extractionErrorName(error));
       })
-      .and_then([&](std::string usr) { return store.findId(usr); })
-      .and_then([](std::optional<SymbolId> id)
-                    -> std::expected<SymbolId, std::error_code> {
-        return id ? std::expected<SymbolId, std::error_code>{*id}
-                  : std::unexpected(std::make_error_code(
-                        std::errc::no_such_file_or_directory));
-      });
+      .and_then(
+          [&](std::string usr) -> std::expected<PatternTarget, IndexingError> {
+            return store.findId(usr)
+                .transform_error([&](std::error_code error) {
+                  return failure(usr, error.message());
+                })
+                .and_then([&](std::optional<SymbolId> id)
+                              -> std::expected<PatternTarget, IndexingError> {
+                  if (!id) {
+                    return std::unexpected(
+                        failure(usr, "target symbol is not persisted"));
+                  }
+                  return PatternTarget{.id = *id, .usr = std::move(usr)};
+                });
+          });
 }
 
 } // namespace
@@ -218,24 +247,37 @@ extractTemplateParameters(llvm::ArrayRef<clang::TemplateArgument> arguments,
       arguments, ParametersResult{std::vector<TemplateParameter>{}}, append);
 }
 
-std::expected<void, std::error_code> storeTemplateInstanceRelations(
-    SymbolId instance, const clang::NamedDecl &pattern,
+IndexingResult storeTemplateInstanceRelations(
+    SymbolId instance, std::string_view instanceName,
+    const clang::NamedDecl &pattern,
     clang::TemplateSpecializationKind specializationKind,
     llvm::ArrayRef<clang::TemplateArgument> arguments,
     const clang::ASTContext &context, FactStore &store) {
+  const auto target = pattern.getQualifiedNameAsString();
   return relationKind(specializationKind)
+      .transform_error([&](std::error_code error) {
+        return relationFailure("template_instance", "source", instanceName,
+                               "target", target, "<unavailable>",
+                               error.message());
+      })
       .and_then([&](RelationKind kind) {
-        return findPattern(pattern, store)
-            .transform([kind](SymbolId destination) {
-              return Relation{.destination = destination, .kind = kind};
+        return findPattern(instanceName, pattern, kind, store)
+            .transform([kind](PatternTarget destination) {
+              return std::pair{
+                  Relation{.destination = destination.id, .kind = kind},
+                  std::move(destination.usr)};
             });
       })
-      .and_then([&](Relation patternRelation) {
+      .and_then([&](auto pattern) {
+        auto [patternRelation, usr] = std::move(pattern);
         return extractTemplateParameters(arguments, context, store)
-            .transform_error([](ExtractionError) {
-              return std::make_error_code(std::errc::invalid_argument);
+            .transform_error([&](ExtractionError error) {
+              return relationFailure(relationName(patternRelation.kind),
+                                     "source", instanceName, "target", target,
+                                     usr, extractionErrorName(error));
             })
-            .transform([&](std::vector<TemplateParameter> parameters) {
+            .transform([&, usr = std::move(usr)](
+                           std::vector<TemplateParameter> parameters) mutable {
               patternRelation.source = instance;
               auto relations =
                   std::views::zip(std::views::iota(std::size_t{0}),
@@ -255,11 +297,17 @@ std::expected<void, std::error_code> storeTemplateInstanceRelations(
                   }) |
                   std::ranges::to<std::vector>();
               relations.insert(relations.begin(), patternRelation);
-              return relations;
+              return std::pair{std::move(relations), std::move(usr)};
             });
       })
-      .and_then([&](std::vector<Relation> relations) {
-        return store.addRelations(relations);
+      .and_then([&](auto result) {
+        auto [relations, usr] = std::move(result);
+        return store.addRelations(relations).transform_error(
+            [&](std::error_code error) {
+              return relationFailure(relationName(relations.front().kind),
+                                     "source", instanceName, "target", target,
+                                     usr, error.message());
+            });
       });
 }
 

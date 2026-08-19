@@ -8,6 +8,7 @@ Feature: Canonical source file registry
   Scenario: Every symbol uses a preimported file identity
     Then the file registry contains these canonical fixture paths
       | fixture   |
+      | dependent_base.cpp |
       | shared.hpp |
       | system/external_base.hpp |
       | one.cpp    |

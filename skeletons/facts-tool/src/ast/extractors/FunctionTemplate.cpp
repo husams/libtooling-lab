@@ -45,17 +45,21 @@ toFunctionInstance(Function function, const clang::FunctionDecl &node,
       });
 }
 
-std::expected<void, std::error_code>
-storeFunctionInstanceRelations(const clang::FunctionDecl &node,
-                               SymbolId instance, FactStore &store) {
+IndexingResult storeFunctionInstanceRelations(const clang::FunctionDecl &node,
+                                              SymbolId instance,
+                                              FactStore &store) {
   const auto *specialization = node.getTemplateSpecializationInfo();
   const auto *arguments = node.getTemplateSpecializationArgs();
   if (specialization == nullptr || arguments == nullptr) {
-    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+    return std::unexpected(relationFailure(
+        "template_instance", "source", node.getQualifiedNameAsString(),
+        "target", "<unavailable>", "<unavailable>",
+        "template specialization metadata is unavailable"));
   }
 
   return storeTemplateInstanceRelations(
-      instance, *specialization->getTemplate()->getTemplatedDecl(),
+      instance, node.getQualifiedNameAsString(),
+      *specialization->getTemplate()->getTemplatedDecl(),
       specialization->getTemplateSpecializationKind(), arguments->asArray(),
       node.getASTContext(), store);
 }

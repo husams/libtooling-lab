@@ -30,7 +30,7 @@ extractTemplateArgument(const clang::NamedDecl &node, FactStore &store) {
           llvm::dyn_cast<clang::NonTypeTemplateParmDecl>(&node)) {
     return extractType(parameter->getType(), store)
         .transform_error(
-            [](std::error_code) { return ExtractionError::InvalidType; })
+            [](TypeResolutionError) { return ExtractionError::InvalidType; })
         .transform([&](SymbolId type) {
           return TemplateArgument{
               .name = parameter->getNameAsString(),

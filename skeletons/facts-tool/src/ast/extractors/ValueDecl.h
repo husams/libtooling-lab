@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_AST_EXTRACTORS_VALUEDECL_H
 #define FACTS_TOOL_AST_EXTRACTORS_VALUEDECL_H
 
+#include "ast/Indexing.h"
 #include "model/SymbolId.h"
 
 #include <expected>
@@ -13,9 +14,8 @@ class ValueDecl;
 namespace facts {
 class FactStore;
 
-std::expected<void, std::error_code>
-storeValueRelations(const clang::ValueDecl &node, SymbolId value,
-                    FactStore &store);
+IndexingResult storeValueRelations(const clang::ValueDecl &node, SymbolId value,
+                                   FactStore &store);
 
 } // namespace facts
 
