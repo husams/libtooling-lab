@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_AST_EXTRACTORS_TEMPLATESPECIALIZATION_H
 #define FACTS_TOOL_AST_EXTRACTORS_TEMPLATESPECIALIZATION_H
 
+#include "ast/Indexing.h"
 #include "ast/extractors/Extraction.h"
 #include "model/SymbolId.h"
 #include "model/TemplateParameter.h"
@@ -9,6 +10,7 @@
 #include <llvm/ADT/ArrayRef.h>
 
 #include <expected>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -25,8 +27,9 @@ ExtractionResult<std::vector<TemplateParameter>>
 extractTemplateParameters(llvm::ArrayRef<clang::TemplateArgument> arguments,
                           const clang::ASTContext &context, FactStore &store);
 
-std::expected<void, std::error_code> storeTemplateInstanceRelations(
-    SymbolId instance, const clang::NamedDecl &pattern,
+IndexingResult storeTemplateInstanceRelations(
+    SymbolId instance, std::string_view instanceName,
+    const clang::NamedDecl &pattern,
     clang::TemplateSpecializationKind specializationKind,
     llvm::ArrayRef<clang::TemplateArgument> arguments,
     const clang::ASTContext &context, FactStore &store);

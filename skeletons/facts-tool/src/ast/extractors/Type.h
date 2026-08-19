@@ -4,6 +4,7 @@
 #include "model/SymbolId.h"
 
 #include <expected>
+#include <string>
 #include <system_error>
 
 namespace clang {
@@ -13,8 +14,16 @@ class QualType;
 namespace facts {
 class FactStore;
 
-std::expected<SymbolId, std::error_code>
-extractType(const clang::QualType &type, FactStore &store);
+struct TypeResolutionError {
+  std::string target;
+  std::string usr;
+  std::string detail;
+  bool targetMissing = false;
+};
+
+using TypeResult = std::expected<SymbolId, TypeResolutionError>;
+
+TypeResult extractType(const clang::QualType &type, FactStore &store);
 
 } // namespace facts
 

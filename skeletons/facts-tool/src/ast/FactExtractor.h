@@ -18,11 +18,13 @@ namespace facts {
 
 class FactStore;
 class FileManager;
+class IndexingStatus;
 
 // The factory outlives every action it creates; the store must outlive the
 // factory, so main owns it.
 std::unique_ptr<clang::tooling::FrontendActionFactory>
-createFactExtractorFactory(FileManager &files, FactStore &store);
+createFactExtractorFactory(FileManager &files, FactStore &store,
+                           IndexingStatus &status);
 
 } // namespace facts
 

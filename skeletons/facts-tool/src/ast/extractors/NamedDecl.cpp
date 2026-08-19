@@ -25,8 +25,8 @@ ExtractionResult<std::string> extractUsr(const clang::NamedDecl &node) {
   return std::string{usr};
 }
 
-std::expected<SymbolId, std::error_code>
-extractAliasTarget(const clang::TypedefNameDecl &node, FactStore &store) {
+TypeResult extractAliasTarget(const clang::TypedefNameDecl &node,
+                              FactStore &store) {
   return extractType(node.getUnderlyingType(), store);
 }
 

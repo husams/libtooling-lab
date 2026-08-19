@@ -53,14 +53,14 @@ extractField(const clang::FieldDecl &node,
       .and_then(addDetails);
 }
 
-void collectSymbol(clang::FieldDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store) {
+IndexingResult collectSymbol(clang::FieldDecl &node, clang::ASTContext &context,
+                             FileManager &files, FactStore &store) {
   const auto storeRelation = [&](SymbolId field) {
     return storeValueRelations(node, field, store);
   };
 
-  storeExtracted(node, extractField(node, context.getSourceManager()), context,
-                 files, store, storeRelation);
+  return storeExtracted(node, extractField(node, context.getSourceManager()),
+                        context, files, store, storeRelation);
 }
 
 } // namespace facts

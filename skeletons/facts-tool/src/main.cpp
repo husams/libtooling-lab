@@ -16,6 +16,7 @@
 //   ./build/facts-tool sample/sample.cpp -- -std=c++23
 
 #include "ast/FactExtractor.h"
+#include "ast/Indexing.h"
 #include "platform/PlatformFlags.h"
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
@@ -108,8 +109,10 @@ int main(int argc, const char **argv) {
   facts::addPlatformFlags(tool);
 
   facts::FactStore store(factsOut);
+  facts::IndexingStatus indexing;
   store.begin();
-  int result = tool.run(facts::createFactExtractorFactory(files, store).get());
+  const int toolResult =
+      tool.run(facts::createFactExtractorFactory(files, store, indexing).get());
   store.end();
-  return result;
+  return toolResult != 0 ? toolResult : indexing.complete() ? 0 : 1;
 }

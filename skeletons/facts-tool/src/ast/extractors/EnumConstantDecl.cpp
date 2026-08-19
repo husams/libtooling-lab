@@ -51,29 +51,46 @@ addEnumeratorDetails(Enumerator enumerator, const clang::EnumConstantDecl &node,
       });
 }
 
-std::expected<SymbolId, std::error_code>
+std::expected<SymbolId, IndexingError>
 enumerationId(const clang::EnumConstantDecl &node, FactStore &store) {
   const auto *enumeration =
       llvm::dyn_cast<clang::EnumDecl>(node.getDeclContext());
   if (enumeration == nullptr) {
-    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+    return std::unexpected(
+        relationFailure("contains", "source", "<unavailable>", "target",
+                        node.getQualifiedNameAsString(), "<unavailable>",
+                        "enumeration declaration is unavailable"));
   }
+  const auto source = enumeration->getQualifiedNameAsString();
+  const auto target = node.getQualifiedNameAsString();
+  const auto failure = [&](std::string_view usr, std::string_view detail) {
+    return relationFailure("contains", "source", source, "target", target, usr,
+                           detail);
+  };
   return extractUsr(*enumeration)
-      .transform_error([](ExtractionError) {
-        return std::make_error_code(std::errc::invalid_argument);
+      .transform_error([&](ExtractionError) {
+        return failure("<unavailable>", "enumeration USR is unavailable");
       })
-      .and_then([&store](std::string usr) { return store.findId(usr); })
-      .and_then([](std::optional<SymbolId> id)
-                    -> std::expected<SymbolId, std::error_code> {
-        return id ? std::expected<SymbolId, std::error_code>{*id}
-                  : std::unexpected(std::make_error_code(
-                        std::errc::no_such_file_or_directory));
+      .and_then([&](std::string usr) -> std::expected<SymbolId, IndexingError> {
+        return store.findId(usr)
+            .transform_error([&](std::error_code error) {
+              return failure(usr, error.message());
+            })
+            .and_then([&](std::optional<SymbolId> id)
+                          -> std::expected<SymbolId, IndexingError> {
+              return id ? std::expected<SymbolId, IndexingError>{*id}
+                        : std::unexpected(
+                              failure(usr, "target symbol is not persisted"));
+            });
       });
 }
 
-std::expected<void, std::error_code>
-storeEnumerationRelation(const clang::EnumConstantDecl &node,
-                         SymbolId enumerator, FactStore &store) {
+IndexingResult storeEnumerationRelation(const clang::EnumConstantDecl &node,
+                                        SymbolId enumerator, FactStore &store) {
+  const auto *parent = llvm::dyn_cast<clang::EnumDecl>(node.getDeclContext());
+  const auto source =
+      parent ? parent->getQualifiedNameAsString() : "<unavailable>";
+  const auto target = node.getQualifiedNameAsString();
   return enumerationId(node, store).and_then([&](SymbolId enumeration) {
     const std::array relations{Relation{
         .source = enumeration,
@@ -81,7 +98,11 @@ storeEnumerationRelation(const clang::EnumConstantDecl &node,
         .kind = RelationKind::Contains,
         .flags = static_cast<std::uint16_t>(bit(LexicalBit)),
     }};
-    return store.addRelations(relations);
+    return store.addRelations(relations).transform_error(
+        [&](std::error_code error) {
+          return relationFailure("contains", "source", source, "target", target,
+                                 "<unavailable>", error.message());
+        });
   });
 }
 
@@ -107,13 +128,15 @@ extractEnumerator(const clang::EnumConstantDecl &node,
       .and_then(addDefinition);
 }
 
-void collectSymbol(clang::EnumConstantDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store) {
+IndexingResult collectSymbol(clang::EnumConstantDecl &node,
+                             clang::ASTContext &context, FileManager &files,
+                             FactStore &store) {
   const auto storeRelation = [&](SymbolId enumerator) {
     return storeEnumerationRelation(node, enumerator, store);
   };
-  storeExtracted(node, extractEnumerator(node, context.getSourceManager()),
-                 context, files, store, storeRelation);
+  return storeExtracted(node,
+                        extractEnumerator(node, context.getSourceManager()),
+                        context, files, store, storeRelation);
 }
 
 } // namespace facts

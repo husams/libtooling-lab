@@ -19,7 +19,7 @@ ExtractionResult<SymbolId> extractUnderlyingType(const clang::EnumDecl &node,
   if (type.isNull()) {
     return SymbolId{};
   }
-  return extractType(type, store).transform_error([](std::error_code) {
+  return extractType(type, store).transform_error([](TypeResolutionError) {
     return ExtractionError::InvalidType;
   });
 }
@@ -61,11 +61,11 @@ extractEnumeration(const clang::EnumDecl &node,
       .and_then(addDefinition);
 }
 
-void collectSymbol(clang::EnumDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store) {
-  storeExtracted(node,
-                 extractEnumeration(node, context.getSourceManager(), store),
-                 context, files, store);
+IndexingResult collectSymbol(clang::EnumDecl &node, clang::ASTContext &context,
+                             FileManager &files, FactStore &store) {
+  return storeExtracted(
+      node, extractEnumeration(node, context.getSourceManager(), store),
+      context, files, store);
 }
 
 } // namespace facts

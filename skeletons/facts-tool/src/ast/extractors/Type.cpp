@@ -13,7 +13,14 @@
 namespace facts {
 namespace {
 
-using TypeResult = std::expected<SymbolId, std::error_code>;
+TypeResolutionError typeFailure(std::string target, std::string usr,
+                                std::string detail,
+                                bool targetMissing = false) {
+  return TypeResolutionError{.target = std::move(target),
+                             .usr = std::move(usr),
+                             .detail = std::move(detail),
+                             .targetMissing = targetMissing};
+}
 
 class TypeSymbolVisitor final
     : public clang::TypeVisitor<TypeSymbolVisitor, TypeResult> {
@@ -64,26 +71,34 @@ public:
   }
 
   TypeResult VisitType(const clang::Type *) {
-    return std::unexpected(
-        std::make_error_code(std::errc::operation_not_supported));
+    return std::unexpected(typeFailure("<unsupported type>", "<unavailable>",
+                                       "type is not supported"));
   }
 
 private:
   TypeResult declarationId(const clang::NamedDecl *declaration) {
     if (declaration == nullptr) {
-      return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+      return std::unexpected(typeFailure("<unavailable>", "<unavailable>",
+                                         "type declaration is unavailable"));
     }
 
+    const auto target = declaration->getQualifiedNameAsString();
     llvm::SmallString<128> usr;
     if (clang::index::generateUSRForDecl(declaration, usr)) {
-      return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+      return std::unexpected(
+          typeFailure(target, "<unavailable>", "type USR is unavailable"));
     }
 
-    return store_.findId(std::string_view{usr.data(), usr.size()})
-        .and_then([](std::optional<SymbolId> id) -> TypeResult {
+    const auto usrText = std::string{usr.data(), usr.size()};
+    return store_.findId(usrText)
+        .transform_error([&](std::error_code error) {
+          return typeFailure(target, usrText, error.message());
+        })
+        .and_then([&](std::optional<SymbolId> id) -> TypeResult {
           return id ? TypeResult{*id}
-                    : std::unexpected(std::make_error_code(
-                          std::errc::no_such_file_or_directory));
+                    : std::unexpected(
+                          typeFailure(target, usrText,
+                                      "target symbol is not persisted", true));
         });
   }
 
@@ -94,7 +109,8 @@ private:
 
 TypeResult extractType(const clang::QualType &type, FactStore &store) {
   if (type.isNull()) {
-    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+    return std::unexpected(
+        typeFailure("<unavailable>", "<unavailable>", "type is null"));
   }
   return TypeSymbolVisitor{store}.Visit(type.getTypePtr());
 }

@@ -64,16 +64,20 @@ extractRecordInstance(const clang::ClassTemplateSpecializationDecl &node,
       });
 }
 
-std::expected<void, std::error_code>
+IndexingResult
 storeRecordInstanceRelations(const clang::ClassTemplateSpecializationDecl &node,
                              SymbolId instance, FactStore &store) {
   const auto *pattern = specializedPattern(node);
   if (pattern == nullptr) {
-    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+    return std::unexpected(relationFailure(
+        "template_instance", "source", node.getQualifiedNameAsString(),
+        "target", "<unavailable>", "<unavailable>",
+        "template pattern is unavailable"));
   }
   return storeTemplateInstanceRelations(
-      instance, *pattern, node.getSpecializationKind(),
-      node.getTemplateArgs().asArray(), node.getASTContext(), store);
+      instance, node.getQualifiedNameAsString(), *pattern,
+      node.getSpecializationKind(), node.getTemplateArgs().asArray(),
+      node.getASTContext(), store);
 }
 
 } // namespace facts

@@ -39,63 +39,89 @@ bool hasSpecializedExtractor(const clang::NamedDecl &decl) {
 
 using AliasFacts = std::pair<SymbolId, std::vector<TemplateArgument>>;
 
-std::expected<AliasFacts, std::error_code>
+std::expected<AliasFacts, IndexingError>
 extractAliasFacts(clang::TypedefNameDecl &node, FactStore &store) {
-  return extractAliasTarget(node, store).and_then([&](SymbolId target) {
-    return extractAliasTemplateArguments(node, store)
-        .transform([target](std::vector<TemplateArgument> arguments) {
-          return AliasFacts{target, std::move(arguments)};
-        })
-        .transform_error([](ExtractionError) {
-          return std::make_error_code(std::errc::invalid_argument);
-        });
-  });
+  const auto source = node.getQualifiedNameAsString();
+  const auto target = node.getUnderlyingType().getAsString();
+  return extractAliasTarget(node, store)
+      .transform_error([&](TypeResolutionError error) {
+        return relationFailure("alias_of", "source", source, "target",
+                               error.target, error.usr, error.detail);
+      })
+      .and_then([&](SymbolId targetId) {
+        return extractAliasTemplateArguments(node, store)
+            .transform([targetId](std::vector<TemplateArgument> arguments) {
+              return AliasFacts{targetId, std::move(arguments)};
+            })
+            .transform_error([&](ExtractionError error) {
+              return relationFailure("alias_of", "source", source, "target",
+                                     target, "<unavailable>",
+                                     extractionErrorName(error));
+            });
+      });
 }
 
-void collectAlias(clang::TypedefNameDecl &node, clang::ASTContext &context,
-                  FileManager &files, FactStore &store) {
-  auto facts = extractAliasFacts(node, store);
-  if (!facts) {
-    return;
-  }
+IndexingResult collectAlias(clang::TypedefNameDecl &node,
+                            clang::ASTContext &context, FileManager &files,
+                            FactStore &store) {
+  return withContext(extractAliasFacts(node, store),
+                     "cannot extract alias facts for '" +
+                         node.getQualifiedNameAsString() + "'")
+      .and_then([&](AliasFacts facts) {
+        auto [target, arguments] = std::move(facts);
+        const auto sourceName = node.getQualifiedNameAsString();
+        const auto targetName = node.getUnderlyingType().getAsString();
+        const auto stored = [&store, target, sourceName, targetName,
+                             arguments =
+                                 std::move(arguments)](SymbolId source) {
+          if (target.file == builtinFileId) {
+            return IndexingResult{};
+          }
+          const std::array relations{Relation{
+              .source = source,
+              .destination = target,
+              .kind = RelationKind::AliasOf,
+          }};
+          return store.addRelations(relations)
+              .transform_error([&](std::error_code error) {
+                return relationFailure("alias_of", "source", sourceName,
+                                       "target", targetName, "<unavailable>",
+                                       error.message());
+              })
+              .and_then([&]() {
+                return withContext(
+                    store.addTemplateArguments(source, arguments),
+                    "cannot persist alias template arguments for '" +
+                        sourceName + "'");
+              });
+        };
 
-  auto [target, arguments] = std::move(*facts);
-  const auto stored = [&store, target,
-                       arguments = std::move(arguments)](SymbolId source) {
-    const std::array relations{Relation{
-        .source = source,
-        .destination = target,
-        .kind = RelationKind::AliasOf,
-    }};
-    return store.addRelations(relations).and_then(
-        [&]() { return store.addTemplateArguments(source, arguments); });
-  };
-
-  storeExtracted(node,
-                 extractSymbol<Symbol>(static_cast<clang::NamedDecl &>(node),
-                                       context.getSourceManager()),
-                 context, files, store, stored);
+        return storeExtracted(
+            node,
+            extractSymbol<Symbol>(static_cast<clang::NamedDecl &>(node),
+                                  context.getSourceManager()),
+            context, files, store, stored);
+      });
 }
 
 } // namespace
 
-void collectSymbol(clang::NamedDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store) {
+IndexingResult collectSymbol(clang::NamedDecl &node, clang::ASTContext &context,
+                             FileManager &files, FactStore &store) {
   if (hasSpecializedExtractor(node)) {
-    return;
+    return {};
   }
 
   if (auto *alias = llvm::dyn_cast<clang::TypedefNameDecl>(&node)) {
-    collectAlias(*alias, context, files, store);
-    return;
+    return collectAlias(*alias, context, files, store);
   }
 
-  storeExtracted(node,
-                 extractSymbol<Symbol>(node, context.getSourceManager())
-                     .transform([](Symbol symbol) {
-                       return classifySymbol(std::move(symbol));
-                     }),
-                 context, files, store);
+  return storeExtracted(node,
+                        extractSymbol<Symbol>(node, context.getSourceManager())
+                            .transform([](Symbol symbol) {
+                              return classifySymbol(std::move(symbol));
+                            }),
+                        context, files, store);
 }
 
 } // namespace facts
