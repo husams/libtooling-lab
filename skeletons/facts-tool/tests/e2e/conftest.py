@@ -20,6 +20,7 @@ pytest_plugins = (
     "steps.parameter_default_steps",
     "steps.parameter_steps",
     "steps.record_steps",
+    "steps.stored_compilation_steps",
     "steps.symbol_identity_steps",
     "steps.symbol_inventory_steps",
     "steps.symbol_stability_steps",

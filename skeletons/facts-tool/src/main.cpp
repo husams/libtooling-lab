@@ -20,6 +20,7 @@
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
 #include "tooling/CompilationFiles.h"
+#include "tooling/StoredCompilationDatabase.h"
 
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <filesystem>
+#include <string_view>
 #include <vector>
 
 static llvm::cl::OptionCategory toolCategory("facts-tool options");
@@ -43,11 +45,36 @@ static llvm::cl::opt<std::string>
              llvm::cl::value_desc("file"), llvm::cl::init("files.db"),
              llvm::cl::cat(toolCategory));
 
+namespace {
+
+std::string storedDatabaseArgument(int argc, const char **argv) {
+  constexpr std::string_view option = "--files-out";
+  for (int index = 1; index < argc; ++index) {
+    const std::string_view argument = argv[index];
+    if (argument == option && index + 1 < argc) {
+      return argv[index + 1];
+    }
+    if (argument.starts_with(option) && argument.size() > option.size() &&
+        argument[option.size()] == '=') {
+      return std::string(argument.substr(option.size() + 1));
+    }
+  }
+  return "files.db";
+}
+
+} // namespace
+
 int main(int argc, const char **argv) {
+  facts::configureStoredCompilationDatabase(storedDatabaseArgument(argc, argv));
   auto options =
       clang::tooling::CommonOptionsParser::create(argc, argv, toolCategory);
   if (!options) {
     llvm::errs() << llvm::toString(options.takeError());
+    return 1;
+  }
+  if (const auto error = facts::storedCompilationDatabaseError()) {
+    llvm::errs() << "facts-tool: invalid stored compile options: " << *error
+                 << '\n';
     return 1;
   }
 

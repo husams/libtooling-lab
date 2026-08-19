@@ -67,9 +67,10 @@ target_link_libraries(facts-storage
 
 add_library(facts-tooling STATIC
   src/tooling/CompilationFiles.cpp
+  src/tooling/StoredCompilationDatabase.cpp
 )
 target_include_directories(facts-tooling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(facts-tooling PRIVATE facts-clang)
+target_link_libraries(facts-tooling PRIVATE facts-clang SQLite3::SQLite3)
 
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
@@ -160,6 +161,16 @@ if(BUILD_TESTING)
     COMMAND compilation-files-test
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_one.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures
+  )
+  add_executable(stored-compilation-database-test
+                 tests/StoredCompilationDatabaseTest.cpp)
+  target_link_libraries(stored-compilation-database-test
+                        PRIVATE facts-tooling facts-storage facts-clang
+                                SQLite3::SQLite3)
+  add_test(
+    NAME stored-compilation-database
+    COMMAND stored-compilation-database-test
+            ${CMAKE_CURRENT_BINARY_DIR}/stored-compilation-database.sqlite
   )
   add_executable(storage-schema-test tests/StorageSchemaTest.cpp)
   target_link_libraries(storage-schema-test PRIVATE facts-storage facts-model
