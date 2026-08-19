@@ -136,12 +136,28 @@ class FactsToolContext:
         self._select_facts_database("missing-stored-command-facts.sqlite")
         self._run(self.stored_tool_command())
 
+    def run_with_deprecated_files_out_option(self) -> None:
+        self.prepare()
+        self._select_facts_database("deprecated-files-out-facts.sqlite")
+        self._run(
+            [
+                str(self.facts_tool),
+                "-p",
+                str(self.run_root_path),
+                "--facts-out",
+                str(self.facts_database_path),
+                "--files-out",
+                str(self.files_database_path),
+                *(str(source) for source in self.sources),
+            ]
+        )
+
     def stored_tool_command(self) -> list[str]:
         return [
             str(self.facts_tool),
             "--facts-out",
             str(self.facts_database_path),
-            "--files-out",
+            "--project-config",
             str(self.files_database_path),
             *(str(source) for source in self.sources),
         ]
@@ -178,7 +194,7 @@ class FactsToolContext:
             str(self.run_root_path),
             "--facts-out",
             str(self.facts_database_path),
-            "--files-out",
+            "--project-config",
             str(self.files_database_path),
             *(str(source) for source in self.sources),
         ]

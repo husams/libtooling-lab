@@ -135,7 +135,7 @@
         "./build/facts-tool",
         "--facts-out",
         "build/symbol-storage-smoke-facts.sqlite",
-        "--files-out",
+        "--project-config",
         "build/symbol-storage-smoke-files.sqlite",
         "tests/fixtures/tu_one.cpp",
         "tests/fixtures/tu_two.cpp",

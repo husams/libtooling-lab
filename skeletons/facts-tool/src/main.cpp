@@ -40,15 +40,16 @@ static llvm::cl::opt<std::string>
              llvm::cl::value_desc("file"), llvm::cl::init("facts.db"),
              llvm::cl::cat(toolCategory));
 
-static llvm::cl::opt<std::string>
-    filesOut("files-out", llvm::cl::desc("SQLite file identity registry"),
-             llvm::cl::value_desc("file"), llvm::cl::init("files.db"),
-             llvm::cl::cat(toolCategory));
+static llvm::cl::opt<std::string> projectConfig(
+    "project-config",
+    llvm::cl::desc("SQLite project configuration and file registry"),
+    llvm::cl::value_desc("database"), llvm::cl::init("project.db"),
+    llvm::cl::cat(toolCategory));
 
 namespace {
 
-std::string storedDatabaseArgument(int argc, const char **argv) {
-  constexpr std::string_view option = "--files-out";
+std::string projectDatabaseArgument(int argc, const char **argv) {
+  constexpr std::string_view option = "--project-config";
   for (int index = 1; index < argc; ++index) {
     const std::string_view argument = argv[index];
     if (argument == option && index + 1 < argc) {
@@ -59,13 +60,14 @@ std::string storedDatabaseArgument(int argc, const char **argv) {
       return std::string(argument.substr(option.size() + 1));
     }
   }
-  return "files.db";
+  return "project.db";
 }
 
 } // namespace
 
 int main(int argc, const char **argv) {
-  facts::configureStoredCompilationDatabase(storedDatabaseArgument(argc, argv));
+  facts::configureStoredCompilationDatabase(
+      projectDatabaseArgument(argc, argv));
   auto options =
       clang::tooling::CommonOptionsParser::create(argc, argv, toolCategory);
   if (!options) {
@@ -80,14 +82,15 @@ int main(int argc, const char **argv) {
 
   const auto factsPath =
       std::filesystem::absolute(factsOut.getValue()).lexically_normal();
-  const auto filesPath =
-      std::filesystem::absolute(filesOut.getValue()).lexically_normal();
-  if (factsPath == filesPath) {
-    llvm::errs() << "facts-tool: facts and files require separate databases\n";
+  const auto projectPath =
+      std::filesystem::absolute(projectConfig.getValue()).lexically_normal();
+  if (factsPath == projectPath) {
+    llvm::errs()
+        << "facts-tool: facts and project config require separate databases\n";
     return 1;
   }
 
-  facts::FileManager files(filesOut);
+  facts::FileManager files(projectConfig);
   const auto importFiles = [&files](std::vector<std::string> paths) {
     return files.addBulk(paths);
   };

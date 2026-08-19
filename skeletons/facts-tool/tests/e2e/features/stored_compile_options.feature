@@ -35,3 +35,9 @@ Feature: Stored compilation options
     When the real facts-tool runs without a stored command for two.cpp
     Then the facts-tool run fails
     And the diagnostic mentions the missing compile command for two.cpp
+
+  Scenario: Project configuration replaces the ambiguous file output option
+    Given realistic shared-header declarations, definitions, parameters, and relations
+    When the real facts-tool is invoked with the deprecated --files-out option
+    Then the facts-tool run fails
+    And the diagnostic reports --files-out as an unknown option
