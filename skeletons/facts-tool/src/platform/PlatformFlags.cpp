@@ -1,6 +1,12 @@
 #include "platform/PlatformFlags.h"
 
+// GetResourcesPath moved into the clangOptions library in LLVM 22; before that
+// it was a static member of the driver.
+#if __has_include("clang/Options/OptionUtils.h")
 #include "clang/Options/OptionUtils.h"
+#else
+#include "clang/Driver/Driver.h"
+#endif
 #include "clang/Tooling/ArgumentsAdjusters.h"
 #include "clang/Tooling/Tooling.h"
 
@@ -16,8 +22,12 @@ namespace {
 // The builtin-header dir comes from the LLVM install this binary is linked
 // against — dladdr finds its libclang-cpp.dylib.
 void addResourceDir(ClangTool &tool) {
+#if __has_include("clang/Options/OptionUtils.h")
   auto *resourcePathFn =
       static_cast<std::string (*)(llvm::StringRef)>(&clang::GetResourcesPath);
+#else
+  auto *resourcePathFn = &clang::driver::Driver::GetResourcesPath;
+#endif
   Dl_info info;
   if (dladdr((void *)resourcePathFn, &info))
     tool.appendArgumentsAdjuster(getInsertArgumentAdjuster(
