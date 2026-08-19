@@ -9,6 +9,7 @@ Feature: Canonical source file registry
     Then the file registry contains these canonical fixture paths
       | fixture   |
       | shared.hpp |
+      | system/external_base.hpp |
       | one.cpp    |
       | two.cpp    |
     And every registered FileId is greater than zero

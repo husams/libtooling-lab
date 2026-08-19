@@ -1,5 +1,7 @@
 #pragma once
 
+#include <external_base.hpp>
+
 namespace e2e {
 
 struct Widget;
@@ -100,6 +102,8 @@ public:
 };
 
 struct PublicWidget : Widget {};
+
+struct ExternalWidget : external::Base {};
 
 class PrivateWidget : Widget {};
 

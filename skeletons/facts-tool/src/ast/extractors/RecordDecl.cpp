@@ -14,8 +14,10 @@
 #include <clang/AST/DeclCXX.h>
 #include <clang/AST/DeclTemplate.h>
 #include <clang/AST/Type.h>
+#include <clang/Basic/SourceManager.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <expected>
 #include <optional>
@@ -28,45 +30,110 @@
 namespace facts {
 namespace {
 
-using RelationResult = std::expected<Relation, std::error_code>;
-using RelationsResult = std::expected<std::vector<Relation>, std::error_code>;
+struct InheritanceRelation {
+  Relation relation;
+  std::string baseName;
+  std::string usr;
+};
 
-std::error_code toErrorCode(ExtractionError) {
-  return std::make_error_code(std::errc::invalid_argument);
+using RelationResult = std::expected<InheritanceRelation, IndexingError>;
+
+IndexingError inheritanceFailure(std::string_view derived,
+                                 std::string_view base, std::string_view usr,
+                                 std::string_view detail) {
+  return IndexingError{"cannot persist relation=inheritance derived='" +
+                       std::string{derived} + "' base='" + std::string{base} +
+                       "' usr='" + std::string{usr} +
+                       "': " + std::string{detail}};
 }
 
-RelationResult extractInheritanceRelation(const clang::CXXBaseSpecifier &base,
-                                          SymbolId source,
-                                          std::uint16_t position,
-                                          FactStore &store) {
+std::expected<FileId, std::error_code>
+registerExternalFile(const clang::CXXRecordDecl &base,
+                     const clang::SourceManager &sourceManager,
+                     FileManager &files) {
+  const auto expansion = sourceManager.getExpansionLoc(base.getLocation());
+  if (expansion.isInvalid()) {
+    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+  }
+
+  return extractFilePath(sourceManager, sourceManager.getFileID(expansion))
+      .and_then([&files](std::string path) {
+        const std::array paths{path};
+        return files.addBulk(paths).and_then(
+            [&files, path = std::move(path)] { return files.getId(path); });
+      });
+}
+
+Symbol externalSymbol(const clang::CXXRecordDecl &base, std::string usr) {
+  Symbol symbol{};
+  static_cast<clang::index::SymbolInfo &>(symbol) =
+      clang::index::getSymbolInfo(&base);
+  symbol.usr = std::move(usr);
+  symbol.qualifiedName = base.getQualifiedNameAsString();
+  symbol.flags = bit(ExternalBit);
+  return symbol;
+}
+
+std::expected<SymbolId, std::error_code> findOrStoreInheritanceTarget(
+    const clang::CXXRecordDecl &base, const clang::SourceManager &sourceManager,
+    FileManager &files, FactStore &store, const std::string &usr) {
+  return store.findId(usr).and_then(
+      [&](std::optional<SymbolId> destination)
+          -> std::expected<SymbolId, std::error_code> {
+        if (destination) {
+          return *destination;
+        }
+        return registerExternalFile(base, sourceManager, files)
+            .and_then([&](FileId file) {
+              return store.save(file, externalSymbol(base, usr));
+            });
+      });
+}
+
+RelationResult extractInheritanceRelation(
+    const clang::CXXBaseSpecifier &base, SymbolId source,
+    std::uint16_t position, const clang::SourceManager &sourceManager,
+    FileManager &files, FactStore &store, std::string_view derivedName) {
   const auto *parent = base.getType()->getAsCXXRecordDecl();
   if (!parent) {
     return std::unexpected(
-        std::make_error_code(std::errc::operation_not_supported));
+        inheritanceFailure(derivedName, base.getType().getAsString(),
+                           "<unavailable>", "base declaration is unavailable"));
   }
 
-  const auto toRelation =
-      [&](std::optional<SymbolId> destination) -> RelationResult {
-    if (!destination) {
-      return std::unexpected(
-          std::make_error_code(std::errc::no_such_file_or_directory));
-    }
-
+  const auto baseName = parent->getQualifiedNameAsString();
+  const auto toRelation = [&](SymbolId destination,
+                              std::string usr) -> InheritanceRelation {
     auto flags = static_cast<std::uint32_t>(base.getAccessSpecifier());
     if (base.isVirtual()) {
       flags |= bit(VirtualBaseBit);
     }
-    return Relation{.source = source,
-                    .destination = *destination,
-                    .kind = RelationKind::Inherits,
-                    .flags = static_cast<std::uint16_t>(flags),
-                    .position = position};
+    return InheritanceRelation{
+        .relation = Relation{.source = source,
+                             .destination = destination,
+                             .kind = RelationKind::Inherits,
+                             .flags = static_cast<std::uint16_t>(flags),
+                             .position = position},
+        .baseName = baseName,
+        .usr = std::move(usr)};
   };
 
   return extractUsr(*parent)
-      .transform_error(toErrorCode)
-      .and_then([&store](std::string usr) { return store.findId(usr); })
-      .and_then(toRelation);
+      .transform_error([&](ExtractionError error) {
+        return inheritanceFailure(derivedName, baseName, "<unavailable>",
+                                  extractionErrorName(error));
+      })
+      .and_then([&](std::string usr) -> RelationResult {
+        return findOrStoreInheritanceTarget(*parent, sourceManager, files,
+                                            store, usr)
+            .transform_error([&](std::error_code error) {
+              return inheritanceFailure(derivedName, baseName, usr,
+                                        error.message());
+            })
+            .transform([&](SymbolId destination) {
+              return toRelation(destination, std::move(usr));
+            });
+      });
 }
 
 } // namespace
@@ -89,15 +156,18 @@ extractRecord(const clang::CXXRecordDecl &node,
 
 namespace {
 
-std::expected<void, std::error_code>
+IndexingResult
 storeInheritanceRelations(const clang::CXXRecordDecl &node, SymbolId source,
-                          FactStore &store) {
+                          const clang::SourceManager &sourceManager,
+                          FileManager &files, FactStore &store) {
+  const auto derivedName = node.getQualifiedNameAsString();
   auto relationResults =
       std::views::zip(std::views::iota(0U), node.bases()) |
       std::views::transform([&](auto indexedBase) {
         auto [position, base] = indexedBase;
         return extractInheritanceRelation(
-            base, source, static_cast<std::uint16_t>(position), store);
+            base, source, static_cast<std::uint16_t>(position), sourceManager,
+            files, store, derivedName);
       }) |
       std::ranges::to<std::vector>();
 
@@ -114,33 +184,50 @@ storeInheritanceRelations(const clang::CXXRecordDecl &node, SymbolId source,
                      return std::move(relation).value();
                    }) |
                    std::ranges::to<std::vector>();
-  return store.addRelations(relations);
+  if (relations.empty()) {
+    return {};
+  }
+  auto relationValues =
+      relations |
+      std::views::transform([](const InheritanceRelation &relation) {
+        return relation.relation;
+      }) |
+      std::ranges::to<std::vector>();
+  return store.addRelations(relationValues)
+      .transform_error([&](std::error_code error) {
+        const auto &relation = relations.front();
+        return inheritanceFailure(derivedName, relation.baseName, relation.usr,
+                                  error.message());
+      });
 }
 
 } // namespace
 
-void collectSymbol(clang::CXXRecordDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store, bool isDefinition) {
-  const auto storeRelations =
-      [&](SymbolId source) -> std::expected<void, std::error_code> {
-    return isDefinition ? storeInheritanceRelations(node, source, store)
-                        : std::expected<void, std::error_code>{};
+IndexingResult collectSymbol(clang::CXXRecordDecl &node,
+                             clang::ASTContext &context, FileManager &files,
+                             FactStore &store, bool isDefinition) {
+  const auto storeRelations = [&](SymbolId source) -> IndexingResult {
+    return isDefinition ? storeInheritanceRelations(node, source,
+                                                    context.getSourceManager(),
+                                                    files, store)
+                        : IndexingResult{};
   };
 
   if (const auto *instance =
           llvm::dyn_cast<clang::ClassTemplateSpecializationDecl>(&node)) {
-    const auto storeInstanceRelations =
-        [&](SymbolId source) -> std::expected<void, std::error_code> {
+    const auto storeInstanceRelations = [&](SymbolId source) -> IndexingResult {
       return storeRelations(source).and_then([&] {
-        return storeRecordInstanceRelations(*instance, source, store);
+        return withContext(
+            storeRecordInstanceRelations(*instance, source, store),
+            "cannot persist record-instance relations for '" +
+                node.getQualifiedNameAsString() + "'");
       });
     };
 
-    storeExtracted(
+    return storeExtracted(
         node,
         extractRecordInstance(*instance, context.getSourceManager(), store),
         context, files, store, storeInstanceRelations);
-    return;
   }
 
   if (const auto *templateDeclaration = node.getDescribedClassTemplate()) {
@@ -156,14 +243,13 @@ void collectSymbol(clang::CXXRecordDecl &node, clang::ASTContext &context,
           });
     };
 
-    storeExtracted(node,
-                   extractRecord(node, context.getSourceManager()) | toTemplate,
-                   context, files, store, storeRelations);
-    return;
+    return storeExtracted(
+        node, extractRecord(node, context.getSourceManager()) | toTemplate,
+        context, files, store, storeRelations);
   }
 
-  storeExtracted(node, extractRecord(node, context.getSourceManager()), context,
-                 files, store, storeRelations);
+  return storeExtracted(node, extractRecord(node, context.getSourceManager()),
+                        context, files, store, storeRelations);
 }
 
 } // namespace facts

@@ -70,17 +70,17 @@ extractVariable(const clang::VarDecl &node,
       .and_then(addDefinition);
 }
 
-void collectSymbol(clang::VarDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store) {
+IndexingResult collectSymbol(clang::VarDecl &node, clang::ASTContext &context,
+                             FileManager &files, FactStore &store) {
   if (!supportedVariable(node)) {
-    return;
+    return {};
   }
 
   const auto storeRelations = [&](SymbolId variable) {
     return storeValueRelations(node, variable, store);
   };
-  storeExtracted(node, extractVariable(node, context.getSourceManager()),
-                 context, files, store, storeRelations);
+  return storeExtracted(node, extractVariable(node, context.getSourceManager()),
+                        context, files, store, storeRelations);
 }
 
 } // namespace facts

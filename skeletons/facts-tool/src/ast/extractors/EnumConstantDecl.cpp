@@ -107,13 +107,15 @@ extractEnumerator(const clang::EnumConstantDecl &node,
       .and_then(addDefinition);
 }
 
-void collectSymbol(clang::EnumConstantDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store) {
+IndexingResult collectSymbol(clang::EnumConstantDecl &node,
+                             clang::ASTContext &context, FileManager &files,
+                             FactStore &store) {
   const auto storeRelation = [&](SymbolId enumerator) {
     return storeEnumerationRelation(node, enumerator, store);
   };
-  storeExtracted(node, extractEnumerator(node, context.getSourceManager()),
-                 context, files, store, storeRelation);
+  return storeExtracted(node,
+                        extractEnumerator(node, context.getSourceManager()),
+                        context, files, store, storeRelation);
 }
 
 } // namespace facts

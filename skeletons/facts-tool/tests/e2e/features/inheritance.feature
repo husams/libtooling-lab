@@ -10,7 +10,7 @@ Feature: C++ record inheritance
     Then the persisted direct inheritance fields include
       | source   | destination   | kind   | position   | access   | is_virtual_base   | is_implicit   | is_lexical   | count   |
       | <source> | <destination> | <kind> | <position> | <access> | <is_virtual_base> | <is_implicit> | <is_lexical> | <count> |
-    And exactly 5 direct inheritance relations are stored
+    And exactly 6 direct inheritance relations are stored
 
     Examples:
       | source               | destination | kind | position | access    | is_virtual_base | is_implicit | is_lexical | count |
@@ -18,3 +18,11 @@ Feature: C++ record inheritance
       | e2e::CompositeWidget | e2e::Policy | 2    | 1        | protected | 1               | 0           | 0          | 1     |
       | e2e::PrivateWidget   | e2e::Widget | 2    | 0        | private   | 0               | 0           | 0          | 1     |
       | e2e::PublicWidget    | e2e::Widget | 2    | 0        | public    | 0               | 0           | 0          | 1     |
+
+  Scenario: Preserve a lightweight target for a filtered system-header base
+    Then the external inheritance target is queryable without its header body
+
+  Scenario: Report a genuine post-save relation failure as incomplete indexing
+    When relation persistence is forced to fail on a rerun
+    Then the indexing command exits unsuccessfully
+    And the relation failure diagnostic identifies both symbols and the base USR

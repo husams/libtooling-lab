@@ -30,6 +30,7 @@ Feature: Extracted symbol and fact inventory
       | 2    | e2e::ClassTemplate      |
       | 2    | e2e::ConstClass         |
       | 2    | e2e::Deferred           |
+      | 2    | e2e::ExternalWidget     |
       | 2    | e2e::MethodFixture      |
       | 2    | e2e::MethodTemplateFixture |
       | 2    | e2e::InitializerFixture |
@@ -68,6 +69,7 @@ Feature: Extracted symbol and fact inventory
       | 5    | e2e::StructAlias        |
       | 5    | e2e::WidgetAlias        |
       | 5    | e2e::WidgetTypedef      |
+      | 5    | external::Base          |
       | 6    | e2e::Mode::Fast         |
       | 6    | e2e::Mode::Later        |
       | 6    | e2e::Mode::Slow         |

@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_AST_EXTRACTORS_ENUMCONSTANTDECL_H
 #define FACTS_TOOL_AST_EXTRACTORS_ENUMCONSTANTDECL_H
 
+#include "ast/Indexing.h"
 #include "ast/extractors/Extraction.h"
 #include "model/Enumerator.h"
 
@@ -18,8 +19,9 @@ ExtractionResult<Enumerator>
 extractEnumerator(const clang::EnumConstantDecl &node,
                   const clang::SourceManager &sourceManager);
 
-void collectSymbol(clang::EnumConstantDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store);
+IndexingResult collectSymbol(clang::EnumConstantDecl &node,
+                             clang::ASTContext &context, FileManager &files,
+                             FactStore &store);
 
 } // namespace facts
 

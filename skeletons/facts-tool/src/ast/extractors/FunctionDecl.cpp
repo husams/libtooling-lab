@@ -60,8 +60,9 @@ extractFunction(const clang::FunctionDecl &node,
       .and_then(addParameterList);
 }
 
-void collectSymbol(clang::FunctionDecl &node, clang::ASTContext &context,
-                   FileManager &files, FactStore &store) {
+IndexingResult collectSymbol(clang::FunctionDecl &node,
+                             clang::ASTContext &context, FileManager &files,
+                             FactStore &store) {
   const auto storeRelations = [&](SymbolId function) {
     return storeMethodRelation(node, function, store);
   };
@@ -76,11 +77,10 @@ void collectSymbol(clang::FunctionDecl &node, clang::ASTContext &context,
       });
     };
 
-    storeExtracted(node,
-                   extractFunction(node, context.getSourceManager(), store) |
-                       toInstance,
-                   context, files, store, storeInstanceRelations);
-    return;
+    return storeExtracted(
+        node,
+        extractFunction(node, context.getSourceManager(), store) | toInstance,
+        context, files, store, storeInstanceRelations);
   }
 
   if (const auto *templateDeclaration = node.getDescribedFunctionTemplate()) {
@@ -90,15 +90,15 @@ void collectSymbol(clang::FunctionDecl &node, clang::ASTContext &context,
                                 store);
     };
 
-    storeExtracted(node,
-                   extractFunction(node, context.getSourceManager(), store) |
-                       toTemplate,
-                   context, files, store, storeRelations);
-    return;
+    return storeExtracted(
+        node,
+        extractFunction(node, context.getSourceManager(), store) | toTemplate,
+        context, files, store, storeRelations);
   }
 
-  storeExtracted(node, extractFunction(node, context.getSourceManager(), store),
-                 context, files, store, storeRelations);
+  return storeExtracted(
+      node, extractFunction(node, context.getSourceManager(), store), context,
+      files, store, storeRelations);
 }
 
 } // namespace facts

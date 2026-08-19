@@ -91,14 +91,21 @@ class FactsToolContext:
 
     def rerun_from_stored_compile_options(self) -> None:
         self.extract()
-        self._store_compile_options(["-std=c++23", f"-I{self.fixture_root}"])
+        self._store_compile_options(self._compile_options())
         self._remove_compilation_database()
         self._select_facts_database("stored-facts.sqlite")
         self._run(self.stored_tool_command())
 
     def rerun_from_labeled_stored_compile_options(self) -> None:
         self.extract()
-        self._store_compile_options(["-std=c++23", "-I<fixture>"])
+        self._store_compile_options(
+            [
+                "-std=c++23",
+                "-I<fixture>",
+                "-isystem",
+                str(self.fixture_root / "system"),
+            ]
+        )
         with sqlite3.connect(self.files_database_path) as connection:
             connection.execute(
                 "CREATE TABLE label(name TEXT PRIMARY KEY, path TEXT NOT NULL)"
@@ -126,7 +133,7 @@ class FactsToolContext:
 
     def run_with_missing_stored_command(self, filename: str) -> None:
         self.extract()
-        self._store_compile_options(["-std=c++23", f"-I{self.fixture_root}"])
+        self._store_compile_options(self._compile_options())
         with sqlite3.connect(self.files_database_path) as connection:
             connection.execute(
                 "UPDATE file SET compile_options=NULL,driver=NULL WHERE name=?",
@@ -152,6 +159,17 @@ class FactsToolContext:
             ]
         )
 
+    def force_relation_persistence_failure(self) -> None:
+        self.extract()
+        with sqlite3.connect(self.facts_database_path) as connection:
+            connection.execute(
+                "CREATE TRIGGER force_relation_failure "
+                "BEFORE INSERT ON relation BEGIN "
+                "SELECT RAISE(ABORT, 'forced relation persistence failure'); "
+                "END"
+            )
+        self._run(self.tool_command())
+
     def stored_tool_command(self) -> list[str]:
         return [
             str(self.facts_tool),
@@ -172,6 +190,14 @@ class FactsToolContext:
 
     def _store_compile_options(self, options: list[str]) -> None:
         self._set_raw_compile_options(json.dumps(options))
+
+    def _compile_options(self) -> list[str]:
+        return [
+            "-std=c++23",
+            f"-I{self.fixture_root}",
+            "-isystem",
+            str(self.fixture_root / "system"),
+        ]
 
     def _set_raw_compile_options(self, options: str) -> None:
         with sqlite3.connect(self.files_database_path) as connection:
@@ -223,6 +249,8 @@ class FactsToolContext:
                     str(self.compiler),
                     "-std=c++23",
                     f"-I{self.fixture_root}",
+                    "-isystem",
+                    str(self.fixture_root / "system"),
                     "-c",
                     str(source),
                 ],
