@@ -16,6 +16,11 @@ Feature: Facts and file storage boundaries
     And the facts database excludes the file table
     And no facts table stores opaque packed flags
     And the files database contains only these tables
-      | table |
-      | file  |
+      | table             |
+      | clone             |
+      | component         |
+      | directory         |
+      | file              |
+      | repository        |
+      | semantic_universe |
     And the facts and files databases use different paths

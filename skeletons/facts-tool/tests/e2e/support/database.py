@@ -35,7 +35,30 @@ def table_names(database: Path) -> set[str]:
 
 
 def file_snapshot(database: Path) -> list[tuple]:
-    return query(database, "SELECT id,path FROM file ORDER BY id")
+    rows = query(
+        database,
+        "SELECT file.id, component.path, component.version, "
+        "component.repository_id, clone.path, directory.path, file.name "
+        "FROM file JOIN directory ON directory.id=file.directory_id "
+        "JOIN component ON component.id=directory.component_id "
+        "LEFT JOIN repository ON repository.id=component.repository_id "
+        "LEFT JOIN clone ON clone.id=repository.active_clone_id "
+        "ORDER BY file.id",
+    )
+    result = []
+    for file_id, component, version, repository_id, clone, directory, name in rows:
+        component_path = Path(component)
+        effective = component_path / version if version else component_path
+        clone_anchored = (
+            repository_id is not None
+            and not component_path.is_absolute()
+            and clone
+            and "<" not in component
+            and "$" not in component
+        )
+        root = Path(clone) / effective if clone_anchored else effective
+        result.append((file_id, str((root / directory / name).resolve())))
+    return result
 
 
 def symbol_snapshot(database: Path) -> list[tuple]:

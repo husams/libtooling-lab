@@ -3,6 +3,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import os
+import sqlite3
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -24,6 +25,8 @@ class FactsToolContext:
     files_database: Optional[Path] = None
     initial_files: list[tuple] = field(default_factory=list)
     initial_symbols: list[tuple] = field(default_factory=list)
+    last_returncode: Optional[int] = None
+    last_output: str = ""
     prepared: bool = False
     extracted: bool = False
 
@@ -71,23 +74,102 @@ class FactsToolContext:
         self.extracted = True
 
     def run_tool(self) -> str:
-        completed = subprocess.run(
-            self.tool_command(), capture_output=True, text=True, check=False
-        )
-        output = completed.stdout + completed.stderr
+        completed = self._run(self.tool_command())
         require(
             completed.returncode == 0,
-            f"facts-tool exited with {completed.returncode}:\n{output}",
+            f"facts-tool exited with {completed.returncode}:\n{self.last_output}",
         )
         require(
-            "symbol(s) recorded" in output,
-            f"missing extraction summary:\n{output}",
+            "symbol(s) recorded" in self.last_output,
+            f"missing extraction summary:\n{self.last_output}",
         )
-        return output
+        return self.last_output
 
     def run_concurrently(self) -> list[str]:
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             return list(executor.map(lambda _: self.run_tool(), range(2)))
+
+    def rerun_from_stored_compile_options(self) -> None:
+        self.extract()
+        self._store_compile_options(["-std=c++23", f"-I{self.fixture_root}"])
+        self._remove_compilation_database()
+        self._select_facts_database("stored-facts.sqlite")
+        self._run(self.stored_tool_command())
+
+    def rerun_from_labeled_stored_compile_options(self) -> None:
+        self.extract()
+        self._store_compile_options(["-std=c++23", "-I<fixture>"])
+        with sqlite3.connect(self.files_database_path) as connection:
+            connection.execute(
+                "CREATE TABLE label(name TEXT PRIMARY KEY, path TEXT NOT NULL)"
+            )
+            connection.execute(
+                "INSERT INTO label(name,path) VALUES('fixture',?)",
+                (str(self.fixture_root),),
+            )
+        self._remove_compilation_database()
+        self._select_facts_database("labeled-stored-facts.sqlite")
+        self._run(self.stored_tool_command())
+
+    def rerun_with_json_over_malformed_stored_options(self) -> None:
+        self.extract()
+        self._set_raw_compile_options('{"invalid":true}')
+        self._select_facts_database("json-precedence-facts.sqlite")
+        self._run(self.tool_command())
+
+    def run_with_malformed_stored_options(self) -> None:
+        self.extract()
+        self._set_raw_compile_options('{"invalid":true}')
+        self._remove_compilation_database()
+        self._select_facts_database("malformed-stored-facts.sqlite")
+        self._run(self.stored_tool_command())
+
+    def run_with_missing_stored_command(self, filename: str) -> None:
+        self.extract()
+        self._store_compile_options(["-std=c++23", f"-I{self.fixture_root}"])
+        with sqlite3.connect(self.files_database_path) as connection:
+            connection.execute(
+                "UPDATE file SET compile_options=NULL,driver=NULL WHERE name=?",
+                (filename,),
+            )
+        self._remove_compilation_database()
+        self._select_facts_database("missing-stored-command-facts.sqlite")
+        self._run(self.stored_tool_command())
+
+    def stored_tool_command(self) -> list[str]:
+        return [
+            str(self.facts_tool),
+            "--facts-out",
+            str(self.facts_database_path),
+            "--files-out",
+            str(self.files_database_path),
+            *(str(source) for source in self.sources),
+        ]
+
+    def _run(self, command: list[str]) -> subprocess.CompletedProcess[str]:
+        completed = subprocess.run(
+            command, capture_output=True, text=True, check=False
+        )
+        self.last_returncode = completed.returncode
+        self.last_output = completed.stdout + completed.stderr
+        return completed
+
+    def _store_compile_options(self, options: list[str]) -> None:
+        self._set_raw_compile_options(json.dumps(options))
+
+    def _set_raw_compile_options(self, options: str) -> None:
+        with sqlite3.connect(self.files_database_path) as connection:
+            connection.execute(
+                "UPDATE file SET driver=?,compile_options=? "
+                "WHERE name IN ('one.cpp','two.cpp')",
+                (str(self.compiler), options),
+            )
+
+    def _remove_compilation_database(self) -> None:
+        (self.run_root_path / "compile_commands.json").unlink()
+
+    def _select_facts_database(self, filename: str) -> None:
+        self.facts_database = self.run_root_path / filename
 
     def tool_command(self) -> list[str]:
         return [

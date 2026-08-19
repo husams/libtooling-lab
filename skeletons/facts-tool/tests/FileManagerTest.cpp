@@ -53,6 +53,107 @@ int main(int argc, char **argv) {
   assert(scalar(database, "SELECT COUNT(*) FROM file WHERE id=0") == 0);
   assert(scalar(database, "SELECT COUNT(*) FROM file") == 2);
   assert(scalar(database,
-                "SELECT COUNT(*) FROM file WHERE path NOT GLOB '/*'") == 0);
+                "SELECT COUNT(*) FROM directory WHERE path GLOB '/*'") == 0);
+  assert(scalar(database, "SELECT COUNT(*) FROM component WHERE path='/'") ==
+         1);
+  assert(scalar(database, "SELECT COUNT(*) FROM file WHERE name GLOB '*/*'") ==
+         0);
+  assert(scalar(database, "SELECT COUNT(*) FROM pragma_table_info('file') "
+                          "WHERE name IN ('directory_id', 'name')") == 2);
   sqlite3_close(database);
+
+  const auto legacyPath = databasePath.string() + ".legacy";
+  std::filesystem::remove(legacyPath);
+  sqlite3 *legacyDatabase = nullptr;
+  assert(sqlite3_open(legacyPath.c_str(), &legacyDatabase) == SQLITE_OK);
+  assert(sqlite3_exec(legacyDatabase,
+                      "CREATE TABLE file(id INTEGER PRIMARY KEY, "
+                      "path TEXT NOT NULL UNIQUE)",
+                      nullptr, nullptr, nullptr) == SQLITE_OK);
+  sqlite3_stmt *legacyInsert = nullptr;
+  assert(sqlite3_prepare_v2(legacyDatabase,
+                            "INSERT INTO file(id, path) VALUES(17, ?1)", -1,
+                            &legacyInsert, nullptr) == SQLITE_OK);
+  assert(sqlite3_bind_text(legacyInsert, 1, source.c_str(), -1,
+                           SQLITE_TRANSIENT) == SQLITE_OK);
+  assert(sqlite3_step(legacyInsert) == SQLITE_DONE);
+  sqlite3_finalize(legacyInsert);
+  sqlite3_close(legacyDatabase);
+
+  facts::FileManager migrated(legacyPath);
+  const auto migratedSource = migrated.getId(source.string());
+  assert(migratedSource && *migratedSource == 17);
+  assert(migrated.addBulk(paths));
+  const auto migratedHeader = migrated.getId(header.string());
+  assert(migratedHeader && *migratedHeader >= facts::firstPhysicalFileId);
+
+  assert(sqlite3_open(legacyPath.c_str(), &legacyDatabase) == SQLITE_OK);
+  assert(scalar(legacyDatabase,
+                "SELECT COUNT(*) FROM pragma_table_info('file') "
+                "WHERE name='path'") == 0);
+  assert(scalar(legacyDatabase, "SELECT COUNT(*) FROM file") == 2);
+  sqlite3_close(legacyDatabase);
+
+  const auto sharedPath = databasePath.string() + ".cpp-indexer";
+  std::filesystem::remove(sharedPath);
+  {
+    facts::FileManager initializeSharedSchema(sharedPath);
+  }
+  sqlite3 *sharedDatabase = nullptr;
+  assert(sqlite3_open(sharedPath.c_str(), &sharedDatabase) == SQLITE_OK);
+  assert(sqlite3_exec(sharedDatabase,
+                      "DELETE FROM component;"
+                      "INSERT INTO repository(id,name,kind,active_clone_id) "
+                      "VALUES(1,'shared','repo',1);"
+                      "INSERT INTO clone(id,repository_id,path,label) "
+                      "VALUES(1,1,'/tmp','active');",
+                      nullptr, nullptr, nullptr) == SQLITE_OK);
+
+  sqlite3_stmt *sharedRoot = nullptr;
+  assert(sqlite3_prepare_v2(sharedDatabase,
+                            "UPDATE clone SET path=?1 WHERE id=1", -1,
+                            &sharedRoot, nullptr) == SQLITE_OK);
+  const auto fixtureRoot = source.parent_path().string();
+  assert(sqlite3_bind_text(sharedRoot, 1, fixtureRoot.c_str(), -1,
+                           SQLITE_TRANSIENT) == SQLITE_OK);
+  assert(sqlite3_step(sharedRoot) == SQLITE_DONE);
+  sqlite3_finalize(sharedRoot);
+  assert(sqlite3_exec(
+             sharedDatabase,
+             "INSERT INTO component(id,name,path,kind,repository_id,"
+             "semantic_universe_id) VALUES(7,'facts-tool','.','repo',1,1);"
+             "INSERT INTO directory(id,component_id,path) VALUES(11,7,'')",
+             nullptr, nullptr, nullptr) == SQLITE_OK);
+  sqlite3_stmt *sharedFile = nullptr;
+  assert(sqlite3_prepare_v2(sharedDatabase,
+                            "INSERT INTO file(id,directory_id,name,indexed) "
+                            "VALUES(23,11,?1,1)",
+                            -1, &sharedFile, nullptr) == SQLITE_OK);
+  const auto headerName = header.filename().string();
+  assert(sqlite3_bind_text(sharedFile, 1, headerName.c_str(), -1,
+                           SQLITE_TRANSIENT) == SQLITE_OK);
+  assert(sqlite3_step(sharedFile) == SQLITE_DONE);
+  sqlite3_finalize(sharedFile);
+  sqlite3_close(sharedDatabase);
+
+  facts::FileManager shared(sharedPath);
+  auto sharedPaths = paths;
+  const auto external = std::filesystem::canonical(__FILE__).string();
+  sharedPaths.push_back(external);
+  assert(shared.addBulk(sharedPaths));
+  const auto sharedHeader = shared.getId(header.string());
+  const auto sharedSource = shared.getId(source.string());
+  const auto sharedExternal = shared.getId(external);
+  assert(sharedHeader && *sharedHeader == 23);
+  assert(sharedSource && *sharedSource >= facts::firstPhysicalFileId);
+  assert(!sharedExternal);
+
+  assert(sqlite3_open(sharedPath.c_str(), &sharedDatabase) == SQLITE_OK);
+  assert(scalar(sharedDatabase, "SELECT COUNT(*) FROM component") == 1);
+  assert(scalar(sharedDatabase,
+                "SELECT COUNT(*) FROM pragma_table_info('file') WHERE name IN "
+                "('mtime','md5','compile_options','driver','indexed',"
+                "'indexed_at','args_overridden')") == 7);
+  assert(scalar(sharedDatabase, "SELECT COUNT(*) FROM file") == 2);
+  sqlite3_close(sharedDatabase);
 }
