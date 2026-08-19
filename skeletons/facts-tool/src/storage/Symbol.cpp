@@ -63,7 +63,8 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node,
       !storage::bindInteger(statement->get(), 3, id.index) ||
       !storage::bindText(statement->get(), 4, identity) ||
       !storage::bindInteger(statement->get(), 5, node) ||
-      !storage::bindInteger(statement->get(), 6, symbol.Kind) ||
+      !storage::bindInteger(statement->get(), 6,
+                            storage::storedSymbolKind(symbol.Kind)) ||
       !storage::bindInteger(statement->get(), 7, symbol.SubKind) ||
       !storage::bindInteger(statement->get(), 8, symbol.Lang) ||
       !storage::bindInteger(statement->get(), 9, symbol.Properties) ||
@@ -130,8 +131,8 @@ std::expected<Symbol, std::error_code> Storage::loadSymbolRow(SymbolNode node,
 
   Symbol symbol;
   symbol.id = id;
-  symbol.Kind = static_cast<decltype(symbol.Kind)>(
-      sqlite3_column_int64(statement->get(), 0));
+  symbol.Kind =
+      storage::symbolKindFromStored(sqlite3_column_int64(statement->get(), 0));
   symbol.SubKind = static_cast<decltype(symbol.SubKind)>(
       sqlite3_column_int64(statement->get(), 1));
   symbol.Lang = static_cast<decltype(symbol.Lang)>(

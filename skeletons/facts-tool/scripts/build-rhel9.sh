@@ -24,11 +24,6 @@
 #     They stay dynamically linked: to run the binary elsewhere the host needs
 #     `dnf install -y clang-libs llvm-libs`.
 #
-# Known limitation on LLVM 21 (what RHEL 9 packages): the stored symbol kind is
-# a raw clang::index::SymbolKind, and LLVM 22 inserted IncludeDirective into that
-# enum, so every kind is one lower here. The two e2e template scenarios assert
-# those numbers literally and fail; everything else passes.
-#
 # Knobs (env vars):
 #   GCC_TOOLSET             gcc-toolset major for C++23 (default 15; 14 is the
 #                           minimum — std::ranges::to landed in libstdc++ 14).

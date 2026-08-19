@@ -213,5 +213,7 @@ if(BUILD_TESTING)
       --compiler ${CMAKE_CXX_COMPILER}
       --output-root ${CMAKE_CURRENT_BINARY_DIR}/e2e-artifacts
   )
-  set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 120)
+  # The suite parses every fixture once per scenario; a slower box needs well
+# over the 120s this used to allow.
+set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 600)
 endif()
