@@ -185,7 +185,7 @@ if(BUILD_TESTING)
     NAME multi-tu-file-registry
     COMMAND facts-tool
             --facts-out ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-test.sqlite
-            --files-out ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-files.sqlite
+            --project-config ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-files.sqlite
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_one.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_two.cpp
             -- -std=c++23 -I${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures

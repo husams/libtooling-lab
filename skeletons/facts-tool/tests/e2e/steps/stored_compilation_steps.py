@@ -25,6 +25,11 @@ def when_a_stored_command_is_missing(context: FactsToolContext) -> None:
     context.run_with_missing_stored_command("two.cpp")
 
 
+@when("the real facts-tool is invoked with the deprecated --files-out option")
+def when_deprecated_files_out_is_used(context: FactsToolContext) -> None:
+    context.run_with_deprecated_files_out_option()
+
+
 @then("the stored-option extraction matches the JSON extraction")
 def then_stored_facts_match_json(context: FactsToolContext) -> None:
     require(
@@ -63,4 +68,13 @@ def then_diagnostic_mentions_missing_command(context: FactsToolContext) -> None:
         "two.cpp" in context.last_output
         and "compile command" in context.last_output.lower(),
         f"missing compile-command diagnostic:\n{context.last_output}",
+    )
+
+
+@then("the diagnostic reports --files-out as an unknown option")
+def then_diagnostic_rejects_files_out(context: FactsToolContext) -> None:
+    require(
+        "--files-out" in context.last_output
+        and "unknown command line argument" in context.last_output.lower(),
+        f"missing unknown-option diagnostic:\n{context.last_output}",
     )
