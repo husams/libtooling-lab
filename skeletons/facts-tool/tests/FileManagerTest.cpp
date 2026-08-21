@@ -113,16 +113,18 @@ int main(int argc, char **argv) {
   assert(sqlite3_prepare_v2(sharedDatabase,
                             "UPDATE clone SET path=?1 WHERE id=1", -1,
                             &sharedRoot, nullptr) == SQLITE_OK);
-  const auto fixtureRoot = source.parent_path().string();
-  assert(sqlite3_bind_text(sharedRoot, 1, fixtureRoot.c_str(), -1,
+  const auto cloneRoot =
+      source.parent_path().parent_path().parent_path().string();
+  assert(sqlite3_bind_text(sharedRoot, 1, cloneRoot.c_str(), -1,
                            SQLITE_TRANSIENT) == SQLITE_OK);
   assert(sqlite3_step(sharedRoot) == SQLITE_DONE);
   sqlite3_finalize(sharedRoot);
   assert(sqlite3_exec(
              sharedDatabase,
              "INSERT INTO component(id,name,path,kind,repository_id,"
-             "semantic_universe_id) VALUES(7,'facts-tool','.','repo',1,1);"
-             "INSERT INTO directory(id,component_id,path) VALUES(11,7,'')",
+             "semantic_universe_id) VALUES(7,'facts-tool','tests','repo',1,1);"
+             "INSERT INTO directory(id,component_id,path) "
+             "VALUES(11,7,'fixtures')",
              nullptr, nullptr, nullptr) == SQLITE_OK);
   sqlite3_stmt *sharedFile = nullptr;
   assert(sqlite3_prepare_v2(sharedDatabase,
@@ -138,13 +140,21 @@ int main(int argc, char **argv) {
 
   facts::FileManager shared(sharedPath);
   auto sharedPaths = paths;
-  const auto external = std::filesystem::canonical(__FILE__).string();
+  const auto external =
+      std::filesystem::canonical(std::filesystem::path(cloneRoot) /
+                                 "src/storage/FileManager.cpp")
+          .string();
   sharedPaths.push_back(external);
   assert(shared.addBulk(sharedPaths));
+  const auto relativeHeader =
+      std::filesystem::relative(header, std::filesystem::current_path())
+          .string();
   const auto sharedHeader = shared.getId(header.string());
+  const auto sharedRelativeHeader = shared.getId(relativeHeader);
   const auto sharedSource = shared.getId(source.string());
   const auto sharedExternal = shared.getId(external);
   assert(sharedHeader && *sharedHeader == 23);
+  assert(sharedRelativeHeader && *sharedRelativeHeader == 23);
   assert(sharedSource && *sharedSource >= facts::firstPhysicalFileId);
   assert(!sharedExternal);
 
@@ -154,6 +164,8 @@ int main(int argc, char **argv) {
                 "SELECT COUNT(*) FROM pragma_table_info('file') WHERE name IN "
                 "('mtime','md5','compile_options','driver','indexed',"
                 "'indexed_at','args_overridden')") == 7);
+  assert(scalar(sharedDatabase,
+                "SELECT COUNT(*) FROM directory WHERE path='fixtures'") == 1);
   assert(scalar(sharedDatabase, "SELECT COUNT(*) FROM file") == 2);
   sqlite3_close(sharedDatabase);
 }

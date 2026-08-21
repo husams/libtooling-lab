@@ -11,6 +11,7 @@
 #include "storage/FileManager.h"
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/DeclCXX.h>
 #include <clang/AST/DeclTemplate.h>
 #include <clang/Basic/SourceManager.h>
 #include <llvm/Support/Casting.h>

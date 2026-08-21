@@ -11,14 +11,33 @@
 namespace facts {
 namespace {
 
-std::expected<std::string, std::error_code>
-canonicalIdentity(std::string_view path) {
+std::expected<std::filesystem::path, std::error_code>
+absoluteIdentityPath(std::string_view path) {
+  std::filesystem::path candidate{path};
+  if (candidate.is_absolute()) {
+    return candidate;
+  }
+
   std::error_code error;
-  auto identity = std::filesystem::canonical(path, error);
+  auto current = std::filesystem::current_path(error);
   if (error) {
     return std::unexpected(error);
   }
-  return identity.lexically_normal().string();
+  return current / candidate;
+}
+
+std::expected<std::string, std::error_code>
+canonicalIdentity(std::string_view path) {
+  return absoluteIdentityPath(path).and_then([](auto absolute) {
+    std::error_code error;
+    auto identity = std::filesystem::canonical(absolute, error);
+    if (error) {
+      return std::expected<std::string, std::error_code>{
+          std::unexpected(error)};
+    }
+    return std::expected<std::string, std::error_code>{
+        identity.lexically_normal().string()};
+  });
 }
 
 std::expected<std::vector<std::string>, std::error_code>
