@@ -7,9 +7,11 @@
 #include <filesystem>
 #include <functional>
 #include <limits>
+#include <map>
 #include <optional>
 #include <ranges>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -102,26 +104,30 @@ std::filesystem::path absolutePath(std::filesystem::path path) {
 
 ComponentRoot componentRoot(sqlite3_stmt *statement) {
   const auto id = sqlite3_column_int64(statement, 0);
-  const auto componentPath = std::filesystem::path(columnText(statement, 1));
-  const auto version = columnText(statement, 2);
-  const auto repositoryId = sqlite3_column_type(statement, 3) != SQLITE_NULL;
-  const auto clonePath = columnText(statement, 4);
-  const auto effective =
-      version.empty() ? componentPath : componentPath / version;
-  const auto cloneAnchored = repositoryId && componentPath.is_relative() &&
-                             !clonePath.empty() &&
-                             !componentPath.string().contains('<') &&
-                             !componentPath.string().contains('$');
-  return {id, absolutePath(cloneAnchored
-                               ? std::filesystem::path(clonePath) / effective
-                               : effective)};
+  ProjectComponent component;
+  component.id = id;
+  component.name = columnText(statement, 1);
+  component.path = columnText(statement, 2);
+  if (const auto version = columnText(statement, 3); !version.empty()) {
+    component.version = version;
+  }
+  if (sqlite3_column_type(statement, 4) != SQLITE_NULL) {
+    component.repositoryId = sqlite3_column_int64(statement, 4);
+  }
+  const auto clonePath = columnText(statement, 5);
+  const auto clone =
+      clonePath.empty()
+          ? std::optional<ProjectClone>{}
+          : std::optional<ProjectClone>{ProjectClone{.path = clonePath}};
+  return {id, effectiveComponentRoot(component, clone)};
 }
 
 std::expected<std::vector<ComponentRoot>, std::error_code>
 componentRoots(sqlite3 *database) {
   constexpr auto sql =
-      "SELECT component.id, component.path, component.version, "
-      "component.repository_id, clone.path FROM component "
+      "SELECT component.id, component.name, component.path, "
+      "component.version, component.repository_id, clone.path "
+      "FROM component "
       "LEFT JOIN repository ON repository.id=component.repository_id "
       "LEFT JOIN clone ON clone.id=repository.active_clone_id";
   return prepare(database, sql).and_then([&](Statement statement) {
@@ -244,6 +250,140 @@ std::expected<FileId, std::error_code> selectId(sqlite3 *database,
   });
 }
 
+std::expected<std::int64_t, std::error_code>
+upsertRepository(sqlite3 *database, const ProjectConfiguration &configuration) {
+  constexpr auto sql =
+      "INSERT INTO repository(name, remote_url) VALUES(?1, ?2) "
+      "ON CONFLICT(name) DO UPDATE SET remote_url=excluded.remote_url "
+      "RETURNING id";
+  return prepare(database, sql).and_then([&](Statement statement) {
+    return bindText(database, statement.get(), 1, configuration.repositoryName)
+        .and_then([&] {
+          return bindText(database, statement.get(), 2,
+                          configuration.remoteUrl);
+        })
+        .and_then([&] { return readRowId(database, statement.get()); });
+  });
+}
+
+std::expected<std::int64_t, std::error_code>
+upsertClone(sqlite3 *database, std::int64_t repositoryId,
+            const ProjectClone &clone) {
+  constexpr auto sql =
+      "INSERT INTO clone(repository_id, path, label) VALUES(?1, ?2, ?3) "
+      "ON CONFLICT(path) DO UPDATE SET label=excluded.label "
+      "RETURNING id";
+  return prepare(database, sql).and_then([&](Statement statement) {
+    if (sqlite3_bind_int64(statement.get(), 1, repositoryId) != SQLITE_OK) {
+      return std::expected<std::int64_t, std::error_code>{
+          std::unexpected(sqliteError(database))};
+    }
+    return bindText(database, statement.get(), 2, clone.path)
+        .and_then(
+            [&] { return bindText(database, statement.get(), 3, clone.label); })
+        .and_then([&] { return readRowId(database, statement.get()); });
+  });
+}
+
+std::expected<void, std::error_code> setActiveClone(sqlite3 *database,
+                                                    std::int64_t repositoryId,
+                                                    std::int64_t cloneId) {
+  constexpr auto sql = "UPDATE repository SET active_clone_id=?1 WHERE id=?2";
+  return prepare(database, sql).and_then([&](Statement statement) {
+    if (sqlite3_bind_int64(statement.get(), 1, cloneId) != SQLITE_OK ||
+        sqlite3_bind_int64(statement.get(), 2, repositoryId) != SQLITE_OK) {
+      return std::expected<void, std::error_code>{
+          std::unexpected(sqliteError(database))};
+    }
+    if (sqlite3_step(statement.get()) != SQLITE_DONE) {
+      return std::expected<void, std::error_code>{
+          std::unexpected(sqliteError(database))};
+    }
+    return std::expected<void, std::error_code>{};
+  });
+}
+
+std::expected<std::int64_t, std::error_code>
+upsertComponent(sqlite3 *database, std::int64_t repositoryId,
+                const ProjectComponent &component) {
+  constexpr auto sql =
+      "INSERT INTO component(name, path, kind, version, repository_id, "
+      "semantic_universe_id) VALUES(?1, ?2, ?3, ?4, ?5, 1) "
+      "ON CONFLICT(repository_id, path) DO UPDATE SET "
+      "name=excluded.name, kind=excluded.kind, version=excluded.version "
+      "RETURNING id";
+  return prepare(database, sql).and_then([&](Statement statement) {
+    if (sqlite3_bind_int64(statement.get(), 5, repositoryId) != SQLITE_OK) {
+      return std::expected<std::int64_t, std::error_code>{
+          std::unexpected(sqliteError(database))};
+    }
+    return bindText(database, statement.get(), 1, component.name)
+        .and_then([&] {
+          return bindText(database, statement.get(), 2, component.path);
+        })
+        .and_then([&] {
+          return bindText(database, statement.get(), 3, component.kind);
+        })
+        .and_then([&] {
+          if (component.version) {
+            return bindText(database, statement.get(), 4, *component.version);
+          }
+          return sqlite3_bind_null(statement.get(), 4) == SQLITE_OK
+                     ? std::expected<void, std::error_code>{}
+                     : std::expected<void, std::error_code>{
+                           std::unexpected(sqliteError(database))};
+        })
+        .and_then([&] { return readRowId(database, statement.get()); });
+  });
+}
+
+std::expected<void, std::error_code>
+clearCompileConfigurations(sqlite3 *database) {
+  return execute(database, "UPDATE file SET compile_options=NULL, driver=NULL, "
+                           "working_directory=NULL");
+}
+
+std::expected<std::int64_t, std::error_code>
+upsertProjectFile(sqlite3 *database, std::int64_t componentId,
+                  const ProjectFile &file) {
+  return upsertDirectory(database, componentId, file.directory)
+      .and_then([&](std::int64_t directoryId) {
+        constexpr auto sql =
+            "INSERT INTO file(directory_id, name, driver, working_directory, "
+            "compile_options) VALUES(?1, ?2, ?3, ?4, ?5) "
+            "ON CONFLICT(directory_id, name) DO UPDATE SET "
+            "driver=excluded.driver, "
+            "working_directory=excluded.working_directory, "
+            "compile_options=excluded.compile_options RETURNING id";
+        return prepare(database, sql).and_then([&](Statement statement) {
+          if (sqlite3_bind_int64(statement.get(), 1, directoryId) !=
+              SQLITE_OK) {
+            return std::expected<std::int64_t, std::error_code>{
+                std::unexpected(sqliteError(database))};
+          }
+          return bindText(database, statement.get(), 2, file.name)
+              .and_then([&] {
+                return bindText(database, statement.get(), 3, file.driver);
+              })
+              .and_then([&] {
+                if (!file.workingDirectory.empty()) {
+                  return bindText(database, statement.get(), 4,
+                                  file.workingDirectory);
+                }
+                return sqlite3_bind_null(statement.get(), 4) == SQLITE_OK
+                           ? std::expected<void, std::error_code>{}
+                           : std::expected<void, std::error_code>{
+                                 std::unexpected(sqliteError(database))};
+              })
+              .and_then([&] {
+                return bindText(database, statement.get(), 5,
+                                file.compileOptions);
+              })
+              .and_then([&] { return readRowId(database, statement.get()); });
+        });
+      });
+}
+
 template <std::ranges::input_range Results>
 auto collect(Results &&results)
     -> std::expected<void,
@@ -291,6 +431,34 @@ std::expected<bool, std::error_code> usesLegacyFileSchema(sqlite3 *database) {
     return std::expected<bool, std::error_code>{
         sqlite3_column_int(statement.get(), 0) != 0};
   });
+}
+
+std::expected<bool, std::error_code> hasFileColumn(sqlite3 *database,
+                                                   std::string_view name) {
+  constexpr auto sql =
+      "SELECT EXISTS(SELECT 1 FROM pragma_table_info('file') WHERE name=?1)";
+  return prepare(database, sql).and_then([&](Statement statement) {
+    return bindText(database, statement.get(), 1, name).and_then([&] {
+      if (sqlite3_step(statement.get()) != SQLITE_ROW) {
+        return std::expected<bool, std::error_code>{
+            std::unexpected(sqliteError(database))};
+      }
+      return std::expected<bool, std::error_code>{
+          sqlite3_column_int(statement.get(), 0) != 0};
+    });
+  });
+}
+
+std::expected<void, std::error_code>
+ensureProjectConfigurationSchema(sqlite3 *database) {
+  return hasFileColumn(database, "working_directory")
+      .and_then([database](bool present) {
+        return present
+                   ? std::expected<void, std::error_code>{}
+                   : execute(database,
+                             "ALTER TABLE file ADD COLUMN working_directory "
+                             "TEXT");
+      });
 }
 
 std::expected<bool, std::error_code>
@@ -457,9 +625,10 @@ std::expected<void, std::error_code> initializeFileSchema(sqlite3 *database) {
         if (flat) {
           return migrateFlatDirectorySchema(database);
         }
-        return execute(database, fileSchemaSql).and_then([&] {
-          return ensureDefaultComponent(database);
-        });
+        return execute(database, fileSchemaSql)
+            .and_then(
+                [&] { return ensureProjectConfigurationSchema(database); })
+            .and_then([&] { return ensureDefaultComponent(database); });
       });
     });
   });
@@ -519,6 +688,116 @@ FileDatabase::addBulk(std::span<const std::string> identities) {
               });
         });
     return collect(records);
+  });
+}
+
+std::expected<void, std::error_code> FileDatabase::replaceProjectConfiguration(
+    const ProjectConfiguration &configuration) {
+  if (configuration.repositoryName.empty() ||
+      configuration.activeClone.path.empty() ||
+      configuration.components.empty()) {
+    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+  }
+
+  return inImmediateTransaction(connection_->handle, [&] {
+    return upsertRepository(connection_->handle, configuration)
+        .and_then([&](std::int64_t repositoryId) {
+          return upsertClone(connection_->handle, repositoryId,
+                             configuration.activeClone)
+              .and_then([&](std::int64_t cloneId) {
+                return setActiveClone(connection_->handle, repositoryId,
+                                      cloneId);
+              })
+              .and_then([&] {
+                return clearCompileConfigurations(connection_->handle);
+              })
+              .and_then([&] {
+                std::map<std::string, std::int64_t> componentIds;
+                for (const auto &component : configuration.components) {
+                  if (component.path.empty() ||
+                      componentIds.contains(component.path)) {
+                    return std::expected<void, std::error_code>{std::unexpected(
+                        std::make_error_code(std::errc::invalid_argument))};
+                  }
+                  auto saved = upsertComponent(connection_->handle,
+                                               repositoryId, component);
+                  if (!saved) {
+                    return std::expected<void, std::error_code>{
+                        std::unexpected(saved.error())};
+                  }
+                  componentIds.emplace(component.path, *saved);
+                }
+                for (const auto &file : configuration.files) {
+                  const auto component = componentIds.find(file.componentPath);
+                  if (component == componentIds.end() || file.name.empty() ||
+                      file.compileOptions.empty()) {
+                    return std::expected<void, std::error_code>{std::unexpected(
+                        std::make_error_code(std::errc::invalid_argument))};
+                  }
+                  auto saved = upsertProjectFile(connection_->handle,
+                                                 component->second, file);
+                  if (!saved) {
+                    return std::expected<void, std::error_code>{
+                        std::unexpected(saved.error())};
+                  }
+                }
+                return std::expected<void, std::error_code>{};
+              });
+        });
+  });
+}
+
+std::expected<void, std::error_code>
+FileDatabase::switchActiveClone(std::string_view repositoryName,
+                                std::string_view clonePathOrLabel) {
+  return inImmediateTransaction(connection_->handle, [&] {
+    constexpr auto sql =
+        "UPDATE repository SET active_clone_id=(SELECT id FROM clone "
+        "WHERE repository_id=repository.id AND (path=?2 OR label=?2)) "
+        "WHERE name=?1 AND EXISTS(SELECT 1 FROM clone "
+        "WHERE repository_id=repository.id AND (path=?2 OR label=?2))";
+    return prepare(connection_->handle, sql).and_then([&](Statement statement) {
+      return bindText(connection_->handle, statement.get(), 1, repositoryName)
+          .and_then([&] {
+            return bindText(connection_->handle, statement.get(), 2,
+                            clonePathOrLabel);
+          })
+          .and_then([&] {
+            if (sqlite3_step(statement.get()) != SQLITE_DONE) {
+              return std::expected<void, std::error_code>{
+                  std::unexpected(sqliteError(connection_->handle))};
+            }
+            return sqlite3_changes(connection_->handle) == 1
+                       ? std::expected<void, std::error_code>{}
+                       : std::expected<void, std::error_code>{
+                             std::unexpected(std::make_error_code(
+                                 std::errc::no_such_file_or_directory))};
+          });
+    });
+  });
+}
+
+std::expected<void, std::error_code>
+FileDatabase::addClone(std::string_view repositoryName,
+                       const ProjectClone &clone, bool activate) {
+  if (repositoryName.empty() || clone.path.empty()) {
+    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+  }
+  return inImmediateTransaction(connection_->handle, [&] {
+    constexpr auto sql = "SELECT id FROM repository WHERE name=?1";
+    return prepare(connection_->handle, sql).and_then([&](Statement statement) {
+      return bindText(connection_->handle, statement.get(), 1, repositoryName)
+          .and_then(
+              [&] { return readRowId(connection_->handle, statement.get()); })
+          .and_then([&](std::int64_t repositoryId) {
+            return upsertClone(connection_->handle, repositoryId, clone)
+                .and_then([&](std::int64_t cloneId) {
+                  return activate ? setActiveClone(connection_->handle,
+                                                   repositoryId, cloneId)
+                                  : std::expected<void, std::error_code>{};
+                });
+          });
+    });
   });
 }
 

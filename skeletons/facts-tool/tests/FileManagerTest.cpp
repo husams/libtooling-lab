@@ -62,6 +62,24 @@ int main(int argc, char **argv) {
                           "WHERE name IN ('directory_id', 'name')") == 2);
   sqlite3_close(database);
 
+  const auto additivePath = databasePath.string() + ".working-directory";
+  std::filesystem::remove(additivePath);
+  {
+    facts::FileManager initialize(additivePath);
+  }
+  assert(sqlite3_open(additivePath.c_str(), &database) == SQLITE_OK);
+  assert(sqlite3_exec(database,
+                      "ALTER TABLE file DROP COLUMN working_directory", nullptr,
+                      nullptr, nullptr) == SQLITE_OK);
+  sqlite3_close(database);
+  {
+    facts::FileManager migrated(additivePath);
+  }
+  assert(sqlite3_open(additivePath.c_str(), &database) == SQLITE_OK);
+  assert(scalar(database, "SELECT COUNT(*) FROM pragma_table_info('file') "
+                          "WHERE name='working_directory'") == 1);
+  sqlite3_close(database);
+
   const auto legacyPath = databasePath.string() + ".legacy";
   std::filesystem::remove(legacyPath);
   sqlite3 *legacyDatabase = nullptr;

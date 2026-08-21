@@ -1,5 +1,7 @@
 #include "tooling/StoredCompilationDatabase.h"
 
+#include "storage/FileManager.h"
+
 #include <clang/Tooling/CompilationDatabasePluginRegistry.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/JSON.h>
@@ -14,6 +16,7 @@
 #include <ranges>
 #include <regex>
 #include <set>
+#include <sstream>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -56,10 +59,12 @@ struct Component {
   std::filesystem::path root;
 };
 
-struct StoredFile {
+struct StoredCompileFile {
   std::filesystem::path root;
   std::filesystem::path path;
+  std::string componentName;
   std::string driver;
+  std::string workingDirectory;
   std::string options;
 };
 
@@ -107,18 +112,21 @@ std::filesystem::path absolutePath(std::filesystem::path path) {
 }
 
 std::filesystem::path componentRoot(sqlite3_stmt *statement) {
-  const auto componentPath = std::filesystem::path(columnText(statement, 2));
-  const auto version = columnText(statement, 3);
-  const auto repositoryId = sqlite3_column_type(statement, 4) != SQLITE_NULL;
+  ProjectComponent component;
+  component.name = columnText(statement, 1);
+  component.path = columnText(statement, 2);
+  if (const auto version = columnText(statement, 3); !version.empty()) {
+    component.version = version;
+  }
+  if (sqlite3_column_type(statement, 4) != SQLITE_NULL) {
+    component.repositoryId = sqlite3_column_int64(statement, 4);
+  }
   const auto clonePath = columnText(statement, 5);
-  const auto effective =
-      version.empty() ? componentPath : componentPath / version;
-  const auto cloneAnchored = repositoryId && componentPath.is_relative() &&
-                             !clonePath.empty() &&
-                             !componentPath.string().contains('<') &&
-                             !componentPath.string().contains('$');
-  return absolutePath(
-      cloneAnchored ? std::filesystem::path(clonePath) / effective : effective);
+  const auto clone =
+      clonePath.empty()
+          ? std::optional<ProjectClone>{}
+          : std::optional<ProjectClone>{ProjectClone{.path = clonePath}};
+  return effectiveComponentRoot(component, clone);
 }
 
 std::expected<std::vector<Component>, std::string>
@@ -148,35 +156,37 @@ readComponents(sqlite3 *database) {
   });
 }
 
-std::expected<std::vector<StoredFile>, std::string>
+std::expected<std::vector<StoredCompileFile>, std::string>
 readStoredFiles(sqlite3 *database) {
   constexpr auto sql =
       "SELECT component.id, component.name, component.path, "
       "component.version, component.repository_id, clone.path, "
-      "directory.path, file.name, file.driver, file.compile_options "
+      "directory.path, file.name, file.driver, file.working_directory, "
+      "file.compile_options "
       "FROM file JOIN directory ON directory.id=file.directory_id "
       "JOIN component ON component.id=directory.component_id "
       "LEFT JOIN repository ON repository.id=component.repository_id "
       "LEFT JOIN clone ON clone.id=repository.active_clone_id "
       "WHERE file.compile_options IS NOT NULL ORDER BY file.id";
   return prepare(database, sql).and_then([&](Statement statement) {
-    std::vector<StoredFile> files;
+    std::vector<StoredCompileFile> files;
     auto status = sqlite3_step(statement.get());
     while (status == SQLITE_ROW) {
       auto root = componentRoot(statement.get());
-      files.push_back({root,
-                       (root / columnText(statement.get(), 6) /
-                        columnText(statement.get(), 7))
-                           .lexically_normal(),
-                       columnText(statement.get(), 8),
-                       columnText(statement.get(), 9)});
+      files.push_back(
+          {root,
+           (root / columnText(statement.get(), 6) /
+            columnText(statement.get(), 7))
+               .lexically_normal(),
+           columnText(statement.get(), 1), columnText(statement.get(), 8),
+           columnText(statement.get(), 9), columnText(statement.get(), 10)});
       status = sqlite3_step(statement.get());
     }
     if (status != SQLITE_DONE) {
-      return std::expected<std::vector<StoredFile>, std::string>{
+      return std::expected<std::vector<StoredCompileFile>, std::string>{
           std::unexpected(sqliteError(database))};
     }
-    return std::expected<std::vector<StoredFile>, std::string>{
+    return std::expected<std::vector<StoredCompileFile>, std::string>{
         std::move(files)};
   });
 }
@@ -456,7 +466,10 @@ std::string resolvePath(std::string value, const Aliases &aliases) {
 
 std::vector<std::string> resolveIncludePaths(std::vector<std::string> options,
                                              const Aliases &aliases) {
-  constexpr std::string_view includeFlags[] = {"-I", "-isystem", "-iquote"};
+  constexpr std::string_view includeFlags[] = {
+      "-I",           "-isystem",    "-iquote",   "-idirafter",
+      "-F",           "-iframework", "-include",  "-imacros",
+      "-include-pch", "--sysroot",   "-isysroot", "-resource-dir"};
   std::vector<std::string> result;
   for (std::size_t index = 0; index < options.size();) {
     auto option = std::move(options[index++]);
@@ -487,20 +500,27 @@ std::string defaultDriver(const std::filesystem::path &source) {
 }
 
 std::expected<clang::tooling::CompileCommand, std::string>
-toCompileCommand(const StoredFile &file, const Aliases &aliases) {
+toCompileCommand(const StoredCompileFile &file, const Aliases &aliases) {
   return decodeOptions(file.options).transform([&](auto options) {
-    auto arguments = resolveIncludePaths(sanitize(std::move(options)), aliases);
+    auto fileAliases = aliases;
+    fileAliases.try_emplace(file.componentName, file.root.string());
+    auto arguments =
+        resolveIncludePaths(sanitize(std::move(options)), fileAliases);
     arguments.insert(arguments.begin(), file.driver.empty()
                                             ? defaultDriver(file.path)
                                             : file.driver);
     arguments.push_back(file.path.string());
+    const auto directory = file.workingDirectory.empty()
+                               ? file.root
+                               : std::filesystem::path(resolvePath(
+                                     file.workingDirectory, fileAliases));
     return clang::tooling::CompileCommand(
-        file.root.string(), file.path.string(), std::move(arguments), "");
+        directory.string(), file.path.string(), std::move(arguments), "");
   });
 }
 
 std::expected<Commands, std::string>
-toCompileCommands(const std::vector<StoredFile> &files,
+toCompileCommands(const std::vector<StoredCompileFile> &files,
                   const Aliases &aliases) {
   Commands commands;
   commands.reserve(files.size());
@@ -582,6 +602,236 @@ static clang::tooling::CompilationDatabasePluginRegistry::Add<
     storedDatabasePlugin("facts-stored-compile-options",
                          "Reads compile options from a cpp-indexer database");
 
+std::string jsonQuote(std::string_view value) {
+  std::string result;
+  result.reserve(value.size() + 2);
+  result.push_back('"');
+  for (const unsigned char character : value) {
+    switch (character) {
+    case '"':
+      result += "\\\"";
+      break;
+    case '\\':
+      result += "\\\\";
+      break;
+    case '\n':
+      result += "\\n";
+      break;
+    case '\r':
+      result += "\\r";
+      break;
+    case '\t':
+      result += "\\t";
+      break;
+    default:
+      if (character < 0x20) {
+        constexpr char hex[] = "0123456789abcdef";
+        result += "\\u00";
+        result.push_back(hex[character >> 4]);
+        result.push_back(hex[character & 0x0f]);
+      } else {
+        result.push_back(static_cast<char>(character));
+      }
+      break;
+    }
+  }
+  result.push_back('"');
+  return result;
+}
+
+std::string encodeOptions(const std::vector<std::string> &options) {
+  std::string result = "[";
+  for (std::size_t index = 0; index < options.size(); ++index) {
+    if (index != 0) {
+      result += ',';
+    }
+    result += jsonQuote(options[index]);
+  }
+  result += ']';
+  return result;
+}
+
+bool ownsPath(const std::filesystem::path &root,
+              const std::filesystem::path &path) {
+  auto key = root.lexically_normal().string();
+  while (!key.empty() && key.back() == '/') {
+    key.pop_back();
+  }
+  const auto identity = path.lexically_normal().string();
+  return identity == key || identity.starts_with(key + "/");
+}
+
+std::string portablePath(const std::filesystem::path &path,
+                         const ProjectComponent &component,
+                         const ProjectClone &clone) {
+  const auto root = effectiveComponentRoot(component, clone);
+  if (!ownsPath(root, path)) {
+    return path.lexically_normal().string();
+  }
+  const auto relative = path.lexically_relative(root);
+  return relative.empty() || relative == "."
+             ? "<" + component.name + ">"
+             : "<" + component.name + ">/" + relative.generic_string();
+}
+
+std::filesystem::path
+resolveCommandPath(const clang::tooling::CompileCommand &command,
+                   std::string_view value) {
+  const std::filesystem::path path(value);
+  return absolutePath(path.is_absolute()
+                          ? path
+                          : std::filesystem::path(command.Directory) / path);
+}
+
+std::string normalizePathValue(const clang::tooling::CompileCommand &command,
+                               std::string value,
+                               const ProjectComponent &component,
+                               const ProjectClone &clone) {
+  const auto resolved = resolveCommandPath(command, value);
+  return portablePath(resolved, component, clone);
+}
+
+std::string compilerDriver(const clang::tooling::CompileCommand &command,
+                           std::size_t start,
+                           const std::filesystem::path &source) {
+  const auto candidate = command.CommandLine[start];
+  const auto name = std::filesystem::path(candidate).filename().string();
+  const auto compilerName =
+      name == "clang" || name.starts_with("clang++") ||
+      (name.starts_with("clang-") && name != "clang-tool") || name == "gcc" ||
+      name.starts_with("gcc-") || name == "cc" || name == "c++" ||
+      name == "g++";
+  const auto usablePath =
+      !candidate.contains('/') || std::filesystem::exists(candidate);
+  const auto compiler = compilerName && usablePath;
+  return compiler ? candidate : defaultDriver(source);
+}
+
+std::vector<std::string>
+normalizePathOptions(const clang::tooling::CompileCommand &command,
+                     std::vector<std::string> options,
+                     const ProjectComponent &component,
+                     const ProjectClone &clone) {
+  constexpr std::string_view pathFlags[] = {
+      "-include-pch", "-iframework", "-idirafter", "-resource-dir",
+      "--sysroot",    "-isystem",    "-iquote",    "-include",
+      "-imacros",     "-isysroot",   "-F",         "-I"};
+  const auto pathFlag = [&](std::string_view option) {
+    return std::ranges::find_if(pathFlags, [&](std::string_view flag) {
+      return option == flag ||
+             (option.starts_with(flag) && option.size() > flag.size() &&
+              (flag.starts_with("--") ? option[flag.size()] == '='
+                                      : option[flag.size()] != '='));
+    });
+  };
+
+  std::vector<std::string> result;
+  for (std::size_t index = 0; index < options.size();) {
+    auto option = std::move(options[index++]);
+    const auto matched = pathFlag(option);
+    if (matched == std::ranges::end(pathFlags)) {
+      result.push_back(std::move(option));
+      continue;
+    }
+    const auto flag = *matched;
+    if (option == flag) {
+      result.push_back(std::move(option));
+      if (index < options.size()) {
+        result.push_back(normalizePathValue(
+            command, std::move(options[index++]), component, clone));
+      }
+      continue;
+    }
+    auto value = option.substr(flag.size());
+    if (value.starts_with('=')) {
+      value.erase(0, 1);
+    }
+    result.push_back(
+        std::string(flag) + (flag.starts_with("--") ? "=" : "") +
+        normalizePathValue(command, std::move(value), component, clone));
+  }
+  return result;
+}
+
+std::filesystem::path
+commonRoot(const std::vector<clang::tooling::CompileCommand> &commands) {
+  auto root = absolutePath(commands.front().Directory);
+  for (const auto &command : commands) {
+    auto directory = absolutePath(command.Directory);
+    while (!ownsPath(root, directory)) {
+      const auto parent = root.parent_path();
+      if (parent == root) {
+        return root;
+      }
+      root = parent;
+    }
+    auto source = resolveCommandPath(command, command.Filename);
+    while (!ownsPath(root, source)) {
+      const auto parent = root.parent_path();
+      if (parent == root) {
+        return root;
+      }
+      root = parent;
+    }
+  }
+  return root;
+}
+
+struct PreparedCommand {
+  std::filesystem::path source;
+  std::size_t component = 0;
+  std::string key;
+  std::string driver;
+  std::string workingDirectory;
+  std::vector<std::string> options;
+};
+
+std::expected<PreparedCommand, std::string>
+prepareCommand(const clang::tooling::CompileCommand &command,
+               std::span<const ProjectComponent> components,
+               const ProjectClone &clone) {
+  if (command.CommandLine.empty()) {
+    return std::unexpected("compile command has no arguments");
+  }
+  const auto source = resolveCommandPath(command, command.Filename);
+  const auto component = selectOwningComponent(components, clone, source);
+  if (!component) {
+    return std::unexpected("source is outside every configured component: " +
+                           source.string());
+  }
+
+  const auto start = commandStart(command.CommandLine);
+  if (start >= command.CommandLine.size()) {
+    return std::unexpected("compile command has no compiler driver: " +
+                           source.string());
+  }
+  std::vector<std::string> options(command.CommandLine.begin() + start + 1,
+                                   command.CommandLine.end());
+  std::erase_if(options, [&](const std::string &option) {
+    return option == command.Filename || option == source.string() ||
+           (!option.starts_with('-') &&
+            resolveCommandPath(command, option) == source);
+  });
+  auto sanitized = sanitize(std::move(options));
+  sanitized = normalizePathOptions(command, std::move(sanitized),
+                                   components[*component], clone);
+  const auto root = effectiveComponentRoot(components[*component], clone);
+  const auto directory = source.lexically_relative(root).parent_path();
+  const auto workingDirectory =
+      portablePath(resolveCommandPath(command, command.Directory),
+                   components[*component], clone);
+  std::ostringstream key;
+  key << source.string() << '\x1f' << command.Directory << '\x1f'
+      << command.CommandLine[start];
+  for (const auto &option : sanitized) {
+    key << '\x1f' << option;
+  }
+  return PreparedCommand{
+      source,           *component,
+      key.str(),        compilerDriver(command, start, source),
+      workingDirectory, std::move(sanitized)};
+}
+
 } // namespace
 
 std::expected<std::unique_ptr<clang::tooling::CompilationDatabase>, std::string>
@@ -598,7 +848,7 @@ loadStoredCompilationDatabase(std::string databasePath) {
             })
             .and_then([&](const Aliases &aliases) {
               return readStoredFiles(connection.handle)
-                  .and_then([&](const std::vector<StoredFile> &files) {
+                  .and_then([&](const std::vector<StoredCompileFile> &files) {
                     return toCompileCommands(files, aliases);
                   });
             })
@@ -617,6 +867,83 @@ void configureStoredCompilationDatabase(std::string databasePath) {
 
 std::optional<std::string> storedCompilationDatabaseError() {
   return configuredDatabaseError;
+}
+
+std::expected<ProjectImportResult, std::string>
+importProjectConfiguration(FileManager &files,
+                           const clang::tooling::CompilationDatabase &database,
+                           std::span<const std::string> fallbackSources,
+                           const ProjectImportOptions &options) {
+  auto commands = database.getAllCompileCommands();
+  if (commands.empty()) {
+    for (const auto &source : fallbackSources) {
+      auto sourceCommands = database.getCompileCommands(source);
+      commands.insert(commands.end(), sourceCommands.begin(),
+                      sourceCommands.end());
+    }
+  }
+  if (commands.empty()) {
+    return std::unexpected("compilation database contains no commands");
+  }
+
+  ProjectConfiguration configuration;
+  configuration.repositoryName = options.repositoryName;
+  configuration.remoteUrl = options.remoteUrl;
+  configuration.activeClone.path = commonRoot(commands).string();
+  configuration.activeClone.label = options.cloneLabel;
+  configuration.components = options.components;
+  if (configuration.components.empty()) {
+    configuration.components.push_back(
+        ProjectComponent{.name = "facts-tool", .path = ".", .kind = "repo"});
+  }
+  for (auto &component : configuration.components) {
+    component.repositoryId = 1;
+  }
+
+  std::map<std::string, PreparedCommand> selected;
+  ProjectImportResult result;
+  for (const auto &command : commands) {
+    auto prepared = prepareCommand(command, configuration.components,
+                                   configuration.activeClone);
+    if (!prepared) {
+      return std::unexpected(prepared.error());
+    }
+    auto candidate = std::move(*prepared);
+    const auto source = candidate.source.string();
+    const auto entry = selected.find(source);
+    if (entry == selected.end()) {
+      selected.emplace(source, std::move(candidate));
+    } else {
+      ++result.duplicateCommands;
+      result.diagnostics.push_back("duplicate compile command for " + source +
+                                   "; selected the deterministic winner");
+      if (entry->second.key > candidate.key) {
+        entry->second = std::move(candidate);
+      }
+    }
+  }
+
+  for (const auto &[source, command] : selected) {
+    const auto &component = configuration.components[command.component];
+    const auto relative = command.source.lexically_relative(
+        effectiveComponentRoot(component, configuration.activeClone));
+    configuration.files.push_back(
+        ProjectFile{.componentPath = component.path,
+                    .directory = relative.parent_path() == "."
+                                     ? std::string{}
+                                     : relative.parent_path().generic_string(),
+                    .name = relative.filename().generic_string(),
+                    .driver = command.driver,
+                    .workingDirectory = command.workingDirectory,
+                    .compileOptions = encodeOptions(command.options)});
+  }
+  result.importedFiles = configuration.files.size();
+  if (auto imported = files.replaceProjectConfiguration(configuration);
+      !imported) {
+    return std::unexpected("cannot store project configuration: " +
+                           imported.error().message());
+  }
+  return result;
 }
 
 } // namespace facts

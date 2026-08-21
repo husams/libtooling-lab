@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS file (
   md5             TEXT,
   compile_options TEXT,
   driver          TEXT,
+  working_directory TEXT,
   indexed         INTEGER NOT NULL DEFAULT 0,
   indexed_at      TEXT,
   args_overridden INTEGER NOT NULL DEFAULT 0,
