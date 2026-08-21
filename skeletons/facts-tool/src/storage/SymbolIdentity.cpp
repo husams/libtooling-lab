@@ -14,8 +14,8 @@ namespace {
 std::expected<std::optional<std::uint32_t>, std::error_code>
 findSymbolIndex(sqlite3 *database, FileId file, std::string_view identity) {
   auto statement = storage::prepare(
-      database,
-      "SELECT file_index FROM symbol WHERE file_id=?1 AND identity=?2");
+      database, "SELECT id FROM symbol WHERE ((id >> 32) & 4294967295)=?1 "
+                "AND identity=?2");
   if (!statement || !storage::bindInteger(statement->get(), 1, file) ||
       !storage::bindText(statement->get(), 2, identity)) {
     return std::unexpected(storage::sqliteError(database));
@@ -29,11 +29,9 @@ findSymbolIndex(sqlite3 *database, FileId file, std::string_view identity) {
     return std::unexpected(storage::sqliteError(database));
   }
 
-  const auto raw = sqlite3_column_int64(statement->get(), 0);
-  if (raw < 0 || raw > std::numeric_limits<std::uint32_t>::max()) {
-    return std::unexpected(std::make_error_code(std::errc::value_too_large));
-  }
-  return std::optional{static_cast<std::uint32_t>(raw)};
+  const auto packed =
+      static_cast<std::uint64_t>(sqlite3_column_int64(statement->get(), 0));
+  return std::optional{static_cast<std::uint32_t>(packed)};
 }
 
 std::expected<std::uint32_t, std::error_code>

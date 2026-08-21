@@ -43,7 +43,7 @@ def then_symbols_use_registered_file_ids(context: FactsToolContext) -> None:
         file_id
         for (file_id,) in query(
             context.facts_database_path,
-            "SELECT DISTINCT file_id FROM symbol",
+            "SELECT DISTINCT ((id >> 32) & 4294967295) FROM symbol",
         )
     }
     require(0 not in symbol_file_ids, "captured symbols must not use builtin FileId 0")

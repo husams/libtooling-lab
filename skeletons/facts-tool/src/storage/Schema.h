@@ -36,8 +36,6 @@ CREATE TABLE IF NOT EXISTS symbol_allocator (
 -- as the raw enum values index::getSymbolInfo() produced.
 CREATE TABLE IF NOT EXISTS symbol (
   id             INTEGER PRIMARY KEY,
-  file_id        INTEGER NOT NULL,
-  file_index     INTEGER NOT NULL,
   identity       TEXT NOT NULL,
   node           INTEGER NOT NULL,  -- which Storage specialization owns it,
                                     -- and therefore which side tables apply
@@ -72,15 +70,15 @@ CREATE TABLE IF NOT EXISTS symbol (
   has_extern_storage INTEGER NOT NULL CHECK(has_extern_storage IN (0,1)),
   constant_evaluation TEXT NOT NULL
     CHECK(constant_evaluation IN ('none','constexpr','consteval','constinit')),
-  is_noexcept    INTEGER NOT NULL CHECK(is_noexcept IN (0,1)),
-  UNIQUE(file_id, file_index),
-  UNIQUE(file_id, identity)
+  is_noexcept    INTEGER NOT NULL CHECK(is_noexcept IN (0,1))
 );
 
 -- '%name%' over qualified_name is the search, so it is the one index that
 -- earns its keep beyond the keys; usr is how a merge or a second run finds a
 -- symbol it already knows.
 CREATE INDEX IF NOT EXISTS idx_symbol_qualified_name ON symbol(qualified_name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_symbol_file_identity
+  ON symbol(((id >> 32) & 4294967295), identity);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_symbol_unique_usr ON symbol(usr)
   WHERE usr <> '';
 
@@ -224,7 +222,7 @@ CREATE TABLE IF NOT EXISTS relation (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=4;
+PRAGMA user_version=5;
 
 )sql";
 

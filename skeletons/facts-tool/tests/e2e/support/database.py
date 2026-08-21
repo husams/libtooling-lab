@@ -64,8 +64,8 @@ def file_snapshot(database: Path) -> list[tuple]:
 def symbol_snapshot(database: Path) -> list[tuple]:
     return query(
         database,
-        "SELECT id,file_id,file_index,node,usr,qualified_name "
-        "FROM symbol ORDER BY file_id,file_index",
+        "SELECT id,((id >> 32) & 4294967295),(id & 4294967295),"
+        "node,usr,qualified_name FROM symbol ORDER BY id",
     )
 
 

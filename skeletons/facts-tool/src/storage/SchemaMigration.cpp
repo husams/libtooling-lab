@@ -211,6 +211,67 @@ CREATE TABLE IF NOT EXISTS enumerator (
 PRAGMA user_version=4;
 )sql";
 
+inline constexpr auto packedSymbolIdMigrationSql = R"sql(
+CREATE TABLE symbol_compact (
+  id             INTEGER PRIMARY KEY,
+  identity       TEXT NOT NULL,
+  node           INTEGER NOT NULL,
+  kind           INTEGER NOT NULL,
+  sub_kind       INTEGER NOT NULL,
+  lang           INTEGER NOT NULL,
+  properties     INTEGER NOT NULL,
+  usr            TEXT NOT NULL,
+  qualified_name TEXT NOT NULL,
+  line           INTEGER NOT NULL,
+  col            INTEGER NOT NULL,
+  offset         INTEGER NOT NULL,
+  access         TEXT NOT NULL
+    CHECK(access IN ('none','public','protected','private')),
+  is_definition  INTEGER NOT NULL CHECK(is_definition IN (0,1)),
+  is_implicit    INTEGER NOT NULL CHECK(is_implicit IN (0,1)),
+  is_static      INTEGER NOT NULL CHECK(is_static IN (0,1)),
+  is_virtual     INTEGER NOT NULL CHECK(is_virtual IN (0,1)),
+  is_const       INTEGER NOT NULL CHECK(is_const IN (0,1)),
+  is_inline      INTEGER NOT NULL CHECK(is_inline IN (0,1)),
+  is_pure        INTEGER NOT NULL CHECK(is_pure IN (0,1)),
+  ref_qualifier  TEXT NOT NULL
+    CHECK(ref_qualifier IN ('none','lvalue','rvalue')),
+  is_override    INTEGER NOT NULL CHECK(is_override IN (0,1)),
+  has_internal_linkage INTEGER NOT NULL
+    CHECK(has_internal_linkage IN (0,1)),
+  is_external    INTEGER NOT NULL CHECK(is_external IN (0,1)),
+  is_variadic    INTEGER NOT NULL CHECK(is_variadic IN (0,1)),
+  is_deleted     INTEGER NOT NULL CHECK(is_deleted IN (0,1)),
+  is_defaulted   INTEGER NOT NULL CHECK(is_defaulted IN (0,1)),
+  is_explicit    INTEGER NOT NULL CHECK(is_explicit IN (0,1)),
+  is_final       INTEGER NOT NULL CHECK(is_final IN (0,1)),
+  is_abstract    INTEGER NOT NULL CHECK(is_abstract IN (0,1)),
+  is_polymorphic INTEGER NOT NULL CHECK(is_polymorphic IN (0,1)),
+  has_extern_storage INTEGER NOT NULL CHECK(has_extern_storage IN (0,1)),
+  constant_evaluation TEXT NOT NULL
+    CHECK(constant_evaluation IN ('none','constexpr','consteval','constinit')),
+  is_noexcept    INTEGER NOT NULL CHECK(is_noexcept IN (0,1))
+);
+
+INSERT INTO symbol_compact(
+  id,identity,node,kind,sub_kind,lang,properties,usr,qualified_name,line,col,
+  offset,access,is_definition,is_implicit,is_static,is_virtual,is_const,
+  is_inline,is_pure,ref_qualifier,is_override,has_internal_linkage,is_external,
+  is_variadic,is_deleted,is_defaulted,is_explicit,is_final,is_abstract,
+  is_polymorphic,has_extern_storage,constant_evaluation,is_noexcept)
+SELECT
+  id,identity,node,kind,sub_kind,lang,properties,usr,qualified_name,line,col,
+  offset,access,is_definition,is_implicit,is_static,is_virtual,is_const,
+  is_inline,is_pure,ref_qualifier,is_override,has_internal_linkage,is_external,
+  is_variadic,is_deleted,is_defaulted,is_explicit,is_final,is_abstract,
+  is_polymorphic,has_extern_storage,constant_evaluation,is_noexcept
+FROM symbol;
+
+DROP TABLE symbol;
+ALTER TABLE symbol_compact RENAME TO symbol;
+PRAGMA user_version=5;
+)sql";
+
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
@@ -241,6 +302,13 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
               return schemaVersion(database).and_then([database](int version) {
                 return version < 4 ? execute(database, enumerationMigrationSql)
                                    : std::expected<void, std::error_code>{};
+              });
+            })
+            .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 5
+                           ? execute(database, packedSymbolIdMigrationSql)
+                           : std::expected<void, std::error_code>{};
               });
             });
       });
