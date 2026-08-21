@@ -6,6 +6,7 @@
 #include <clang/AST/DeclTemplate.h>
 #include <clang/AST/Type.h>
 #include <clang/AST/TypeVisitor.h>
+#include <clang/Basic/Version.h>
 #include <clang/Index/USRGeneration.h>
 #include <llvm/ADT/SmallString.h>
 
@@ -47,6 +48,15 @@ public:
   TypeResult VisitTagType(const clang::TagType *type) {
     return declarationId(type->getDecl());
   }
+
+#if CLANG_VERSION_MAJOR < 22
+  // Before LLVM 22 a type written with a tag keyword or a nested-name
+  // qualifier arrives wrapped in ElaboratedType sugar. Unwrap it — the named
+  // type underneath still keeps any typedef the source wrote.
+  TypeResult VisitElaboratedType(const clang::ElaboratedType *type) {
+    return Visit(type->getNamedType().getTypePtr());
+  }
+#endif
 
   TypeResult VisitTemplateSpecializationType(
       const clang::TemplateSpecializationType *type) {

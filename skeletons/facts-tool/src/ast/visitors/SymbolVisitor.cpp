@@ -2,7 +2,28 @@
 
 #include "ast/visitors/SymbolCollector.h"
 
+#include <algorithm>
+#include <clang/Basic/SourceManager.h>
+
 namespace facts {
+namespace {
+
+bool isSystemHeaderDeclaration(const clang::Decl &decl,
+                               const clang::SourceManager &sourceManager) {
+  const auto location = decl.getLocation();
+  return location.isValid() && sourceManager.isInSystemHeader(location);
+}
+
+} // namespace
+
+bool SymbolVisitor::TraverseTranslationUnitDecl(
+    clang::TranslationUnitDecl *decl) {
+  const auto &sourceManager = context_.getSourceManager();
+  return std::ranges::all_of(decl->decls(), [&](clang::Decl *child) {
+    return isSystemHeaderDeclaration(*child, sourceManager) ||
+           TraverseDecl(child);
+  });
+}
 
 bool SymbolVisitor::TraverseParmVarDecl(clang::ParmVarDecl *) { return true; }
 

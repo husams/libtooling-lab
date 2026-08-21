@@ -9,6 +9,12 @@ cmake_minimum_required(VERSION 3.20)
 # C is needed too: LLVM's own cmake modules (FindLibEdit) run C header checks.
 project(facts_tool C CXX)
 
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+               Debug Release RelWithDebInfo MinSizeRel)
+endif()
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -17,6 +23,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
 find_package(SQLite3 REQUIRED)
+# CMake >= 4.3 names the imported target SQLite3::SQLite3; older CMake (RHEL 9
+# ships 3.31) only defines the now-deprecated SQLite::SQLite3.
+if(NOT TARGET SQLite3::SQLite3)
+  add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+endif()
 message(STATUS "Building against LLVM ${LLVM_PACKAGE_VERSION} at ${LLVM_DIR}")
 
 # LLVM and Clang are implementation dependencies shared by the internal modules.
@@ -25,7 +36,10 @@ target_include_directories(facts-clang SYSTEM INTERFACE
   ${LLVM_INCLUDE_DIRS}
   ${CLANG_INCLUDE_DIRS}
 )
-target_compile_options(facts-clang INTERFACE ${LLVM_DEFINITIONS})
+# LLVM_DEFINITIONS is one space-separated string; split it so each -D reaches
+# the compiler as its own argument.
+separate_arguments(FACTS_LLVM_DEFINITIONS NATIVE_COMMAND "${LLVM_DEFINITIONS}")
+target_compile_options(facts-clang INTERFACE ${FACTS_LLVM_DEFINITIONS})
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(facts-clang INTERFACE -fno-rtti)
 endif()

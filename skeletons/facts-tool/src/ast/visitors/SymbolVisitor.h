@@ -13,6 +13,7 @@ public:
                 FactStore &store)
       : context_(context), files_(files), store_(store) {}
 
+  bool TraverseTranslationUnitDecl(clang::TranslationUnitDecl *decl);
   bool TraverseParmVarDecl(clang::ParmVarDecl *decl);
   bool VisitCXXRecordDecl(clang::CXXRecordDecl *decl);
   bool VisitFunctionDecl(clang::FunctionDecl *decl);

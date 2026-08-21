@@ -1,6 +1,10 @@
 # Build directories
 skeletons/*/build/
 build/
+# build-rhel9.sh: out-of-tree build, vendored SQLite, pytest venv
+skeletons/*/build-rhel9/
+skeletons/*/.deps/
+skeletons/*/.venv-rhel9/
 
 # CMake
 CMakeCache.txt
