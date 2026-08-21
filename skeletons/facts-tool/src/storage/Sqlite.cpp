@@ -36,10 +36,20 @@ bool bindText(sqlite3_stmt *statement, int position, std::string_view value) {
 
 std::string columnText(sqlite3_stmt *statement, int column) {
   const auto *value = sqlite3_column_text(statement, column);
-  return value ? reinterpret_cast<const char *>(value) : std::string{};
+  return value ? std::string{reinterpret_cast<const char *>(value),
+                             static_cast<std::size_t>(
+                                 sqlite3_column_bytes(statement, column))}
+               : std::string{};
 }
 
 std::uint64_t packSymbolId(SymbolId id) { return id.packed(); }
+
+SymbolId unpackSymbolId(std::uint64_t packed) {
+  return {
+      static_cast<FileId>(packed >> 32U),
+      static_cast<std::uint32_t>(packed),
+  };
+}
 
 std::expected<Transaction, std::error_code>
 Transaction::read(sqlite3 *database) {

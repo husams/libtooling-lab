@@ -1,5 +1,6 @@
 #include "ast/extractors/ParmVarDecl.h"
 
+#include "ast/extractors/Initializer.h"
 #include "ast/extractors/Location.h"
 #include "ast/extractors/Type.h"
 
@@ -68,6 +69,15 @@ std::uint8_t extractParameterFlags(const clang::ParmVarDecl &node) {
          flagWhen(ParameterBit::PackBit, node.isParameterPack());
 }
 
+std::optional<Initializer>
+extractDefaultValue(const clang::ParmVarDecl &node,
+                    const clang::SourceManager &sourceManager) {
+  return node.hasDefaultArg()
+             ? extractInitializer(node.getDefaultArg(), node.getType(),
+                                  node.getASTContext(), sourceManager)
+             : std::nullopt;
+}
+
 } // namespace
 
 ExtractionResult<Parameter>
@@ -78,7 +88,7 @@ extractParameter(const clang::ParmVarDecl &node,
         [&, location](Region region) -> ExtractionResult<Parameter> {
       return extractType(node.getType(), store)
           .transform_error(
-              [](std::error_code) { return ExtractionError::InvalidType; })
+              [](TypeResolutionError) { return ExtractionError::InvalidType; })
           .transform([&](SymbolId type) {
             return Parameter{
                 .name = node.getNameAsString(),
@@ -87,6 +97,7 @@ extractParameter(const clang::ParmVarDecl &node,
                 .region = region,
                 .flags = extractParameterFlags(node),
                 .hasDefault = node.hasDefaultArg(),
+                .defaultValue = extractDefaultValue(node, sourceManager),
             };
           });
     };

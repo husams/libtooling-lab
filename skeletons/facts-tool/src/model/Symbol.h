@@ -55,7 +55,7 @@ enum SymbolBit : std::size_t {
   ImplicitBit = 3,   // compiler-generated, never written in the source
   StaticBit = 4,
   VirtualBit = 5,
-  ConstBit = 6, // const-qualified method
+  ConstBit = 6, // const-qualified method or top-level const value
   InlineBit = 7,
   PureBit = 8, // pure virtual — `= 0`, FunctionDecl::isPureVirtual()
   // bits 9-10: ref-qualifier field, see above
@@ -73,10 +73,9 @@ enum SymbolBit : std::size_t {
   DefaultedBit = 16, // `= default`
   ExplicitBit = 17,  // explicit constructor or conversion operator
   FinalBit = 18,
-  AbstractBit = 19,    // a record with an unimplemented pure virtual
-  PolymorphicBit = 20, // a record with a vtable
-  // bit 21 free — a pack is TemplateArgumentKind::Pack on the slot, or
-  // ParameterBit::PackBit on the parameter, never a fact about the symbol
+  AbstractBit = 19,      // a record with an unimplemented pure virtual
+  PolymorphicBit = 20,   // a record with a vtable
+  ExternStorageBit = 21, // the declaration was written with extern storage
   // bits 22-23: constexpr/consteval/constinit field, see above
   NoexceptBit = 24, // declared not to throw. The written spec has fourteen
                     // spellings (EST_BasicNoexcept, EST_NoexceptTrue,
@@ -103,6 +102,9 @@ struct Symbol : clang::index::SymbolInfo {
   // The token-inclusive source range of this declaration when it defines the
   // symbol. Declarations without a definition leave this empty.
   std::optional<Region> definition;
+  // A merged symbol's stable id may belong to a declaration in another file.
+  // Keep the definition's actual file alongside its range when known.
+  std::optional<FileId> definitionFile;
 
   // Parameters in source order. The vector position is the parameter index.
   std::vector<Parameter> parameters;

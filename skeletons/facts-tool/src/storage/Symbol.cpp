@@ -23,34 +23,48 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node,
       "is_implicit,is_static,is_virtual,is_const,is_inline,is_pure,"
       "ref_qualifier,is_override,has_internal_linkage,is_external,is_variadic,"
       "is_deleted,is_defaulted,is_explicit,is_final,is_abstract,is_polymorphic,"
-      "constant_evaluation,is_noexcept) "
+      "has_extern_storage,constant_evaluation,is_noexcept) "
       "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,"
       "?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,"
-      "?33,?34,?35) "
+      "?33,?34,?35,?36) "
       "ON CONFLICT(file_id,identity) DO UPDATE SET node=excluded.node,"
       "kind=excluded.kind,sub_kind=excluded.sub_kind,lang=excluded.lang,"
       "properties=excluded.properties,usr=excluded.usr,"
-      "qualified_name=excluded.qualified_name,line=excluded.line,"
-      "col=excluded.col,offset=excluded.offset,access=excluded.access,"
-      "is_definition=excluded.is_definition,is_implicit=excluded.is_implicit,"
-      "is_static=excluded.is_static,is_virtual=excluded.is_virtual,"
-      "is_const=excluded.is_const,is_inline=excluded.is_inline,"
-      "is_pure=excluded.is_pure,ref_qualifier=excluded.ref_qualifier,"
-      "is_override=excluded.is_override,"
-      "has_internal_linkage=excluded.has_internal_linkage,"
-      "is_external=excluded.is_external,is_variadic=excluded.is_variadic,"
-      "is_deleted=excluded.is_deleted,is_defaulted=excluded.is_defaulted,"
-      "is_explicit=excluded.is_explicit,is_final=excluded.is_final,"
-      "is_abstract=excluded.is_abstract,is_polymorphic=excluded.is_polymorphic,"
-      "constant_evaluation=excluded.constant_evaluation,"
-      "is_noexcept=excluded.is_noexcept");
+      "qualified_name=excluded.qualified_name,"
+      "access=CASE WHEN excluded.access<>'none' THEN excluded.access ELSE "
+      "access END,"
+      "is_definition=MAX(is_definition,excluded.is_definition),"
+      "is_implicit=MAX(is_implicit,excluded.is_implicit),"
+      "is_static=MAX(is_static,excluded.is_static),"
+      "is_virtual=MAX(is_virtual,excluded.is_virtual),"
+      "is_const=MAX(is_const,excluded.is_const),"
+      "is_inline=MAX(is_inline,excluded.is_inline),"
+      "is_pure=MAX(is_pure,excluded.is_pure),"
+      "ref_qualifier=CASE WHEN excluded.ref_qualifier<>'none' "
+      "THEN excluded.ref_qualifier ELSE ref_qualifier END,"
+      "is_override=MAX(is_override,excluded.is_override),"
+      "has_internal_linkage=MAX(has_internal_linkage,excluded.has_internal_"
+      "linkage),"
+      "is_external=MIN(is_external,excluded.is_external),"
+      "is_variadic=MAX(is_variadic,excluded.is_variadic),"
+      "is_deleted=MAX(is_deleted,excluded.is_deleted),"
+      "is_defaulted=MAX(is_defaulted,excluded.is_defaulted),"
+      "is_explicit=MAX(is_explicit,excluded.is_explicit),"
+      "is_final=MAX(is_final,excluded.is_final),"
+      "is_abstract=MAX(is_abstract,excluded.is_abstract),"
+      "is_polymorphic=MAX(is_polymorphic,excluded.is_polymorphic),"
+      "has_extern_storage=MAX(has_extern_storage,excluded.has_extern_storage),"
+      "constant_evaluation=CASE WHEN excluded.constant_evaluation<>'none' "
+      "THEN excluded.constant_evaluation ELSE constant_evaluation END,"
+      "is_noexcept=MAX(is_noexcept,excluded.is_noexcept)");
   if (!statement ||
       !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
       !storage::bindInteger(statement->get(), 2, id.file) ||
       !storage::bindInteger(statement->get(), 3, id.index) ||
       !storage::bindText(statement->get(), 4, identity) ||
       !storage::bindInteger(statement->get(), 5, node) ||
-      !storage::bindInteger(statement->get(), 6, symbol.Kind) ||
+      !storage::bindInteger(statement->get(), 6,
+                            storage::storedSymbolKind(symbol.Kind)) ||
       !storage::bindInteger(statement->get(), 7, symbol.SubKind) ||
       !storage::bindInteger(statement->get(), 8, symbol.Lang) ||
       !storage::bindInteger(statement->get(), 9, symbol.Properties) ||
@@ -79,8 +93,10 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node,
       !storage::bindInteger(statement->get(), 31, properties.isFinal) ||
       !storage::bindInteger(statement->get(), 32, properties.isAbstract) ||
       !storage::bindInteger(statement->get(), 33, properties.isPolymorphic) ||
-      !storage::bindText(statement->get(), 34, properties.constantEvaluation) ||
-      !storage::bindInteger(statement->get(), 35, properties.isNoexcept) ||
+      !storage::bindInteger(statement->get(), 34,
+                            properties.hasExternStorage) ||
+      !storage::bindText(statement->get(), 35, properties.constantEvaluation) ||
+      !storage::bindInteger(statement->get(), 36, properties.isNoexcept) ||
       sqlite3_step(statement->get()) != SQLITE_DONE) {
     return std::unexpected(storage::sqliteError(handle()));
   }
@@ -95,7 +111,8 @@ std::expected<Symbol, std::error_code> Storage::loadSymbolRow(SymbolNode node,
       "offset,access,is_definition,is_implicit,is_static,is_virtual,is_const,"
       "is_inline,is_pure,ref_qualifier,is_override,has_internal_linkage,"
       "is_external,is_variadic,is_deleted,is_defaulted,is_explicit,is_final,"
-      "is_abstract,is_polymorphic,constant_evaluation,is_noexcept "
+      "is_abstract,is_polymorphic,has_extern_storage,constant_evaluation,"
+      "is_noexcept "
       "FROM symbol WHERE id=?1 AND node=?2");
   if (!statement ||
       !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
@@ -114,8 +131,8 @@ std::expected<Symbol, std::error_code> Storage::loadSymbolRow(SymbolNode node,
 
   Symbol symbol;
   symbol.id = id;
-  symbol.Kind = static_cast<decltype(symbol.Kind)>(
-      sqlite3_column_int64(statement->get(), 0));
+  symbol.Kind =
+      storage::symbolKindFromStored(sqlite3_column_int64(statement->get(), 0));
   symbol.SubKind = static_cast<decltype(symbol.SubKind)>(
       sqlite3_column_int64(statement->get(), 1));
   symbol.Lang = static_cast<decltype(symbol.Lang)>(
@@ -149,8 +166,9 @@ std::expected<Symbol, std::error_code> Storage::loadSymbolRow(SymbolNode node,
       .isFinal = sqlite3_column_int64(statement->get(), 25) != 0,
       .isAbstract = sqlite3_column_int64(statement->get(), 26) != 0,
       .isPolymorphic = sqlite3_column_int64(statement->get(), 27) != 0,
-      .constantEvaluation = storage::columnText(statement->get(), 28),
-      .isNoexcept = sqlite3_column_int64(statement->get(), 29) != 0,
+      .hasExternStorage = sqlite3_column_int64(statement->get(), 28) != 0,
+      .constantEvaluation = storage::columnText(statement->get(), 29),
+      .isNoexcept = sqlite3_column_int64(statement->get(), 30) != 0,
   });
   return symbol;
 }
@@ -187,10 +205,14 @@ std::expected<Symbol, std::error_code> Storage::loadFacts(Symbol symbol,
   auto definition =
       facts.definition
           ? loadDefinition(id)
-          : std::expected<std::optional<Region>, std::error_code>{std::nullopt};
+          : std::expected<std::optional<DefinitionFacts>, std::error_code>{
+                std::nullopt};
   return std::move(definition)
       .transform([symbol = std::move(symbol)](auto loaded) mutable {
-        symbol.definition = loaded;
+        if (loaded) {
+          symbol.definition = loaded->region;
+          symbol.definitionFile = loaded->file;
+        }
         return symbol;
       })
       .and_then([this, id, facts](Symbol value) {
@@ -228,8 +250,9 @@ Storage::saveSymbol(SymbolNode node, const Symbol &symbol, SymbolFacts facts) {
       .and_then([&](SymbolId id) {
         return replaceSymbolRow(id, node, identity, symbol)
             .and_then([&] {
-              return replaceDefinition(id, facts.definition ? symbol.definition
-                                                            : std::nullopt);
+              return replaceDefinition(
+                  id, symbol.definitionFile.value_or(symbol.id.file),
+                  facts.definition ? symbol.definition : std::nullopt);
             })
             .and_then([&] {
               return replaceParameters(

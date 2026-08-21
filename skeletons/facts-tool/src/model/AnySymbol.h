@@ -2,10 +2,10 @@
 #define FACTS_TOOL_MODEL_ANY_SYMBOL_H
 
 #include "model/Enumeration.h"
+#include "model/Enumerator.h"
 #include "model/Function.h"
 #include "model/Record.h"
 #include "model/Symbol.h"
-#include "model/TypeAlias.h"
 #include "model/Variable.h"
 
 #include <utility>
@@ -14,7 +14,7 @@
 namespace facts {
 
 using AnySymbol =
-    std::variant<Symbol, Function, Record, Enumeration, Variable, TypeAlias>;
+    std::variant<Symbol, Function, Record, Enumeration, Enumerator, Variable>;
 
 template <typename Model>
 Model toSymbolModel(Symbol symbol) {
@@ -41,16 +41,15 @@ inline AnySymbol classifySymbol(Symbol symbol) {
     return toSymbolModel<Record>(std::move(symbol));
   case clang::index::SymbolKind::Enum:
     return toSymbolModel<Enumeration>(std::move(symbol));
+  case clang::index::SymbolKind::EnumConstant:
+    return toSymbolModel<Enumerator>(std::move(symbol));
   case clang::index::SymbolKind::Variable:
   case clang::index::SymbolKind::Field:
-  case clang::index::SymbolKind::EnumConstant:
   case clang::index::SymbolKind::InstanceProperty:
   case clang::index::SymbolKind::ClassProperty:
   case clang::index::SymbolKind::StaticProperty:
   case clang::index::SymbolKind::Parameter:
     return toSymbolModel<Variable>(std::move(symbol));
-  case clang::index::SymbolKind::TypeAlias:
-    return toSymbolModel<TypeAlias>(std::move(symbol));
   default:
     return symbol;
   }

@@ -84,6 +84,12 @@ public:
     return storage_.addRelations(relations);
   }
 
+  std::expected<void, std::error_code>
+  addTemplateArguments(SymbolId id,
+                       std::span<const TemplateArgument> arguments) {
+    return storage_.addTemplateArguments(id, arguments);
+  }
+
   bool contains(std::string_view usr) const;
 
   std::size_t cachedIdCount() const { return idsByUsr_.size(); }

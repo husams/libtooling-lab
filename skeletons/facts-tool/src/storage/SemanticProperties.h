@@ -5,11 +5,39 @@
 #include "model/Relation.h"
 #include "model/Symbol.h"
 
+#include "clang/Basic/Version.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
 
 namespace facts::storage {
+
+// The symbol table stores the LLVM 22 clang::index::SymbolKind numbering. LLVM
+// 22 inserted IncludeDirective directly after Macro, so a tool built against an
+// older Clang sees every kind from Enum on sitting one lower. Shifting at the
+// storage boundary keeps a database saying the same thing whichever LLVM the
+// tool was built with.
+inline constexpr std::int64_t firstShiftedKind =
+    static_cast<std::int64_t>(clang::index::SymbolKind::Enum);
+
+constexpr std::int64_t storedSymbolKind(clang::index::SymbolKind kind) {
+  const auto value = static_cast<std::int64_t>(kind);
+#if CLANG_VERSION_MAJOR < 22
+  return value >= firstShiftedKind ? value + 1 : value;
+#else
+  return value;
+#endif
+}
+
+constexpr clang::index::SymbolKind symbolKindFromStored(std::int64_t value) {
+#if CLANG_VERSION_MAJOR < 22
+  const auto native = value > firstShiftedKind ? value - 1 : value;
+#else
+  const auto native = value;
+#endif
+  return static_cast<clang::index::SymbolKind>(native);
+}
 
 struct ParameterProperties {
   bool isPointer;
@@ -40,6 +68,7 @@ struct SymbolProperties {
   bool isFinal;
   bool isAbstract;
   bool isPolymorphic;
+  bool hasExternStorage;
   std::string_view constantEvaluation;
   bool isNoexcept;
 };
@@ -173,6 +202,7 @@ constexpr SymbolProperties symbolProperties(std::uint32_t flags) {
       .isFinal = hasBit(flags, FinalBit),
       .isAbstract = hasBit(flags, AbstractBit),
       .isPolymorphic = hasBit(flags, PolymorphicBit),
+      .hasExternStorage = hasBit(flags, ExternStorageBit),
       .constantEvaluation = constantEvaluationName(flags),
       .isNoexcept = hasBit(flags, NoexceptBit),
   };
@@ -198,6 +228,7 @@ constexpr std::uint32_t symbolFlags(SymbolProperties properties) {
          flagWhen(FinalBit, properties.isFinal) |
          flagWhen(AbstractBit, properties.isAbstract) |
          flagWhen(PolymorphicBit, properties.isPolymorphic) |
+         flagWhen(ExternStorageBit, properties.hasExternStorage) |
          constantEvaluationFlags(properties.constantEvaluation) |
          flagWhen(NoexceptBit, properties.isNoexcept);
 }

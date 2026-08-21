@@ -55,17 +55,22 @@ add_library(facts-storage STATIC
   src/storage/FileManager.cpp
   src/storage/Definition.cpp
   src/storage/Enumeration.cpp
+  src/storage/Enumerator.cpp
   src/storage/FactStore.cpp
   src/storage/Function.cpp
+  src/storage/FunctionInstance.cpp
+  src/storage/FunctionTemplate.cpp
+  src/storage/Initializer.cpp
   src/storage/Parameter.cpp
   src/storage/Record.cpp
+  src/storage/RecordInstance.cpp
+  src/storage/RecordTemplate.cpp
   src/storage/Relation.cpp
   src/storage/SchemaMigration.cpp
   src/storage/Sqlite.cpp
   src/storage/Storage.cpp
   src/storage/Symbol.cpp
   src/storage/SymbolIdentity.cpp
-  src/storage/TypeAlias.cpp
   src/storage/Variable.cpp
 )
 target_include_directories(facts-storage PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -84,14 +89,25 @@ target_link_libraries(facts-tooling PRIVATE facts-clang SQLite3::SQLite3)
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
   src/ast/extractors/Definition.cpp
+  src/ast/extractors/EnumConstantDecl.cpp
+  src/ast/extractors/EnumDecl.cpp
+  src/ast/extractors/FieldDecl.cpp
   src/ast/extractors/File.cpp
   src/ast/extractors/FunctionDecl.cpp
+  src/ast/extractors/FunctionTemplate.cpp
+  src/ast/extractors/Initializer.cpp
   src/ast/extractors/Location.cpp
+  src/ast/extractors/MethodDecl.cpp
   src/ast/extractors/NamedDecl.cpp
   src/ast/extractors/ParmVarDecl.cpp
   src/ast/extractors/Parameters.cpp
   src/ast/extractors/RecordDecl.cpp
+  src/ast/extractors/RecordInstance.cpp
+  src/ast/extractors/TemplatePattern.cpp
+  src/ast/extractors/TemplateSpecialization.cpp
   src/ast/extractors/Type.cpp
+  src/ast/extractors/ValueDecl.cpp
+  src/ast/extractors/VarDecl.cpp
   src/ast/visitors/SymbolCollector.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
@@ -203,5 +219,7 @@ if(BUILD_TESTING)
       --compiler ${CMAKE_CXX_COMPILER}
       --output-root ${CMAKE_CURRENT_BINARY_DIR}/e2e-artifacts
   )
-  set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 120)
+  # The suite parses every fixture once per scenario; a slower box needs well
+# over the 120s this used to allow.
+set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 600)
 endif()

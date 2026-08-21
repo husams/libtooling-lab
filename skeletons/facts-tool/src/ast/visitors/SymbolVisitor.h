@@ -1,6 +1,8 @@
 #ifndef FACTS_TOOL_AST_VISITORS_SYMBOL_VISITOR_H
 #define FACTS_TOOL_AST_VISITORS_SYMBOL_VISITOR_H
 
+#include "ast/Indexing.h"
+
 #include <clang/AST/RecursiveASTVisitor.h>
 
 namespace facts {
@@ -10,19 +12,28 @@ class FileManager;
 class SymbolVisitor final : public clang::RecursiveASTVisitor<SymbolVisitor> {
 public:
   SymbolVisitor(clang::ASTContext &context, FileManager &files,
-                FactStore &store)
-      : context_(context), files_(files), store_(store) {}
+                FactStore &store, IndexingStatus &status)
+      : context_(context), files_(files), store_(store), status_(status) {}
 
+  bool shouldVisitTemplateInstantiations() const { return true; }
+
+  bool TraverseCXXMethodDecl(clang::CXXMethodDecl *decl);
+  bool TraverseFieldDecl(clang::FieldDecl *decl);
   bool TraverseTranslationUnitDecl(clang::TranslationUnitDecl *decl);
   bool TraverseParmVarDecl(clang::ParmVarDecl *decl);
   bool VisitCXXRecordDecl(clang::CXXRecordDecl *decl);
+  bool VisitEnumConstantDecl(clang::EnumConstantDecl *decl);
+  bool VisitEnumDecl(clang::EnumDecl *decl);
+  bool VisitFieldDecl(clang::FieldDecl *decl);
   bool VisitFunctionDecl(clang::FunctionDecl *decl);
   bool VisitNamedDecl(clang::NamedDecl *decl);
+  bool VisitVarDecl(clang::VarDecl *decl);
 
 private:
   clang::ASTContext &context_;
   FileManager &files_;
   FactStore &store_;
+  IndexingStatus &status_;
 };
 
 } // namespace facts

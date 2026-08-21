@@ -1,160 +1,98 @@
 {
   "dry_run": false,
-  "finished_at": "2026-08-13T13:55:14+00:00",
+  "finished_at": "2026-08-15T18:45:36+00:00",
   "passed": true,
-  "plan": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool/.codex/cpp-quality-plan.json",
-  "project_root": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool",
+  "plan": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool/.codex/cpp-quality-plan.json",
+  "project_root": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
   "results": [
     {
       "argv": [
         "cmake",
-        "-G",
-        "Ninja",
         "-S",
         ".",
         "-B",
-        "/tmp/facts-tool-queryable-storage-build",
-        "-DCMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm",
-        "-DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang",
-        "-DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++",
-        "-DCMAKE_BUILD_TYPE=Debug",
-        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+        "/tmp/facts-tool-enum-test-build",
+        "-DBUILD_TESTING=ON",
+        "-DLLVM_DIR=/opt/homebrew/opt/llvm/lib/cmake/llvm",
+        "-DPython3_EXECUTABLE=/tmp/facts-tool-enum-test-venv/bin/python"
       ],
-      "cwd": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 0.303,
+      "cwd": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.301,
       "kind": "configure",
-      "name": "fresh-configure",
+      "name": "configure-enum-tests",
       "required": true,
       "returncode": 0,
       "status": "passed",
       "stderr": "",
-      "stdout": "-- Building against LLVM 22.1.8 at /opt/homebrew/opt/llvm/lib/cmake/llvm\n-- Configuring done (0.3s)\n-- Generating done (0.0s)\n-- Build files have been written to: /tmp/facts-tool-queryable-storage-build\n"
+      "stdout": "-- Building against LLVM 22.1.8 at /opt/homebrew/opt/llvm/lib/cmake/llvm\n-- Configuring done (0.3s)\n-- Generating done (0.0s)\n-- Build files have been written to: /tmp/facts-tool-enum-test-build\n"
     },
     {
       "argv": [
         "cmake",
         "--build",
-        "/tmp/facts-tool-queryable-storage-build",
+        "/tmp/facts-tool-enum-test-build",
         "--parallel"
       ],
-      "cwd": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 0.722,
+      "cwd": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.011,
       "kind": "build",
-      "name": "fresh-build",
+      "name": "build-enum-tests",
       "required": true,
       "returncode": 0,
       "status": "passed",
       "stderr": "",
-      "stdout": "[1/9] Building CXX object CMakeFiles/facts-storage.dir/src/storage/Relation.cpp.o\n[2/9] Building CXX object CMakeFiles/facts-storage.dir/src/storage/Parameter.cpp.o\n[3/9] Building CXX object CMakeFiles/facts-storage.dir/src/storage/Symbol.cpp.o\n[4/9] Linking CXX static library libfacts-storage.a\n[5/9] Building CXX object CMakeFiles/storage-schema-test.dir/tests/StorageSchemaTest.cpp.o\n[6/9] Linking CXX executable fact-store-test\n[7/9] Linking CXX executable file-manager-test\n[8/9] Linking CXX executable facts-tool\n[9/9] Linking CXX executable storage-schema-test\n"
+      "stdout": "ninja: no work to do.\n"
     },
     {
       "argv": [
         "ctest",
         "--test-dir",
-        "/tmp/facts-tool-queryable-storage-build",
-        "-R",
-        "^(storage-schema|facts-tool-e2e)$",
+        "/tmp/facts-tool-enum-test-build",
         "--output-on-failure"
       ],
-      "cwd": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 4.146,
+      "cwd": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 7.869,
       "kind": "test",
-      "name": "focused-tests",
+      "name": "run-all-tests",
       "required": true,
       "returncode": 0,
       "status": "passed",
       "stderr": "",
-      "stdout": "Test project /tmp/facts-tool-queryable-storage-build\n    Start 4: storage-schema\n1/2 Test #4: storage-schema ...................   Passed    0.43 sec\n    Start 6: facts-tool-e2e\n2/2 Test #6: facts-tool-e2e ...................   Passed    3.71 sec\n\n100% tests passed out of 2\n\nTotal Test time (real) =   4.14 sec\n"
-    },
-    {
-      "argv": [
-        "ctest",
-        "--test-dir",
-        "/tmp/facts-tool-queryable-storage-build",
-        "--output-on-failure"
-      ],
-      "cwd": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 4.299,
-      "kind": "test",
-      "name": "full-tests",
-      "required": true,
-      "returncode": 0,
-      "status": "passed",
-      "stderr": "",
-      "stdout": "Test project /tmp/facts-tool-queryable-storage-build\n    Start 1: fact-store\n1/6 Test #1: fact-store .......................   Passed    0.63 sec\n    Start 2: file-manager\n2/6 Test #2: file-manager .....................   Passed    0.22 sec\n    Start 3: compilation-files\n3/6 Test #3: compilation-files ................   Passed    0.02 sec\n    Start 4: storage-schema\n4/6 Test #4: storage-schema ...................   Passed    0.03 sec\n    Start 5: multi-tu-file-registry\n5/6 Test #5: multi-tu-file-registry ...........   Passed    0.06 sec\n    Start 6: facts-tool-e2e\n6/6 Test #6: facts-tool-e2e ...................   Passed    3.32 sec\n\n100% tests passed out of 6\n\nTotal Test time (real) =   4.29 sec\n"
+      "stdout": "Test project /tmp/facts-tool-enum-test-build\n    Start 1: fact-store\n1/6 Test #1: fact-store .......................   Passed    0.29 sec\n    Start 2: file-manager\n2/6 Test #2: file-manager .....................   Passed    0.03 sec\n    Start 3: compilation-files\n3/6 Test #3: compilation-files ................   Passed    0.02 sec\n    Start 4: storage-schema\n4/6 Test #4: storage-schema ...................   Passed    0.04 sec\n    Start 5: multi-tu-file-registry\n5/6 Test #5: multi-tu-file-registry ...........   Passed    0.07 sec\n    Start 6: facts-tool-e2e\n6/6 Test #6: facts-tool-e2e ...................   Passed    7.42 sec\n\n100% tests passed out of 6\n\nTotal Test time (real) =   7.86 sec\n"
     },
     {
       "argv": [
         "/opt/homebrew/opt/llvm/bin/clang-format",
         "--dry-run",
         "--Werror",
+        "src/ast/extractors/Definition.cpp",
+        "src/ast/extractors/Definition.h",
+        "src/ast/extractors/EnumConstantDecl.cpp",
+        "src/ast/extractors/EnumConstantDecl.h",
+        "src/ast/extractors/EnumDecl.cpp",
+        "src/ast/extractors/EnumDecl.h",
+        "src/ast/visitors/SymbolCollector.cpp",
+        "src/ast/visitors/SymbolVisitor.cpp",
+        "src/ast/visitors/SymbolVisitor.h",
+        "src/model/AnySymbol.h",
+        "src/model/Enumeration.h",
+        "src/model/Enumerator.h",
+        "src/storage/Enumeration.cpp",
+        "src/storage/Enumerator.cpp",
+        "src/storage/Enumerator.h",
         "src/storage/Parameter.cpp",
-        "src/storage/Relation.cpp",
+        "src/storage/Schema.h",
         "src/storage/SchemaMigration.cpp",
-        "src/storage/SchemaMigration.h",
-        "src/storage/SemanticProperties.h",
-        "src/storage/Storage.cpp",
-        "src/storage/Symbol.cpp",
-        "tests/StorageSchemaTest.cpp"
+        "src/storage/Sqlite.cpp",
+        "src/storage/Sqlite.h",
+        "src/storage/Storage.h",
+        "tests/StorageSchemaTest.cpp",
+        "tests/fixtures/e2e/shared.hpp"
       ],
-      "cwd": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 0.046,
+      "cwd": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.06,
       "kind": "format",
-      "name": "clang-format",
-      "required": true,
-      "returncode": 0,
-      "status": "passed",
-      "stderr": "",
-      "stdout": ""
-    },
-    {
-      "argv": [
-        "/opt/homebrew/opt/llvm/bin/clang-tidy",
-        "-p",
-        "/tmp/facts-tool-queryable-storage-build",
-        "src/storage/Parameter.cpp",
-        "src/storage/Relation.cpp",
-        "src/storage/SchemaMigration.cpp",
-        "src/storage/Storage.cpp",
-        "src/storage/Symbol.cpp",
-        "tests/StorageSchemaTest.cpp"
-      ],
-      "cwd": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 1.825,
-      "kind": "static-analysis",
-      "name": "clang-tidy",
-      "required": true,
-      "returncode": 0,
-      "status": "passed",
-      "stderr": "[1/6] Processing file /Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool/src/storage/Parameter.cpp.\n[2/6] Processing file /Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool/src/storage/Relation.cpp.\n[3/6] Processing file /Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool/src/storage/SchemaMigration.cpp.\n[4/6] Processing file /Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool/src/storage/Storage.cpp.\n[5/6] Processing file /Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool/src/storage/Symbol.cpp.\n[6/6] Processing file /Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool/tests/StorageSchemaTest.cpp.\n",
-      "stdout": ""
-    },
-    {
-      "argv": [
-        "python3",
-        "-c",
-        "import ast, pathlib; [ast.parse(pathlib.Path(path).read_text()) for path in ['tests/e2e/steps/database_steps.py','tests/e2e/steps/inheritance_steps.py','tests/e2e/steps/parameter_steps.py']]"
-      ],
-      "cwd": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 0.023,
-      "kind": "custom",
-      "name": "python-syntax",
-      "required": true,
-      "returncode": 0,
-      "status": "passed",
-      "stderr": "",
-      "stdout": ""
-    },
-    {
-      "argv": [
-        "git",
-        "diff",
-        "--check"
-      ],
-      "cwd": "/Users/husam/.codex/worktrees/1dc7/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 0.029,
-      "kind": "custom",
-      "name": "diff-check",
+      "name": "format-check",
       "required": true,
       "returncode": 0,
       "status": "passed",
@@ -162,11 +100,11 @@
       "stdout": ""
     }
   ],
-  "started_at": "2026-08-13T13:55:03+00:00",
+  "started_at": "2026-08-15T18:45:28+00:00",
   "summary": {
     "failed": 0,
     "not_found": 0,
-    "passed": 8,
+    "passed": 4,
     "planned": 0,
     "timeout": 0
   }

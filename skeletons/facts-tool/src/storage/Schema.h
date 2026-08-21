@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS symbol (
   is_final       INTEGER NOT NULL CHECK(is_final IN (0,1)),
   is_abstract    INTEGER NOT NULL CHECK(is_abstract IN (0,1)),
   is_polymorphic INTEGER NOT NULL CHECK(is_polymorphic IN (0,1)),
+  has_extern_storage INTEGER NOT NULL CHECK(has_extern_storage IN (0,1)),
   constant_evaluation TEXT NOT NULL
     CHECK(constant_evaluation IN ('none','constexpr','consteval','constinit')),
   is_noexcept    INTEGER NOT NULL CHECK(is_noexcept IN (0,1)),
@@ -94,6 +95,39 @@ CREATE TABLE IF NOT EXISTS definition (
   size      INTEGER NOT NULL
 );
 
+-- Enum-only facts. The underlying type is a packed SymbolId rather than a
+-- relation target because compiler-provided builtin types use FileId zero and
+-- deliberately have no symbol row.
+CREATE TABLE IF NOT EXISTS enumeration (
+  symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  underlying_type INTEGER NOT NULL,
+  is_scoped INTEGER NOT NULL CHECK(is_scoped IN (0,1)),
+  has_fixed_underlying_type INTEGER NOT NULL
+    CHECK(has_fixed_underlying_type IN (0,1))
+);
+
+CREATE TABLE IF NOT EXISTS enumerator (
+  symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  value TEXT NOT NULL,
+  initializer_expression TEXT NOT NULL
+);
+
+-- A value declaration's written initializer is always retained. The evaluated
+-- columns are populated only for scalar and string constants Clang can fold.
+CREATE TABLE IF NOT EXISTS variable_initializer (
+  symbol_id       INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  expression      TEXT NOT NULL,
+  evaluated_kind  TEXT NOT NULL
+    CHECK(evaluated_kind IN ('none','integer','floating','boolean','string')),
+  evaluated_value TEXT,
+  CHECK((evaluated_kind='none' AND evaluated_value IS NULL) OR
+        (evaluated_kind<>'none' AND evaluated_value IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_variable_initializer_evaluated
+  ON variable_initializer(evaluated_kind,evaluated_value)
+  WHERE evaluated_kind<>'none';
+
 -- Symbol::parameters. Type is a packed SymbolId; FileId zero identifies
 -- predefined compiler types.
 CREATE TABLE IF NOT EXISTS parameter (
@@ -116,6 +150,24 @@ CREATE TABLE IF NOT EXISTS parameter (
   has_default   INTEGER NOT NULL,
   PRIMARY KEY (symbol_id, position)
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS parameter_default (
+  symbol_id       INTEGER NOT NULL,
+  position        INTEGER NOT NULL,
+  expression      TEXT NOT NULL,
+  evaluated_kind  TEXT NOT NULL
+    CHECK(evaluated_kind IN ('none','integer','floating','boolean','string')),
+  evaluated_value TEXT,
+  PRIMARY KEY (symbol_id, position),
+  FOREIGN KEY (symbol_id, position) REFERENCES parameter(symbol_id, position)
+    ON DELETE CASCADE,
+  CHECK((evaluated_kind='none' AND evaluated_value IS NULL) OR
+        (evaluated_kind<>'none' AND evaluated_value IS NOT NULL))
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_parameter_default_evaluated
+  ON parameter_default(evaluated_kind,evaluated_value)
+  WHERE evaluated_kind<>'none';
 
 -- The slots a template declares: `template <typename T, int N>`. Named the way
 -- the fact model names it, which is the opposite of the standard's wording and
@@ -151,13 +203,6 @@ CREATE TABLE IF NOT EXISTS template_parameter (
   PRIMARY KEY (symbol_id, position)
 ) WITHOUT ROWID;
 
--- TypeAlias::underlyingType. One column, so it could have been a nullable
--- field on symbol, but an alias is a handful of rows in a table of millions.
-CREATE TABLE IF NOT EXISTS type_alias (
-  symbol_id     INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
-  underlying_id INTEGER NOT NULL
-) WITHOUT ROWID;
-
 -- Every edge. position is in the key because an ordered kind can join the same
 -- pair twice -- a function taking Widget at position 1 and again at 3 is two
 -- ParamType edges, not one with count 2.
@@ -179,7 +224,7 @@ CREATE TABLE IF NOT EXISTS relation (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=1;
+PRAGMA user_version=4;
 
 )sql";
 

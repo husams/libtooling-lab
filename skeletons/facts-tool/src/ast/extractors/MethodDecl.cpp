@@ -1,0 +1,95 @@
+#include "ast/extractors/MethodDecl.h"
+
+#include "ast/extractors/NamedDecl.h"
+#include "model/Relation.h"
+#include "storage/FactStore.h"
+
+#include <clang/AST/DeclCXX.h>
+#include <llvm/Support/Casting.h>
+
+#include <array>
+#include <optional>
+#include <string>
+
+namespace facts {
+namespace {
+
+std::uint32_t flagWhen(SymbolBit flag, bool condition) {
+  return condition ? bit(flag) : 0;
+}
+
+const clang::CXXMethodDecl *supportedMethod(const clang::FunctionDecl &node) {
+  const auto *method = llvm::dyn_cast<clang::CXXMethodDecl>(&node);
+  if (!method || llvm::isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
+                           clang::CXXConversionDecl>(method)) {
+    return nullptr;
+  }
+  return method;
+}
+
+} // namespace
+
+ExtractionResult<Function> addMethodFlags(Function function,
+                                          const clang::FunctionDecl &node) {
+  const auto *method = supportedMethod(node);
+  if (!method) {
+    return function;
+  }
+
+  function.flags |=
+      static_cast<std::uint32_t>(method->getAccess()) |
+      flagWhen(StaticBit, method->isStatic()) |
+      flagWhen(VirtualBit, method->isVirtual()) |
+      flagWhen(PureBit, method->isPureVirtual()) |
+      flagWhen(OverrideBit, method->size_overridden_methods() != 0) |
+      flagWhen(InlineBit, method->isInlined()) |
+      flagWhen(DefaultedBit, method->isDefaulted()) |
+      flagWhen(DeletedBit, method->isDeleted());
+  return function;
+}
+
+IndexingResult storeMethodRelation(const clang::FunctionDecl &node,
+                                   SymbolId function, FactStore &store) {
+  const auto *method = supportedMethod(node);
+  if (!method) {
+    return {};
+  }
+
+  const auto source = node.getQualifiedNameAsString();
+  const auto target = method->getParent()->getQualifiedNameAsString();
+  const auto failure = [&](std::string_view usr, std::string_view detail) {
+    return relationFailure("method_of", "source", source, "target", target, usr,
+                           detail);
+  };
+  const auto invalidUsr = [&](ExtractionError) {
+    return failure("<unavailable>", "owner USR is unavailable");
+  };
+  const auto findAndStore = [&](std::string usr) -> IndexingResult {
+    return store.findId(usr)
+        .transform_error([&](std::error_code error) {
+          return failure(usr, error.message());
+        })
+        .and_then([&](std::optional<SymbolId> owner) -> IndexingResult {
+          if (!owner) {
+            return std::unexpected(
+                failure(usr, "target symbol is not persisted"));
+          }
+
+          const std::array relations{Relation{
+              .source = function,
+              .destination = *owner,
+              .kind = RelationKind::MethodOf,
+          }};
+          return store.addRelations(relations).transform_error(
+              [&](std::error_code error) {
+                return failure(usr, error.message());
+              });
+        });
+  };
+
+  return extractUsr(*method->getParent())
+      .transform_error(invalidUsr)
+      .and_then(findAndStore);
+}
+
+} // namespace facts

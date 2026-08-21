@@ -3,6 +3,8 @@
 
 #include "model/AnySymbol.h"
 #include "model/Relation.h"
+#include "model/TemplateArgument.h"
+#include "model/TemplateParameter.h"
 
 #include <concepts>
 #include <cstdint>
@@ -44,6 +46,9 @@ public:
 
   std::expected<void, std::error_code>
   addRelations(std::span<const Relation> relations);
+  std::expected<void, std::error_code>
+  addTemplateArguments(SymbolId id,
+                       std::span<const TemplateArgument> arguments);
 
   template <typename Model>
     requires std::derived_from<Model, Symbol>
@@ -74,12 +79,17 @@ private:
     Enumeration,
     Variable,
     Symbol,
-    TypeAlias,
+    Enumerator,
   };
 
   struct SymbolFacts {
     bool definition = false;
     bool parameters = false;
+  };
+
+  struct DefinitionFacts {
+    FileId file;
+    Region region;
   };
 
   struct Connection;
@@ -102,13 +112,30 @@ private:
                                                    SymbolFacts facts);
 
   std::expected<void, std::error_code>
-  replaceDefinition(SymbolId id, const std::optional<Region> &definition);
-  std::expected<std::optional<Region>, std::error_code>
+  replaceDefinition(SymbolId id, FileId file,
+                    const std::optional<Region> &definition);
+  std::expected<std::optional<DefinitionFacts>, std::error_code>
   loadDefinition(SymbolId id);
   std::expected<void, std::error_code>
   replaceParameters(SymbolId id, std::span<const Parameter> parameters);
   std::expected<std::vector<Parameter>, std::error_code>
   loadParameters(SymbolId id);
+  std::expected<void, std::error_code>
+  replaceVariableInitializer(SymbolId id,
+                             const std::optional<Initializer> &initializer);
+  std::expected<std::optional<Initializer>, std::error_code>
+  loadVariableInitializer(SymbolId id);
+  std::expected<void, std::error_code>
+  replaceEnumerationDetails(SymbolId id, const Enumeration &enumeration);
+  std::expected<Enumeration, std::error_code>
+  loadEnumerationDetails(Enumeration enumeration);
+  std::expected<void, std::error_code>
+  replaceEnumeratorDetails(SymbolId id, const Enumerator &enumerator);
+  std::expected<Enumerator, std::error_code>
+  loadEnumeratorDetails(Enumerator enumerator);
+  std::expected<void, std::error_code>
+  addTemplateParameters(SymbolId id,
+                        std::span<const TemplateParameter> parameters);
 
   template <typename Model>
   std::expected<SymbolId, std::error_code>
@@ -150,9 +177,12 @@ private:
 
 #include "storage/Enumeration.h"
 #include "storage/Function.h"
+#include "storage/FunctionInstance.h"
+#include "storage/FunctionTemplate.h"
 #include "storage/Record.h"
+#include "storage/RecordInstance.h"
+#include "storage/RecordTemplate.h"
 #include "storage/Symbol.h"
-#include "storage/TypeAlias.h"
 #include "storage/Variable.h"
 
 #endif
