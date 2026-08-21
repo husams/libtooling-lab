@@ -2,6 +2,8 @@
 
 #include <clang/Tooling/CompilationDatabase.h>
 
+#include "tooling/ProjectImport.h"
+
 #include <expected>
 #include <memory>
 #include <optional>

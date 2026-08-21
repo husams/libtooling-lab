@@ -18,7 +18,7 @@ Feature: Stored compilation options
     Then the stored-option extraction matches the JSON extraction
     And every captured symbol uses a registered nonzero FileId
 
-  Scenario: JSON compilation database takes precedence over malformed stored options
+  Scenario: Explicit refresh replaces malformed stored options from JSON
     Given realistic shared-header declarations, definitions, parameters, and relations
     When the real facts-tool reruns with malformed stored options while JSON remains
     Then the facts-tool run succeeds

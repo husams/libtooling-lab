@@ -62,6 +62,7 @@ add_library(facts-storage STATIC
   src/storage/FunctionTemplate.cpp
   src/storage/Initializer.cpp
   src/storage/Parameter.cpp
+  src/storage/ProjectConfiguration.cpp
   src/storage/Record.cpp
   src/storage/RecordInstance.cpp
   src/storage/RecordTemplate.cpp
@@ -84,7 +85,8 @@ add_library(facts-tooling STATIC
   src/tooling/StoredCompilationDatabase.cpp
 )
 target_include_directories(facts-tooling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(facts-tooling PRIVATE facts-clang SQLite3::SQLite3)
+target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang
+                                            SQLite3::SQLite3)
 
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
@@ -185,6 +187,16 @@ if(BUILD_TESTING)
     NAME stored-compilation-database
     COMMAND stored-compilation-database-test
             ${CMAKE_CURRENT_BINARY_DIR}/stored-compilation-database.sqlite
+  )
+  add_executable(project-configuration-test tests/ProjectConfigurationTest.cpp)
+  target_link_libraries(project-configuration-test
+                        PRIVATE facts-tooling facts-storage facts-clang
+                                SQLite3::SQLite3)
+  add_test(
+    NAME project-configuration
+    COMMAND project-configuration-test
+            ${CMAKE_CURRENT_BINARY_DIR}/project-configuration.sqlite
+            ${CMAKE_CURRENT_SOURCE_DIR}
   )
   add_executable(storage-schema-test tests/StorageSchemaTest.cpp)
   target_link_libraries(storage-schema-test PRIVATE facts-storage facts-model

@@ -122,7 +122,7 @@ class FactsToolContext:
         self.extract()
         self._set_raw_compile_options('{"invalid":true}')
         self._select_facts_database("json-precedence-facts.sqlite")
-        self._run(self.tool_command())
+        self._run([*self.tool_command(), "--refresh-project-config"])
 
     def run_with_malformed_stored_options(self) -> None:
         self.extract()

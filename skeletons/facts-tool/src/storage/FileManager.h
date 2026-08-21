@@ -2,6 +2,7 @@
 #define FACTS_TOOL_STORAGE_FILE_MANAGER_H
 
 #include "model/SymbolId.h"
+#include "storage/ProjectConfiguration.h"
 
 #include <expected>
 #include <memory>
@@ -25,6 +26,14 @@ public:
 
   std::expected<void, std::error_code>
   addBulk(std::span<const std::string> paths);
+  std::expected<void, std::error_code>
+  replaceProjectConfiguration(const ProjectConfiguration &configuration);
+  std::expected<void, std::error_code>
+  switchActiveClone(std::string_view repositoryName,
+                    std::string_view clonePathOrLabel);
+  std::expected<void, std::error_code> addClone(std::string_view repositoryName,
+                                                const ProjectClone &clone,
+                                                bool activate = false);
   std::expected<FileId, std::error_code> getId(std::string_view path);
 
 private:

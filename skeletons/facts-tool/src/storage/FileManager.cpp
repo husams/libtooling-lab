@@ -80,6 +80,23 @@ FileManager::addBulk(std::span<const std::string> paths) {
       });
 }
 
+std::expected<void, std::error_code> FileManager::replaceProjectConfiguration(
+    const ProjectConfiguration &configuration) {
+  return database_->replaceProjectConfiguration(configuration);
+}
+
+std::expected<void, std::error_code>
+FileManager::switchActiveClone(std::string_view repositoryName,
+                               std::string_view clonePathOrLabel) {
+  return database_->switchActiveClone(repositoryName, clonePathOrLabel);
+}
+
+std::expected<void, std::error_code>
+FileManager::addClone(std::string_view repositoryName,
+                      const ProjectClone &clone, bool activate) {
+  return database_->addClone(repositoryName, clone, activate);
+}
+
 std::expected<FileId, std::error_code>
 FileManager::getId(std::string_view path) {
   const auto getCachedOrStored = [this](const std::string &identity) {
