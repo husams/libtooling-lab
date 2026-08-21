@@ -24,7 +24,7 @@ def then_symbols_are_stored_in_their_declaring_fixture_files(
         qualified_name: file_paths[file_id]
         for qualified_name, file_id in query(
             context.facts_database_path,
-            "SELECT qualified_name,file_id FROM symbol "
+            "SELECT qualified_name,((id >> 32) & 4294967295) FROM symbol "
             f"WHERE qualified_name IN ({placeholders})",
             tuple(expected),
         )

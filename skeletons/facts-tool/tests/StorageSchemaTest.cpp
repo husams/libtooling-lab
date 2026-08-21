@@ -61,6 +61,12 @@ bool noPackedFlags(sqlite3 *database) {
   });
 }
 
+bool noRedundantSymbolIdColumns(sqlite3 *database) {
+  return scalar(database,
+                "SELECT COUNT(*) FROM pragma_table_info('symbol') WHERE "
+                "name IN ('file_id','file_index')") == 0;
+}
+
 bool verifyFreshSchema(const std::string &path) {
   std::filesystem::remove(path);
 
@@ -245,6 +251,8 @@ bool verifyFreshSchema(const std::string &path) {
   const auto destinationKey = packed(destinationId);
   const auto valid =
       require(noPackedFlags(database), "fresh schema retained packed flags") &&
+      require(noRedundantSymbolIdColumns(database),
+              "fresh schema retained redundant symbol id columns") &&
       require(scalar(database,
                      "SELECT COUNT(*) FROM symbol WHERE id=" +
                          std::to_string(functionKey) +
@@ -390,7 +398,7 @@ bool verifyVersionOneMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version one") &&
-      require(scalar(database, "PRAGMA user_version") == 4,
+      require(scalar(database, "PRAGMA user_version") == 5,
               "version-one migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -433,7 +441,7 @@ bool verifyVersionTwoMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version two") &&
-      require(scalar(database, "PRAGMA user_version") == 4,
+      require(scalar(database, "PRAGMA user_version") == 5,
               "version-two migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -455,6 +463,8 @@ bool verifyMigration(const std::string &path) {
   }
   const auto valid =
       require(noPackedFlags(database), "migration retained packed flags") &&
+      require(noRedundantSymbolIdColumns(database),
+              "migration retained redundant symbol id columns") &&
       require(scalar(database,
                      "SELECT COUNT(*) FROM symbol WHERE access='private' AND "
                      "is_definition=1 AND is_const=1 AND "
@@ -496,7 +506,7 @@ bool verifyMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'enumerator')") == 3,
               "enumerator schema was not migrated") &&
-      require(scalar(database, "PRAGMA user_version") == 4,
+      require(scalar(database, "PRAGMA user_version") == 5,
               "migration version was not recorded");
   sqlite3_close(database);
   return valid;

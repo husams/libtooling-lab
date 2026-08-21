@@ -18,7 +18,7 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node,
   const auto properties = storage::symbolProperties(symbol.flags);
   auto statement = storage::prepare(
       handle(),
-      "INSERT INTO symbol(id,file_id,file_index,identity,node,kind,sub_kind,"
+      "INSERT INTO symbol(id,identity,node,kind,sub_kind,"
       "lang,properties,usr,qualified_name,line,col,offset,access,is_definition,"
       "is_implicit,is_static,is_virtual,is_const,is_inline,is_pure,"
       "ref_qualifier,is_override,has_internal_linkage,is_external,is_variadic,"
@@ -26,8 +26,8 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node,
       "has_extern_storage,constant_evaluation,is_noexcept) "
       "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,"
       "?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,"
-      "?33,?34,?35,?36) "
-      "ON CONFLICT(file_id,identity) DO UPDATE SET node=excluded.node,"
+      "?33,?34) "
+      "ON CONFLICT(id) DO UPDATE SET node=excluded.node,"
       "kind=excluded.kind,sub_kind=excluded.sub_kind,lang=excluded.lang,"
       "properties=excluded.properties,usr=excluded.usr,"
       "qualified_name=excluded.qualified_name,"
@@ -59,44 +59,42 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node,
       "is_noexcept=MAX(is_noexcept,excluded.is_noexcept)");
   if (!statement ||
       !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
-      !storage::bindInteger(statement->get(), 2, id.file) ||
-      !storage::bindInteger(statement->get(), 3, id.index) ||
-      !storage::bindText(statement->get(), 4, identity) ||
-      !storage::bindInteger(statement->get(), 5, node) ||
-      !storage::bindInteger(statement->get(), 6,
+      !storage::bindText(statement->get(), 2, identity) ||
+      !storage::bindInteger(statement->get(), 3, node) ||
+      !storage::bindInteger(statement->get(), 4,
                             storage::storedSymbolKind(symbol.Kind)) ||
-      !storage::bindInteger(statement->get(), 7, symbol.SubKind) ||
-      !storage::bindInteger(statement->get(), 8, symbol.Lang) ||
-      !storage::bindInteger(statement->get(), 9, symbol.Properties) ||
-      !storage::bindText(statement->get(), 10, symbol.usr) ||
-      !storage::bindText(statement->get(), 11, symbol.qualifiedName) ||
-      !storage::bindInteger(statement->get(), 12, symbol.loc.line) ||
-      !storage::bindInteger(statement->get(), 13, symbol.loc.column) ||
-      !storage::bindInteger(statement->get(), 14, symbol.loc.offset) ||
-      !storage::bindText(statement->get(), 15, properties.access) ||
-      !storage::bindInteger(statement->get(), 16, properties.isDefinition) ||
-      !storage::bindInteger(statement->get(), 17, properties.isImplicit) ||
-      !storage::bindInteger(statement->get(), 18, properties.isStatic) ||
-      !storage::bindInteger(statement->get(), 19, properties.isVirtual) ||
-      !storage::bindInteger(statement->get(), 20, properties.isConst) ||
-      !storage::bindInteger(statement->get(), 21, properties.isInline) ||
-      !storage::bindInteger(statement->get(), 22, properties.isPure) ||
-      !storage::bindText(statement->get(), 23, properties.refQualifier) ||
-      !storage::bindInteger(statement->get(), 24, properties.isOverride) ||
-      !storage::bindInteger(statement->get(), 25,
+      !storage::bindInteger(statement->get(), 5, symbol.SubKind) ||
+      !storage::bindInteger(statement->get(), 6, symbol.Lang) ||
+      !storage::bindInteger(statement->get(), 7, symbol.Properties) ||
+      !storage::bindText(statement->get(), 8, symbol.usr) ||
+      !storage::bindText(statement->get(), 9, symbol.qualifiedName) ||
+      !storage::bindInteger(statement->get(), 10, symbol.loc.line) ||
+      !storage::bindInteger(statement->get(), 11, symbol.loc.column) ||
+      !storage::bindInteger(statement->get(), 12, symbol.loc.offset) ||
+      !storage::bindText(statement->get(), 13, properties.access) ||
+      !storage::bindInteger(statement->get(), 14, properties.isDefinition) ||
+      !storage::bindInteger(statement->get(), 15, properties.isImplicit) ||
+      !storage::bindInteger(statement->get(), 16, properties.isStatic) ||
+      !storage::bindInteger(statement->get(), 17, properties.isVirtual) ||
+      !storage::bindInteger(statement->get(), 18, properties.isConst) ||
+      !storage::bindInteger(statement->get(), 19, properties.isInline) ||
+      !storage::bindInteger(statement->get(), 20, properties.isPure) ||
+      !storage::bindText(statement->get(), 21, properties.refQualifier) ||
+      !storage::bindInteger(statement->get(), 22, properties.isOverride) ||
+      !storage::bindInteger(statement->get(), 23,
                             properties.hasInternalLinkage) ||
-      !storage::bindInteger(statement->get(), 26, properties.isExternal) ||
-      !storage::bindInteger(statement->get(), 27, properties.isVariadic) ||
-      !storage::bindInteger(statement->get(), 28, properties.isDeleted) ||
-      !storage::bindInteger(statement->get(), 29, properties.isDefaulted) ||
-      !storage::bindInteger(statement->get(), 30, properties.isExplicit) ||
-      !storage::bindInteger(statement->get(), 31, properties.isFinal) ||
-      !storage::bindInteger(statement->get(), 32, properties.isAbstract) ||
-      !storage::bindInteger(statement->get(), 33, properties.isPolymorphic) ||
-      !storage::bindInteger(statement->get(), 34,
+      !storage::bindInteger(statement->get(), 24, properties.isExternal) ||
+      !storage::bindInteger(statement->get(), 25, properties.isVariadic) ||
+      !storage::bindInteger(statement->get(), 26, properties.isDeleted) ||
+      !storage::bindInteger(statement->get(), 27, properties.isDefaulted) ||
+      !storage::bindInteger(statement->get(), 28, properties.isExplicit) ||
+      !storage::bindInteger(statement->get(), 29, properties.isFinal) ||
+      !storage::bindInteger(statement->get(), 30, properties.isAbstract) ||
+      !storage::bindInteger(statement->get(), 31, properties.isPolymorphic) ||
+      !storage::bindInteger(statement->get(), 32,
                             properties.hasExternStorage) ||
-      !storage::bindText(statement->get(), 35, properties.constantEvaluation) ||
-      !storage::bindInteger(statement->get(), 36, properties.isNoexcept) ||
+      !storage::bindText(statement->get(), 33, properties.constantEvaluation) ||
+      !storage::bindInteger(statement->get(), 34, properties.isNoexcept) ||
       sqlite3_step(statement->get()) != SQLITE_DONE) {
     return std::unexpected(storage::sqliteError(handle()));
   }
@@ -180,8 +178,7 @@ Storage::findId(std::string_view usr) {
   }
 
   auto statement =
-      storage::prepare(handle(), "SELECT file_id,file_index FROM symbol "
-                                 "WHERE usr=?1");
+      storage::prepare(handle(), "SELECT id FROM symbol WHERE usr=?1");
   if (!statement || !storage::bindText(statement->get(), 1, usr)) {
     return std::unexpected(storage::sqliteError(handle()));
   }
@@ -193,10 +190,8 @@ Storage::findId(std::string_view usr) {
   if (step != SQLITE_ROW) {
     return std::unexpected(storage::sqliteError(handle()));
   }
-  return SymbolId{
-      static_cast<FileId>(sqlite3_column_int64(statement->get(), 0)),
-      static_cast<std::uint32_t>(sqlite3_column_int64(statement->get(), 1)),
-  };
+  return storage::unpackSymbolId(
+      static_cast<std::uint64_t>(sqlite3_column_int64(statement->get(), 0)));
 }
 
 std::expected<Symbol, std::error_code> Storage::loadFacts(Symbol symbol,

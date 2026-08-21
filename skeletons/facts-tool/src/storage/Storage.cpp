@@ -24,13 +24,16 @@ struct Storage::Connection {
     sqlite3_busy_timeout(database, 10000);
 
     auto initialized =
-        storage::execute(database, "PRAGMA foreign_keys=ON;")
+        storage::execute(database, "PRAGMA foreign_keys=OFF;")
             .and_then([this] { return storage::Transaction::write(database); })
             .and_then([this](storage::Transaction transaction) {
               return storage::migrateSchema(database)
                   .and_then(
                       [this] { return storage::execute(database, schemaSql); })
                   .and_then([&transaction] { return transaction.commit(); });
+            })
+            .and_then([this] {
+              return storage::execute(database, "PRAGMA foreign_keys=ON;");
             });
     if (!initialized) {
       const std::string message = sqlite3_errmsg(database);
