@@ -1,6 +1,7 @@
 # Build directories
 skeletons/*/build/
 build/
+skeletons/*/build-codex/
 # build-rhel9.sh: out-of-tree build, vendored SQLite, pytest venv
 skeletons/*/build-rhel9/
 skeletons/*/.deps/
@@ -12,6 +13,10 @@ CMakeFiles/
 cmake_install.cmake
 compile_commands.json
 
+# Python caches
+__pycache__/
+*.py[cod]
+
 # Editor / OS
 .DS_Store
 *.swp
@@ -21,3 +26,11 @@ compile_commands.json
 
 # generated symbol-table DB from visitor-tool
 symbols.db
+
+# generated facts-tool and cidx databases/artifacts
+.cidx-artifacts/
+index.db
+project.db
+skeletons/facts-tool/--help
+skeletons/*/.codex/cpp-quality-plan-story-*.json
+skeletons/*/.codex/cpp-quality-report-story-*.json
