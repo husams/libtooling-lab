@@ -72,7 +72,12 @@ public:
 
   TypeResult
   VisitSubstTemplateTypeParmType(const clang::SubstTemplateTypeParmType *type) {
-    return Visit(type->getReplacementType().getTypePtr());
+    const auto replacement = type->getReplacementType();
+    const auto *parameter =
+        llvm::dyn_cast<clang::TemplateTypeParmType>(replacement.getTypePtr());
+    return parameter != nullptr && parameter->getDecl() == nullptr
+               ? declarationId(type->getReplacedParameter())
+               : Visit(replacement.getTypePtr());
   }
 
 #if CLANG_VERSION_MAJOR < 22

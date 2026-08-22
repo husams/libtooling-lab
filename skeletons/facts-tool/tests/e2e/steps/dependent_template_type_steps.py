@@ -37,40 +37,6 @@ def given_dependent_template_compile_database(context: FactsToolContext) -> Path
     return source
 
 
-def run_subcommand_extraction(
-    context: FactsToolContext, source: Path
-) -> subprocess.CompletedProcess[str]:
-    imported = run(
-        [
-            str(context.facts_tool),
-            "import",
-            "--conf",
-            str(context.files_database_path),
-            "--compilation-database",
-            str(context.run_root_path),
-            "--component",
-            f"dependent-templates={context.fixture_root}",
-        ]
-    )
-    require(
-        imported.returncode == 0,
-        f"expected import exit code 0, got {imported.returncode}:\n"
-        + imported.stdout
-        + imported.stderr,
-    )
-    return run(
-        [
-            str(context.facts_tool),
-            "extract",
-            "--output",
-            str(context.facts_database_path),
-            "--conf",
-            str(context.files_database_path),
-            str(source),
-        ]
-    )
-
-
 def run_flat_extraction(
     context: FactsToolContext, source: Path
 ) -> subprocess.CompletedProcess[str]:
@@ -93,12 +59,7 @@ def run_flat_extraction(
 def when_extract_indexes_dependent_templates(
     context: FactsToolContext, dependent_template_source: Path
 ) -> None:
-    help_result = run([str(context.facts_tool), "--help"])
-    completed = (
-        run_subcommand_extraction(context, dependent_template_source)
-        if "SUBCOMMANDS" in help_result.stdout
-        else run_flat_extraction(context, dependent_template_source)
-    )
+    completed = run_flat_extraction(context, dependent_template_source)
     context.last_returncode = completed.returncode
     context.last_output = completed.stdout + completed.stderr
 
@@ -138,6 +99,8 @@ def then_dependent_template_parameters_are_resolvable(
         ("b004::pointer", "T", 1, 0, 0, 0),
         ("b004::lvalue", "T", 0, 1, 0, 1),
         ("b004::rvalue", "T", 0, 0, 1, 0),
+        ("b004::Nested::relay", "U", 0, 0, 0, 0),
+        ("b004::Nested<b004::Widget>::relay", "U", 0, 0, 0, 0),
     }
     require(
         expected <= set(parameters),

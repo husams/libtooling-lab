@@ -27,12 +27,23 @@ T &&rvalue(T &&value) {
   return static_cast<T &&>(value);
 }
 
+template <typename T>
+struct Nested {
+  template <typename U>
+  static U relay(U value) {
+    return value;
+  }
+
+  static T instantiate(T value) { return relay<T>(value); }
+};
+
 Widget instantiate(Widget value) {
   auto *address = &value;
   (void)identity(1);
   (void)pointer(address);
   (void)lvalue(value);
   (void)rvalue(static_cast<Widget &&>(value));
+  (void)Nested<Widget>::instantiate(value);
   return identity(value);
 }
 
