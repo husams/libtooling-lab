@@ -37,38 +37,23 @@ def given_external_target_compile_database(context: FactsToolContext) -> Path:
     (context.run_root_path / "compile_commands.json").write_text(
         json.dumps(compilation_database, indent=2) + "\n", encoding="utf-8"
     )
-    imported = run(
-        [
-            str(context.facts_tool),
-            "import",
-            "--conf",
-            str(context.files_database_path),
-            "--compilation-database",
-            str(context.run_root_path),
-            str(source),
-        ]
-    )
-    require(
-        imported.returncode == 0,
-        "cannot import reproducing compile database:\n"
-        + imported.stdout
-        + imported.stderr,
-    )
     return source
 
 
-@when("the real extract subcommand indexes the external-target fixture")
+@when("the real extraction command indexes the external-target fixture")
 def when_extract_indexes_external_targets(
     context: FactsToolContext, external_target_source: Path
 ) -> None:
     completed = run(
         [
             str(context.facts_tool),
-            "extract",
-            "-o",
+            "-p",
+            str(context.run_root_path),
+            "--facts-out",
             str(context.facts_database_path),
-            "-c",
+            "--project-config",
             str(context.files_database_path),
+            "--refresh-project-config",
             str(external_target_source),
         ]
     )

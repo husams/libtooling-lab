@@ -4,7 +4,7 @@ Feature: Filtered external alias and compound type targets
 
   Scenario: Extract aliases and compound external parameter types successfully
     Given a reproducing compile database for filtered external targets
-    When the real extract subcommand indexes the external-target fixture
+    When the real extraction command indexes the external-target fixture
     Then the external-target extraction exits successfully without incomplete diagnostics
     And RelationResult aliases a lightweight external std::expected symbol
     And compound external field types resolve to lightweight symbols
