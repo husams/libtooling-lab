@@ -68,6 +68,7 @@ class FactsToolContext:
         self.prepare()
         if self.extracted:
             return
+        self.run_import()
         self.run_tool()
         self.initial_files = file_snapshot(self.files_database_path)
         self.initial_symbols = symbol_snapshot(self.facts_database_path)
@@ -82,6 +83,14 @@ class FactsToolContext:
         require(
             "symbol(s) recorded" in self.last_output,
             f"missing extraction summary:\n{self.last_output}",
+        )
+        return self.last_output
+
+    def run_import(self) -> str:
+        completed = self._run(self.import_command())
+        require(
+            completed.returncode == 0,
+            f"facts-tool import exited with {completed.returncode}:\n{self.last_output}",
         )
         return self.last_output
 
@@ -122,7 +131,8 @@ class FactsToolContext:
         self.extract()
         self._set_raw_compile_options('{"invalid":true}')
         self._select_facts_database("json-precedence-facts.sqlite")
-        self._run([*self.tool_command(), "--refresh-project-config"])
+        self.run_import()
+        self._run(self.tool_command())
 
     def run_with_malformed_stored_options(self) -> None:
         self.extract()
@@ -149,12 +159,12 @@ class FactsToolContext:
         self._run(
             [
                 str(self.facts_tool),
-                "-p",
-                str(self.run_root_path),
-                "--facts-out",
+                "extract",
+                "--output",
                 str(self.facts_database_path),
-                "--files-out",
+                "--conf",
                 str(self.files_database_path),
+                "--files-out",
                 *(str(source) for source in self.sources),
             ]
         )
@@ -199,15 +209,28 @@ class FactsToolContext:
         self.facts_database = self.run_root_path / "dependent-facts.sqlite"
         self.files_database = self.run_root_path / "dependent-files.sqlite"
         self._write_compilation_database((source,))
+        self.run_import()
         self._run(self._tool_command((source,)))
 
     def stored_tool_command(self) -> list[str]:
         return [
             str(self.facts_tool),
-            "--facts-out",
+            "extract",
+            "--output",
             str(self.facts_database_path),
-            "--project-config",
+            "--conf",
             str(self.files_database_path),
+            *(str(source) for source in self.sources),
+        ]
+
+    def import_command(self) -> list[str]:
+        return [
+            str(self.facts_tool),
+            "import",
+            "--conf",
+            str(self.files_database_path),
+            "--compilation-database",
+            str(self.run_root_path),
             *(str(source) for source in self.sources),
         ]
 
@@ -250,11 +273,10 @@ class FactsToolContext:
     def _tool_command(self, sources: tuple[Path, ...]) -> list[str]:
         return [
             str(self.facts_tool),
-            "-p",
-            str(self.run_root_path),
-            "--facts-out",
+            "extract",
+            "--output",
             str(self.facts_database_path),
-            "--project-config",
+            "--conf",
             str(self.files_database_path),
             *(str(source) for source in sources),
         ]
