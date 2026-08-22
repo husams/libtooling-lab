@@ -2,7 +2,6 @@
 
 #include "storage/FileManager.h"
 
-#include <clang/Tooling/CompilationDatabasePluginRegistry.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/JSON.h>
 
@@ -12,7 +11,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <map>
-#include <optional>
 #include <ranges>
 #include <regex>
 #include <set>
@@ -67,9 +65,6 @@ struct StoredCompileFile {
   std::string workingDirectory;
   std::string options;
 };
-
-std::string configuredDatabasePath;
-std::optional<std::string> configuredDatabaseError;
 
 std::string sqliteError(sqlite3 *database) { return sqlite3_errmsg(database); }
 
@@ -563,45 +558,6 @@ private:
   Commands commands_;
 };
 
-bool hasJsonCompilationDatabase(std::filesystem::path directory) {
-  std::error_code error;
-  directory = absolutePath(std::move(directory));
-  return std::filesystem::is_regular_file(directory / "compile_commands.json",
-                                          error);
-}
-
-class StoredCompilationDatabasePlugin final
-    : public clang::tooling::CompilationDatabasePlugin {
-public:
-  std::unique_ptr<clang::tooling::CompilationDatabase>
-  loadFromDirectory(llvm::StringRef directory,
-                    std::string &errorMessage) override {
-    if (configuredDatabasePath.empty() ||
-        hasJsonCompilationDatabase(directory.str())) {
-      return nullptr;
-    }
-    std::error_code pathError;
-    if (!std::filesystem::is_regular_file(configuredDatabasePath, pathError)) {
-      return nullptr;
-    }
-    auto database = loadStoredCompilationDatabase(configuredDatabasePath);
-    if (!database) {
-      errorMessage = database.error();
-      configuredDatabaseError = database.error();
-      return nullptr;
-    }
-    if ((*database)->getAllFiles().empty()) {
-      return nullptr;
-    }
-    return std::move(*database);
-  }
-};
-
-static clang::tooling::CompilationDatabasePluginRegistry::Add<
-    StoredCompilationDatabasePlugin>
-    storedDatabasePlugin("facts-stored-compile-options",
-                         "Reads compile options from a cpp-indexer database");
-
 std::string jsonQuote(std::string_view value) {
   std::string result;
   result.reserve(value.size() + 2);
@@ -860,28 +816,29 @@ loadStoredCompilationDatabase(std::string databasePath) {
       });
 }
 
-void configureStoredCompilationDatabase(std::string databasePath) {
-  configuredDatabasePath = absolutePath(std::move(databasePath)).string();
-  configuredDatabaseError.reset();
+namespace {
+
+Commands selectCommands(const clang::tooling::CompilationDatabase &database,
+                        std::span<const std::string> requestedSources) {
+  if (requestedSources.empty()) {
+    return database.getAllCompileCommands();
+  }
+  Commands commands;
+  for (const auto &source : requestedSources) {
+    auto selected = database.getCompileCommands(source);
+    commands.insert(commands.end(), selected.begin(), selected.end());
+  }
+  return commands;
 }
 
-std::optional<std::string> storedCompilationDatabaseError() {
-  return configuredDatabaseError;
-}
+} // namespace
 
 std::expected<ProjectImportResult, std::string>
 importProjectConfiguration(FileManager &files,
                            const clang::tooling::CompilationDatabase &database,
-                           std::span<const std::string> fallbackSources,
+                           std::span<const std::string> requestedSources,
                            const ProjectImportOptions &options) {
-  auto commands = database.getAllCompileCommands();
-  if (commands.empty()) {
-    for (const auto &source : fallbackSources) {
-      auto sourceCommands = database.getCompileCommands(source);
-      commands.insert(commands.end(), sourceCommands.begin(),
-                      sourceCommands.end());
-    }
-  }
+  auto commands = selectCommands(database, requestedSources);
   if (commands.empty()) {
     return std::unexpected("compilation database contains no commands");
   }

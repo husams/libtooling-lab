@@ -9,6 +9,15 @@ cmake_minimum_required(VERSION 3.20)
 # C is needed too: LLVM's own cmake modules (FindLibEdit) run C header checks.
 project(facts_tool C CXX)
 
+include(FetchContent)
+
+FetchContent_Declare(
+  CLI11
+  GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+  GIT_TAG 37bb6edc5317e99af72ef48405e65d9ca5218861
+)
+FetchContent_MakeAvailable(CLI11)
+
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
@@ -127,15 +136,28 @@ add_library(facts-platform STATIC
 target_include_directories(facts-platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-platform PRIVATE facts-clang)
 
-# Keep the executable as the composition root; application logic lives in modules.
-add_executable(facts-tool src/main.cpp)
-target_link_libraries(facts-tool PRIVATE
+# Commands own application behavior and remain independent of CLI11.
+add_library(facts-commands STATIC
+  src/commands/Extract.cpp
+  src/commands/Import.cpp
+)
+target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(facts-commands PRIVATE
   facts-ast
   facts-storage
   facts-platform
   facts-tooling
   facts-clang
 )
+
+# CLI parsing is isolated so command behavior can be reused without parser state.
+add_library(facts-cli STATIC src/cli/CommandLine.cpp)
+target_include_directories(facts-cli PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(facts-cli PRIVATE facts-commands CLI11::CLI11)
+
+# Keep the executable as the composition root; application logic lives in modules.
+add_executable(facts-tool src/main.cpp)
+target_link_libraries(facts-tool PRIVATE facts-cli)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -209,16 +231,46 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-legacy.sqlite
   )
   add_test(
-    NAME multi-tu-file-registry
-    COMMAND facts-tool
-            --facts-out ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-test.sqlite
-            --project-config ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-files.sqlite
+    NAME multi-tu-project-import
+    COMMAND facts-tool import
+            --conf ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-files.sqlite
+            --extra-arg=-std=c++23
+            --extra-arg=-I${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_one.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_two.cpp
-            -- -std=c++23 -I${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures
+  )
+  set_tests_properties(multi-tu-project-import PROPERTIES
+    FIXTURES_SETUP multi-tu-project
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+  add_test(
+    NAME multi-tu-file-registry
+    COMMAND facts-tool extract
+            --output ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-test.sqlite
+            --conf ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-files.sqlite
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_one.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_two.cpp
   )
   set_tests_properties(multi-tu-file-registry PROPERTIES
+    FIXTURES_REQUIRED multi-tu-project
     PASS_REGULAR_EXPRESSION "recorded from 3 file\\(s\\)"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+  add_test(
+    NAME multi-tu-project-cleanup
+    COMMAND ${CMAKE_COMMAND} -E rm -f
+            ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-files.sqlite
+            ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-test.sqlite
+  )
+  set_tests_properties(multi-tu-project-cleanup PROPERTIES
+    FIXTURES_CLEANUP multi-tu-project
+  )
+
+  add_test(
+    NAME facts-tool-cli-contract
+    COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_contract_test.py
+            $<TARGET_FILE:facts-tool>
   )
 
   add_test(

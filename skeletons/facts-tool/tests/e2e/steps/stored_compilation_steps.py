@@ -75,6 +75,9 @@ def then_diagnostic_mentions_missing_command(context: FactsToolContext) -> None:
 def then_diagnostic_rejects_files_out(context: FactsToolContext) -> None:
     require(
         "--files-out" in context.last_output
-        and "unknown command line argument" in context.last_output.lower(),
+        and (
+            "not expected" in context.last_output.lower()
+            or "unrecognized" in context.last_output.lower()
+        ),
         f"missing unknown-option diagnostic:\n{context.last_output}",
     )
