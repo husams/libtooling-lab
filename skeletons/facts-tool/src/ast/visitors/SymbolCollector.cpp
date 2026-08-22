@@ -41,16 +41,18 @@ bool hasSpecializedExtractor(const clang::NamedDecl &decl) {
 using AliasFacts = std::pair<SymbolId, std::vector<TemplateArgument>>;
 
 std::expected<AliasFacts, IndexingError>
-extractAliasFacts(clang::TypedefNameDecl &node, FactStore &store) {
+extractAliasFacts(clang::TypedefNameDecl &node,
+                  const clang::SourceManager &sourceManager, FileManager &files,
+                  FactStore &store) {
   const auto source = node.getQualifiedNameAsString();
   const auto target = node.getUnderlyingType().getAsString();
-  return extractAliasTarget(node, store)
+  return extractAliasTarget(node, sourceManager, files, store)
       .transform_error([&](TypeResolutionError error) {
         return relationFailure("alias_of", "source", source, "target",
                                error.target, error.usr, error.detail);
       })
       .and_then([&](SymbolId targetId) {
-        return extractAliasTemplateArguments(node, store)
+        return extractAliasTemplateArguments(node, sourceManager, files, store)
             .transform([targetId](std::vector<TemplateArgument> arguments) {
               return AliasFacts{targetId, std::move(arguments)};
             })
@@ -65,9 +67,10 @@ extractAliasFacts(clang::TypedefNameDecl &node, FactStore &store) {
 IndexingResult collectAlias(clang::TypedefNameDecl &node,
                             clang::ASTContext &context, FileManager &files,
                             FactStore &store) {
-  return withContext(extractAliasFacts(node, store),
-                     "cannot extract alias facts for '" +
-                         node.getQualifiedNameAsString() + "'")
+  return withContext(
+             extractAliasFacts(node, context.getSourceManager(), files, store),
+             "cannot extract alias facts for '" +
+                 node.getQualifiedNameAsString() + "'")
       .and_then([&](AliasFacts facts) {
         auto [target, arguments] = std::move(facts);
         const auto sourceName = node.getQualifiedNameAsString();

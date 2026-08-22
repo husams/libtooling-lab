@@ -15,14 +15,15 @@ namespace {
 
 ExtractionResult<std::vector<TemplateArgument>>
 extractOpenArguments(const clang::ClassTemplateSpecializationDecl &node,
-                     FactStore &store) {
+                     const clang::SourceManager &sourceManager,
+                     FileManager &files, FactStore &store) {
   const auto *partial =
       llvm::dyn_cast<clang::ClassTemplatePartialSpecializationDecl>(&node);
   return partial == nullptr
              ? ExtractionResult<std::vector<TemplateArgument>>{std::vector<
                    TemplateArgument>{}}
              : extractTemplateArguments(*partial->getTemplateParameters(),
-                                        store);
+                                        sourceManager, files, store);
 }
 
 const clang::NamedDecl *
@@ -41,10 +42,10 @@ specializedPattern(const clang::ClassTemplateSpecializationDecl &node) {
 ExtractionResult<RecordInstance>
 extractRecordInstance(const clang::ClassTemplateSpecializationDecl &node,
                       const clang::SourceManager &sourceManager,
-                      FactStore &store) {
+                      FileManager &files, FactStore &store) {
   return extractRecord(node, sourceManager)
       .and_then([&](Record record) {
-        return extractOpenArguments(node, store)
+        return extractOpenArguments(node, sourceManager, files, store)
             .transform([record = std::move(record)](
                            std::vector<TemplateArgument> arguments) mutable {
               RecordInstance instance;
@@ -55,7 +56,7 @@ extractRecordInstance(const clang::ClassTemplateSpecializationDecl &node,
       })
       .and_then([&](RecordInstance instance) {
         return extractTemplateParameters(node.getTemplateArgs().asArray(),
-                                         node.getASTContext(), store)
+                                         node.getASTContext(), files, store)
             .transform([instance = std::move(instance)](
                            std::vector<TemplateParameter> parameters) mutable {
               instance.templateParameters = std::move(parameters);
@@ -66,7 +67,8 @@ extractRecordInstance(const clang::ClassTemplateSpecializationDecl &node,
 
 IndexingResult
 storeRecordInstanceRelations(const clang::ClassTemplateSpecializationDecl &node,
-                             SymbolId instance, FactStore &store) {
+                             SymbolId instance, FileManager &files,
+                             FactStore &store) {
   const auto *pattern = specializedPattern(node);
   if (pattern == nullptr) {
     return std::unexpected(relationFailure(
@@ -77,7 +79,7 @@ storeRecordInstanceRelations(const clang::ClassTemplateSpecializationDecl &node,
   return storeTemplateInstanceRelations(
       instance, node.getQualifiedNameAsString(), *pattern,
       node.getSpecializationKind(), node.getTemplateArgs().asArray(),
-      node.getASTContext(), store);
+      node.getASTContext(), files, store);
 }
 
 } // namespace facts

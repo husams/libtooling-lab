@@ -13,21 +13,24 @@
 namespace facts {
 namespace {
 
-ExtractionResult<SymbolId> extractUnderlyingType(const clang::EnumDecl &node,
-                                                 FactStore &store) {
+ExtractionResult<SymbolId>
+extractUnderlyingType(const clang::EnumDecl &node,
+                      const clang::SourceManager &sourceManager,
+                      FileManager &files, FactStore &store) {
   const auto type = node.getIntegerType();
   if (type.isNull()) {
     return SymbolId{};
   }
-  return extractType(type, store).transform_error([](TypeResolutionError) {
-    return ExtractionError::InvalidType;
-  });
+  return extractType(type, sourceManager, files, store)
+      .transform_error(
+          [](TypeResolutionError) { return ExtractionError::InvalidType; });
 }
 
-ExtractionResult<Enumeration> addEnumerationDetails(Enumeration enumeration,
-                                                    const clang::EnumDecl &node,
-                                                    FactStore &store) {
-  return extractUnderlyingType(node, store)
+ExtractionResult<Enumeration>
+addEnumerationDetails(Enumeration enumeration, const clang::EnumDecl &node,
+                      const clang::SourceManager &sourceManager,
+                      FileManager &files, FactStore &store) {
+  return extractUnderlyingType(node, sourceManager, files, store)
       .transform([enumeration = std::move(enumeration),
                   &node](SymbolId underlyingType) mutable {
         enumeration.underlyingType = underlyingType;
@@ -42,13 +45,14 @@ ExtractionResult<Enumeration> addEnumerationDetails(Enumeration enumeration,
 ExtractionResult<Enumeration>
 extractEnumeration(const clang::EnumDecl &node,
                    const clang::SourceManager &sourceManager,
-                   FactStore &store) {
+                   FileManager &files, FactStore &store) {
   const auto toEnumeration =
       [](Symbol symbol) -> ExtractionResult<Enumeration> {
     return toSymbolModel<Enumeration>(std::move(symbol));
   };
   const auto addDetails = [&](Enumeration enumeration) {
-    return addEnumerationDetails(std::move(enumeration), node, store);
+    return addEnumerationDetails(std::move(enumeration), node, sourceManager,
+                                 files, store);
   };
   const auto addDefinition = [&](Enumeration enumeration) {
     return addDefinitionRegion(std::move(enumeration), node,
@@ -64,7 +68,7 @@ extractEnumeration(const clang::EnumDecl &node,
 IndexingResult collectSymbol(clang::EnumDecl &node, clang::ASTContext &context,
                              FileManager &files, FactStore &store) {
   return storeExtracted(
-      node, extractEnumeration(node, context.getSourceManager(), store),
+      node, extractEnumeration(node, context.getSourceManager(), files, store),
       context, files, store);
 }
 

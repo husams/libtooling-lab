@@ -17,7 +17,9 @@ std::uint32_t flagWhen(TemplateArgumentBit flag, bool condition) {
 }
 
 ExtractionResult<TemplateArgument>
-extractTemplateArgument(const clang::NamedDecl &node, FactStore &store) {
+extractTemplateArgument(const clang::NamedDecl &node,
+                        const clang::SourceManager &sourceManager,
+                        FileManager &files, FactStore &store) {
   if (const auto *parameter =
           llvm::dyn_cast<clang::TemplateTypeParmDecl>(&node)) {
     return TemplateArgument{
@@ -28,7 +30,7 @@ extractTemplateArgument(const clang::NamedDecl &node, FactStore &store) {
 
   if (const auto *parameter =
           llvm::dyn_cast<clang::NonTypeTemplateParmDecl>(&node)) {
-    return extractType(parameter->getType(), store)
+    return extractType(parameter->getType(), sourceManager, files, store)
         .transform_error(
             [](TypeResolutionError) { return ExtractionError::InvalidType; })
         .transform([&](SymbolId type) {
@@ -58,13 +60,15 @@ extractTemplateArgument(const clang::NamedDecl &node, FactStore &store) {
 
 ExtractionResult<std::vector<TemplateArgument>>
 extractTemplateArguments(const clang::TemplateParameterList &parameters,
-                         FactStore &store) {
+                         const clang::SourceManager &sourceManager,
+                         FileManager &files, FactStore &store) {
   const auto append =
       [&](ExtractionResult<std::vector<TemplateArgument>> result,
           const clang::NamedDecl *parameter) {
         return std::move(result).and_then(
             [&](std::vector<TemplateArgument> arguments) {
-              return extractTemplateArgument(*parameter, store)
+              return extractTemplateArgument(*parameter, sourceManager, files,
+                                             store)
                   .transform([arguments = std::move(arguments)](
                                  TemplateArgument argument) mutable {
                     arguments.push_back(std::move(argument));

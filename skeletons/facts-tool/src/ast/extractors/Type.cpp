@@ -1,11 +1,14 @@
 #include "ast/extractors/Type.h"
 
+#include "ast/extractors/TargetResolution.h"
 #include "storage/FactStore.h"
 
 #include <clang/AST/Decl.h>
+#include <clang/AST/DeclCXX.h>
 #include <clang/AST/DeclTemplate.h>
 #include <clang/AST/Type.h>
 #include <clang/AST/TypeVisitor.h>
+#include <clang/Basic/SourceManager.h>
 #include <clang/Basic/Version.h>
 #include <clang/Index/USRGeneration.h>
 #include <llvm/ADT/SmallString.h>
@@ -14,18 +17,18 @@ namespace facts {
 namespace {
 
 TypeResolutionError typeFailure(std::string target, std::string usr,
-                                std::string detail,
-                                bool targetMissing = false) {
+                                std::string detail) {
   return TypeResolutionError{.target = std::move(target),
                              .usr = std::move(usr),
-                             .detail = std::move(detail),
-                             .targetMissing = targetMissing};
+                             .detail = std::move(detail)};
 }
 
 class TypeSymbolVisitor final
     : public clang::TypeVisitor<TypeSymbolVisitor, TypeResult> {
 public:
-  explicit TypeSymbolVisitor(FactStore &store) : store_(store) {}
+  TypeSymbolVisitor(const clang::SourceManager &sourceManager,
+                    FileManager &files, FactStore &store)
+      : sourceManager_(sourceManager), files_(files), store_(store) {}
 
   TypeResult VisitBuiltinType(const clang::BuiltinType *type) {
     return SymbolId{builtinFileId,
@@ -51,6 +54,12 @@ public:
   TypeResult VisitTypedefType(const clang::TypedefType *type) {
     return declarationId(type->getDecl());
   }
+
+#if CLANG_VERSION_MAJOR >= 22
+  TypeResult VisitUsingType(const clang::UsingType *type) {
+    return declarationId(type->getDecl()->getTargetDecl());
+  }
+#endif
 
   TypeResult VisitTagType(const clang::TagType *type) {
     return declarationId(type->getDecl());
@@ -95,24 +104,33 @@ private:
           return typeFailure(target, usrText, error.message());
         })
         .and_then([&](std::optional<SymbolId> id) -> TypeResult {
-          return id ? TypeResult{*id}
-                    : std::unexpected(
-                          typeFailure(target, usrText,
-                                      "target symbol is not persisted", true));
+          if (id) {
+            return *id;
+          }
+          return findOrStoreSymbolTarget(*declaration, sourceManager_, files_,
+                                         store_, usrText)
+              .transform_error([&](std::error_code error) {
+                return typeFailure(target, usrText, error.message());
+              });
         });
   }
 
+  const clang::SourceManager &sourceManager_;
+  FileManager &files_;
   FactStore &store_;
 };
 
 } // namespace
 
-TypeResult extractType(const clang::QualType &type, FactStore &store) {
+TypeResult extractType(const clang::QualType &type,
+                       const clang::SourceManager &sourceManager,
+                       FileManager &files, FactStore &store) {
   if (type.isNull()) {
     return std::unexpected(
         typeFailure("<unavailable>", "<unavailable>", "type is null"));
   }
-  return TypeSymbolVisitor{store}.Visit(type.getTypePtr());
+  return TypeSymbolVisitor{sourceManager, files, store}.Visit(
+      type.getTypePtr());
 }
 
 } // namespace facts

@@ -82,11 +82,12 @@ extractDefaultValue(const clang::ParmVarDecl &node,
 
 ExtractionResult<Parameter>
 extractParameter(const clang::ParmVarDecl &node,
-                 const clang::SourceManager &sourceManager, FactStore &store) {
+                 const clang::SourceManager &sourceManager, FileManager &files,
+                 FactStore &store) {
   const auto toParameter = [&](Location location) {
     const auto withRegion =
         [&, location](Region region) -> ExtractionResult<Parameter> {
-      return extractType(node.getType(), store)
+      return extractType(node.getType(), sourceManager, files, store)
           .transform_error(
               [](TypeResolutionError) { return ExtractionError::InvalidType; })
           .transform([&](SymbolId type) {

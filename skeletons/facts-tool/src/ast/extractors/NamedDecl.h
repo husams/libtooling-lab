@@ -18,6 +18,7 @@ class TypedefNameDecl;
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 ExtractionResult<std::string> extractUsr(const clang::NamedDecl &node);
 
@@ -26,11 +27,13 @@ ExtractionResult<Symbol> extractSymbol<Symbol, clang::NamedDecl>(
     const clang::NamedDecl &node, const clang::SourceManager &sourceManager);
 
 TypeResult extractAliasTarget(const clang::TypedefNameDecl &node,
-                              FactStore &store);
+                              const clang::SourceManager &sourceManager,
+                              FileManager &files, FactStore &store);
 
 ExtractionResult<std::vector<TemplateArgument>>
 extractAliasTemplateArguments(const clang::TypedefNameDecl &node,
-                              FactStore &store);
+                              const clang::SourceManager &sourceManager,
+                              FileManager &files, FactStore &store);
 
 } // namespace facts
 

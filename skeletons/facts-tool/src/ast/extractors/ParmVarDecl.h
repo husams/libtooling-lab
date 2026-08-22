@@ -11,10 +11,12 @@ class SourceManager;
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 ExtractionResult<Parameter>
 extractParameter(const clang::ParmVarDecl &node,
-                 const clang::SourceManager &sourceManager, FactStore &store);
+                 const clang::SourceManager &sourceManager, FileManager &files,
+                 FactStore &store);
 
 } // namespace facts
 

@@ -10,10 +10,12 @@ class FunctionDecl;
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 ExtractionResult<Function>
 extractFunction(const clang::FunctionDecl &node,
-                const clang::SourceManager &sourceManager, FactStore &store);
+                const clang::SourceManager &sourceManager, FileManager &files,
+                FactStore &store);
 
 } // namespace facts
 

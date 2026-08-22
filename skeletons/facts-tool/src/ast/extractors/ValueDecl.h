@@ -8,14 +8,17 @@
 #include <system_error>
 
 namespace clang {
+class SourceManager;
 class ValueDecl;
 } // namespace clang
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 IndexingResult storeValueRelations(const clang::ValueDecl &node, SymbolId value,
-                                   FactStore &store);
+                                   const clang::SourceManager &sourceManager,
+                                   FileManager &files, FactStore &store);
 
 } // namespace facts
 

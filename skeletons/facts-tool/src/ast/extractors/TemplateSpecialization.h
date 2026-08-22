@@ -22,17 +22,19 @@ class TemplateArgument;
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 ExtractionResult<std::vector<TemplateParameter>>
 extractTemplateParameters(llvm::ArrayRef<clang::TemplateArgument> arguments,
-                          const clang::ASTContext &context, FactStore &store);
+                          const clang::ASTContext &context, FileManager &files,
+                          FactStore &store);
 
 IndexingResult storeTemplateInstanceRelations(
     SymbolId instance, std::string_view instanceName,
     const clang::NamedDecl &pattern,
     clang::TemplateSpecializationKind specializationKind,
     llvm::ArrayRef<clang::TemplateArgument> arguments,
-    const clang::ASTContext &context, FactStore &store);
+    const clang::ASTContext &context, FileManager &files, FactStore &store);
 
 } // namespace facts
 

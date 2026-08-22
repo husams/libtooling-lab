@@ -7,15 +7,18 @@
 #include <vector>
 
 namespace clang {
+class SourceManager;
 class TemplateParameterList;
 } // namespace clang
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 ExtractionResult<std::vector<TemplateArgument>>
 extractTemplateArguments(const clang::TemplateParameterList &parameters,
-                         FactStore &store);
+                         const clang::SourceManager &sourceManager,
+                         FileManager &files, FactStore &store);
 
 } // namespace facts
 
