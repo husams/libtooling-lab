@@ -1,6 +1,6 @@
-Feature: Filtered external alias and compound type targets
-  System-header declarations used by aliases and compound parameter types are
-  retained as lightweight symbols without indexing their header bodies.
+Feature: Filtered external relation targets
+  System-header declarations used by project-owned relations are retained as
+  lightweight symbols without indexing their header bodies.
 
   Scenario: Extract aliases and compound external parameter types successfully
     Given a reproducing compile database for filtered external targets
@@ -9,3 +9,9 @@ Feature: Filtered external alias and compound type targets
     And RelationResult aliases a lightweight external std::expected symbol
     And compound external field types resolve to lightweight symbols
     And the compound external parameter types retain their modifiers
+
+  Scenario: Extract a specialization with a filtered external primary successfully
+    Given a reproducing compile database for a filtered external template primary
+    When the real extraction command indexes the external-template-specialization fixture
+    Then the external-target extraction exits successfully without incomplete diagnostics
+    And the specialization points to a lightweight external std::hash primary

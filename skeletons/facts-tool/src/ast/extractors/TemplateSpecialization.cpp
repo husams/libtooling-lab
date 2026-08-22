@@ -2,6 +2,7 @@
 
 #include "ast/StoreExtracted.h"
 #include "ast/extractors/NamedDecl.h"
+#include "ast/extractors/TargetResolution.h"
 #include "ast/extractors/Type.h"
 #include "model/Parameter.h"
 #include "model/Relation.h"
@@ -196,7 +197,8 @@ std::string_view relationName(RelationKind kind) {
 
 std::expected<PatternTarget, IndexingError>
 findPattern(std::string_view source, const clang::NamedDecl &pattern,
-            RelationKind kind, FactStore &store) {
+            RelationKind kind, const clang::SourceManager &sourceManager,
+            FileManager &files, FactStore &store) {
   const auto target = pattern.getQualifiedNameAsString();
   const auto failure = [&](std::string_view usr, std::string_view detail) {
     return relationFailure(relationName(kind), "source", source, "target",
@@ -209,17 +211,13 @@ findPattern(std::string_view source, const clang::NamedDecl &pattern,
       })
       .and_then(
           [&](std::string usr) -> std::expected<PatternTarget, IndexingError> {
-            return store.findId(usr)
+            return findOrStoreSymbolTarget(pattern, sourceManager, files, store,
+                                           usr)
                 .transform_error([&](std::error_code error) {
                   return failure(usr, error.message());
                 })
-                .and_then([&](std::optional<SymbolId> id)
-                              -> std::expected<PatternTarget, IndexingError> {
-                  if (!id) {
-                    return std::unexpected(
-                        failure(usr, "target symbol is not persisted"));
-                  }
-                  return PatternTarget{.id = *id, .usr = std::move(usr)};
+                .transform([usr = std::move(usr)](SymbolId id) mutable {
+                  return PatternTarget{.id = id, .usr = std::move(usr)};
                 });
           });
 }
@@ -261,7 +259,8 @@ IndexingResult storeTemplateInstanceRelations(
                                error.message());
       })
       .and_then([&](RelationKind kind) {
-        return findPattern(instanceName, pattern, kind, store)
+        return findPattern(instanceName, pattern, kind,
+                           context.getSourceManager(), files, store)
             .transform([kind](PatternTarget destination) {
               return std::pair{
                   Relation{.destination = destination.id, .kind = kind},
