@@ -13,15 +13,15 @@ def run(command: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, capture_output=True, text=True, check=False)
 
 
-@given(
-    "a reproducing compile database for filtered external targets",
-    target_fixture="external_target_source",
-)
-def given_external_target_compile_database(context: FactsToolContext) -> Path:
+def prepare_compile_database(
+    context: FactsToolContext, fixture_name: str, database_stem: str
+) -> Path:
     context.prepare()
-    source = (context.fixture_root / "external_targets.cpp").resolve(strict=True)
-    context.facts_database = context.run_root_path / "external-targets.sqlite"
-    context.files_database = context.run_root_path / "external-targets-project.sqlite"
+    source = (context.fixture_root / fixture_name).resolve(strict=True)
+    context.facts_database = context.run_root_path / f"{database_stem}.sqlite"
+    context.files_database = (
+        context.run_root_path / f"{database_stem}-project.sqlite"
+    )
     compilation_database = [
         {
             "directory": str(context.fixture_root),
@@ -40,10 +40,38 @@ def given_external_target_compile_database(context: FactsToolContext) -> Path:
     return source
 
 
+@given(
+    "a reproducing compile database for filtered external targets",
+    target_fixture="external_target_source",
+)
+def given_external_target_compile_database(context: FactsToolContext) -> Path:
+    return prepare_compile_database(
+        context, "external_targets.cpp", "external-targets"
+    )
+
+
+@given(
+    "a reproducing compile database for a filtered external template primary",
+    target_fixture="external_template_specialization_source",
+)
+def given_external_template_specialization_compile_database(
+    context: FactsToolContext,
+) -> Path:
+    return prepare_compile_database(
+        context,
+        "external_template_specialization.cpp",
+        "external-template-specialization",
+    )
+
+
 @when("the real extraction command indexes the external-target fixture")
 def when_extract_indexes_external_targets(
     context: FactsToolContext, external_target_source: Path
 ) -> None:
+    extract_fixture(context, external_target_source)
+
+
+def extract_fixture(context: FactsToolContext, source: Path) -> None:
     completed = run(
         [
             str(context.facts_tool),
@@ -54,11 +82,20 @@ def when_extract_indexes_external_targets(
             "--project-config",
             str(context.files_database_path),
             "--refresh-project-config",
-            str(external_target_source),
+            str(source),
         ]
     )
     context.last_returncode = completed.returncode
     context.last_output = completed.stdout + completed.stderr
+
+
+@when(
+    "the real extraction command indexes the external-template-specialization fixture"
+)
+def when_extract_indexes_external_template_specialization(
+    context: FactsToolContext, external_template_specialization_source: Path
+) -> None:
+    extract_fixture(context, external_template_specialization_source)
 
 
 @then(
@@ -198,4 +235,25 @@ def then_compound_parameter_types_are_persisted(
             ),
         ],
         f"unexpected compound external parameters: {parameters}",
+    )
+
+
+@then("the specialization points to a lightweight external std::hash primary")
+def then_specialization_target_is_lightweight_external(
+    context: FactsToolContext,
+) -> None:
+    relation = query(
+        context.facts_database_path,
+        "SELECT source.qualified_name,source.is_external,source.is_definition,"
+        "destination.qualified_name,destination.is_external,"
+        "destination.is_definition FROM relation r "
+        "JOIN symbol source ON source.id=r.source_id "
+        "JOIN symbol destination ON destination.id=r.destination_id "
+        "WHERE r.kind=4 "
+        "AND source.qualified_name='std::hash' "
+        "AND destination.qualified_name='std::hash'",
+    )
+    require(
+        relation == [("std::hash", 0, 1, "std::hash", 1, 0)],
+        f"unexpected external specialization target: {relation}",
     )

@@ -10,6 +10,7 @@ Feature: Canonical source file registry
       | fixture   |
       | dependent_base.cpp |
       | external_targets.cpp |
+      | external_template_specialization.cpp |
       | shared.hpp |
       | system/external_base.hpp |
       | one.cpp    |
