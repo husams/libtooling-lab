@@ -65,6 +65,16 @@ public:
     return declarationId(type->getDecl());
   }
 
+  TypeResult
+  VisitTemplateTypeParmType(const clang::TemplateTypeParmType *type) {
+    return declarationId(type->getDecl());
+  }
+
+  TypeResult
+  VisitSubstTemplateTypeParmType(const clang::SubstTemplateTypeParmType *type) {
+    return Visit(type->getReplacementType().getTypePtr());
+  }
+
 #if CLANG_VERSION_MAJOR < 22
   // Before LLVM 22 a type written with a tag keyword or a nested-name
   // qualifier arrives wrapped in ElaboratedType sugar. Unwrap it — the named

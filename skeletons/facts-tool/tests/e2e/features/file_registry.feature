@@ -9,6 +9,7 @@ Feature: Canonical source file registry
     Then the file registry contains these canonical fixture paths
       | fixture   |
       | dependent_base.cpp |
+      | dependent_template_types.cpp |
       | external_targets.cpp |
       | external_template_specialization.cpp |
       | shared.hpp |
