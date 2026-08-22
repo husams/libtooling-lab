@@ -57,14 +57,15 @@ IndexingResult storeFieldOwnerRelation(const clang::ValueDecl &node,
 }
 
 IndexingResult storeTypeRelation(const clang::ValueDecl &node, SymbolId value,
-                                 FactStore &store) {
+                                 const clang::SourceManager &sourceManager,
+                                 FileManager &files, FactStore &store) {
   const auto source = node.getQualifiedNameAsString();
   const auto target = node.getType().getAsString();
   const auto failure = [&](std::string_view detail) {
     return relationFailure("of_type", "source", source, "target", target,
                            "<unavailable>", detail);
   };
-  return extractType(node.getType(), store)
+  return extractType(node.getType(), sourceManager, files, store)
       .transform_error([&](TypeResolutionError error) {
         return relationFailure("of_type", "source", source, "target",
                                error.target, error.usr, error.detail);
@@ -86,9 +87,10 @@ IndexingResult storeTypeRelation(const clang::ValueDecl &node, SymbolId value,
 } // namespace
 
 IndexingResult storeValueRelations(const clang::ValueDecl &node, SymbolId value,
-                                   FactStore &store) {
+                                   const clang::SourceManager &sourceManager,
+                                   FileManager &files, FactStore &store) {
   return storeFieldOwnerRelation(node, value, store).and_then([&] {
-    return storeTypeRelation(node, value, store);
+    return storeTypeRelation(node, value, sourceManager, files, store);
   });
 }
 

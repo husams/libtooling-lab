@@ -21,7 +21,8 @@ namespace {
 
 ExtractionResult<Function>
 addParameters(Function function, const clang::FunctionDecl &node,
-              const clang::SourceManager &sourceManager, FactStore &store) {
+              const clang::SourceManager &sourceManager, FileManager &files,
+              FactStore &store) {
   auto toFunction = [function = std::move(function)](
                         std::vector<Parameter> parameters) mutable
       -> ExtractionResult<Function> {
@@ -29,14 +30,16 @@ addParameters(Function function, const clang::FunctionDecl &node,
     return std::move(function);
   };
 
-  return extractParameters(node, sourceManager, store) | std::move(toFunction);
+  return extractParameters(node, sourceManager, files, store) |
+         std::move(toFunction);
 }
 
 } // namespace
 
 ExtractionResult<Function>
 extractFunction(const clang::FunctionDecl &node,
-                const clang::SourceManager &sourceManager, FactStore &store) {
+                const clang::SourceManager &sourceManager, FileManager &files,
+                FactStore &store) {
   const auto toFunction = [](Symbol symbol) -> ExtractionResult<Function> {
     return toSymbolModel<Function>(std::move(symbol));
   };
@@ -46,7 +49,8 @@ extractFunction(const clang::FunctionDecl &node,
                                sourceManager);
   };
   const auto addParameterList = [&](Function function) {
-    return addParameters(std::move(function), node, sourceManager, store);
+    return addParameters(std::move(function), node, sourceManager, files,
+                         store);
   };
 
   const auto addFlags = [&](Function function) {
@@ -69,17 +73,18 @@ IndexingResult collectSymbol(clang::FunctionDecl &node,
 
   if (node.getTemplateSpecializationInfo() != nullptr) {
     const auto toInstance = [&](Function function) {
-      return toFunctionInstance(std::move(function), node, store);
+      return toFunctionInstance(std::move(function), node, files, store);
     };
     const auto storeInstanceRelations = [&](SymbolId function) {
       return storeMethodRelation(node, function, store).and_then([&] {
-        return storeFunctionInstanceRelations(node, function, store);
+        return storeFunctionInstanceRelations(node, function, files, store);
       });
     };
 
     return storeExtracted(
         node,
-        extractFunction(node, context.getSourceManager(), store) | toInstance,
+        extractFunction(node, context.getSourceManager(), files, store) |
+            toInstance,
         context, files, store, storeInstanceRelations);
   }
 
@@ -87,18 +92,19 @@ IndexingResult collectSymbol(clang::FunctionDecl &node,
     const auto toTemplate = [&](Function function) {
       return toFunctionTemplate(std::move(function),
                                 *templateDeclaration->getTemplateParameters(),
-                                store);
+                                context.getSourceManager(), files, store);
     };
 
     return storeExtracted(
         node,
-        extractFunction(node, context.getSourceManager(), store) | toTemplate,
+        extractFunction(node, context.getSourceManager(), files, store) |
+            toTemplate,
         context, files, store, storeRelations);
   }
 
   return storeExtracted(
-      node, extractFunction(node, context.getSourceManager(), store), context,
-      files, store, storeRelations);
+      node, extractFunction(node, context.getSourceManager(), files, store),
+      context, files, store, storeRelations);
 }
 
 } // namespace facts

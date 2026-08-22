@@ -9,21 +9,24 @@
 
 namespace clang {
 class QualType;
-}
+class SourceManager;
+} // namespace clang
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 struct TypeResolutionError {
   std::string target;
   std::string usr;
   std::string detail;
-  bool targetMissing = false;
 };
 
 using TypeResult = std::expected<SymbolId, TypeResolutionError>;
 
-TypeResult extractType(const clang::QualType &type, FactStore &store);
+TypeResult extractType(const clang::QualType &type,
+                       const clang::SourceManager &sourceManager,
+                       FileManager &files, FactStore &store);
 
 } // namespace facts
 

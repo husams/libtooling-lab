@@ -26,19 +26,22 @@ ExtractionResult<std::string> extractUsr(const clang::NamedDecl &node) {
 }
 
 TypeResult extractAliasTarget(const clang::TypedefNameDecl &node,
-                              FactStore &store) {
-  return extractType(node.getUnderlyingType(), store);
+                              const clang::SourceManager &sourceManager,
+                              FileManager &files, FactStore &store) {
+  return extractType(node.getUnderlyingType(), sourceManager, files, store);
 }
 
 ExtractionResult<std::vector<TemplateArgument>>
 extractAliasTemplateArguments(const clang::TypedefNameDecl &node,
-                              FactStore &store) {
+                              const clang::SourceManager &sourceManager,
+                              FileManager &files, FactStore &store) {
   const auto *alias = llvm::dyn_cast<clang::TypeAliasDecl>(&node);
   if (alias == nullptr || alias->getDescribedAliasTemplate() == nullptr) {
     return std::vector<TemplateArgument>{};
   }
   return extractTemplateArguments(
-      *alias->getDescribedAliasTemplate()->getTemplateParameters(), store);
+      *alias->getDescribedAliasTemplate()->getTemplateParameters(),
+      sourceManager, files, store);
 }
 
 template <>

@@ -56,7 +56,8 @@ extractField(const clang::FieldDecl &node,
 IndexingResult collectSymbol(clang::FieldDecl &node, clang::ASTContext &context,
                              FileManager &files, FactStore &store) {
   const auto storeRelation = [&](SymbolId field) {
-    return storeValueRelations(node, field, store);
+    return storeValueRelations(node, field, context.getSourceManager(), files,
+                               store);
   };
 
   return storeExtracted(node, extractField(node, context.getSourceManager()),

@@ -11,6 +11,7 @@ pytest_plugins = (
     "steps.common_steps",
     "steps.database_steps",
     "steps.enumeration_steps",
+    "steps.external_target_steps",
     "steps.field_steps",
     "steps.variable_steps",
     "steps.file_registry_steps",

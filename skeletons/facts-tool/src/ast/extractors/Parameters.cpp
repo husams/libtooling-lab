@@ -15,7 +15,8 @@ namespace {
 ExtractionResult<std::vector<Parameter>>
 appendParameter(std::vector<Parameter> parameters,
                 const clang::ParmVarDecl &node,
-                const clang::SourceManager &sourceManager, FactStore &store) {
+                const clang::SourceManager &sourceManager, FileManager &files,
+                FactStore &store) {
   auto append = [parameters =
                      std::move(parameters)](Parameter parameter) mutable
       -> ExtractionResult<std::vector<Parameter>> {
@@ -23,7 +24,8 @@ appendParameter(std::vector<Parameter> parameters,
     return std::move(parameters);
   };
 
-  return extractParameter(node, sourceManager, store) | std::move(append);
+  return extractParameter(node, sourceManager, files, store) |
+         std::move(append);
 }
 
 } // namespace
@@ -32,11 +34,12 @@ appendParameter(std::vector<Parameter> parameters,
 // sequence. Keeping list extraction here lets functions and methods reuse it.
 ExtractionResult<std::vector<Parameter>>
 extractParameters(const clang::FunctionDecl &node,
-                  const clang::SourceManager &sourceManager, FactStore &store) {
+                  const clang::SourceManager &sourceManager, FileManager &files,
+                  FactStore &store) {
   const auto toExtractionStage = [&](const auto *parameter) {
     return [&, parameter](std::vector<Parameter> parameters) {
       return appendParameter(std::move(parameters), *parameter, sourceManager,
-                             store);
+                             files, store);
     };
   };
 

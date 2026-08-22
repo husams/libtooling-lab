@@ -4,6 +4,7 @@
 #include "ast/extractors/Definition.h"
 #include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/RecordInstance.h"
+#include "ast/extractors/TargetResolution.h"
 #include "ast/extractors/TemplatePattern.h"
 #include "ast/visitors/SymbolCollector.h"
 #include "model/AnySymbol.h"
@@ -46,49 +47,6 @@ IndexingError inheritanceFailure(std::string_view derived,
                          detail);
 }
 
-std::expected<FileId, std::error_code>
-registerExternalFile(const clang::CXXRecordDecl &base,
-                     const clang::SourceManager &sourceManager,
-                     FileManager &files) {
-  const auto expansion = sourceManager.getExpansionLoc(base.getLocation());
-  if (expansion.isInvalid()) {
-    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
-  }
-
-  return extractFilePath(sourceManager, sourceManager.getFileID(expansion))
-      .and_then([&files](std::string path) {
-        const std::array paths{path};
-        return files.addBulk(paths).and_then(
-            [&files, path = std::move(path)] { return files.getId(path); });
-      });
-}
-
-Symbol externalSymbol(const clang::CXXRecordDecl &base, std::string usr) {
-  Symbol symbol{};
-  static_cast<clang::index::SymbolInfo &>(symbol) =
-      clang::index::getSymbolInfo(&base);
-  symbol.usr = std::move(usr);
-  symbol.qualifiedName = base.getQualifiedNameAsString();
-  symbol.flags = bit(ExternalBit);
-  return symbol;
-}
-
-std::expected<SymbolId, std::error_code> findOrStoreInheritanceTarget(
-    const clang::CXXRecordDecl &base, const clang::SourceManager &sourceManager,
-    FileManager &files, FactStore &store, const std::string &usr) {
-  return store.findId(usr).and_then(
-      [&](std::optional<SymbolId> destination)
-          -> std::expected<SymbolId, std::error_code> {
-        if (destination) {
-          return *destination;
-        }
-        return registerExternalFile(base, sourceManager, files)
-            .and_then([&](FileId file) {
-              return store.save(file, externalSymbol(base, usr));
-            });
-      });
-}
-
 RelationResult extractInheritanceRelation(
     const clang::CXXBaseSpecifier &base, SymbolId source,
     std::uint16_t position, const clang::SourceManager &sourceManager,
@@ -126,8 +84,8 @@ RelationResult extractInheritanceRelation(
                                   extractionErrorName(error));
       })
       .and_then([&](std::string usr) -> RelationResult {
-        return findOrStoreInheritanceTarget(*parent, sourceManager, files,
-                                            store, usr)
+        return findOrStoreSymbolTarget(*parent, sourceManager, files, store,
+                                       usr)
             .transform_error([&](std::error_code error) {
               return inheritanceFailure(derivedName, baseName, usr,
                                         error.message());
@@ -223,22 +181,24 @@ IndexingResult collectSymbol(clang::CXXRecordDecl &node,
     const auto storeInstanceRelations = [&](SymbolId source) -> IndexingResult {
       return storeRelations(source).and_then([&] {
         return withContext(
-            storeRecordInstanceRelations(*instance, source, store),
+            storeRecordInstanceRelations(*instance, source, files, store),
             "cannot persist record-instance relations for '" +
                 node.getQualifiedNameAsString() + "'");
       });
     };
 
-    return storeExtracted(
-        node,
-        extractRecordInstance(*instance, context.getSourceManager(), store),
-        context, files, store, storeInstanceRelations);
+    return storeExtracted(node,
+                          extractRecordInstance(*instance,
+                                                context.getSourceManager(),
+                                                files, store),
+                          context, files, store, storeInstanceRelations);
   }
 
   if (const auto *templateDeclaration = node.getDescribedClassTemplate()) {
     const auto toTemplate = [&](Record record) {
       return extractTemplateArguments(
-                 *templateDeclaration->getTemplateParameters(), store)
+                 *templateDeclaration->getTemplateParameters(),
+                 context.getSourceManager(), files, store)
           .transform([record = std::move(record)](
                          std::vector<TemplateArgument> arguments) mutable {
             RecordTemplate result;

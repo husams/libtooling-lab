@@ -12,23 +12,27 @@
 
 namespace clang {
 class FunctionDecl;
+class SourceManager;
 class TemplateParameterList;
 } // namespace clang
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 ExtractionResult<FunctionTemplate>
 toFunctionTemplate(Function function,
                    const clang::TemplateParameterList &parameters,
-                   FactStore &store);
+                   const clang::SourceManager &sourceManager,
+                   FileManager &files, FactStore &store);
 
 ExtractionResult<FunctionInstance>
 toFunctionInstance(Function function, const clang::FunctionDecl &node,
-                   FactStore &store);
+                   FileManager &files, FactStore &store);
 
 IndexingResult storeFunctionInstanceRelations(const clang::FunctionDecl &node,
                                               SymbolId instance,
+                                              FileManager &files,
                                               FactStore &store);
 
 } // namespace facts

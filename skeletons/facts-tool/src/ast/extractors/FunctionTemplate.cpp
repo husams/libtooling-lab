@@ -15,8 +15,9 @@ namespace facts {
 ExtractionResult<FunctionTemplate>
 toFunctionTemplate(Function function,
                    const clang::TemplateParameterList &parameters,
-                   FactStore &store) {
-  return extractTemplateArguments(parameters, store)
+                   const clang::SourceManager &sourceManager,
+                   FileManager &files, FactStore &store) {
+  return extractTemplateArguments(parameters, sourceManager, files, store)
       .transform([function = std::move(function)](
                      std::vector<TemplateArgument> arguments) mutable {
         FunctionTemplate result;
@@ -28,14 +29,14 @@ toFunctionTemplate(Function function,
 
 ExtractionResult<FunctionInstance>
 toFunctionInstance(Function function, const clang::FunctionDecl &node,
-                   FactStore &store) {
+                   FileManager &files, FactStore &store) {
   const auto *arguments = node.getTemplateSpecializationArgs();
   if (arguments == nullptr) {
     return std::unexpected(ExtractionError::InvalidType);
   }
 
   return extractTemplateParameters(arguments->asArray(), node.getASTContext(),
-                                   store)
+                                   files, store)
       .transform([function = std::move(function)](
                      std::vector<TemplateParameter> parameters) mutable {
         FunctionInstance instance;
@@ -47,6 +48,7 @@ toFunctionInstance(Function function, const clang::FunctionDecl &node,
 
 IndexingResult storeFunctionInstanceRelations(const clang::FunctionDecl &node,
                                               SymbolId instance,
+                                              FileManager &files,
                                               FactStore &store) {
   const auto *specialization = node.getTemplateSpecializationInfo();
   const auto *arguments = node.getTemplateSpecializationArgs();
@@ -61,7 +63,7 @@ IndexingResult storeFunctionInstanceRelations(const clang::FunctionDecl &node,
       instance, node.getQualifiedNameAsString(),
       *specialization->getTemplate()->getTemplatedDecl(),
       specialization->getTemplateSpecializationKind(), arguments->asArray(),
-      node.getASTContext(), store);
+      node.getASTContext(), files, store);
 }
 
 } // namespace facts

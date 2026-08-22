@@ -48,20 +48,18 @@ std::uint32_t typeFlags(clang::QualType type, bool isPack) {
          flagWhen(ParameterBit::PackBit, isPack);
 }
 
-ExtractionResult<SymbolId> resolveType(clang::QualType type, FactStore &store) {
+ExtractionResult<SymbolId> resolveType(clang::QualType type,
+                                       const clang::ASTContext &context,
+                                       FileManager &files, FactStore &store) {
   if (type.isNull()) {
     return std::unexpected(ExtractionError::InvalidType);
   }
   if (type->isDependentType()) {
     return SymbolId{};
   }
-  return extractType(type, store).or_else([](TypeResolutionError error) {
-    if (error.targetMissing) {
-      return ExtractionResult<SymbolId>{SymbolId{}};
-    }
-    return ExtractionResult<SymbolId>{
-        std::unexpected(ExtractionError::InvalidType)};
-  });
+  return extractType(type, context.getSourceManager(), files, store)
+      .transform_error(
+          [](TypeResolutionError) { return ExtractionError::InvalidType; });
 }
 
 ExtractionResult<SymbolId>
@@ -86,9 +84,10 @@ std::string printArgument(const clang::TemplateArgument &argument,
 
 ExtractionResult<TemplateParameter>
 extractLeafParameter(const clang::TemplateArgument &argument,
-                     const clang::ASTContext &context, FactStore &store) {
+                     const clang::ASTContext &context, FileManager &files,
+                     FactStore &store) {
   const auto nonType = [&](clang::QualType type) {
-    return resolveType(type, store).transform([&](SymbolId id) {
+    return resolveType(type, context, files, store).transform([&](SymbolId id) {
       return TemplateParameter{
           .value = printArgument(argument, context),
           .type = id,
@@ -101,7 +100,7 @@ extractLeafParameter(const clang::TemplateArgument &argument,
   switch (argument.getKind()) {
   case clang::TemplateArgument::Type: {
     const auto type = argument.getAsType();
-    return resolveType(type, store).transform([&](SymbolId id) {
+    return resolveType(type, context, files, store).transform([&](SymbolId id) {
       return TemplateParameter{
           .type = id,
           .flags = typeFlags(type, argument.isPackExpansion()),
@@ -143,9 +142,9 @@ extractLeafParameter(const clang::TemplateArgument &argument,
 
 ParametersResult extractParameter(const clang::TemplateArgument &argument,
                                   const clang::ASTContext &context,
-                                  FactStore &store) {
+                                  FileManager &files, FactStore &store) {
   if (argument.getKind() != clang::TemplateArgument::Pack) {
-    return extractLeafParameter(argument, context, store)
+    return extractLeafParameter(argument, context, files, store)
         .transform([](TemplateParameter parameter) {
           return std::vector<TemplateParameter>{std::move(parameter)};
         });
@@ -155,7 +154,7 @@ ParametersResult extractParameter(const clang::TemplateArgument &argument,
     auto [packIndex, element] = indexedArgument;
     return std::move(result).and_then(
         [&](std::vector<TemplateParameter> parameters) {
-          return extractParameter(element, context, store)
+          return extractParameter(element, context, files, store)
               .transform([parameters = std::move(parameters), packIndex](
                              std::vector<TemplateParameter> elements) mutable {
                 std::ranges::for_each(elements, [packIndex](auto &parameter) {
@@ -229,12 +228,13 @@ findPattern(std::string_view source, const clang::NamedDecl &pattern,
 
 ParametersResult
 extractTemplateParameters(llvm::ArrayRef<clang::TemplateArgument> arguments,
-                          const clang::ASTContext &context, FactStore &store) {
+                          const clang::ASTContext &context, FileManager &files,
+                          FactStore &store) {
   const auto append = [&](ParametersResult result,
                           const clang::TemplateArgument &argument) {
     return std::move(result).and_then(
         [&](std::vector<TemplateParameter> parameters) {
-          return extractParameter(argument, context, store)
+          return extractParameter(argument, context, files, store)
               .transform([parameters = std::move(parameters)](
                              std::vector<TemplateParameter> extracted) mutable {
                 std::ranges::move(extracted, std::back_inserter(parameters));
@@ -252,7 +252,7 @@ IndexingResult storeTemplateInstanceRelations(
     const clang::NamedDecl &pattern,
     clang::TemplateSpecializationKind specializationKind,
     llvm::ArrayRef<clang::TemplateArgument> arguments,
-    const clang::ASTContext &context, FactStore &store) {
+    const clang::ASTContext &context, FileManager &files, FactStore &store) {
   const auto target = pattern.getQualifiedNameAsString();
   return relationKind(specializationKind)
       .transform_error([&](std::error_code error) {
@@ -270,7 +270,7 @@ IndexingResult storeTemplateInstanceRelations(
       })
       .and_then([&](auto pattern) {
         auto [patternRelation, usr] = std::move(pattern);
-        return extractTemplateParameters(arguments, context, store)
+        return extractTemplateParameters(arguments, context, files, store)
             .transform_error([&](ExtractionError error) {
               return relationFailure(relationName(patternRelation.kind),
                                      "source", instanceName, "target", target,

@@ -105,6 +105,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/Parameters.cpp
   src/ast/extractors/RecordDecl.cpp
   src/ast/extractors/RecordInstance.cpp
+  src/ast/extractors/TargetResolution.cpp
   src/ast/extractors/TemplatePattern.cpp
   src/ast/extractors/TemplateSpecialization.cpp
   src/ast/extractors/Type.cpp

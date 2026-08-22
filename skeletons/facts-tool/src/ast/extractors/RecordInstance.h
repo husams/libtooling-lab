@@ -15,15 +15,17 @@ class SourceManager;
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 ExtractionResult<RecordInstance>
 extractRecordInstance(const clang::ClassTemplateSpecializationDecl &node,
                       const clang::SourceManager &sourceManager,
-                      FactStore &store);
+                      FileManager &files, FactStore &store);
 
 IndexingResult
 storeRecordInstanceRelations(const clang::ClassTemplateSpecializationDecl &node,
-                             SymbolId instance, FactStore &store);
+                             SymbolId instance, FileManager &files,
+                             FactStore &store);
 
 } // namespace facts
 

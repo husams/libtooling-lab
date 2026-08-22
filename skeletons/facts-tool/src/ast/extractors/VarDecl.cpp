@@ -77,7 +77,8 @@ IndexingResult collectSymbol(clang::VarDecl &node, clang::ASTContext &context,
   }
 
   const auto storeRelations = [&](SymbolId variable) {
-    return storeValueRelations(node, variable, store);
+    return storeValueRelations(node, variable, context.getSourceManager(),
+                               files, store);
   };
   return storeExtracted(node, extractVariable(node, context.getSourceManager()),
                         context, files, store, storeRelations);

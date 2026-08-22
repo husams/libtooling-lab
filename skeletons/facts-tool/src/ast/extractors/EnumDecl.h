@@ -17,7 +17,8 @@ class FileManager;
 
 ExtractionResult<Enumeration>
 extractEnumeration(const clang::EnumDecl &node,
-                   const clang::SourceManager &sourceManager, FactStore &store);
+                   const clang::SourceManager &sourceManager,
+                   FileManager &files, FactStore &store);
 
 IndexingResult collectSymbol(clang::EnumDecl &node, clang::ASTContext &context,
                              FileManager &files, FactStore &store);
