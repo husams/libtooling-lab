@@ -87,7 +87,8 @@ private:
         ->type_name("ARG");
     command.add_option(
         "sources", import_.sources,
-        "Source files used when importing fixed compiler arguments");
+        "Source files to import; filter compilation database commands or use "
+        "--extra-arg arguments");
   }
 
   CLI::App app_;

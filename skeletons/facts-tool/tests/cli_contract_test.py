@@ -49,6 +49,12 @@ def main() -> None:
     import_help = run(tool, "import", "--help")
     require(import_help.returncode == 0, output(import_help))
     require("--compilation-database" in output(import_help), output(import_help))
+    require(
+        "Source files to import; filter compilation database commands or"
+        in output(import_help)
+        and "use --extra-arg arguments" in output(import_help),
+        output(import_help),
+    )
 
     missing = run(tool, "extract")
     require(missing.returncode != 0, output(missing))
