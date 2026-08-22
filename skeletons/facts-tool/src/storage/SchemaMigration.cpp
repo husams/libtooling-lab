@@ -214,13 +214,12 @@ PRAGMA user_version=4;
 inline constexpr auto packedSymbolIdMigrationSql = R"sql(
 CREATE TABLE symbol_compact (
   id             INTEGER PRIMARY KEY,
-  identity       TEXT NOT NULL,
   node           INTEGER NOT NULL,
   kind           INTEGER NOT NULL,
   sub_kind       INTEGER NOT NULL,
   lang           INTEGER NOT NULL,
   properties     INTEGER NOT NULL,
-  usr            TEXT NOT NULL,
+  usr            TEXT NOT NULL CHECK(usr <> ''),
   qualified_name TEXT NOT NULL,
   line           INTEGER NOT NULL,
   col            INTEGER NOT NULL,
@@ -254,13 +253,13 @@ CREATE TABLE symbol_compact (
 );
 
 INSERT INTO symbol_compact(
-  id,identity,node,kind,sub_kind,lang,properties,usr,qualified_name,line,col,
+  id,node,kind,sub_kind,lang,properties,usr,qualified_name,line,col,
   offset,access,is_definition,is_implicit,is_static,is_virtual,is_const,
   is_inline,is_pure,ref_qualifier,is_override,has_internal_linkage,is_external,
   is_variadic,is_deleted,is_defaulted,is_explicit,is_final,is_abstract,
   is_polymorphic,has_extern_storage,constant_evaluation,is_noexcept)
 SELECT
-  id,identity,node,kind,sub_kind,lang,properties,usr,qualified_name,line,col,
+  id,node,kind,sub_kind,lang,properties,usr,qualified_name,line,col,
   offset,access,is_definition,is_implicit,is_static,is_virtual,is_const,
   is_inline,is_pure,ref_qualifier,is_override,has_internal_linkage,is_external,
   is_variadic,is_deleted,is_defaulted,is_explicit,is_final,is_abstract,
@@ -269,7 +268,15 @@ FROM symbol;
 
 DROP TABLE symbol;
 ALTER TABLE symbol_compact RENAME TO symbol;
-PRAGMA user_version=5;
+PRAGMA user_version=6;
+)sql";
+
+inline constexpr auto usrIdentityMigrationSql = R"sql(
+DROP INDEX IF EXISTS idx_symbol_file_identity;
+DROP INDEX IF EXISTS idx_symbol_unique_usr;
+ALTER TABLE symbol DROP COLUMN identity;
+CREATE UNIQUE INDEX idx_symbol_unique_usr ON symbol(usr);
+PRAGMA user_version=6;
 )sql";
 
 } // namespace
@@ -309,6 +316,12 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
                 return version < 5
                            ? execute(database, packedSymbolIdMigrationSql)
                            : std::expected<void, std::error_code>{};
+              });
+            })
+            .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 6 ? execute(database, usrIdentityMigrationSql)
+                                   : std::expected<void, std::error_code>{};
               });
             });
       });

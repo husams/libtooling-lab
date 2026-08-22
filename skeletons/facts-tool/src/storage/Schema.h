@@ -36,14 +36,13 @@ CREATE TABLE IF NOT EXISTS symbol_allocator (
 -- as the raw enum values index::getSymbolInfo() produced.
 CREATE TABLE IF NOT EXISTS symbol (
   id             INTEGER PRIMARY KEY,
-  identity       TEXT NOT NULL,
   node           INTEGER NOT NULL,  -- which Storage specialization owns it,
                                     -- and therefore which side tables apply
   kind           INTEGER NOT NULL,
   sub_kind       INTEGER NOT NULL,
   lang           INTEGER NOT NULL,
   properties     INTEGER NOT NULL,
-  usr            TEXT NOT NULL,
+  usr            TEXT NOT NULL CHECK(usr <> ''),
   qualified_name TEXT NOT NULL,
   line           INTEGER NOT NULL,  -- Symbol::loc — where it was declared;
   col            INTEGER NOT NULL,  -- the file is already the top half of id
@@ -73,14 +72,9 @@ CREATE TABLE IF NOT EXISTS symbol (
   is_noexcept    INTEGER NOT NULL CHECK(is_noexcept IN (0,1))
 );
 
--- '%name%' over qualified_name is the search, so it is the one index that
--- earns its keep beyond the keys; usr is how a merge or a second run finds a
--- symbol it already knows.
+-- '%name%' over qualified_name is the search; USR is the sole symbol identity.
 CREATE INDEX IF NOT EXISTS idx_symbol_qualified_name ON symbol(qualified_name);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_symbol_file_identity
-  ON symbol(((id >> 32) & 4294967295), identity);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_symbol_unique_usr ON symbol(usr)
-  WHERE usr <> '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_symbol_unique_usr ON symbol(usr);
 
 -- Where the body is. A side table and not columns on symbol because only
 -- records and functions can have one, and because a missing row already says
@@ -222,7 +216,7 @@ CREATE TABLE IF NOT EXISTS relation (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=5;
+PRAGMA user_version=6;
 
 )sql";
 

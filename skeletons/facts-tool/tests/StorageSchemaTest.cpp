@@ -67,6 +67,12 @@ bool noRedundantSymbolIdColumns(sqlite3 *database) {
                 "name IN ('file_id','file_index')") == 0;
 }
 
+bool usrIsOnlySymbolIdentity(sqlite3 *database) {
+  return scalar(database,
+                "SELECT COUNT(*) FROM pragma_table_info('symbol') WHERE "
+                "name='identity'") == 0;
+}
+
 bool verifyFreshSchema(const std::string &path) {
   std::filesystem::remove(path);
 
@@ -126,6 +132,24 @@ bool verifyFreshSchema(const std::string &path) {
       return false;
     }
     destinationId = *savedDestination;
+
+    auto duplicateDestination = destination;
+    duplicateDestination.id.file = 2;
+    auto savedDuplicate = storage.save(duplicateDestination);
+    if (!require(savedDuplicate.has_value() && *savedDuplicate == destinationId,
+                 "USR did not preserve symbol identity across files")) {
+      return false;
+    }
+
+    facts::Symbol missingUsr;
+    missingUsr.id.file = 1;
+    auto rejected = storage.save(missingUsr);
+    if (!require(!rejected &&
+                     rejected.error() ==
+                         std::make_error_code(std::errc::invalid_argument),
+                 "symbol without a USR was accepted")) {
+      return false;
+    }
 
     facts::Variable variable;
     variable.id.file = 1;
@@ -253,6 +277,8 @@ bool verifyFreshSchema(const std::string &path) {
       require(noPackedFlags(database), "fresh schema retained packed flags") &&
       require(noRedundantSymbolIdColumns(database),
               "fresh schema retained redundant symbol id columns") &&
+      require(usrIsOnlySymbolIdentity(database),
+              "fresh schema retained a separate symbol identity") &&
       require(scalar(database,
                      "SELECT COUNT(*) FROM symbol WHERE id=" +
                          std::to_string(functionKey) +
@@ -398,7 +424,7 @@ bool verifyVersionOneMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version one") &&
-      require(scalar(database, "PRAGMA user_version") == 5,
+      require(scalar(database, "PRAGMA user_version") == 6,
               "version-one migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -441,8 +467,48 @@ bool verifyVersionTwoMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version two") &&
-      require(scalar(database, "PRAGMA user_version") == 5,
+      require(scalar(database, "PRAGMA user_version") == 6,
               "version-two migration was not recorded");
+  sqlite3_close(database);
+  return valid;
+}
+
+bool verifyVersionFiveMigration(const std::string &path) {
+  std::filesystem::remove(path);
+  {
+    facts::Storage current{path};
+  }
+
+  sqlite3 *database = nullptr;
+  if (!require(sqlite3_open(path.c_str(), &database) == SQLITE_OK,
+               "failed to open version-five database")) {
+    return false;
+  }
+  const auto prepared = execute(database, R"sql(
+DROP INDEX idx_symbol_unique_usr;
+ALTER TABLE symbol ADD COLUMN identity TEXT NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX idx_symbol_file_identity
+  ON symbol(((id >> 32) & 4294967295), identity);
+CREATE UNIQUE INDEX idx_symbol_unique_usr ON symbol(usr) WHERE usr <> '';
+PRAGMA user_version=5;
+)sql");
+  sqlite3_close(database);
+  if (!require(prepared, "failed to create version-five database")) {
+    return false;
+  }
+
+  {
+    facts::Storage migrated{path};
+  }
+  if (!require(sqlite3_open(path.c_str(), &database) == SQLITE_OK,
+               "failed to open migrated version-five database")) {
+    return false;
+  }
+  const auto valid =
+      require(usrIsOnlySymbolIdentity(database),
+              "version-five migration retained a separate symbol identity") &&
+      require(scalar(database, "PRAGMA user_version") == 6,
+              "version-five migration was not recorded");
   sqlite3_close(database);
   return valid;
 }
@@ -465,6 +531,8 @@ bool verifyMigration(const std::string &path) {
       require(noPackedFlags(database), "migration retained packed flags") &&
       require(noRedundantSymbolIdColumns(database),
               "migration retained redundant symbol id columns") &&
+      require(usrIsOnlySymbolIdentity(database),
+              "migration retained a separate symbol identity") &&
       require(scalar(database,
                      "SELECT COUNT(*) FROM symbol WHERE access='private' AND "
                      "is_definition=1 AND is_const=1 AND "
@@ -506,7 +574,7 @@ bool verifyMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'enumerator')") == 3,
               "enumerator schema was not migrated") &&
-      require(scalar(database, "PRAGMA user_version") == 5,
+      require(scalar(database, "PRAGMA user_version") == 6,
               "migration version was not recorded");
   sqlite3_close(database);
   return valid;
@@ -521,7 +589,8 @@ int main(int argc, char **argv) {
   }
   return verifyFreshSchema(argv[1]) && verifyMigration(argv[2]) &&
                  verifyVersionOneMigration(std::string{argv[2]} + ".v1") &&
-                 verifyVersionTwoMigration(std::string{argv[2]} + ".v2")
+                 verifyVersionTwoMigration(std::string{argv[2]} + ".v2") &&
+                 verifyVersionFiveMigration(std::string{argv[2]} + ".v5")
              ? 0
              : 1;
 }

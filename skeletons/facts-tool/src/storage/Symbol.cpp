@@ -2,23 +2,43 @@
 
 #include "storage/SemanticProperties.h"
 #include "storage/Sqlite.h"
-#include "storage/SymbolIdentity.h"
 
 #include <sqlite3.h>
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <utility>
 
 namespace facts {
+namespace {
+
+std::expected<SymbolId, std::error_code> allocateSymbolId(sqlite3 *database,
+                                                          FileId file) {
+  auto statement = storage::prepare(
+      database, "INSERT INTO symbol_allocator(file_id,next_index) VALUES(?1,1) "
+                "ON CONFLICT(file_id) DO UPDATE SET next_index=next_index+1 "
+                "RETURNING next_index-1");
+  if (!statement || !storage::bindInteger(statement->get(), 1, file) ||
+      sqlite3_step(statement->get()) != SQLITE_ROW) {
+    return std::unexpected(storage::sqliteError(database));
+  }
+
+  const auto raw = sqlite3_column_int64(statement->get(), 0);
+  if (raw < 0 || raw > std::numeric_limits<std::uint32_t>::max()) {
+    return std::unexpected(std::make_error_code(std::errc::value_too_large));
+  }
+  return SymbolId{file, static_cast<std::uint32_t>(raw)};
+}
+
+} // namespace
 
 std::expected<void, std::error_code>
-Storage::replaceSymbolRow(SymbolId id, SymbolNode node,
-                          std::string_view identity, const Symbol &symbol) {
+Storage::replaceSymbolRow(SymbolId id, SymbolNode node, const Symbol &symbol) {
   const auto properties = storage::symbolProperties(symbol.flags);
   auto statement = storage::prepare(
       handle(),
-      "INSERT INTO symbol(id,identity,node,kind,sub_kind,"
+      "INSERT INTO symbol(id,node,kind,sub_kind,"
       "lang,properties,usr,qualified_name,line,col,offset,access,is_definition,"
       "is_implicit,is_static,is_virtual,is_const,is_inline,is_pure,"
       "ref_qualifier,is_override,has_internal_linkage,is_external,is_variadic,"
@@ -26,7 +46,7 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node,
       "has_extern_storage,constant_evaluation,is_noexcept) "
       "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,"
       "?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,"
-      "?33,?34) "
+      "?33) "
       "ON CONFLICT(id) DO UPDATE SET node=excluded.node,"
       "kind=excluded.kind,sub_kind=excluded.sub_kind,lang=excluded.lang,"
       "properties=excluded.properties,usr=excluded.usr,"
@@ -59,42 +79,41 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node,
       "is_noexcept=MAX(is_noexcept,excluded.is_noexcept)");
   if (!statement ||
       !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
-      !storage::bindText(statement->get(), 2, identity) ||
-      !storage::bindInteger(statement->get(), 3, node) ||
-      !storage::bindInteger(statement->get(), 4,
+      !storage::bindInteger(statement->get(), 2, node) ||
+      !storage::bindInteger(statement->get(), 3,
                             storage::storedSymbolKind(symbol.Kind)) ||
-      !storage::bindInteger(statement->get(), 5, symbol.SubKind) ||
-      !storage::bindInteger(statement->get(), 6, symbol.Lang) ||
-      !storage::bindInteger(statement->get(), 7, symbol.Properties) ||
-      !storage::bindText(statement->get(), 8, symbol.usr) ||
-      !storage::bindText(statement->get(), 9, symbol.qualifiedName) ||
-      !storage::bindInteger(statement->get(), 10, symbol.loc.line) ||
-      !storage::bindInteger(statement->get(), 11, symbol.loc.column) ||
-      !storage::bindInteger(statement->get(), 12, symbol.loc.offset) ||
-      !storage::bindText(statement->get(), 13, properties.access) ||
-      !storage::bindInteger(statement->get(), 14, properties.isDefinition) ||
-      !storage::bindInteger(statement->get(), 15, properties.isImplicit) ||
-      !storage::bindInteger(statement->get(), 16, properties.isStatic) ||
-      !storage::bindInteger(statement->get(), 17, properties.isVirtual) ||
-      !storage::bindInteger(statement->get(), 18, properties.isConst) ||
-      !storage::bindInteger(statement->get(), 19, properties.isInline) ||
-      !storage::bindInteger(statement->get(), 20, properties.isPure) ||
-      !storage::bindText(statement->get(), 21, properties.refQualifier) ||
-      !storage::bindInteger(statement->get(), 22, properties.isOverride) ||
-      !storage::bindInteger(statement->get(), 23,
+      !storage::bindInteger(statement->get(), 4, symbol.SubKind) ||
+      !storage::bindInteger(statement->get(), 5, symbol.Lang) ||
+      !storage::bindInteger(statement->get(), 6, symbol.Properties) ||
+      !storage::bindText(statement->get(), 7, symbol.usr) ||
+      !storage::bindText(statement->get(), 8, symbol.qualifiedName) ||
+      !storage::bindInteger(statement->get(), 9, symbol.loc.line) ||
+      !storage::bindInteger(statement->get(), 10, symbol.loc.column) ||
+      !storage::bindInteger(statement->get(), 11, symbol.loc.offset) ||
+      !storage::bindText(statement->get(), 12, properties.access) ||
+      !storage::bindInteger(statement->get(), 13, properties.isDefinition) ||
+      !storage::bindInteger(statement->get(), 14, properties.isImplicit) ||
+      !storage::bindInteger(statement->get(), 15, properties.isStatic) ||
+      !storage::bindInteger(statement->get(), 16, properties.isVirtual) ||
+      !storage::bindInteger(statement->get(), 17, properties.isConst) ||
+      !storage::bindInteger(statement->get(), 18, properties.isInline) ||
+      !storage::bindInteger(statement->get(), 19, properties.isPure) ||
+      !storage::bindText(statement->get(), 20, properties.refQualifier) ||
+      !storage::bindInteger(statement->get(), 21, properties.isOverride) ||
+      !storage::bindInteger(statement->get(), 22,
                             properties.hasInternalLinkage) ||
-      !storage::bindInteger(statement->get(), 24, properties.isExternal) ||
-      !storage::bindInteger(statement->get(), 25, properties.isVariadic) ||
-      !storage::bindInteger(statement->get(), 26, properties.isDeleted) ||
-      !storage::bindInteger(statement->get(), 27, properties.isDefaulted) ||
-      !storage::bindInteger(statement->get(), 28, properties.isExplicit) ||
-      !storage::bindInteger(statement->get(), 29, properties.isFinal) ||
-      !storage::bindInteger(statement->get(), 30, properties.isAbstract) ||
-      !storage::bindInteger(statement->get(), 31, properties.isPolymorphic) ||
-      !storage::bindInteger(statement->get(), 32,
+      !storage::bindInteger(statement->get(), 23, properties.isExternal) ||
+      !storage::bindInteger(statement->get(), 24, properties.isVariadic) ||
+      !storage::bindInteger(statement->get(), 25, properties.isDeleted) ||
+      !storage::bindInteger(statement->get(), 26, properties.isDefaulted) ||
+      !storage::bindInteger(statement->get(), 27, properties.isExplicit) ||
+      !storage::bindInteger(statement->get(), 28, properties.isFinal) ||
+      !storage::bindInteger(statement->get(), 29, properties.isAbstract) ||
+      !storage::bindInteger(statement->get(), 30, properties.isPolymorphic) ||
+      !storage::bindInteger(statement->get(), 31,
                             properties.hasExternStorage) ||
-      !storage::bindText(statement->get(), 33, properties.constantEvaluation) ||
-      !storage::bindInteger(statement->get(), 34, properties.isNoexcept) ||
+      !storage::bindText(statement->get(), 32, properties.constantEvaluation) ||
+      !storage::bindInteger(statement->get(), 33, properties.isNoexcept) ||
       sqlite3_step(statement->get()) != SQLITE_DONE) {
     return std::unexpected(storage::sqliteError(handle()));
   }
@@ -225,25 +244,27 @@ std::expected<Symbol, std::error_code> Storage::loadFacts(Symbol symbol,
 
 std::expected<SymbolId, std::error_code>
 Storage::saveSymbol(SymbolNode node, const Symbol &symbol, SymbolFacts facts) {
-  const auto identity = symbolIdentity(symbol);
+  if (symbol.usr.empty()) {
+    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+  }
+
   auto transaction = storage::Transaction::write(handle());
   if (!transaction) {
     return std::unexpected(transaction.error());
   }
 
   auto id =
-      symbol.usr.empty()
-          ? findOrAllocateSymbol(handle(), symbol.id.file, identity)
-          : findId(symbol.usr).and_then([&](std::optional<SymbolId> existing) {
-              if (existing) {
-                return std::expected<SymbolId, std::error_code>{*existing};
-              }
-              return findOrAllocateSymbol(handle(), symbol.id.file, identity);
-            });
+      findId(symbol.usr)
+          .and_then([&](std::optional<SymbolId> existing)
+                        -> std::expected<SymbolId, std::error_code> {
+            return existing
+                       ? std::expected<SymbolId, std::error_code>{*existing}
+                       : allocateSymbolId(handle(), symbol.id.file);
+          });
 
   return id
       .and_then([&](SymbolId id) {
-        return replaceSymbolRow(id, node, identity, symbol)
+        return replaceSymbolRow(id, node, symbol)
             .and_then([&] {
               return replaceDefinition(
                   id, symbol.definitionFile.value_or(symbol.id.file),

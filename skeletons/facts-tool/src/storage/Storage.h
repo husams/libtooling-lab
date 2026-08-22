@@ -104,8 +104,7 @@ private:
   loadSymbol(SymbolNode node, std::string_view usr, SymbolFacts facts);
 
   std::expected<void, std::error_code>
-  replaceSymbolRow(SymbolId id, SymbolNode node, std::string_view identity,
-                   const Symbol &symbol);
+  replaceSymbolRow(SymbolId id, SymbolNode node, const Symbol &symbol);
   std::expected<Symbol, std::error_code> loadSymbolRow(SymbolNode node,
                                                        SymbolId id);
   std::expected<Symbol, std::error_code> loadFacts(Symbol symbol,
