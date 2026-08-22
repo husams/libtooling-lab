@@ -14,8 +14,7 @@ include(FetchContent)
 FetchContent_Declare(
   CLI11
   GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
-  GIT_TAG v2.6.2
-  GIT_SHALLOW TRUE
+  GIT_TAG 37bb6edc5317e99af72ef48405e65d9ca5218861
 )
 FetchContent_MakeAvailable(CLI11)
 
@@ -255,6 +254,15 @@ if(BUILD_TESTING)
     FIXTURES_REQUIRED multi-tu-project
     PASS_REGULAR_EXPRESSION "recorded from 3 file\\(s\\)"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+  add_test(
+    NAME multi-tu-project-cleanup
+    COMMAND ${CMAKE_COMMAND} -E rm -f
+            ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-files.sqlite
+            ${CMAKE_CURRENT_BINARY_DIR}/multi-tu-test.sqlite
+  )
+  set_tests_properties(multi-tu-project-cleanup PROPERTIES
+    FIXTURES_CLEANUP multi-tu-project
   )
 
   add_test(

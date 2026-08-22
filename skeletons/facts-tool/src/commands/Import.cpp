@@ -54,6 +54,10 @@ loadCompilationDatabase(const cli::ImportOptions &options) {
     return std::make_unique<clang::tooling::FixedCompilationDatabase>(
         std::filesystem::current_path().string(), options.extraArguments);
   }
+  if (!options.extraArguments.empty()) {
+    return std::unexpected(
+        "--extra-arg cannot be used with --compilation-database");
+  }
 
   std::string error;
   auto database = CompilationDatabase::loadFromDirectory(

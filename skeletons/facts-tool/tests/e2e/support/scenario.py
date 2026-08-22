@@ -86,8 +86,8 @@ class FactsToolContext:
         )
         return self.last_output
 
-    def run_import(self) -> str:
-        completed = self._run(self.import_command())
+    def run_import(self, sources: tuple[Path, ...] | None = None) -> str:
+        completed = self._run(self.import_command(sources))
         require(
             completed.returncode == 0,
             f"facts-tool import exited with {completed.returncode}:\n{self.last_output}",
@@ -209,7 +209,7 @@ class FactsToolContext:
         self.facts_database = self.run_root_path / "dependent-facts.sqlite"
         self.files_database = self.run_root_path / "dependent-files.sqlite"
         self._write_compilation_database((source,))
-        self.run_import()
+        self.run_import((source,))
         self._run(self._tool_command((source,)))
 
     def stored_tool_command(self) -> list[str]:
@@ -223,7 +223,8 @@ class FactsToolContext:
             *(str(source) for source in self.sources),
         ]
 
-    def import_command(self) -> list[str]:
+    def import_command(self, sources: tuple[Path, ...] | None = None) -> list[str]:
+        requested_sources = self.sources if sources is None else sources
         return [
             str(self.facts_tool),
             "import",
@@ -231,7 +232,7 @@ class FactsToolContext:
             str(self.files_database_path),
             "--compilation-database",
             str(self.run_root_path),
-            *(str(source) for source in self.sources),
+            *(str(source) for source in requested_sources),
         ]
 
     def _run(self, command: list[str]) -> subprocess.CompletedProcess[str]:

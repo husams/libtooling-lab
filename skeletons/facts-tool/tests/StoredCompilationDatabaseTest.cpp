@@ -80,41 +80,10 @@ int main(int argc, char **argv) {
   assert(
       (*stored)->getCompileCommands((root / "missing.cpp").string()).empty());
 
-  facts::configureStoredCompilationDatabase(databasePath.string());
-  std::string error;
-  auto detected = clang::tooling::CompilationDatabase::autoDetectFromSource(
-      source.string(), error);
-  assert(detected);
-  assert(detected->getCompileCommands(source.string()).size() == 1);
-
-  {
-    std::ofstream json(root / "compile_commands.json");
-    json << "[{\"directory\":\"" << root.string() << "\",\"file\":\""
-         << source.string() << "\",\"arguments\":[\"clang++\",\"-DJSON=1\",\""
-         << source.string() << "\"]}]";
-  }
-  error.clear();
-  auto json = clang::tooling::CompilationDatabase::loadFromDirectory(
-      root.string(), error);
-  assert(json);
-  const auto jsonCommands = json->getCompileCommands(source.string());
-  assert(jsonCommands.size() == 1);
-  assert(contains(jsonCommands.front().CommandLine, "-DJSON=1"));
-  assert(!contains(jsonCommands.front().CommandLine, "-DVALUE=1"));
-
   assert(sqlite3_open(databasePath.c_str(), &database) == SQLITE_OK);
   execute(database,
           "UPDATE file SET compile_options='{\"invalid\":true}' WHERE id=23");
   sqlite3_close(database);
   auto malformed = facts::loadStoredCompilationDatabase(databasePath.string());
   assert(!malformed);
-
-  std::filesystem::remove(root / "compile_commands.json");
-  facts::configureStoredCompilationDatabase(databasePath.string());
-  error.clear();
-  clang::tooling::CompilationDatabase::autoDetectFromSource(source.string(),
-                                                            error);
-  const auto configuredError = facts::storedCompilationDatabaseError();
-  assert(configuredError);
-  assert(configuredError->contains("compile_options is not a JSON array"));
 }

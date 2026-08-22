@@ -30,7 +30,7 @@ struct ProjectImportResult {
 std::expected<ProjectImportResult, std::string>
 importProjectConfiguration(FileManager &files,
                            const clang::tooling::CompilationDatabase &database,
-                           std::span<const std::string> fallbackSources,
+                           std::span<const std::string> requestedSources,
                            const ProjectImportOptions &options);
 
 } // namespace facts
