@@ -37,19 +37,34 @@ def given_dependent_template_compile_database(context: FactsToolContext) -> Path
     return source
 
 
-def run_flat_extraction(
+def run_subcommand_extraction(
     context: FactsToolContext, source: Path
 ) -> subprocess.CompletedProcess[str]:
+    imported = run(
+        [
+            str(context.facts_tool),
+            "import",
+            "--conf",
+            str(context.files_database_path),
+            "--compilation-database",
+            str(context.run_root_path),
+            str(source),
+        ]
+    )
+    require(
+        imported.returncode == 0,
+        f"expected import exit code 0, got {imported.returncode}:\n"
+        + imported.stdout
+        + imported.stderr,
+    )
     return run(
         [
             str(context.facts_tool),
-            "-p",
-            str(context.run_root_path),
-            "--facts-out",
+            "extract",
+            "--output",
             str(context.facts_database_path),
-            "--project-config",
+            "--conf",
             str(context.files_database_path),
-            "--refresh-project-config",
             str(source),
         ]
     )
@@ -59,7 +74,7 @@ def run_flat_extraction(
 def when_extract_indexes_dependent_templates(
     context: FactsToolContext, dependent_template_source: Path
 ) -> None:
-    completed = run_flat_extraction(context, dependent_template_source)
+    completed = run_subcommand_extraction(context, dependent_template_source)
     context.last_returncode = completed.returncode
     context.last_output = completed.stdout + completed.stderr
 
