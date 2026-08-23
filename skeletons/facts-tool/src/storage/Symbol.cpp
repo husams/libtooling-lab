@@ -82,24 +82,25 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node, const Symbol &symbol) {
           "THEN excluded.constant_evaluation ELSE constant_evaluation END,"
           "is_noexcept=MAX(is_noexcept,excluded.is_noexcept)",
           rows,
-          [id, node](sqlite3_stmt *statement, const Symbol &value) {
+          storage::detail::typedBinder([id, node](auto bind,
+                                                  const Symbol &value) {
             const auto properties = storage::symbolProperties(value.flags);
-            return storage::bindParameters(
-                statement, id, node, storage::storedSymbolKind(value.Kind),
-                value.SubKind, value.Lang, value.Properties, value.usr,
-                value.qualifiedName, value.loc.line, value.loc.column,
-                value.loc.offset, properties.access, properties.isDefinition,
-                properties.isImplicit, properties.isStatic,
-                properties.isVirtual, properties.isConst, properties.isInline,
-                properties.isPure, properties.refQualifier,
-                properties.isOverride, properties.hasInternalLinkage,
-                properties.isExternal, properties.isVariadic,
-                properties.isDeleted, properties.isDefaulted,
-                properties.isExplicit, properties.isFinal,
-                properties.isAbstract, properties.isPolymorphic,
-                properties.hasExternStorage, properties.constantEvaluation,
-                properties.isNoexcept);
-          })
+            return bind(id, node, storage::storedSymbolKind(value.Kind),
+                        value.SubKind, value.Lang, value.Properties, value.usr,
+                        value.qualifiedName, value.loc.line, value.loc.column,
+                        value.loc.offset, properties.access,
+                        properties.isDefinition, properties.isImplicit,
+                        properties.isStatic, properties.isVirtual,
+                        properties.isConst, properties.isInline,
+                        properties.isPure, properties.refQualifier,
+                        properties.isOverride, properties.hasInternalLinkage,
+                        properties.isExternal, properties.isVariadic,
+                        properties.isDeleted, properties.isDefaulted,
+                        properties.isExplicit, properties.isFinal,
+                        properties.isAbstract, properties.isPolymorphic,
+                        properties.hasExternStorage,
+                        properties.constantEvaluation, properties.isNoexcept);
+          }))
       .transform([](const storage::BulkResult &) {});
 }
 

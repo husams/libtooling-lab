@@ -17,11 +17,11 @@ Storage::replaceEnumeratorDetails(SymbolId id, const Enumerator &enumerator) {
           "value=excluded.value,"
           "initializer_expression=excluded.initializer_expression",
           rows,
-          [id](sqlite3_stmt *statement, const Enumerator &value) {
-            return storage::bindParameters(
-                statement, id, value.value,
-                value.initializerExpression.value_or(""));
-          })
+          storage::detail::typedBinder(
+              [id](auto bind, const Enumerator &value) {
+                return bind(id, value.value,
+                            value.initializerExpression.value_or(""));
+              }))
       .transform([](const storage::BulkResult &) {});
 }
 

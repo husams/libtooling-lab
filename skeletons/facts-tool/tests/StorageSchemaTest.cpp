@@ -1,4 +1,6 @@
 #include "model/Function.h"
+#include "model/RecordInstance.h"
+#include "model/RecordTemplate.h"
 #include "model/Relation.h"
 #include "storage/Storage.h"
 
@@ -225,6 +227,35 @@ bool verifyFreshSchema(const std::string &path) {
     }
     enumeratorId = *savedEnumerator;
 
+    facts::RecordTemplate recordTemplate;
+    recordTemplate.id.file = 1;
+    recordTemplate.usr = "c:@S@BoxTemplate";
+    recordTemplate.qualifiedName = "Box";
+    recordTemplate.loc = {.line = 5, .column = 1, .offset = 80};
+    recordTemplate.flags = facts::bit(facts::DefinitionBit);
+    recordTemplate.definition = facts::Region{80, 20};
+    recordTemplate.templateArguments.push_back({.name = "T"});
+    if (!require(storage.save(recordTemplate).has_value(),
+                 "failed to save record template")) {
+      return false;
+    }
+
+    facts::RecordInstance recordInstance;
+    recordInstance.id.file = 1;
+    recordInstance.usr = "c:@S@BoxInt";
+    recordInstance.qualifiedName = "Box<int *>";
+    recordInstance.loc = {.line = 6, .column = 1, .offset = 100};
+    recordInstance.flags = facts::bit(facts::DefinitionBit);
+    recordInstance.definition = facts::Region{100, 24};
+    recordInstance.templateParameters.push_back({
+        .type = {.file = 0, .index = 8},
+        .flags = facts::bit(facts::ParameterBit::PointerBit),
+    });
+    if (!require(storage.save(recordInstance).has_value(),
+                 "failed to save record instance")) {
+      return false;
+    }
+
     const auto relationFlags = static_cast<std::uint16_t>(
         clang::AS_protected | facts::bit(facts::VirtualBaseBit) |
         facts::bit(facts::ImplicitEdgeBit) | facts::bit(facts::LexicalBit));
@@ -337,6 +368,10 @@ bool verifyFreshSchema(const std::string &path) {
   const auto destinationKey = packed(destinationId);
   const auto canonical = textScalar(database, R"sql(
 SELECT group_concat(record, char(10)) FROM (
+  SELECT 'definition|' || symbol.usr || '|' || definition.file_id || '|' ||
+         definition.offset || '|' || definition.size AS record
+  FROM definition JOIN symbol ON symbol.id=definition.symbol_id
+  UNION ALL
   SELECT 'enumeration|' || symbol.usr || '|' || enumeration.underlying_type ||
          '|' || enumeration.is_scoped || '|' ||
          enumeration.has_fixed_underlying_type AS record
@@ -361,6 +396,27 @@ SELECT group_concat(record, char(10)) FROM (
   UNION ALL
   SELECT 'symbol|' || usr || '|' || qualified_name FROM symbol
   UNION ALL
+  SELECT 'template_argument|' || symbol.usr || '|' ||
+         template_argument.position || '|' || template_argument.name || '|' ||
+         template_argument.type_id || '|' ||
+         template_argument.is_parameter_pack || '|' ||
+         template_argument.is_non_type || '|' ||
+         template_argument.is_template_template
+  FROM template_argument
+  JOIN symbol ON symbol.id=template_argument.symbol_id
+  UNION ALL
+  SELECT 'template_parameter|' || symbol.usr || '|' ||
+         template_parameter.position || '|' || template_parameter.value ||
+         '|' || template_parameter.type_id || '|' ||
+         template_parameter.is_pointer || '|' ||
+         template_parameter.is_lvalue_reference || '|' ||
+         template_parameter.is_rvalue_reference || '|' ||
+         template_parameter.is_forwarding_reference || '|' ||
+         template_parameter.is_const || '|' || template_parameter.is_pack ||
+         '|' || template_parameter.kind || '|' || template_parameter.pack_index
+  FROM template_parameter
+  JOIN symbol ON symbol.id=template_parameter.symbol_id
+  UNION ALL
   SELECT 'variable|' || symbol.usr || '|' || variable_initializer.expression ||
          '|' || variable_initializer.evaluated_kind || '|' ||
          variable_initializer.evaluated_value
@@ -370,6 +426,11 @@ SELECT group_concat(record, char(10)) FROM (
 )
 )sql");
   constexpr std::string_view canonicalBaseline =
+      "definition|c:@E@Mode@Fast|1|69|8\n"
+      "definition|c:@E@Mode|1|50|30\n"
+      "definition|c:@S@BoxInt|1|100|24\n"
+      "definition|c:@S@BoxTemplate|1|80|20\n"
+      "definition|c:@V@initializer|1|30|12\n"
       "enumeration|c:@E@Mode|7|1|1\n"
       "enumerator|c:@E@Mode@Fast|5|5\n"
       "parameter|c:@F@queryable|0|values|1|2 + 3|integer|5\n"
@@ -378,8 +439,12 @@ SELECT group_concat(record, char(10)) FROM (
       "symbol|c:@E@Mode@Fast|Mode::Fast\n"
       "symbol|c:@E@Mode|Mode\n"
       "symbol|c:@F@queryable|queryableUpdated\n"
+      "symbol|c:@S@BoxInt|Box<int *>\n"
+      "symbol|c:@S@BoxTemplate|Box\n"
       "symbol|c:@S@base|base\n"
       "symbol|c:@V@initializer|initializer\n"
+      "template_argument|c:@S@BoxTemplate|0|T|0|0|0|0\n"
+      "template_parameter|c:@S@BoxInt|0||8|1|0|0|0|0|0|1|-1\n"
       "variable|c:@V@initializer|2 + 3|integer|5";
   const auto valid =
       require(canonical == canonicalBaseline,

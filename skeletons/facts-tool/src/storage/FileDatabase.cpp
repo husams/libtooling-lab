@@ -195,8 +195,9 @@ ComponentRoot currentComponentRoot(const storage::Row &row) {
   component.repositoryId = row.get<std::optional<std::int64_t>>(4);
   const auto clonePath = row.get<std::optional<std::string>>(5);
   const auto clone =
-      clonePath ? std::optional<ProjectClone>{ProjectClone{.path = *clonePath}}
-                : std::optional<ProjectClone>{};
+      clonePath && !clonePath->empty()
+          ? std::optional<ProjectClone>{ProjectClone{.path = *clonePath}}
+          : std::optional<ProjectClone>{};
   return {component.id, effectiveComponentRoot(component, clone)};
 }
 
@@ -526,7 +527,8 @@ storage::Database openFileDatabase(const std::string &path) {
   constexpr int flags = storage::Database::readWrite | SQLITE_OPEN_FULLMUTEX;
   auto opened = storage::Database::open(path, flags);
   if (!opened) {
-    throw std::system_error(opened.error(), "cannot open file database");
+    throw std::runtime_error("cannot open file database: " +
+                             opened.error().message());
   }
   auto database = std::move(*opened);
   auto initialized =
@@ -534,8 +536,9 @@ storage::Database openFileDatabase(const std::string &path) {
         return initializeFileSchema(database.nativeHandle());
       });
   if (!initialized) {
-    throw std::system_error(initialized.error(),
-                            "cannot initialize file database");
+    throw std::runtime_error(
+        "cannot initialize file database: " +
+        std::string{sqlite3_errmsg(database.nativeHandle())});
   }
   return database;
 }

@@ -15,7 +15,8 @@ storage::Database openDatabase(const std::string &path) {
   constexpr int flags = storage::Database::readWrite | SQLITE_OPEN_FULLMUTEX;
   auto opened = storage::Database::open(path, flags);
   if (!opened) {
-    throw std::system_error(opened.error(), "cannot open SQLite database");
+    throw std::runtime_error("cannot open SQLite database: " +
+                             opened.error().message());
   }
 
   auto database = std::move(*opened);
@@ -31,8 +32,9 @@ storage::Database openDatabase(const std::string &path) {
             return database.executeScript("PRAGMA foreign_keys=ON;");
           });
   if (!initialized) {
-    throw std::system_error(initialized.error(),
-                            "cannot initialize SQLite database");
+    throw std::runtime_error(
+        "cannot initialize SQLite database: " +
+        std::string{sqlite3_errmsg(database.nativeHandle())});
   }
   return database;
 }

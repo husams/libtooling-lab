@@ -20,11 +20,11 @@ Storage::replaceEnumerationDetails(SymbolId id,
           "is_scoped=excluded.is_scoped,"
           "has_fixed_underlying_type=excluded.has_fixed_underlying_type",
           rows,
-          [id](sqlite3_stmt *statement, const Enumeration &value) {
-            return storage::bindParameters(statement, id, value.underlyingType,
-                                           value.isScoped,
-                                           value.hasFixedUnderlyingType);
-          })
+          storage::detail::typedBinder(
+              [id](auto bind, const Enumeration &value) {
+                return bind(id, value.underlyingType, value.isScoped,
+                            value.hasFixedUnderlyingType);
+              }))
       .transform([](const storage::BulkResult &) {});
 }
 

@@ -1,5 +1,7 @@
 #include "storage/RecordTemplate.h"
 
+#include "storage/StorageQuery.h"
+
 #include <ranges>
 
 namespace facts {
@@ -14,16 +16,16 @@ Storage::addTemplateArguments(SymbolId id,
       "ON CONFLICT(symbol_id,position) DO NOTHING";
   auto positions = std::views::iota(std::size_t{0}, arguments.size());
   return database_
-      .executeBulk(
-          sql, positions,
-          [id, arguments](sqlite3_stmt *statement, std::size_t position) {
-            const auto &argument = arguments[position];
-            return storage::bindParameters(
-                statement, id, position, argument.name, argument.type,
-                (argument.flags & bit(ParameterPackBit)) != 0,
-                (argument.flags & bit(NonTypeBit)) != 0,
-                (argument.flags & bit(TemplateTemplateBit)) != 0);
-          })
+      .executeBulk(sql, positions,
+                   storage::detail::typedBinder(
+                       [id, arguments](auto bind, std::size_t position) {
+                         const auto &argument = arguments[position];
+                         return bind(
+                             id, position, argument.name, argument.type,
+                             (argument.flags & bit(ParameterPackBit)) != 0,
+                             (argument.flags & bit(NonTypeBit)) != 0,
+                             (argument.flags & bit(TemplateTemplateBit)) != 0);
+                       }))
       .transform([](const storage::BulkResult &) {});
 }
 

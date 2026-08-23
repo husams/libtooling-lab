@@ -1,6 +1,7 @@
 #include "storage/RecordInstance.h"
 
 #include "storage/SemanticProperties.h"
+#include "storage/StorageQuery.h"
 
 #include <ranges>
 
@@ -19,17 +20,17 @@ Storage::addTemplateParameters(SymbolId id,
   return database_
       .executeBulk(
           sql, positions,
-          [id, parameters](sqlite3_stmt *statement, std::size_t position) {
+          storage::detail::typedBinder([id, parameters](auto bind,
+                                                        std::size_t position) {
             const auto &parameter = parameters[position];
             const auto properties = storage::parameterProperties(
                 static_cast<std::uint8_t>(parameter.flags));
-            return storage::bindParameters(
-                statement, id, position, parameter.value, parameter.type,
-                properties.isPointer, properties.isLValueReference,
-                properties.isRValueReference, properties.isForwardingReference,
-                properties.isConst, properties.isPack, parameter.kind,
-                parameter.packIndex);
-          })
+            return bind(id, position, parameter.value, parameter.type,
+                        properties.isPointer, properties.isLValueReference,
+                        properties.isRValueReference,
+                        properties.isForwardingReference, properties.isConst,
+                        properties.isPack, parameter.kind, parameter.packIndex);
+          }))
       .transform([](const storage::BulkResult &) {});
 }
 

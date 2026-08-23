@@ -244,6 +244,16 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-fresh.sqlite
             ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-legacy.sqlite
   )
+  add_executable(file-database-persistence-test
+                 tests/FileDatabasePersistenceTest.cpp)
+  target_link_libraries(file-database-persistence-test
+                        PRIVATE facts-storage facts-model SQLite3::SQLite3)
+  add_test(
+    NAME file-database-persistence
+    COMMAND file-database-persistence-test
+            ${CMAKE_CURRENT_BINARY_DIR}/storage-connection.sqlite
+            ${CMAKE_CURRENT_BINARY_DIR}/file-database-persistence.sqlite
+  )
   add_executable(sqlite-query-test tests/SqliteQueryTest.cpp)
   target_link_libraries(sqlite-query-test PRIVATE facts-storage
                                                   SQLite3::SQLite3)

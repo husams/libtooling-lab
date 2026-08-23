@@ -16,19 +16,18 @@ std::expected<void, std::error_code> Storage::replaceVariableInitializer(
 
   const std::array rows{storage::initializerColumns(*initializer)};
   return database_
-      .executeBulk("INSERT INTO variable_initializer(symbol_id,expression,"
-                   "evaluated_kind,evaluated_value) VALUES(?1,?2,?3,?4) "
-                   "ON CONFLICT(symbol_id) DO UPDATE SET "
-                   "expression=excluded.expression,"
-                   "evaluated_kind=excluded.evaluated_kind,"
-                   "evaluated_value=excluded.evaluated_value",
-                   rows,
-                   [id](sqlite3_stmt *statement,
-                        const storage::InitializerColumns &value) {
-                     return storage::bindParameters(statement, id,
-                                                    value.expression,
-                                                    value.kind, value.value);
-                   })
+      .executeBulk(
+          "INSERT INTO variable_initializer(symbol_id,expression,"
+          "evaluated_kind,evaluated_value) VALUES(?1,?2,?3,?4) "
+          "ON CONFLICT(symbol_id) DO UPDATE SET "
+          "expression=excluded.expression,"
+          "evaluated_kind=excluded.evaluated_kind,"
+          "evaluated_value=excluded.evaluated_value",
+          rows,
+          storage::detail::typedBinder(
+              [id](auto bind, const storage::InitializerColumns &value) {
+                return bind(id, value.expression, value.kind, value.value);
+              }))
       .transform([](const storage::BulkResult &) {});
 }
 

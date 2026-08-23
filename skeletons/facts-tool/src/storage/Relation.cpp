@@ -1,6 +1,7 @@
 #include "storage/Storage.h"
 
 #include "storage/SemanticProperties.h"
+#include "storage/StorageQuery.h"
 #include <system_error>
 
 namespace facts {
@@ -14,13 +15,13 @@ Storage::addRelations(std::span<const Relation> relations) {
           "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9) ON CONFLICT(source_id,"
           "destination_id,kind,position) DO NOTHING",
           relations,
-          [](sqlite3_stmt *statement, const Relation &relation) {
+          storage::detail::typedBinder([](auto bind, const Relation &relation) {
             const auto properties = storage::relationProperties(relation.flags);
-            return storage::bindParameters(
-                statement, relation.source, relation.destination, relation.kind,
-                relation.position, properties.access, properties.isVirtualBase,
-                properties.isImplicit, properties.isLexical, relation.count);
-          })
+            return bind(relation.source, relation.destination, relation.kind,
+                        relation.position, properties.access,
+                        properties.isVirtualBase, properties.isImplicit,
+                        properties.isLexical, relation.count);
+          }))
       .transform([](const storage::BulkResult &) {});
 }
 

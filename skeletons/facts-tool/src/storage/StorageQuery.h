@@ -6,6 +6,7 @@
 #include <itlib/generator.hpp>
 
 #include <expected>
+#include <functional>
 #include <optional>
 #include <system_error>
 #include <type_traits>
@@ -13,6 +14,28 @@
 #include <vector>
 
 namespace facts::storage::detail {
+
+class ParameterBinder {
+public:
+  explicit ParameterBinder(sqlite3_stmt *statement) : statement_(statement) {}
+
+  template <typename... Values>
+  bool operator()(Values &&...values) const {
+    return storage::bindParameters(statement_, std::forward<Values>(values)...);
+  }
+
+private:
+  sqlite3_stmt *statement_;
+};
+
+template <typename Bind>
+auto typedBinder(Bind bind) {
+  return
+      [bind = std::move(bind)](sqlite3_stmt *statement, auto &&value) mutable {
+        return std::invoke(bind, ParameterBinder{statement},
+                           std::forward<decltype(value)>(value));
+      };
+}
 
 template <typename Value>
 auto collectGenerator(itlib::generator<Value> values)

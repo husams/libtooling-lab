@@ -35,10 +35,10 @@ Storage::replaceDefinition(SymbolId id, FileId file,
           "ON CONFLICT(symbol_id) DO UPDATE SET file_id=excluded.file_id,"
           "offset=excluded.offset,size=excluded.size",
           rows,
-          [id, file](sqlite3_stmt *statement, const Region &region) {
-            return storage::bindParameters(statement, id, file, region.offset,
-                                           region.size);
-          })
+          storage::detail::typedBinder(
+              [id, file](auto bind, const Region &region) {
+                return bind(id, file, region.offset, region.size);
+              }))
       .transform([](const storage::BulkResult &) {});
 }
 

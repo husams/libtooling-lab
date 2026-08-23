@@ -49,9 +49,8 @@ Storage::replaceParameters(SymbolId id, std::span<const Parameter> parameters) {
   const std::array trimRows{parameters.size()};
   auto trimmed = database_.executeBulk(
       "DELETE FROM parameter WHERE symbol_id=?1 AND position>=?2", trimRows,
-      [id](sqlite3_stmt *statement, std::size_t size) {
-        return storage::bindParameters(statement, id, size);
-      });
+      storage::detail::typedBinder(
+          [id](auto bind, std::size_t size) { return bind(id, size); }));
   if (!trimmed) {
     return std::unexpected(trimmed.error());
   }
@@ -74,17 +73,18 @@ Storage::replaceParameters(SymbolId id, std::span<const Parameter> parameters) {
   auto positions = std::views::iota(std::size_t{0}, parameters.size());
   auto saved = database_.executeBulk(
       sql, positions,
-      [id, parameters](sqlite3_stmt *statement, std::size_t position) {
+      storage::detail::typedBinder([id, parameters](auto bind,
+                                                    std::size_t position) {
         const auto &parameter = parameters[position];
         const auto properties = storage::parameterProperties(parameter.flags);
-        return storage::bindParameters(
-            statement, id, position, parameter.name, parameter.type,
-            parameter.loc.line, parameter.loc.column, parameter.loc.offset,
-            parameter.region.offset, parameter.region.size,
-            properties.isPointer, properties.isLValueReference,
-            properties.isRValueReference, properties.isForwardingReference,
-            properties.isConst, properties.isPack, parameter.hasDefault);
-      });
+        return bind(id, position, parameter.name, parameter.type,
+                    parameter.loc.line, parameter.loc.column,
+                    parameter.loc.offset, parameter.region.offset,
+                    parameter.region.size, properties.isPointer,
+                    properties.isLValueReference, properties.isRValueReference,
+                    properties.isForwardingReference, properties.isConst,
+                    properties.isPack, parameter.hasDefault);
+      }));
   if (!saved) {
     return std::unexpected(saved.error());
   }
@@ -99,12 +99,12 @@ Storage::replaceParameters(SymbolId id, std::span<const Parameter> parameters) {
       "expression=excluded.expression,evaluated_kind=excluded.evaluated_kind,"
       "evaluated_value=excluded.evaluated_value",
       defaultPositions,
-      [id, parameters](sqlite3_stmt *statement, std::size_t position) {
+      storage::detail::typedBinder([id, parameters](auto bind,
+                                                    std::size_t position) {
         const auto value =
             storage::initializerColumns(*parameters[position].defaultValue);
-        return storage::bindParameters(
-            statement, id, position, value.expression, value.kind, value.value);
-      });
+        return bind(id, position, value.expression, value.kind, value.value);
+      }));
   if (!defaults) {
     return std::unexpected(defaults.error());
   }
