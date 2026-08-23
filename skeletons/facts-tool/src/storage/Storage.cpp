@@ -2,8 +2,6 @@
 
 #include "storage/Schema.h"
 #include "storage/SchemaMigration.h"
-#include "storage/Sqlite.h"
-
 #include <sqlite3.h>
 
 #include <stdexcept>
@@ -11,54 +9,42 @@
 
 namespace facts {
 
-struct Storage::Connection {
-  explicit Connection(const std::string &path) {
-    constexpr int flags =
-        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX;
-    if (sqlite3_open_v2(path.c_str(), &database, flags, nullptr) != SQLITE_OK) {
-      const std::string message =
-          database ? sqlite3_errmsg(database) : "cannot allocate SQLite handle";
-      close();
-      throw std::runtime_error(message);
-    }
-    sqlite3_busy_timeout(database, 10000);
+namespace {
 
-    auto initialized =
-        storage::execute(database, "PRAGMA foreign_keys=OFF;")
-            .and_then([this] { return storage::Transaction::write(database); })
-            .and_then([this](storage::Transaction transaction) {
-              return storage::migrateSchema(database)
-                  .and_then(
-                      [this] { return storage::execute(database, schemaSql); })
-                  .and_then([&transaction] { return transaction.commit(); });
-            })
-            .and_then([this] {
-              return storage::execute(database, "PRAGMA foreign_keys=ON;");
-            });
-    if (!initialized) {
-      const std::string message = sqlite3_errmsg(database);
-      close();
-      throw std::runtime_error(message);
-    }
+storage::Database openDatabase(const std::string &path) {
+  constexpr int flags = storage::Database::readWrite | SQLITE_OPEN_FULLMUTEX;
+  auto opened = storage::Database::open(path, flags);
+  if (!opened) {
+    throw std::runtime_error("cannot open SQLite database: " +
+                             opened.error().message());
   }
 
-  ~Connection() { close(); }
-
-  void close() {
-    if (database) {
-      sqlite3_close(database);
-      database = nullptr;
-    }
+  auto database = std::move(*opened);
+  auto initialized =
+      database.executeScript("PRAGMA foreign_keys=OFF;")
+          .and_then([&] { return database.write(); })
+          .and_then([&](storage::Transaction transaction) {
+            return storage::migrateSchema(database.nativeHandle())
+                .and_then([&] { return database.executeScript(schemaSql); })
+                .and_then([&] { return transaction.commit(); });
+          })
+          .and_then([&] {
+            return database.executeScript("PRAGMA foreign_keys=ON;");
+          });
+  if (!initialized) {
+    throw std::runtime_error(
+        "cannot initialize SQLite database: " +
+        std::string{sqlite3_errmsg(database.nativeHandle())});
   }
+  return database;
+}
 
-  sqlite3 *database = nullptr;
-};
+} // namespace
 
-Storage::Storage(std::string path)
-    : connection_(std::make_unique<Connection>(std::move(path))) {}
+Storage::Storage(std::string path) : database_(openDatabase(path)) {}
 
 Storage::~Storage() = default;
 
-sqlite3 *Storage::handle() const { return connection_->database; }
+sqlite3 *Storage::handle() const { return database_.nativeHandle(); }
 
 } // namespace facts

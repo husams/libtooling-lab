@@ -2,20 +2,23 @@
 #define FACTS_TOOL_STORAGE_INITIALIZER_H
 
 #include "model/Initializer.h"
+#include "storage/SqliteQuery.h"
 
 #include <optional>
-
-struct sqlite3_stmt;
+#include <string>
 
 namespace facts::storage {
 
-bool bindInitializer(sqlite3_stmt *statement, int expressionPosition,
-                     int kindPosition, int valuePosition,
-                     const Initializer &initializer);
+struct InitializerColumns {
+  std::string expression;
+  std::string kind;
+  std::optional<std::string> value;
+};
 
-std::optional<Initializer> loadInitializer(sqlite3_stmt *statement,
-                                           int expressionColumn, int kindColumn,
-                                           int valueColumn);
+InitializerColumns initializerColumns(const Initializer &initializer);
+
+std::optional<Initializer> loadInitializer(const Row &row, int expressionColumn,
+                                           int kindColumn, int valueColumn);
 
 } // namespace facts::storage
 

@@ -1,9 +1,10 @@
 #include "storage/Variable.h"
 
 #include "storage/Initializer.h"
-#include "storage/Sqlite.h"
+#include "storage/ItlibGenerator.h"
+#include "storage/StorageQuery.h"
 
-#include <sqlite3.h>
+#include <array>
 
 namespace facts {
 
@@ -13,43 +14,33 @@ std::expected<void, std::error_code> Storage::replaceVariableInitializer(
     return {};
   }
 
-  auto statement = storage::prepare(
-      handle(),
-      "INSERT INTO variable_initializer(symbol_id,expression,evaluated_kind,"
-      "evaluated_value) VALUES(?1,?2,?3,?4) "
-      "ON CONFLICT(symbol_id) DO UPDATE SET expression=excluded.expression,"
-      "evaluated_kind=excluded.evaluated_kind,"
-      "evaluated_value=excluded.evaluated_value");
-  if (!statement ||
-      !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
-      !storage::bindInitializer(statement->get(), 2, 3, 4, *initializer)) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-  if (sqlite3_step(statement->get()) != SQLITE_DONE) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-  return {};
+  const std::array rows{storage::initializerColumns(*initializer)};
+  return database_
+      .executeBulk(
+          "INSERT INTO variable_initializer(symbol_id,expression,"
+          "evaluated_kind,evaluated_value) VALUES(?1,?2,?3,?4) "
+          "ON CONFLICT(symbol_id) DO UPDATE SET "
+          "expression=excluded.expression,"
+          "evaluated_kind=excluded.evaluated_kind,"
+          "evaluated_value=excluded.evaluated_value",
+          rows,
+          storage::detail::typedBinder(
+              [id](auto bind, const storage::InitializerColumns &value) {
+                return bind(id, value.expression, value.kind, value.value);
+              }))
+      .transform([](const storage::BulkResult &) {});
 }
 
 std::expected<std::optional<Initializer>, std::error_code>
 Storage::loadVariableInitializer(SymbolId id) {
-  auto statement = storage::prepare(
-      handle(), "SELECT expression,evaluated_kind,evaluated_value "
-                "FROM variable_initializer WHERE symbol_id=?1");
-  if (!statement ||
-      !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id))) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-
-  const auto step = sqlite3_step(statement->get());
-  if (step == SQLITE_DONE) {
-    return std::nullopt;
-  }
-  if (step != SQLITE_ROW) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-
-  return storage::loadInitializer(statement->get(), 0, 1, 2);
+  auto initializers = storage::detail::toItlibGenerator(database_.query(
+      "SELECT expression,evaluated_kind,evaluated_value "
+      "FROM variable_initializer WHERE symbol_id=?1",
+      [](const storage::Row &row) {
+        return storage::loadInitializer(row, 0, 1, 2).value();
+      },
+      id));
+  return storage::detail::collectOptional(std::move(initializers));
 }
 
 template <>

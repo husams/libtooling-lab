@@ -278,11 +278,13 @@ public:
     return connection_ && connection_.get() != nullptr;
   }
 
+  sqlite3 *nativeHandle() const noexcept { return connection_.get(); }
+
 private:
   explicit Database(detail::Connection connection)
       : connection_(std::move(connection)) {}
 
-  sqlite3 *handle() const noexcept { return connection_.get(); }
+  sqlite3 *handle() const noexcept { return nativeHandle(); }
 
   detail::Connection connection_;
 };

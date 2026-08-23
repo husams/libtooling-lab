@@ -18,6 +18,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(CLI11)
 
+FetchContent_Declare(
+  itlib
+  GIT_REPOSITORY https://github.com/iboB/itlib.git
+  # itlib v1.12.2
+  GIT_TAG 8ed6d2efb56911ea499e7cf97335722248491639
+)
+FetchContent_MakeAvailable(itlib)
+
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
@@ -82,7 +90,10 @@ add_library(facts-storage STATIC
   src/storage/Symbol.cpp
   src/storage/Variable.cpp
 )
-target_include_directories(facts-storage PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(facts-storage
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
+  PRIVATE ${itlib_SOURCE_DIR}/include
+)
 target_link_libraries(facts-storage
   PUBLIC facts-model
   PRIVATE facts-clang SQLite3::SQLite3
@@ -232,6 +243,16 @@ if(BUILD_TESTING)
     COMMAND storage-schema-test
             ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-fresh.sqlite
             ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-legacy.sqlite
+  )
+  add_executable(file-database-persistence-test
+                 tests/FileDatabasePersistenceTest.cpp)
+  target_link_libraries(file-database-persistence-test
+                        PRIVATE facts-storage facts-model SQLite3::SQLite3)
+  add_test(
+    NAME file-database-persistence
+    COMMAND file-database-persistence-test
+            ${CMAKE_CURRENT_BINARY_DIR}/storage-connection.sqlite
+            ${CMAKE_CURRENT_BINARY_DIR}/file-database-persistence.sqlite
   )
   add_executable(sqlite-query-test tests/SqliteQueryTest.cpp)
   target_link_libraries(sqlite-query-test PRIVATE facts-storage

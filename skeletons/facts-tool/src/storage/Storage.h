@@ -5,11 +5,11 @@
 #include "model/Relation.h"
 #include "model/TemplateArgument.h"
 #include "model/TemplateParameter.h"
+#include "storage/SqliteDatabase.h"
 
 #include <concepts>
 #include <cstdint>
 #include <expected>
-#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -92,8 +92,6 @@ private:
     Region region;
   };
 
-  struct Connection;
-
   sqlite3 *handle() const;
 
   std::expected<SymbolId, std::error_code>
@@ -169,7 +167,7 @@ private:
     return model;
   }
 
-  std::unique_ptr<Connection> connection_;
+  storage::Database database_;
 };
 
 } // namespace facts

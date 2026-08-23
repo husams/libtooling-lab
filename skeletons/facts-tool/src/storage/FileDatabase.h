@@ -2,11 +2,11 @@
 #define FACTS_TOOL_STORAGE_FILE_DATABASE_H
 
 #include "storage/ProjectConfiguration.h"
+#include "storage/SqliteDatabase.h"
 
 #include "model/SymbolId.h"
 
 #include <expected>
-#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -35,8 +35,7 @@ public:
   std::expected<FileId, std::error_code> getId(std::string_view identity);
 
 private:
-  struct Connection;
-  std::unique_ptr<Connection> connection_;
+  storage::Database database_;
 };
 
 } // namespace facts

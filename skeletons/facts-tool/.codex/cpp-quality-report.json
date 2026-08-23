@@ -1,9 +1,9 @@
 {
   "dry_run": false,
-  "finished_at": "2026-08-15T18:45:36+00:00",
+  "finished_at": "2026-08-23T12:55:34+00:00",
   "passed": true,
-  "plan": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool/.codex/cpp-quality-plan.json",
-  "project_root": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
+  "plan": "/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/.codex/cpp-quality-plan.json",
+  "project_root": "/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool",
   "results": [
     {
       "argv": [
@@ -11,86 +11,96 @@
         "-S",
         ".",
         "-B",
-        "/tmp/facts-tool-enum-test-build",
+        "build",
         "-DBUILD_TESTING=ON",
-        "-DLLVM_DIR=/opt/homebrew/opt/llvm/lib/cmake/llvm",
-        "-DPython3_EXECUTABLE=/tmp/facts-tool-enum-test-venv/bin/python"
+        "-DLLVM_DIR=/opt/homebrew/opt/llvm/lib/cmake/llvm"
       ],
-      "cwd": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 0.301,
+      "cwd": "/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.662,
       "kind": "configure",
-      "name": "configure-enum-tests",
+      "name": "configure",
       "required": true,
       "returncode": 0,
       "status": "passed",
       "stderr": "",
-      "stdout": "-- Building against LLVM 22.1.8 at /opt/homebrew/opt/llvm/lib/cmake/llvm\n-- Configuring done (0.3s)\n-- Generating done (0.0s)\n-- Build files have been written to: /tmp/facts-tool-enum-test-build\n"
+      "stdout": "-- Building against LLVM 22.1.8 at /opt/homebrew/opt/llvm/lib/cmake/llvm\n-- Configuring done (0.6s)\n-- Generating done (0.0s)\n-- Build files have been written to: /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build\n"
     },
     {
       "argv": [
         "cmake",
         "--build",
-        "/tmp/facts-tool-enum-test-build",
-        "--parallel"
+        "build",
+        "--parallel",
+        "4"
       ],
-      "cwd": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 0.011,
+      "cwd": "/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.34,
       "kind": "build",
-      "name": "build-enum-tests",
+      "name": "build",
       "required": true,
       "returncode": 0,
       "status": "passed",
       "stderr": "",
-      "stdout": "ninja: no work to do.\n"
+      "stdout": "[1/9] Linking CXX executable fact-store-test\n[2/9] Linking CXX executable facts-tool\n[3/9] Linking CXX executable sqlite-generator-demo\n[4/9] Linking CXX executable file-manager-test\n[5/9] Linking CXX executable stored-compilation-database-test\n[6/9] Linking CXX executable sqlite-query-test\n[7/9] Linking CXX executable compilation-files-test\n[8/9] Linking CXX executable project-configuration-test\n[9/9] Linking CXX executable sqlite-command-test\n"
     },
     {
       "argv": [
         "ctest",
         "--test-dir",
-        "/tmp/facts-tool-enum-test-build",
-        "--output-on-failure"
+        "build",
+        "--output-on-failure",
+        "-R",
+        "^(storage-schema|file-database-persistence)$"
       ],
-      "cwd": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 7.869,
+      "cwd": "/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.115,
       "kind": "test",
-      "name": "run-all-tests",
+      "name": "focused-tests",
       "required": true,
       "returncode": 0,
       "status": "passed",
       "stderr": "",
-      "stdout": "Test project /tmp/facts-tool-enum-test-build\n    Start 1: fact-store\n1/6 Test #1: fact-store .......................   Passed    0.29 sec\n    Start 2: file-manager\n2/6 Test #2: file-manager .....................   Passed    0.03 sec\n    Start 3: compilation-files\n3/6 Test #3: compilation-files ................   Passed    0.02 sec\n    Start 4: storage-schema\n4/6 Test #4: storage-schema ...................   Passed    0.04 sec\n    Start 5: multi-tu-file-registry\n5/6 Test #5: multi-tu-file-registry ...........   Passed    0.07 sec\n    Start 6: facts-tool-e2e\n6/6 Test #6: facts-tool-e2e ...................   Passed    7.42 sec\n\n100% tests passed out of 6\n\nTotal Test time (real) =   7.86 sec\n"
+      "stdout": "Test project /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build\n    Start 6: storage-schema\n1/2 Test #6: storage-schema ...................   Passed    0.04 sec\n    Start 7: file-database-persistence\n2/2 Test #7: file-database-persistence ........   Passed    0.07 sec\n\n100% tests passed out of 2\n\nTotal Test time (real) =   0.11 sec\n"
+    },
+    {
+      "argv": [
+        "ctest",
+        "--test-dir",
+        "build",
+        "--output-on-failure"
+      ],
+      "cwd": "/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 12.324,
+      "kind": "test",
+      "name": "all-tests",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "",
+      "stdout": "Test project /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build\n      Start  1: fact-store\n 1/15 Test  #1: fact-store .......................   Passed    0.56 sec\n      Start  2: file-manager\n 2/15 Test  #2: file-manager .....................   Passed    0.23 sec\n      Start  3: compilation-files\n 3/15 Test  #3: compilation-files ................   Passed    0.28 sec\n      Start  4: stored-compilation-database\n 4/15 Test  #4: stored-compilation-database ......   Passed    0.26 sec\n      Start  5: project-configuration\n 5/15 Test  #5: project-configuration ............   Passed    0.26 sec\n      Start  6: storage-schema\n 6/15 Test  #6: storage-schema ...................   Passed    0.05 sec\n      Start  7: file-database-persistence\n 7/15 Test  #7: file-database-persistence ........   Passed    0.07 sec\n      Start  8: sqlite-query\n 8/15 Test  #8: sqlite-query .....................   Passed    0.27 sec\n      Start  9: sqlite-command\n 9/15 Test  #9: sqlite-command ...................   Passed    0.25 sec\n      Start 10: sqlite-generator-demo\n10/15 Test #10: sqlite-generator-demo ............   Passed    0.25 sec\n      Start 11: multi-tu-project-import\n11/15 Test #11: multi-tu-project-import ..........   Passed    0.27 sec\n      Start 12: multi-tu-file-registry\n12/15 Test #12: multi-tu-file-registry ...........   Passed    0.04 sec\n      Start 13: multi-tu-project-cleanup\n13/15 Test #13: multi-tu-project-cleanup .........   Passed    0.01 sec\n      Start 14: facts-tool-cli-contract\n14/15 Test #14: facts-tool-cli-contract ..........   Passed    0.22 sec\n      Start 15: facts-tool-e2e\n15/15 Test #15: facts-tool-e2e ...................   Passed    9.28 sec\n\n100% tests passed out of 15\n\nTotal Test time (real) =  12.32 sec\n"
     },
     {
       "argv": [
         "/opt/homebrew/opt/llvm/bin/clang-format",
         "--dry-run",
         "--Werror",
-        "src/ast/extractors/Definition.cpp",
-        "src/ast/extractors/Definition.h",
-        "src/ast/extractors/EnumConstantDecl.cpp",
-        "src/ast/extractors/EnumConstantDecl.h",
-        "src/ast/extractors/EnumDecl.cpp",
-        "src/ast/extractors/EnumDecl.h",
-        "src/ast/visitors/SymbolCollector.cpp",
-        "src/ast/visitors/SymbolVisitor.cpp",
-        "src/ast/visitors/SymbolVisitor.h",
-        "src/model/AnySymbol.h",
-        "src/model/Enumeration.h",
-        "src/model/Enumerator.h",
+        "src/storage/StorageQuery.h",
+        "src/storage/Definition.cpp",
         "src/storage/Enumeration.cpp",
         "src/storage/Enumerator.cpp",
-        "src/storage/Enumerator.h",
         "src/storage/Parameter.cpp",
-        "src/storage/Schema.h",
-        "src/storage/SchemaMigration.cpp",
-        "src/storage/Sqlite.cpp",
-        "src/storage/Sqlite.h",
-        "src/storage/Storage.h",
+        "src/storage/RecordInstance.cpp",
+        "src/storage/RecordTemplate.cpp",
+        "src/storage/Relation.cpp",
+        "src/storage/Variable.cpp",
+        "src/storage/Symbol.cpp",
+        "src/storage/Storage.cpp",
+        "src/storage/FileDatabase.cpp",
         "tests/StorageSchemaTest.cpp",
-        "tests/fixtures/e2e/shared.hpp"
+        "tests/FileDatabasePersistenceTest.cpp"
       ],
-      "cwd": "/Users/husam/.codex/worktrees/60ad/libtooling-lab/skeletons/facts-tool",
-      "duration_seconds": 0.06,
+      "cwd": "/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.085,
       "kind": "format",
       "name": "format-check",
       "required": true,
@@ -98,13 +108,42 @@
       "status": "passed",
       "stderr": "",
       "stdout": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/clang-tidy",
+        "-p",
+        "build",
+        "src/storage/Definition.cpp",
+        "src/storage/Enumeration.cpp",
+        "src/storage/Enumerator.cpp",
+        "src/storage/Parameter.cpp",
+        "src/storage/RecordInstance.cpp",
+        "src/storage/RecordTemplate.cpp",
+        "src/storage/Relation.cpp",
+        "src/storage/Variable.cpp",
+        "src/storage/Symbol.cpp",
+        "src/storage/Storage.cpp",
+        "src/storage/FileDatabase.cpp",
+        "tests/StorageSchemaTest.cpp",
+        "tests/FileDatabasePersistenceTest.cpp"
+      ],
+      "cwd": "/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 5.31,
+      "kind": "static-analysis",
+      "name": "static-analysis",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "[1/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Definition.cpp.\n47 warnings generated.\n[2/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Enumeration.cpp.\n94 warnings generated.\n[3/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Enumerator.cpp.\n141 warnings generated.\n[4/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Parameter.cpp.\n188 warnings generated.\n[5/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/RecordInstance.cpp.\n235 warnings generated.\n[6/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/RecordTemplate.cpp.\n282 warnings generated.\n[7/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Relation.cpp.\n329 warnings generated.\n[8/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Variable.cpp.\n376 warnings generated.\n[9/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Symbol.cpp.\n423 warnings generated.\n[10/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Storage.cpp.\n442 warnings generated.\n[11/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/FileDatabase.cpp.\n489 warnings generated.\n[12/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/tests/StorageSchemaTest.cpp.\n508 warnings generated.\n[13/13] Processing file /Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/tests/FileDatabasePersistenceTest.cpp.\n527 warnings generated.\n",
+      "stdout": "/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:100:7: warning: invalid case style for class 'generator_value' [readability-identifier-naming]\n  100 | class generator_value : public std::optional<T> {};\n      |       ^~~~~~~~~~~~~~~\n      |       GeneratorValue\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:104:8: warning: invalid case style for private member 'm_val' [readability-identifier-naming]\n  104 |     T* m_val = nullptr;\n      |        ^~~~~\n      |        mVal_\n  105 | public:\n  106 |     void emplace(T& v) noexcept { m_val = &v; }\n      |                                   ~~~~~\n      |                                   mVal_\n  107 |     void reset() noexcept { m_val = nullptr; }\n      |                             ~~~~~\n      |                             mVal_\n  108 |     T& operator*() noexcept { return *m_val; }\n      |                                       ~~~~~\n      |                                       mVal_\n  109 |     bool has_value() const noexcept { return m_val != nullptr; }\n      |                                              ~~~~~\n      |                                              mVal_\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:109:10: warning: invalid case style for method 'has_value' [readability-identifier-naming]\n  109 |     bool has_value() const noexcept { return m_val != nullptr; }\n      |          ^~~~~~~~~\n      |          hasValue\n  110 |     explicit operator bool() const noexcept { return has_value(); }\n      |                                                      ~~~~~~~~~\n      |                                                      hasValue\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:115:8: warning: invalid case style for struct 'ret_promise_helper' [readability-identifier-naming]\n  115 | struct ret_promise_helper {\n      |        ^~~~~~~~~~~~~~~~~~\n      |        RetPromiseHelper\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:116:24: warning: invalid case style for public member 'm_ret' [readability-identifier-naming]\n  116 |     generator_value<R> m_ret;\n      |                        ^~~~~\n      |                        mRet\n  117 | \n  118 |     void return_value(R value) noexcept {\n  119 |         if constexpr (std::is_reference_v<R>) {\n  120 |             m_ret.emplace(value);\n      |             ~~~~~\n      |             mRet\n  121 |         }\n  122 |         else {\n  123 |             m_ret.emplace(std::move(value));\n      |             ~~~~~\n      |             mRet\n  124 |         }\n  125 |     }\n  126 | \n  127 |     R& rval() noexcept { return *m_ret; }\n      |                                  ~~~~~\n      |                                  mRet\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:118:10: warning: invalid case style for method 'return_value' [readability-identifier-naming]\n  118 |     void return_value(R value) noexcept {\n      |          ^~~~~~~~~~~~\n      |          returnValue\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:131:10: warning: invalid case style for method 'return_void' [readability-identifier-naming]\n  131 |     void return_void() noexcept {}\n      |          ^~~~~~~~~~~\n      |          returnVoid\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:138:23: warning: invalid case style for global variable 'noexcept_generator' [readability-identifier-naming]\n  138 | inline constexpr bool noexcept_generator = true;\n      |                       ^~~~~~~~~~~~~~~~~~\n      |                       noexceptGenerator\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:141:7: warning: invalid case style for class 'generator' [readability-identifier-naming]\n  141 | class generator {\n      |       ^~~~~~~~~\n      |       Generator\n  142 | public:\n  143 |     // return ref in case we're generating values, otherwise keep the ref type\n  144 |     using value_ret_t = std::conditional_t<std::is_reference_v<T>, T, T&>;\n  145 | \n  146 |     struct promise_type : public gen_impl::ret_promise_helper<R> {\n  147 |         generator_value<T> m_yval;\n  148 |         std::exception_ptr m_exception;\n  149 | \n  150 |         promise_type() noexcept = default;\n  151 | \n  152 |         ~promise_type() noexcept = default;\n  153 |         generator get_return_object() noexcept {\n      |         ~~~~~~~~~\n      |         Generator\n  154 |             return generator{std::coroutine_handle<promise_type>::from_promise(*this)};\n      |                    ~~~~~~~~~\n      |                    Generator\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:144:11: warning: invalid case style for type alias 'value_ret_t' [readability-identifier-naming]\n  144 |     using value_ret_t = std::conditional_t<std::is_reference_v<T>, T, T&>;\n      |           ^~~~~~~~~~~\n      |           ValueRetT\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/build/_deps/itlib-src/include/itlib/generator.hpp:146:12: warning: invalid case style for struct 'promise_type' [readability-identifier-naming]\n  146 |     struct promise_type : public gen_impl::ret_promise_helper<R> {\n      |            ^~~~~~~~~~~~\n      |            PromiseType\n  147 |         generator_value<T> m_yval;\n  148 |         std::exception_ptr m_exception;\n  149 | \n  150 |         promise_type() noexcept = default;\n      |  \n... 12678 characters omitted ...\n            ^~~~~~~~~~~~~~~\n      |                         initialSuspend\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:34:25: warning: invalid case style for method 'final_suspend' [readability-identifier-naming]\n   34 |     std::suspend_always final_suspend() const noexcept { return {}; }\n      |                         ^~~~~~~~~~~~~\n      |                         finalSuspend\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:36:25: warning: invalid case style for method 'yield_value' [readability-identifier-naming]\n   36 |     std::suspend_always yield_value(T &yielded) noexcept {\n      |                         ^~~~~~~~~~~\n      |                         yieldValue\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:41:25: warning: invalid case style for method 'yield_value' [readability-identifier-naming]\n   41 |     std::suspend_always yield_value(T &&yielded) noexcept {\n      |                         ^~~~~~~~~~~\n      |                         yieldValue\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:46:10: warning: invalid case style for method 'return_void' [readability-identifier-naming]\n   46 |     void return_void() const noexcept {}\n      |          ^~~~~~~~~~~\n      |          returnVoid\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:48:10: warning: invalid case style for method 'unhandled_exception' [readability-identifier-naming]\n   48 |     void unhandled_exception() { error = std::current_exception(); }\n      |          ^~~~~~~~~~~~~~~~~~~\n      |          unhandledException\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:51:9: warning: invalid case style for class 'iterator' [readability-identifier-naming]\n   51 |   class iterator {\n      |         ^~~~~~~~\n      |         Iterator\n   52 |   public:\n   53 |     using iterator_concept = std::input_iterator_tag;\n   54 |     using iterator_category = std::input_iterator_tag;\n   55 |     using value_type = T;\n   56 |     using difference_type = std::ptrdiff_t;\n   57 | \n   58 |     iterator() = default;\n      |     ~~~~~~~~\n      |     Iterator\n   59 | \n   60 |     explicit iterator(std::coroutine_handle<promise_type> handle)\n      |              ~~~~~~~~\n      |              Iterator\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:53:11: warning: invalid case style for type alias 'iterator_concept' [readability-identifier-naming]\n   53 |     using iterator_concept = std::input_iterator_tag;\n      |           ^~~~~~~~~~~~~~~~\n      |           IteratorConcept\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:54:11: warning: invalid case style for type alias 'iterator_category' [readability-identifier-naming]\n   54 |     using iterator_category = std::input_iterator_tag;\n      |           ^~~~~~~~~~~~~~~~~\n      |           IteratorCategory\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:55:11: warning: invalid case style for type alias 'value_type' [readability-identifier-naming]\n   55 |     using value_type = T;\n      |           ^~~~~~~~~~\n      |           ValueType\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Generator.h:56:11: warning: invalid case style for type alias 'difference_type' [readability-identifier-naming]\n   56 |     using difference_type = std::ptrdiff_t;\n      |           ^~~~~~~~~~~~~~~\n      |           DifferenceType\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Sqlite.h:35:30: warning: invalid case style for enum constant 'deferred' [readability-identifier-naming]\n   35 | enum class TransactionMode { deferred, immediate, exclusive };\n      |                              ^~~~~~~~\n      |                              Deferred\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Sqlite.h:35:40: warning: invalid case style for enum constant 'immediate' [readability-identifier-naming]\n   35 | enum class TransactionMode { deferred, immediate, exclusive };\n      |                                        ^~~~~~~~~\n      |                                        Immediate\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Sqlite.h:35:51: warning: invalid case style for enum constant 'exclusive' [readability-identifier-naming]\n   35 | enum class TransactionMode { deferred, immediate, exclusive };\n      |                                                   ^~~~~~~~~\n      |                                                   Exclusive\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Sqlite.h:36:31: warning: invalid case style for enum constant 'active' [readability-identifier-naming]\n   36 | enum class TransactionState { active, committed, rolledBack };\n      |                               ^~~~~~\n      |                               Active\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Sqlite.h:36:39: warning: invalid case style for enum constant 'committed' [readability-identifier-naming]\n   36 | enum class TransactionState { active, committed, rolledBack };\n      |                                       ^~~~~~~~~\n      |                                       Committed\n/Users/husam/.codex/worktrees/fc64/libtooling-lab/skeletons/facts-tool/src/storage/Sqlite.h:36:50: warning: invalid case style for enum constant 'rolledBack' [readability-identifier-naming]\n   36 | enum class TransactionState { active, committed, rolledBack };\n      |                                                  ^~~~~~~~~~\n      |                                                  RolledBack\n"
     }
   ],
-  "started_at": "2026-08-15T18:45:28+00:00",
+  "started_at": "2026-08-23T12:55:15+00:00",
   "summary": {
     "failed": 0,
     "not_found": 0,
-    "passed": 4,
+    "passed": 6,
     "planned": 0,
     "timeout": 0
   }

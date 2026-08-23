@@ -1,10 +1,10 @@
 #include "storage/Symbol.h"
 
+#include "storage/ItlibGenerator.h"
 #include "storage/SemanticProperties.h"
-#include "storage/Sqlite.h"
+#include "storage/StorageQuery.h"
 
-#include <sqlite3.h>
-
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -13,181 +13,146 @@
 namespace facts {
 namespace {
 
-std::expected<SymbolId, std::error_code> allocateSymbolId(sqlite3 *database,
-                                                          FileId file) {
-  auto statement = storage::prepare(
-      database, "INSERT INTO symbol_allocator(file_id,next_index) VALUES(?1,1) "
-                "ON CONFLICT(file_id) DO UPDATE SET next_index=next_index+1 "
-                "RETURNING next_index-1");
-  if (!statement || !storage::bindInteger(statement->get(), 1, file) ||
-      sqlite3_step(statement->get()) != SQLITE_ROW) {
-    return std::unexpected(storage::sqliteError(database));
-  }
-
-  const auto raw = sqlite3_column_int64(statement->get(), 0);
-  if (raw < 0 || raw > std::numeric_limits<std::uint32_t>::max()) {
-    return std::unexpected(std::make_error_code(std::errc::value_too_large));
-  }
-  return SymbolId{file, static_cast<std::uint32_t>(raw)};
+std::expected<SymbolId, std::error_code>
+allocateSymbolId(storage::Database &database, FileId file) {
+  auto ids = storage::detail::toItlibGenerator(database.query(
+      "INSERT INTO symbol_allocator(file_id,next_index) VALUES(?1,1) "
+      "ON CONFLICT(file_id) DO UPDATE SET next_index=next_index+1 "
+      "RETURNING next_index-1",
+      [](const storage::Row &row) { return row.get<std::int64_t>(0); }, file));
+  return storage::detail::collectOne(std::move(ids))
+      .and_then(
+          [file](std::int64_t raw) -> std::expected<SymbolId, std::error_code> {
+            if (raw < 0 || raw > std::numeric_limits<std::uint32_t>::max()) {
+              return std::unexpected(
+                  std::make_error_code(std::errc::value_too_large));
+            }
+            return SymbolId{file, static_cast<std::uint32_t>(raw)};
+          });
 }
 
 } // namespace
 
 std::expected<void, std::error_code>
 Storage::replaceSymbolRow(SymbolId id, SymbolNode node, const Symbol &symbol) {
-  const auto properties = storage::symbolProperties(symbol.flags);
-  auto statement = storage::prepare(
-      handle(),
-      "INSERT INTO symbol(id,node,kind,sub_kind,"
-      "lang,properties,usr,qualified_name,line,col,offset,access,is_definition,"
-      "is_implicit,is_static,is_virtual,is_const,is_inline,is_pure,"
-      "ref_qualifier,is_override,has_internal_linkage,is_external,is_variadic,"
-      "is_deleted,is_defaulted,is_explicit,is_final,is_abstract,is_polymorphic,"
-      "has_extern_storage,constant_evaluation,is_noexcept) "
-      "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,"
-      "?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,"
-      "?33) "
-      "ON CONFLICT(id) DO UPDATE SET node=excluded.node,"
-      "kind=excluded.kind,sub_kind=excluded.sub_kind,lang=excluded.lang,"
-      "properties=excluded.properties,usr=excluded.usr,"
-      "qualified_name=excluded.qualified_name,"
-      "access=CASE WHEN excluded.access<>'none' THEN excluded.access ELSE "
-      "access END,"
-      "is_definition=MAX(is_definition,excluded.is_definition),"
-      "is_implicit=MAX(is_implicit,excluded.is_implicit),"
-      "is_static=MAX(is_static,excluded.is_static),"
-      "is_virtual=MAX(is_virtual,excluded.is_virtual),"
-      "is_const=MAX(is_const,excluded.is_const),"
-      "is_inline=MAX(is_inline,excluded.is_inline),"
-      "is_pure=MAX(is_pure,excluded.is_pure),"
-      "ref_qualifier=CASE WHEN excluded.ref_qualifier<>'none' "
-      "THEN excluded.ref_qualifier ELSE ref_qualifier END,"
-      "is_override=MAX(is_override,excluded.is_override),"
-      "has_internal_linkage=MAX(has_internal_linkage,excluded.has_internal_"
-      "linkage),"
-      "is_external=MIN(is_external,excluded.is_external),"
-      "is_variadic=MAX(is_variadic,excluded.is_variadic),"
-      "is_deleted=MAX(is_deleted,excluded.is_deleted),"
-      "is_defaulted=MAX(is_defaulted,excluded.is_defaulted),"
-      "is_explicit=MAX(is_explicit,excluded.is_explicit),"
-      "is_final=MAX(is_final,excluded.is_final),"
-      "is_abstract=MAX(is_abstract,excluded.is_abstract),"
-      "is_polymorphic=MAX(is_polymorphic,excluded.is_polymorphic),"
-      "has_extern_storage=MAX(has_extern_storage,excluded.has_extern_storage),"
-      "constant_evaluation=CASE WHEN excluded.constant_evaluation<>'none' "
-      "THEN excluded.constant_evaluation ELSE constant_evaluation END,"
-      "is_noexcept=MAX(is_noexcept,excluded.is_noexcept)");
-  if (!statement ||
-      !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
-      !storage::bindInteger(statement->get(), 2, node) ||
-      !storage::bindInteger(statement->get(), 3,
-                            storage::storedSymbolKind(symbol.Kind)) ||
-      !storage::bindInteger(statement->get(), 4, symbol.SubKind) ||
-      !storage::bindInteger(statement->get(), 5, symbol.Lang) ||
-      !storage::bindInteger(statement->get(), 6, symbol.Properties) ||
-      !storage::bindText(statement->get(), 7, symbol.usr) ||
-      !storage::bindText(statement->get(), 8, symbol.qualifiedName) ||
-      !storage::bindInteger(statement->get(), 9, symbol.loc.line) ||
-      !storage::bindInteger(statement->get(), 10, symbol.loc.column) ||
-      !storage::bindInteger(statement->get(), 11, symbol.loc.offset) ||
-      !storage::bindText(statement->get(), 12, properties.access) ||
-      !storage::bindInteger(statement->get(), 13, properties.isDefinition) ||
-      !storage::bindInteger(statement->get(), 14, properties.isImplicit) ||
-      !storage::bindInteger(statement->get(), 15, properties.isStatic) ||
-      !storage::bindInteger(statement->get(), 16, properties.isVirtual) ||
-      !storage::bindInteger(statement->get(), 17, properties.isConst) ||
-      !storage::bindInteger(statement->get(), 18, properties.isInline) ||
-      !storage::bindInteger(statement->get(), 19, properties.isPure) ||
-      !storage::bindText(statement->get(), 20, properties.refQualifier) ||
-      !storage::bindInteger(statement->get(), 21, properties.isOverride) ||
-      !storage::bindInteger(statement->get(), 22,
-                            properties.hasInternalLinkage) ||
-      !storage::bindInteger(statement->get(), 23, properties.isExternal) ||
-      !storage::bindInteger(statement->get(), 24, properties.isVariadic) ||
-      !storage::bindInteger(statement->get(), 25, properties.isDeleted) ||
-      !storage::bindInteger(statement->get(), 26, properties.isDefaulted) ||
-      !storage::bindInteger(statement->get(), 27, properties.isExplicit) ||
-      !storage::bindInteger(statement->get(), 28, properties.isFinal) ||
-      !storage::bindInteger(statement->get(), 29, properties.isAbstract) ||
-      !storage::bindInteger(statement->get(), 30, properties.isPolymorphic) ||
-      !storage::bindInteger(statement->get(), 31,
-                            properties.hasExternStorage) ||
-      !storage::bindText(statement->get(), 32, properties.constantEvaluation) ||
-      !storage::bindInteger(statement->get(), 33, properties.isNoexcept) ||
-      sqlite3_step(statement->get()) != SQLITE_DONE) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-  return {};
+  const std::array rows{symbol};
+  return database_
+      .executeBulk(
+          "INSERT INTO symbol(id,node,kind,sub_kind,"
+          "lang,properties,usr,qualified_name,line,col,offset,access,is_"
+          "definition,"
+          "is_implicit,is_static,is_virtual,is_const,is_inline,is_pure,"
+          "ref_qualifier,is_override,has_internal_linkage,is_external,is_"
+          "variadic,"
+          "is_deleted,is_defaulted,is_explicit,is_final,is_abstract,is_"
+          "polymorphic,"
+          "has_extern_storage,constant_evaluation,is_noexcept) "
+          "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,"
+          "?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,"
+          "?33) "
+          "ON CONFLICT(id) DO UPDATE SET node=excluded.node,"
+          "kind=excluded.kind,sub_kind=excluded.sub_kind,lang=excluded.lang,"
+          "properties=excluded.properties,usr=excluded.usr,"
+          "qualified_name=excluded.qualified_name,"
+          "access=CASE WHEN excluded.access<>'none' THEN excluded.access ELSE "
+          "access END,"
+          "is_definition=MAX(is_definition,excluded.is_definition),"
+          "is_implicit=MAX(is_implicit,excluded.is_implicit),"
+          "is_static=MAX(is_static,excluded.is_static),"
+          "is_virtual=MAX(is_virtual,excluded.is_virtual),"
+          "is_const=MAX(is_const,excluded.is_const),"
+          "is_inline=MAX(is_inline,excluded.is_inline),"
+          "is_pure=MAX(is_pure,excluded.is_pure),"
+          "ref_qualifier=CASE WHEN excluded.ref_qualifier<>'none' "
+          "THEN excluded.ref_qualifier ELSE ref_qualifier END,"
+          "is_override=MAX(is_override,excluded.is_override),"
+          "has_internal_linkage=MAX(has_internal_linkage,excluded.has_internal_"
+          "linkage),"
+          "is_external=MIN(is_external,excluded.is_external),"
+          "is_variadic=MAX(is_variadic,excluded.is_variadic),"
+          "is_deleted=MAX(is_deleted,excluded.is_deleted),"
+          "is_defaulted=MAX(is_defaulted,excluded.is_defaulted),"
+          "is_explicit=MAX(is_explicit,excluded.is_explicit),"
+          "is_final=MAX(is_final,excluded.is_final),"
+          "is_abstract=MAX(is_abstract,excluded.is_abstract),"
+          "is_polymorphic=MAX(is_polymorphic,excluded.is_polymorphic),"
+          "has_extern_storage=MAX(has_extern_storage,excluded.has_extern_"
+          "storage),"
+          "constant_evaluation=CASE WHEN excluded.constant_evaluation<>'none' "
+          "THEN excluded.constant_evaluation ELSE constant_evaluation END,"
+          "is_noexcept=MAX(is_noexcept,excluded.is_noexcept)",
+          rows,
+          storage::detail::typedBinder([id, node](auto bind,
+                                                  const Symbol &value) {
+            const auto properties = storage::symbolProperties(value.flags);
+            return bind(id, node, storage::storedSymbolKind(value.Kind),
+                        value.SubKind, value.Lang, value.Properties, value.usr,
+                        value.qualifiedName, value.loc.line, value.loc.column,
+                        value.loc.offset, properties.access,
+                        properties.isDefinition, properties.isImplicit,
+                        properties.isStatic, properties.isVirtual,
+                        properties.isConst, properties.isInline,
+                        properties.isPure, properties.refQualifier,
+                        properties.isOverride, properties.hasInternalLinkage,
+                        properties.isExternal, properties.isVariadic,
+                        properties.isDeleted, properties.isDefaulted,
+                        properties.isExplicit, properties.isFinal,
+                        properties.isAbstract, properties.isPolymorphic,
+                        properties.hasExternStorage,
+                        properties.constantEvaluation, properties.isNoexcept);
+          }))
+      .transform([](const storage::BulkResult &) {});
 }
 
 std::expected<Symbol, std::error_code> Storage::loadSymbolRow(SymbolNode node,
                                                               SymbolId id) {
-  auto statement = storage::prepare(
-      handle(),
+  auto rows = storage::detail::toItlibGenerator(database_.query(
       "SELECT kind,sub_kind,lang,properties,usr,qualified_name,line,col,"
       "offset,access,is_definition,is_implicit,is_static,is_virtual,is_const,"
       "is_inline,is_pure,ref_qualifier,is_override,has_internal_linkage,"
       "is_external,is_variadic,is_deleted,is_defaulted,is_explicit,is_final,"
       "is_abstract,is_polymorphic,has_extern_storage,constant_evaluation,"
       "is_noexcept "
-      "FROM symbol WHERE id=?1 AND node=?2");
-  if (!statement ||
-      !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
-      !storage::bindInteger(statement->get(), 2, node)) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-
-  const auto step = sqlite3_step(statement->get());
-  if (step == SQLITE_DONE) {
-    return std::unexpected(
-        std::make_error_code(std::errc::no_such_file_or_directory));
-  }
-  if (step != SQLITE_ROW) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-
-  Symbol symbol;
-  symbol.id = id;
-  symbol.Kind =
-      storage::symbolKindFromStored(sqlite3_column_int64(statement->get(), 0));
-  symbol.SubKind = static_cast<decltype(symbol.SubKind)>(
-      sqlite3_column_int64(statement->get(), 1));
-  symbol.Lang = static_cast<decltype(symbol.Lang)>(
-      sqlite3_column_int64(statement->get(), 2));
-  symbol.Properties = static_cast<decltype(symbol.Properties)>(
-      sqlite3_column_int64(statement->get(), 3));
-  symbol.usr = storage::columnText(statement->get(), 4);
-  symbol.qualifiedName = storage::columnText(statement->get(), 5);
-  symbol.loc = {
-      static_cast<unsigned>(sqlite3_column_int64(statement->get(), 6)),
-      static_cast<unsigned>(sqlite3_column_int64(statement->get(), 7)),
-      static_cast<unsigned>(sqlite3_column_int64(statement->get(), 8)),
-  };
-  symbol.flags = storage::symbolFlags({
-      .access = storage::columnText(statement->get(), 9),
-      .isDefinition = sqlite3_column_int64(statement->get(), 10) != 0,
-      .isImplicit = sqlite3_column_int64(statement->get(), 11) != 0,
-      .isStatic = sqlite3_column_int64(statement->get(), 12) != 0,
-      .isVirtual = sqlite3_column_int64(statement->get(), 13) != 0,
-      .isConst = sqlite3_column_int64(statement->get(), 14) != 0,
-      .isInline = sqlite3_column_int64(statement->get(), 15) != 0,
-      .isPure = sqlite3_column_int64(statement->get(), 16) != 0,
-      .refQualifier = storage::columnText(statement->get(), 17),
-      .isOverride = sqlite3_column_int64(statement->get(), 18) != 0,
-      .hasInternalLinkage = sqlite3_column_int64(statement->get(), 19) != 0,
-      .isExternal = sqlite3_column_int64(statement->get(), 20) != 0,
-      .isVariadic = sqlite3_column_int64(statement->get(), 21) != 0,
-      .isDeleted = sqlite3_column_int64(statement->get(), 22) != 0,
-      .isDefaulted = sqlite3_column_int64(statement->get(), 23) != 0,
-      .isExplicit = sqlite3_column_int64(statement->get(), 24) != 0,
-      .isFinal = sqlite3_column_int64(statement->get(), 25) != 0,
-      .isAbstract = sqlite3_column_int64(statement->get(), 26) != 0,
-      .isPolymorphic = sqlite3_column_int64(statement->get(), 27) != 0,
-      .hasExternStorage = sqlite3_column_int64(statement->get(), 28) != 0,
-      .constantEvaluation = storage::columnText(statement->get(), 29),
-      .isNoexcept = sqlite3_column_int64(statement->get(), 30) != 0,
-  });
-  return symbol;
+      "FROM symbol WHERE id=?1 AND node=?2",
+      [id](const storage::Row &row) {
+        Symbol symbol;
+        symbol.id = id;
+        symbol.Kind = storage::symbolKindFromStored(row.get<std::int64_t>(0));
+        symbol.SubKind = row.get<decltype(symbol.SubKind)>(1);
+        symbol.Lang = row.get<decltype(symbol.Lang)>(2);
+        symbol.Properties = row.get<decltype(symbol.Properties)>(3);
+        symbol.usr = row.get<std::string>(4);
+        symbol.qualifiedName = row.get<std::string>(5);
+        symbol.loc = {row.get<unsigned>(6), row.get<unsigned>(7),
+                      row.get<unsigned>(8)};
+        symbol.flags = storage::symbolFlags({
+            .access = row.get<std::string>(9),
+            .isDefinition = row.get<bool>(10),
+            .isImplicit = row.get<bool>(11),
+            .isStatic = row.get<bool>(12),
+            .isVirtual = row.get<bool>(13),
+            .isConst = row.get<bool>(14),
+            .isInline = row.get<bool>(15),
+            .isPure = row.get<bool>(16),
+            .refQualifier = row.get<std::string>(17),
+            .isOverride = row.get<bool>(18),
+            .hasInternalLinkage = row.get<bool>(19),
+            .isExternal = row.get<bool>(20),
+            .isVariadic = row.get<bool>(21),
+            .isDeleted = row.get<bool>(22),
+            .isDefaulted = row.get<bool>(23),
+            .isExplicit = row.get<bool>(24),
+            .isFinal = row.get<bool>(25),
+            .isAbstract = row.get<bool>(26),
+            .isPolymorphic = row.get<bool>(27),
+            .hasExternStorage = row.get<bool>(28),
+            .constantEvaluation = row.get<std::string>(29),
+            .isNoexcept = row.get<bool>(30),
+        });
+        return symbol;
+      },
+      id, node));
+  return storage::detail::collectOne(std::move(rows));
 }
 
 std::expected<std::optional<SymbolId>, std::error_code>
@@ -196,21 +161,10 @@ Storage::findId(std::string_view usr) {
     return std::unexpected(std::make_error_code(std::errc::invalid_argument));
   }
 
-  auto statement =
-      storage::prepare(handle(), "SELECT id FROM symbol WHERE usr=?1");
-  if (!statement || !storage::bindText(statement->get(), 1, usr)) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-
-  const auto step = sqlite3_step(statement->get());
-  if (step == SQLITE_DONE) {
-    return std::nullopt;
-  }
-  if (step != SQLITE_ROW) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-  return storage::unpackSymbolId(
-      static_cast<std::uint64_t>(sqlite3_column_int64(statement->get(), 0)));
+  auto ids = storage::detail::toItlibGenerator(database_.query(
+      "SELECT id FROM symbol WHERE usr=?1",
+      [](const storage::Row &row) { return row.get<SymbolId>(0); }, usr));
+  return storage::detail::collectOptional(std::move(ids));
 }
 
 std::expected<Symbol, std::error_code> Storage::loadFacts(Symbol symbol,
@@ -248,7 +202,7 @@ Storage::saveSymbol(SymbolNode node, const Symbol &symbol, SymbolFacts facts) {
     return std::unexpected(std::make_error_code(std::errc::invalid_argument));
   }
 
-  auto transaction = storage::Transaction::write(handle());
+  auto transaction = database_.write();
   if (!transaction) {
     return std::unexpected(transaction.error());
   }
@@ -259,7 +213,7 @@ Storage::saveSymbol(SymbolNode node, const Symbol &symbol, SymbolFacts facts) {
                         -> std::expected<SymbolId, std::error_code> {
             return existing
                        ? std::expected<SymbolId, std::error_code>{*existing}
-                       : allocateSymbolId(handle(), symbol.id.file);
+                       : allocateSymbolId(database_, symbol.id.file);
           });
 
   return id
@@ -285,7 +239,7 @@ Storage::saveSymbol(SymbolNode node, const Symbol &symbol, SymbolFacts facts) {
 
 std::expected<Symbol, std::error_code>
 Storage::loadSymbol(SymbolNode node, SymbolId id, SymbolFacts facts) {
-  auto transaction = storage::Transaction::read(handle());
+  auto transaction = database_.read();
   if (!transaction) {
     return std::unexpected(transaction.error());
   }
@@ -308,7 +262,7 @@ Storage::loadSymbol(SymbolNode node, std::string_view usr, SymbolFacts facts) {
     return std::unexpected(std::make_error_code(std::errc::invalid_argument));
   }
 
-  auto transaction = storage::Transaction::read(handle());
+  auto transaction = database_.read();
   if (!transaction) {
     return std::unexpected(transaction.error());
   }
