@@ -1,5 +1,7 @@
 #include "commands/Extract.h"
 
+#include "commands/DatabasePaths.h"
+
 #include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
 #include "platform/PlatformFlags.h"
@@ -12,7 +14,6 @@
 
 #include <chrono>
 #include <cstdlib>
-#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -60,19 +61,6 @@ decltype(auto) timePhase(std::string_view phase, Operation &&operation) {
     reportTiming(phase, started);
     return result;
   }
-}
-
-std::expected<void, std::string>
-validateDatabasePaths(const cli::ExtractOptions &options) {
-  const auto output =
-      std::filesystem::absolute(options.output).lexically_normal();
-  const auto configuration =
-      std::filesystem::absolute(options.configuration).lexically_normal();
-  if (output == configuration) {
-    return std::unexpected(
-        "output and project configuration require separate databases");
-  }
-  return {};
 }
 
 std::expected<CompilationDatabasePtr, std::string>
@@ -152,7 +140,10 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
 
 std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
   return timePhase("validate database paths",
-                   [&] { return validateDatabasePaths(options); })
+                   [&] {
+                     return validateDatabasePaths(options.output,
+                                                  options.configuration);
+                   })
       .and_then([&] {
         return timePhase("load compilation database", [&] {
           return loadStoredCompilationDatabase(options.configuration);

@@ -2,6 +2,7 @@
 
 #include "ast/visitors/IncludeVisitor.h"
 #include "cli/Options.h"
+#include "commands/DatabasePaths.h"
 #include "model/Dependency.h"
 #include "platform/PlatformFlags.h"
 #include "storage/DependencyDatabase.h"
@@ -168,7 +169,7 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
                         });
                   })
                   .and_then([&](StoredGraph graph) {
-                    return replaceDependencies(options.configuration,
+                    return replaceDependencies(options.output,
                                                graph.visitedSources,
                                                graph.edges)
                         .transform_error([](std::error_code error) {
@@ -189,7 +190,9 @@ runDependency(const cli::DependencyOptions &options) {
     return std::unexpected(
         "dependency analysis requires at least one translation-unit source");
   }
-  return loadStoredCompilationDatabase(options.configuration)
+  return validateDatabasePaths(options.output, options.configuration)
+      .and_then(
+          [&] { return loadStoredCompilationDatabase(options.configuration); })
       .and_then(requireStoredCommands)
       .and_then([&](CompilationDatabasePtr database) {
         return analyse(options, std::move(database));

@@ -11,6 +11,7 @@ Feature: Facts and file storage boundaries
       | symbol           |
       | symbol_allocator |
       | definition       |
+      | include_dependency |
       | parameter        |
       | relation         |
     And the facts database excludes the file table
@@ -21,7 +22,6 @@ Feature: Facts and file storage boundaries
       | component         |
       | directory         |
       | file              |
-      | include_dependency |
       | repository        |
       | semantic_universe |
     And the facts and files databases use different paths

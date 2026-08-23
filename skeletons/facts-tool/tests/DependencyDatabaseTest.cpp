@@ -36,20 +36,27 @@ long long scalar(sqlite3 *database, const char *sql, facts::FileId source = 0,
 } // namespace
 
 int main(int argc, char **argv) {
-  require(argc == 5);
-  const auto databasePath = std::filesystem::absolute(argv[1]).string();
-  const auto root = std::filesystem::canonical(argv[2]).string();
-  const auto middle = std::filesystem::canonical(argv[3]).string();
-  const auto leaf = std::filesystem::canonical(argv[4]).string();
+  require(argc == 6);
+  const auto factsPath = std::filesystem::absolute(argv[1]).string();
+  const auto configurationPath = std::filesystem::absolute(argv[2]).string();
+  const auto root = std::filesystem::canonical(argv[3]).string();
+  const auto middle = std::filesystem::canonical(argv[4]).string();
+  const auto leaf = std::filesystem::canonical(argv[5]).string();
 
-  facts::FileManager files(databasePath);
+  facts::FileManager files(configurationPath);
   const auto rootId = files.getId(root);
   const auto middleId = files.getId(middle);
   const auto leafId = files.getId(leaf);
   require(rootId && middleId && leafId);
 
   sqlite3 *database = nullptr;
-  require(sqlite3_open(databasePath.c_str(), &database) == SQLITE_OK);
+  require(sqlite3_open(configurationPath.c_str(), &database) == SQLITE_OK);
+  require(scalar(database,
+                 "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
+                 "AND name='include_dependency'") == 0);
+  sqlite3_close(database);
+
+  require(sqlite3_open(factsPath.c_str(), &database) == SQLITE_OK);
   require(scalar(database, "SELECT COUNT(*) FROM include_dependency") == 2);
   require(scalar(database,
                  "SELECT COUNT(*) FROM include_dependency "
@@ -68,10 +75,10 @@ int main(int argc, char **argv) {
   const std::vector<facts::FileId> visitedSources{*middleId};
   const std::vector<facts::DependencyEdge> replacementEdges;
   require(
-      facts::replaceDependencies(databasePath, visitedSources, replacementEdges)
+      facts::replaceDependencies(factsPath, visitedSources, replacementEdges)
           .has_value());
 
-  require(sqlite3_open(databasePath.c_str(), &database) == SQLITE_OK);
+  require(sqlite3_open(factsPath.c_str(), &database) == SQLITE_OK);
   require(scalar(database, "SELECT COUNT(*) FROM include_dependency") == 1);
   require(scalar(database,
                  "SELECT COUNT(*) FROM include_dependency "

@@ -31,6 +31,14 @@ CREATE TABLE IF NOT EXISTS symbol_allocator (
   next_index INTEGER NOT NULL
 ) WITHOUT ROWID;
 
+-- Direct include facts. File identities remain owned by the project
+-- configuration database; this facts database retains their allocated ids.
+CREATE TABLE IF NOT EXISTS include_dependency (
+  src_file_id INTEGER NOT NULL,
+  dst_file_id INTEGER NOT NULL,
+  PRIMARY KEY(src_file_id, dst_file_id)
+);
+
 -- The common row: everything in Symbol, which every alternative starts with.
 -- kind/sub_kind/lang/properties are the clang::index::SymbolInfo base, stored
 -- as the raw enum values index::getSymbolInfo() produced.

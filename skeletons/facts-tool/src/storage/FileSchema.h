@@ -5,6 +5,8 @@ namespace facts {
 
 inline constexpr const char *fileSchemaSql = R"sql(
 
+DROP TABLE IF EXISTS include_dependency;
+
 CREATE TABLE IF NOT EXISTS semantic_universe (
   id     INTEGER PRIMARY KEY,
   key    TEXT NOT NULL UNIQUE,
@@ -64,12 +66,6 @@ CREATE TABLE IF NOT EXISTS file (
   indexed_at      TEXT,
   args_overridden INTEGER NOT NULL DEFAULT 0,
   UNIQUE(directory_id, name)
-);
-
-CREATE TABLE IF NOT EXISTS include_dependency (
-  src_file_id INTEGER NOT NULL REFERENCES file(id) ON DELETE CASCADE,
-  dst_file_id INTEGER NOT NULL REFERENCES file(id) ON DELETE CASCADE,
-  PRIMARY KEY(src_file_id, dst_file_id)
 );
 
 )sql";
