@@ -155,20 +155,18 @@ def then_dependent_decltype_alias_is_captured(context: FactsToolContext) -> None
     )
 
 
-@then("deduced variables and parenthesized function types are captured")
-def then_deduced_and_function_types_are_resolvable(
+@then("deduced auto variables and aliases are captured")
+def then_deduced_auto_types_are_resolvable(
     context: FactsToolContext,
 ) -> None:
-    symbols = set(
-        query(
-            context.facts_database_path,
-            "SELECT qualified_name,node FROM symbol "
-            "WHERE qualified_name IN ('b004::migrationSql','b004::Writer')",
-        )
+    variables = query(
+        context.facts_database_path,
+        "SELECT qualified_name,node FROM symbol "
+        "WHERE qualified_name='b004::migrationSql'",
     )
     require(
-        symbols == {("b004::migrationSql", 4), ("b004::Writer", 5)},
-        f"missing deduced variable or function-pointer alias: {symbols}",
+        variables == [("b004::migrationSql", 4)],
+        f"missing deduced auto variable: {variables}",
     )
 
     aliases = query(
@@ -183,6 +181,21 @@ def then_deduced_and_function_types_are_resolvable(
         f"missing deduced auto alias relation: {aliases}",
     )
 
+
+@then("parenthesized function-pointer template arguments are resolved")
+def then_parenthesized_function_types_are_resolvable(
+    context: FactsToolContext,
+) -> None:
+    aliases = query(
+        context.facts_database_path,
+        "SELECT qualified_name,node FROM symbol "
+        "WHERE qualified_name='b004::Writer'",
+    )
+    require(
+        aliases == [("b004::Writer", 5)],
+        f"missing parenthesized function-pointer alias: {aliases}",
+    )
+
     function_parameters = query(
         context.facts_database_path,
         "SELECT p.is_pointer,p.type_id FROM template_parameter p "
@@ -194,6 +207,20 @@ def then_deduced_and_function_types_are_resolvable(
         and function_parameters[0][0] == 1
         and function_parameters[0][1] != 0,
         f"function-pointer template argument was not resolved: {function_parameters}",
+    )
+
+
+@then("using directives are ignored as non-symbol declarations")
+def then_using_directives_are_ignored(context: FactsToolContext) -> None:
+    symbols = query(
+        context.facts_database_path,
+        "SELECT qualified_name,node FROM symbol "
+        "WHERE qualified_name IN ('b004::support::Marker','<using-directive>') "
+        "ORDER BY qualified_name",
+    )
+    require(
+        symbols == [("b004::support::Marker", 2)],
+        f"using directive was persisted as a symbol or fixture was skipped: {symbols}",
     )
 
 

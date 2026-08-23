@@ -16,8 +16,10 @@ Feature: Dependent function-template parameter types
     And the dependent decltype alias is captured
     And dependent parameter packs retain resolvable types and modifiers
 
-  Scenario: Extract deduced and parenthesized function types successfully
+  Scenario: Extract every formerly unsupported project type successfully
     Given a reproducing compile database for dependent template parameter types
     When the real extraction command indexes the dependent-template fixture
     Then the dependent-template extraction exits successfully without incomplete diagnostics
-    And deduced variables and parenthesized function types are captured
+    And deduced auto variables and aliases are captured
+    And parenthesized function-pointer template arguments are resolved
+    And using directives are ignored as non-symbol declarations
