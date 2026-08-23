@@ -150,6 +150,7 @@ target_link_libraries(facts-platform PRIVATE facts-clang)
 
 # Commands own application behavior and remain independent of CLI11.
 add_library(facts-commands STATIC
+  src/commands/DatabasePaths.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
   src/commands/Import.cpp
@@ -286,6 +287,7 @@ if(BUILD_TESTING)
   add_test(
     NAME dependency-analysis-first
     COMMAND facts-tool analyses dependency
+            --output ${dependency_output}
             --conf ${dependency_config}
             ${dependency_fixture}/root.cpp
   )
@@ -294,6 +296,7 @@ if(BUILD_TESTING)
   add_test(
     NAME dependency-analysis-second
     COMMAND facts-tool analyses dependency
+            --output ${dependency_output}
             --conf ${dependency_config}
             ${dependency_fixture}/root.cpp
   )
@@ -311,6 +314,7 @@ if(BUILD_TESTING)
   add_test(
     NAME dependency-analysis-verify
     COMMAND dependency-database-test
+            ${dependency_output}
             ${dependency_config}
             ${dependency_fixture}/root.cpp
             ${dependency_fixture}/b.h

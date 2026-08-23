@@ -1,5 +1,7 @@
 #include "storage/DependencyDatabase.h"
 
+#include "storage/Schema.h"
+#include "storage/SchemaMigration.h"
 #include "storage/Sqlite.h"
 #include "storage/SqliteDatabase.h"
 
@@ -7,6 +9,19 @@
 
 namespace facts {
 namespace {
+
+std::expected<void, std::error_code>
+initializeFactsDatabase(storage::Database &database) {
+  return database.executeScript("PRAGMA foreign_keys=OFF;")
+      .and_then([&] { return database.write(); })
+      .and_then([&](storage::Transaction transaction) {
+        return storage::migrateSchema(database.nativeHandle())
+            .and_then([&] { return database.executeScript(schemaSql); })
+            .and_then([&] { return transaction.commit(); });
+      })
+      .and_then(
+          [&] { return database.executeScript("PRAGMA foreign_keys=ON;"); });
+}
 
 std::expected<void, std::error_code>
 deleteVisitedSources(storage::Database &database,
@@ -53,9 +68,8 @@ replaceDependencies(const std::string &databasePath,
                     std::span<const DependencyEdge> edges) {
   return storage::Database::open(databasePath, storage::Database::readWrite)
       .and_then([&](storage::Database database) {
-        return database.executeScript("PRAGMA foreign_keys=ON").and_then([&] {
-          return replace(database, visitedSources, edges);
-        });
+        return initializeFactsDatabase(database).and_then(
+            [&] { return replace(database, visitedSources, edges); });
       });
 }
 

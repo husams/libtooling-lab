@@ -103,6 +103,11 @@ private:
   void configureDependency(CLI::App &command) {
     dependencyCommand_ = &command;
     command
+        .add_option("-o,--output", dependency_.output,
+                    "SQLite database for extracted dependency facts")
+        ->required()
+        ->type_name("FILE");
+    command
         .add_option("-c,--conf", dependency_.configuration,
                     "Full path to the stored project configuration")
         ->required()

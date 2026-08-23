@@ -56,6 +56,14 @@ def main() -> None:
         output(import_help),
     )
 
+    dependency_help = run(tool, "analyses", "dependency", "--help")
+    require(dependency_help.returncode == 0, output(dependency_help))
+    require(
+        "--output" in output(dependency_help)
+        and "--conf" in output(dependency_help),
+        output(dependency_help),
+    )
+
     missing = run(tool, "extract")
     require(missing.returncode != 0, output(missing))
     require(
@@ -99,6 +107,21 @@ def main() -> None:
         )
         require_failure(
             identical_databases,
+            "output and project configuration require separate databases",
+        )
+
+        identical_dependency_databases = run(
+            tool,
+            "analyses",
+            "dependency",
+            "--output",
+            str(same_database),
+            "--conf",
+            str(same_database),
+            "source.cpp",
+        )
+        require_failure(
+            identical_dependency_databases,
             "output and project configuration require separate databases",
         )
 

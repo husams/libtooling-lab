@@ -21,6 +21,7 @@ struct ImportOptions {
 };
 
 struct DependencyOptions {
+  std::string output;
   std::string configuration;
   std::vector<std::string> sources;
 };
