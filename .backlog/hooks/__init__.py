@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import sys
 
+from backlog_cli.api import BacklogError, ReviewSeverity
+
 # This repository's GitHub account does not require an explicit reviewer
 # approval on a pull request, so `pr_review_state` would sit at `pending`
 # forever and block both `gate --for merge` and Accepted -> Done. Once a
@@ -26,14 +28,40 @@ TRIGGER_STATE = "accepted"
 DELIVERABLE_TYPES = {"story", "bug", "subtask"}
 DEAD_PR_STATES = {"merged", "closed"}
 
+# Acceptance must mean every reviewer remark was dealt with, not just the
+# blocking ones. The built-in `review_threads_closed` gate only looks at
+# blockers, so these severities are enforced here instead.
+EXTRA_ACCEPTANCE_SEVERITIES = (ReviewSeverity.NICE_TO_HAVE, ReviewSeverity.INFO)
+
 # `set_pr` emits `pr.approved`, which re-enters these hooks before the new PR
 # state is visible. Without this guard the hook would recurse indefinitely.
 _approving: set[str] = set()
 
 
 def pre_transition(action, context, current_state, proposed_state, bl):
-    """No project-specific override; keep the state the workflow resolved."""
+    """Refuse acceptance while non-blocking review comments are still open."""
+    if proposed_state == TRIGGER_STATE:
+        _require_all_comments_closed(context.get("task_key"), bl)
     return proposed_state
+
+
+def _require_all_comments_closed(key, bl):
+    """Blockers keep their native `review_threads_closed` gate message."""
+    if not key:
+        return
+    still_open = [
+        (severity.value, thread.root_key)
+        for severity in EXTRA_ACCEPTANCE_SEVERITIES
+        for thread in bl.threads(key, state="open", severity=severity)
+    ]
+    if not still_open:
+        return
+    detail = ", ".join(f"{root} ({severity})" for severity, root in still_open)
+    raise BacklogError(
+        f"review_comments_closed: {len(still_open)} non-blocking review "
+        f"comment(s) still open on {key}: {detail}. Every nice-to-have and "
+        "info thread must be answered and closed before acceptance."
+    )
 
 
 def post_transition(action, context, current_state, proposed_state, bl):
