@@ -33,7 +33,7 @@ struct StoredGraph {
 };
 
 std::string normalized(std::string_view path) {
-  return std::filesystem::absolute(path).lexically_normal().string();
+  return std::filesystem::canonical(path).lexically_normal().string();
 }
 
 template <typename Value>
@@ -82,6 +82,23 @@ collectIncludes(const CompilationDatabase &database,
   return facts;
 }
 
+std::expected<std::vector<std::string>, std::string>
+registerIncludeFiles(FileManager &files, std::vector<std::string> registered,
+                     const IncludeGraphFacts &facts) {
+  auto included = facts.visitedSources;
+  sortUnique(included);
+  return files.addBulk(included)
+      .transform_error([](std::error_code error) {
+        return "cannot register included files: " + error.message();
+      })
+      .transform([registered = std::move(registered),
+                  included = std::move(included)]() mutable {
+        std::ranges::move(included, std::back_inserter(registered));
+        sortUnique(registered);
+        return registered;
+      });
+}
+
 std::expected<std::unordered_map<std::string, FileId>, std::string>
 resolveRegisteredFiles(FileManager &files,
                        const std::vector<std::string> &registered) {
@@ -97,21 +114,37 @@ resolveRegisteredFiles(FileManager &files,
   return ids;
 }
 
-StoredGraph
+std::expected<FileId, std::string>
+requireRegistered(const std::unordered_map<std::string, FileId> &registered,
+                  const std::string &path) {
+  auto id = registered.find(normalized(path));
+  if (id == registered.end()) {
+    return std::unexpected("include endpoint is not registered: " + path);
+  }
+  return id->second;
+}
+
+std::expected<StoredGraph, std::string>
 toStoredGraph(const IncludeGraphFacts &facts,
               const std::unordered_map<std::string, FileId> &registered) {
   StoredGraph graph;
   for (const auto &source : facts.visitedSources) {
-    if (auto id = registered.find(normalized(source)); id != registered.end()) {
-      graph.visitedSources.push_back(id->second);
+    auto id = requireRegistered(registered, source);
+    if (!id) {
+      return std::unexpected(id.error());
     }
+    graph.visitedSources.push_back(*id);
   }
   for (const auto &edge : facts.edges) {
-    const auto source = registered.find(normalized(edge.source));
-    const auto destination = registered.find(normalized(edge.destination));
-    if (source != registered.end() && destination != registered.end()) {
-      graph.edges.push_back({source->second, destination->second});
+    auto source = requireRegistered(registered, edge.source);
+    if (!source) {
+      return std::unexpected(source.error());
     }
+    auto destination = requireRegistered(registered, edge.destination);
+    if (!destination) {
+      return std::unexpected(destination.error());
+    }
+    graph.edges.push_back({*source, *destination});
   }
   sortUnique(graph.visitedSources);
   sortUnique(graph.edges);
@@ -124,10 +157,17 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
   return registerFiles(files, *database, options.sources)
       .and_then([&](std::vector<std::string> registered) {
         return collectIncludes(*database, options.sources)
-            .and_then([&](IncludeGraphFacts facts) {
-              return resolveRegisteredFiles(files, registered)
-                  .and_then([&](auto ids) {
-                    auto graph = toStoredGraph(facts, ids);
+            .and_then([&, registered = std::move(registered)](
+                          IncludeGraphFacts facts) mutable {
+              return registerIncludeFiles(files, std::move(registered), facts)
+                  .and_then([&, facts = std::move(facts)](
+                                std::vector<std::string> paths) mutable {
+                    return resolveRegisteredFiles(files, paths)
+                        .and_then([&, facts = std::move(facts)](auto ids) {
+                          return toStoredGraph(facts, ids);
+                        });
+                  })
+                  .and_then([&](StoredGraph graph) {
                     return replaceDependencies(options.configuration,
                                                graph.visitedSources,
                                                graph.edges)

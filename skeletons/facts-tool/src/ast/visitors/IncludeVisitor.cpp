@@ -20,7 +20,7 @@ namespace {
 std::string pathOf(clang::FileEntryRef file) {
   const auto realPath = file.getFileEntry().tryGetRealPathName();
   const auto path = realPath.empty() ? file.getName() : realPath;
-  return std::filesystem::absolute(path.str()).lexically_normal().string();
+  return std::filesystem::canonical(path.str()).lexically_normal().string();
 }
 
 class IncludeVisitor final : public clang::PPCallbacks {
