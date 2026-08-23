@@ -178,8 +178,6 @@ private:
 
 namespace detail {
 
-using Connection = std::shared_ptr<sqlite3>;
-
 template <typename Value>
 concept ByteRange = std::ranges::contiguous_range<Value> &&
                     std::same_as<std::ranges::range_value_t<Value>, std::byte>;
@@ -274,6 +272,20 @@ concept Bindable =
       { bindOne(statement, position, value) } -> std::same_as<bool>;
     };
 
+template <typename... Values>
+  requires(Bindable<std::remove_cvref_t<Values>> && ...)
+bool bindValues(sqlite3_stmt *statement, Values &&...values) {
+  int position = 0;
+  const std::array<bool, sizeof...(Values)> bound{
+      bindOne(statement, ++position, values)...};
+  for (const bool ok : bound) {
+    if (!ok) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Streams a result set. Nothing is prepared until the first iteration, and the
 // statement is finalized when the generator dies -- including on an early
 // break, or when an exception unwinds the loop.
@@ -298,13 +310,8 @@ Generator<Row> rowStream(Connection connection, std::string sql,
             ": " + sql);
   }
 
-  int position = 0;
-  const std::array<bool, sizeof...(Binds)> bound{
-      bindOne(statement->get(), ++position, binds)...};
-  for (const bool ok : bound) {
-    if (!ok) {
-      raiseQueryError(database);
-    }
+  if (!bindValues(statement->get(), binds...)) {
+    raiseQueryError(database);
   }
 
   Row row(statement->get());
@@ -333,6 +340,13 @@ auto valueStream(Connection connection, std::string sql, Map map,
 }
 
 } // namespace detail
+
+template <typename... Values>
+  requires(detail::Bindable<std::remove_cvref_t<Values>> && ...)
+bool bindParameters(sqlite3_stmt *statement, Values &&...values) {
+  return sqlite3_bind_parameter_count(statement) == sizeof...(Values) &&
+         detail::bindValues(statement, std::forward<Values>(values)...);
+}
 
 // Drains a stream into one vector, converting QueryError back into the
 // std::expected the storage layer uses at its boundaries.
