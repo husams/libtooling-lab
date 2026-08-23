@@ -1,60 +1,47 @@
 #include "storage/Enumeration.h"
 
-#include "storage/Sqlite.h"
+#include "storage/ItlibGenerator.h"
+#include "storage/StorageQuery.h"
 
-#include <sqlite3.h>
+#include <array>
 
 namespace facts {
 
 std::expected<void, std::error_code>
 Storage::replaceEnumerationDetails(SymbolId id,
                                    const Enumeration &enumeration) {
-  auto statement = storage::prepare(
-      handle(), "INSERT INTO enumeration(symbol_id,underlying_type,is_scoped,"
-                "has_fixed_underlying_type) VALUES(?1,?2,?3,?4) "
-                "ON CONFLICT(symbol_id) DO UPDATE SET "
-                "underlying_type=excluded.underlying_type,"
-                "is_scoped=excluded.is_scoped,"
-                "has_fixed_underlying_type=excluded.has_fixed_underlying_type");
-  if (!statement ||
-      !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
-      !storage::bindInteger(
-          statement->get(), 2,
-          storage::packSymbolId(enumeration.underlyingType)) ||
-      !storage::bindInteger(statement->get(), 3, enumeration.isScoped) ||
-      !storage::bindInteger(statement->get(), 4,
-                            enumeration.hasFixedUnderlyingType) ||
-      sqlite3_step(statement->get()) != SQLITE_DONE) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-  return {};
+  const std::array rows{enumeration};
+  return database_
+      .executeBulk(
+          "INSERT INTO enumeration(symbol_id,underlying_type,is_scoped,"
+          "has_fixed_underlying_type) VALUES(?1,?2,?3,?4) "
+          "ON CONFLICT(symbol_id) DO UPDATE SET "
+          "underlying_type=excluded.underlying_type,"
+          "is_scoped=excluded.is_scoped,"
+          "has_fixed_underlying_type=excluded.has_fixed_underlying_type",
+          rows,
+          [id](sqlite3_stmt *statement, const Enumeration &value) {
+            return storage::bindParameters(statement, id, value.underlyingType,
+                                           value.isScoped,
+                                           value.hasFixedUnderlyingType);
+          })
+      .transform([](const storage::BulkResult &) {});
 }
 
 std::expected<Enumeration, std::error_code>
 Storage::loadEnumerationDetails(Enumeration enumeration) {
-  auto statement = storage::prepare(
-      handle(), "SELECT underlying_type,is_scoped,has_fixed_underlying_type "
-                "FROM enumeration WHERE symbol_id=?1");
-  if (!statement ||
-      !storage::bindInteger(statement->get(), 1,
-                            storage::packSymbolId(enumeration.id))) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-  const auto step = sqlite3_step(statement->get());
-  if (step == SQLITE_DONE) {
-    return std::unexpected(
-        std::make_error_code(std::errc::no_such_file_or_directory));
-  }
-  if (step != SQLITE_ROW) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-
-  enumeration.underlyingType =
-      storage::unpackSymbolId(sqlite3_column_int64(statement->get(), 0));
-  enumeration.isScoped = sqlite3_column_int64(statement->get(), 1) != 0;
-  enumeration.hasFixedUnderlyingType =
-      sqlite3_column_int64(statement->get(), 2) != 0;
-  return enumeration;
+  const auto id = enumeration.id;
+  auto details = storage::detail::toItlibGenerator(database_.query(
+      "SELECT underlying_type,is_scoped,has_fixed_underlying_type "
+      "FROM enumeration WHERE symbol_id=?1",
+      [enumeration = std::move(enumeration)](const storage::Row &row) mutable {
+        enumeration.underlyingType = row.get<SymbolId>(0);
+        enumeration.isScoped = row.get<bool>(1);
+        enumeration.hasFixedUnderlyingType = row.get<bool>(2);
+        return std::move(enumeration);
+      },
+      id));
+  return storage::detail::collectOne(std::move(details));
 }
 
 template <>

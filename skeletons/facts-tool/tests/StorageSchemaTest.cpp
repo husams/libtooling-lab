@@ -12,6 +12,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -45,6 +46,21 @@ std::int64_t scalar(sqlite3 *database, std::string_view sql) {
                           : -1;
   sqlite3_finalize(statement);
   return result;
+}
+
+std::string textScalar(sqlite3 *database, std::string_view sql) {
+  sqlite3_stmt *statement = nullptr;
+  if (sqlite3_prepare_v2(database, sql.data(), -1, &statement, nullptr) !=
+      SQLITE_OK) {
+    return {};
+  }
+  std::string value;
+  if (sqlite3_step(statement) == SQLITE_ROW) {
+    const auto *text = sqlite3_column_text(statement, 0);
+    value = text ? reinterpret_cast<const char *>(text) : std::string{};
+  }
+  sqlite3_finalize(statement);
+  return value;
 }
 
 std::uint64_t packed(facts::SymbolId id) {
@@ -114,6 +130,12 @@ bool verifyFreshSchema(const std::string &path) {
                         .value = "5",
                     },
             },
+    });
+    function.parameters.push_back({
+        .name = "removed",
+        .type = {.file = 0, .index = 2},
+        .loc = {.line = 1, .column = 20, .offset = 19},
+        .region = {.offset = 19, .size = 7},
     });
 
     auto savedFunction = storage.save(function);
@@ -206,6 +228,23 @@ bool verifyFreshSchema(const std::string &path) {
     const auto relationFlags = static_cast<std::uint16_t>(
         clang::AS_protected | facts::bit(facts::VirtualBaseBit) |
         facts::bit(facts::ImplicitEdgeBit) | facts::bit(facts::LexicalBit));
+    const std::array rejectedRelations{
+        facts::Relation{
+            .source = functionId,
+            .destination = destinationId,
+            .kind = facts::RelationKind::Calls,
+        },
+        facts::Relation{
+            .source = functionId,
+            .destination = {.file = 99, .index = 1},
+            .kind = facts::RelationKind::Calls,
+            .position = 1,
+        },
+    };
+    if (!require(!storage.addRelations(rejectedRelations).has_value(),
+                 "failing relation batch was accepted")) {
+      return false;
+    }
     const std::array relations{facts::Relation{
         .source = functionId,
         .destination = destinationId,
@@ -232,7 +271,7 @@ bool verifyFreshSchema(const std::string &path) {
     if (!require(loaded.has_value(), "failed to load function") ||
         !require(loaded->flags == symbolFlags,
                  "symbol flags did not round trip") ||
-        !require(loaded->parameters.size() == 1,
+        !require(loaded->parameters.size() == 2,
                  "parameters did not round trip") ||
         !require(loaded->parameters.front().flags == parameterFlags,
                  "parameter flags did not round trip") ||
@@ -245,6 +284,29 @@ bool verifyFreshSchema(const std::string &path) {
                 loaded->parameters.front().defaultValue->evaluated->value ==
                     "5",
             "parameter evaluated default did not round trip")) {
+      return false;
+    }
+
+    function.qualifiedName = "queryableUpdated";
+    function.parameters.front().name = "values";
+    function.parameters.resize(1);
+    auto updatedFunction = storage.save(function);
+    auto loadedByUsr = storage.load<facts::Function>(function.usr);
+    auto missing =
+        storage.load<facts::Function>(facts::SymbolId{.file = 77, .index = 1});
+    if (!require(updatedFunction == savedFunction,
+                 "function update changed symbol identity") ||
+        !require(loadedByUsr && loadedByUsr->has_value(),
+                 "updated function was not found by USR") ||
+        !require((*loadedByUsr)->qualifiedName == "queryableUpdated",
+                 "symbol update did not round trip") ||
+        !require((*loadedByUsr)->parameters.size() == 1 &&
+                     (*loadedByUsr)->parameters.front().name == "values",
+                 "parameter deletion did not round trip") ||
+        !require(!missing && missing.error() ==
+                                 std::make_error_code(
+                                     std::errc::no_such_file_or_directory),
+                 "missing symbol did not report the expected error")) {
       return false;
     }
 
@@ -273,7 +335,59 @@ bool verifyFreshSchema(const std::string &path) {
   }
   const auto functionKey = packed(functionId);
   const auto destinationKey = packed(destinationId);
+  const auto canonical = textScalar(database, R"sql(
+SELECT group_concat(record, char(10)) FROM (
+  SELECT 'enumeration|' || symbol.usr || '|' || enumeration.underlying_type ||
+         '|' || enumeration.is_scoped || '|' ||
+         enumeration.has_fixed_underlying_type AS record
+  FROM enumeration JOIN symbol ON symbol.id=enumeration.symbol_id
+  UNION ALL
+  SELECT 'enumerator|' || symbol.usr || '|' || enumerator.value || '|' ||
+         enumerator.initializer_expression
+  FROM enumerator JOIN symbol ON symbol.id=enumerator.symbol_id
+  UNION ALL
+  SELECT 'parameter|' || symbol.usr || '|' || parameter.position || '|' ||
+         parameter.name || '|' || parameter.has_default || '|' ||
+         COALESCE(parameter_default.expression,'') || '|' ||
+         COALESCE(parameter_default.evaluated_kind,'') || '|' ||
+         COALESCE(parameter_default.evaluated_value,'')
+  FROM parameter JOIN symbol ON symbol.id=parameter.symbol_id
+  LEFT JOIN parameter_default USING(symbol_id,position)
+  UNION ALL
+  SELECT 'relation|' || source.usr || '|' || destination.usr
+  FROM relation
+  JOIN symbol source ON source.id=relation.source_id
+  JOIN symbol destination ON destination.id=relation.destination_id
+  UNION ALL
+  SELECT 'symbol|' || usr || '|' || qualified_name FROM symbol
+  UNION ALL
+  SELECT 'variable|' || symbol.usr || '|' || variable_initializer.expression ||
+         '|' || variable_initializer.evaluated_kind || '|' ||
+         variable_initializer.evaluated_value
+  FROM variable_initializer
+  JOIN symbol ON symbol.id=variable_initializer.symbol_id
+  ORDER BY record
+)
+)sql");
+  constexpr std::string_view canonicalBaseline =
+      "enumeration|c:@E@Mode|7|1|1\n"
+      "enumerator|c:@E@Mode@Fast|5|5\n"
+      "parameter|c:@F@queryable|0|values|1|2 + 3|integer|5\n"
+      "relation|c:@E@Mode|c:@E@Mode@Fast\n"
+      "relation|c:@F@queryable|c:@S@base\n"
+      "symbol|c:@E@Mode@Fast|Mode::Fast\n"
+      "symbol|c:@E@Mode|Mode\n"
+      "symbol|c:@F@queryable|queryableUpdated\n"
+      "symbol|c:@S@base|base\n"
+      "symbol|c:@V@initializer|initializer\n"
+      "variable|c:@V@initializer|2 + 3|integer|5";
   const auto valid =
+      require(canonical == canonicalBaseline,
+              "canonical persistence dump changed") &&
+      require(scalar(database, "SELECT COUNT(*) FROM relation WHERE kind=" +
+                                   std::to_string(static_cast<int>(
+                                       facts::RelationKind::Calls))) == 0,
+              "failing relation batch was not rolled back") &&
       require(noPackedFlags(database), "fresh schema retained packed flags") &&
       require(noRedundantSymbolIdColumns(database),
               "fresh schema retained redundant symbol id columns") &&

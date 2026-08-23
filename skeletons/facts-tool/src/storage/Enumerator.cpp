@@ -1,55 +1,47 @@
 #include "storage/Enumerator.h"
 
-#include "storage/Sqlite.h"
+#include "storage/ItlibGenerator.h"
+#include "storage/StorageQuery.h"
 
-#include <sqlite3.h>
+#include <array>
 
 namespace facts {
 
 std::expected<void, std::error_code>
 Storage::replaceEnumeratorDetails(SymbolId id, const Enumerator &enumerator) {
-  auto statement = storage::prepare(
-      handle(),
-      "INSERT INTO enumerator(symbol_id,value,initializer_expression) "
-      "VALUES(?1,?2,?3) ON CONFLICT(symbol_id) DO UPDATE SET "
-      "value=excluded.value,"
-      "initializer_expression=excluded.initializer_expression");
-  if (!statement ||
-      !storage::bindInteger(statement->get(), 1, storage::packSymbolId(id)) ||
-      !storage::bindText(statement->get(), 2, enumerator.value) ||
-      !storage::bindText(statement->get(), 3,
-                         enumerator.initializerExpression.value_or("")) ||
-      sqlite3_step(statement->get()) != SQLITE_DONE) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-  return {};
+  const std::array rows{enumerator};
+  return database_
+      .executeBulk(
+          "INSERT INTO enumerator(symbol_id,value,initializer_expression) "
+          "VALUES(?1,?2,?3) ON CONFLICT(symbol_id) DO UPDATE SET "
+          "value=excluded.value,"
+          "initializer_expression=excluded.initializer_expression",
+          rows,
+          [id](sqlite3_stmt *statement, const Enumerator &value) {
+            return storage::bindParameters(
+                statement, id, value.value,
+                value.initializerExpression.value_or(""));
+          })
+      .transform([](const storage::BulkResult &) {});
 }
 
 std::expected<Enumerator, std::error_code>
 Storage::loadEnumeratorDetails(Enumerator enumerator) {
-  auto statement = storage::prepare(
-      handle(), "SELECT value,initializer_expression FROM enumerator "
-                "WHERE symbol_id=?1");
-  if (!statement ||
-      !storage::bindInteger(statement->get(), 1,
-                            storage::packSymbolId(enumerator.id))) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-  const auto step = sqlite3_step(statement->get());
-  if (step == SQLITE_DONE) {
-    return std::unexpected(
-        std::make_error_code(std::errc::no_such_file_or_directory));
-  }
-  if (step != SQLITE_ROW) {
-    return std::unexpected(storage::sqliteError(handle()));
-  }
-
-  enumerator.value = storage::columnText(statement->get(), 0);
-  auto expression = storage::columnText(statement->get(), 1);
-  enumerator.initializerExpression =
-      expression.empty() ? std::nullopt
-                         : std::optional<std::string>{std::move(expression)};
-  return enumerator;
+  const auto id = enumerator.id;
+  auto details = storage::detail::toItlibGenerator(database_.query(
+      "SELECT value,initializer_expression FROM enumerator "
+      "WHERE symbol_id=?1",
+      [enumerator = std::move(enumerator)](const storage::Row &row) mutable {
+        enumerator.value = row.get<std::string>(0);
+        auto expression = row.get<std::string>(1);
+        enumerator.initializerExpression =
+            expression.empty()
+                ? std::nullopt
+                : std::optional<std::string>{std::move(expression)};
+        return std::move(enumerator);
+      },
+      id));
+  return storage::detail::collectOne(std::move(details));
 }
 
 template <>

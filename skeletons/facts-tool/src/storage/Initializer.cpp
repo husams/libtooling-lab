@@ -1,9 +1,5 @@
 #include "storage/Initializer.h"
 
-#include "storage/Sqlite.h"
-
-#include <sqlite3.h>
-
 #include <string_view>
 
 namespace facts::storage {
@@ -41,35 +37,33 @@ std::optional<EvaluatedValueKind> valueKind(std::string_view name) {
 
 } // namespace
 
-bool bindInitializer(sqlite3_stmt *statement, int expressionPosition,
-                     int kindPosition, int valuePosition,
-                     const Initializer &initializer) {
+InitializerColumns initializerColumns(const Initializer &initializer) {
   const auto kind = initializer.evaluated
                         ? valueKindName(initializer.evaluated->kind)
                         : std::string_view{"none"};
-  const auto valueBound =
-      initializer.evaluated
-          ? bindText(statement, valuePosition, initializer.evaluated->value)
-          : sqlite3_bind_null(statement, valuePosition) == SQLITE_OK;
-  return bindText(statement, expressionPosition, initializer.expression) &&
-         bindText(statement, kindPosition, kind) && valueBound;
+  return {
+      .expression = initializer.expression,
+      .kind = std::string{kind},
+      .value = initializer.evaluated
+                   ? std::optional<std::string>{initializer.evaluated->value}
+                   : std::nullopt,
+  };
 }
 
-std::optional<Initializer> loadInitializer(sqlite3_stmt *statement,
-                                           int expressionColumn, int kindColumn,
-                                           int valueColumn) {
-  if (sqlite3_column_type(statement, expressionColumn) == SQLITE_NULL) {
+std::optional<Initializer> loadInitializer(const Row &row, int expressionColumn,
+                                           int kindColumn, int valueColumn) {
+  if (row.isNull(expressionColumn)) {
     return std::nullopt;
   }
 
   Initializer initializer{
-      .expression = columnText(statement, expressionColumn),
+      .expression = row.get<std::string>(expressionColumn),
   };
-  const auto kind = valueKind(columnText(statement, kindColumn));
+  const auto kind = valueKind(row.get<std::string>(kindColumn));
   if (kind) {
     initializer.evaluated = EvaluatedValue{
         .kind = *kind,
-        .value = columnText(statement, valueColumn),
+        .value = row.get<std::optional<std::string>>(valueColumn).value_or(""),
     };
   }
   return initializer;
