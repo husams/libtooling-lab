@@ -123,6 +123,38 @@ def then_dependent_template_parameters_are_resolvable(
     )
 
 
+@then("dependent parameter packs retain resolvable types and modifiers")
+def then_dependent_parameter_packs_are_resolvable(
+    context: FactsToolContext,
+) -> None:
+    parameters = query(
+        context.facts_database_path,
+        "SELECT target.qualified_name,p.is_pointer,p.is_lvalue_reference,"
+        "p.is_rvalue_reference,p.is_forwarding_reference,p.is_const,p.is_pack "
+        "FROM parameter p "
+        "JOIN symbol source ON source.id=p.symbol_id "
+        "JOIN symbol target ON target.id=p.type "
+        "WHERE source.qualified_name='b004::parameterPack' "
+        "AND target.qualified_name='Values'",
+    )
+    require(
+        parameters == [("Values", 0, 0, 1, 1, 0, 1)],
+        f"unexpected parameter-pack type or modifiers: {parameters}",
+    )
+
+
+@then("the dependent decltype alias is captured")
+def then_dependent_decltype_alias_is_captured(context: FactsToolContext) -> None:
+    aliases = query(
+        context.facts_database_path,
+        "SELECT qualified_name FROM symbol WHERE node=5 AND qualified_name='Owned'",
+    )
+    require(
+        aliases and set(aliases) == {("Owned",)},
+        f"missing dependent decltype alias: {aliases}",
+    )
+
+
 @then("dependent function-template instances point to their primary templates")
 def then_dependent_instances_point_to_primary(context: FactsToolContext) -> None:
     relations = set(

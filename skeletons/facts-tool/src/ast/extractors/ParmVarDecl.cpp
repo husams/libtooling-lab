@@ -17,6 +17,11 @@ std::uint8_t flagWhen(ParameterBit flag, bool condition) {
   return condition ? bit(flag) : 0;
 }
 
+clang::QualType parameterPattern(clang::QualType type) {
+  const auto *pack = type->getAs<clang::PackExpansionType>();
+  return pack == nullptr ? type : pack->getPattern();
+}
+
 bool isConstQualified(clang::QualType type) {
   if (type.isConstQualified()) {
     return true;
@@ -56,7 +61,7 @@ bool isForwardingReference(const clang::ParmVarDecl &node,
 }
 
 std::uint8_t extractParameterFlags(const clang::ParmVarDecl &node) {
-  const auto type = node.getType();
+  const auto type = parameterPattern(node.getType());
 
   return flagWhen(ParameterBit::PointerBit, type->isPointerType()) |
          flagWhen(ParameterBit::LValueReferenceBit,

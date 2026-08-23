@@ -27,6 +27,17 @@ T &&rvalue(T &&value) {
   return static_cast<T &&>(value);
 }
 
+template <typename Value>
+auto dependentAlias(Value &&value) {
+  using Owned = decltype(identity(*value));
+  return Owned{};
+}
+
+template <typename... Values>
+void parameterPack(Values &&...values) {
+  ((void)values, ...);
+}
+
 template <typename T>
 struct Nested {
   template <typename U>
@@ -43,6 +54,8 @@ Widget instantiate(Widget value) {
   (void)pointer(address);
   (void)lvalue(value);
   (void)rvalue(static_cast<Widget &&>(value));
+  (void)dependentAlias(address);
+  parameterPack(value, 1);
   (void)Nested<Widget>::instantiate(value);
   return identity(value);
 }
