@@ -320,4 +320,36 @@ int main(int argc, char **argv) {
   assert(cached.findId("c:@S@Cached") == foundCachedId);
   assert(!cached.load<facts::Symbol>(cachedId));
   std::filesystem::remove(cacheDatabasePath);
+
+  const auto transactionDatabasePath = databasePath.string() + ".transaction";
+  std::filesystem::remove(transactionDatabasePath);
+  {
+    facts::FactStore rolledBack(transactionDatabasePath);
+    assert(rolledBack.begin());
+    assert(rolledBack.save(
+        12, makeSymbol<facts::Symbol>("c:@S@RolledBack", "RolledBack")));
+    assert(rolledBack.cachedIdCount() == 1);
+    assert(rolledBack.rollback());
+    assert(rolledBack.cachedIdCount() == 0);
+  }
+  {
+    facts::FactStore afterRollback(transactionDatabasePath);
+    const auto missingAfterRollback =
+        afterRollback.load<facts::Symbol>("c:@S@RolledBack");
+    assert(missingAfterRollback && !*missingAfterRollback);
+  }
+  {
+    facts::FactStore committed(transactionDatabasePath);
+    assert(committed.begin());
+    assert(committed.save(
+        12, makeSymbol<facts::Symbol>("c:@S@Committed", "Committed")));
+    assert(committed.end());
+  }
+  {
+    facts::FactStore afterCommit(transactionDatabasePath);
+    const auto loadedAfterCommit =
+        afterCommit.load<facts::Symbol>("c:@S@Committed");
+    assert(loadedAfterCommit && *loadedAfterCommit);
+  }
+  std::filesystem::remove(transactionDatabasePath);
 }

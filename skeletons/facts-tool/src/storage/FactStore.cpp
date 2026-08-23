@@ -8,14 +8,22 @@ namespace facts {
 
 FactStore::FactStore(std::string path) : storage_(std::move(path)) {}
 
-void FactStore::begin() {}
+std::expected<void, std::error_code> FactStore::begin() {
+  return storage_.begin();
+}
 
-void FactStore::end() {
-  const auto files = idsByUsr_ | std::views::values |
-                     std::views::transform(&SymbolId::file) |
-                     std::ranges::to<std::unordered_set>();
-  std::cerr << "facts-tool: " << count() << " symbol(s) recorded from "
-            << files.size() << " file(s)\n";
+std::expected<void, std::error_code> FactStore::end() {
+  return storage_.commit().transform([this] {
+    const auto files = idsByUsr_ | std::views::values |
+                       std::views::transform(&SymbolId::file) |
+                       std::ranges::to<std::unordered_set>();
+    std::cerr << "facts-tool: " << count() << " symbol(s) recorded from "
+              << files.size() << " file(s)\n";
+  });
+}
+
+std::expected<void, std::error_code> FactStore::rollback() {
+  return storage_.rollback().transform([this] { idsByUsr_.clear(); });
 }
 
 void FactStore::remember(std::string_view usr, SymbolId id) {

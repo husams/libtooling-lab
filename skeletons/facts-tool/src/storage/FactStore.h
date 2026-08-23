@@ -19,8 +19,9 @@ class FactStore {
 public:
   explicit FactStore(std::string path);
 
-  void begin();
-  void end();
+  std::expected<void, std::error_code> begin();
+  std::expected<void, std::error_code> end();
+  std::expected<void, std::error_code> rollback();
 
   template <typename Model>
     requires std::derived_from<Model, Symbol>

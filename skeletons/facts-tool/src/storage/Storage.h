@@ -31,6 +31,10 @@ public:
   Storage(const Storage &) = delete;
   Storage &operator=(const Storage &) = delete;
 
+  std::expected<void, std::error_code> begin();
+  std::expected<void, std::error_code> commit();
+  std::expected<void, std::error_code> rollback();
+
   template <typename Model>
   std::expected<SymbolId, std::error_code> save(const Model &object);
 
@@ -167,7 +171,15 @@ private:
     return model;
   }
 
+  using OptionalTransaction = std::optional<storage::Transaction>;
+
+  std::expected<OptionalTransaction, std::error_code> readTransaction();
+  std::expected<OptionalTransaction, std::error_code> writeTransaction();
+  static std::expected<void, std::error_code>
+  commit(OptionalTransaction &transaction);
+
   storage::Database database_;
+  OptionalTransaction transaction_;
 };
 
 } // namespace facts

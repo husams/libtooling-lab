@@ -235,7 +235,8 @@ public:
   std::expected<BulkResult, std::error_code>
   executeBulk(std::string_view sql, Input &&input, Binder &&binder,
               BulkOptions options = {}) {
-    return detail::BulkScope::start(connection_, options.atomic)
+    return detail::BulkScope::start(connection_,
+                                    options.atomic && nestedBulkAtomic_)
         .and_then([&](detail::BulkScope scope) {
           return prepareSingle(handle(), sql)
               .and_then([&](Statement statement) {
@@ -274,6 +275,10 @@ public:
     return transaction(TransactionMode::immediate);
   }
 
+  void setNestedBulkAtomic(bool enabled) noexcept {
+    nestedBulkAtomic_ = enabled;
+  }
+
   explicit operator bool() const noexcept {
     return connection_ && connection_.get() != nullptr;
   }
@@ -287,6 +292,7 @@ private:
   sqlite3 *handle() const noexcept { return nativeHandle(); }
 
   detail::Connection connection_;
+  bool nestedBulkAtomic_{true};
 };
 
 template <typename Binder>

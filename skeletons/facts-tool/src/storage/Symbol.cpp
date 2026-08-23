@@ -202,7 +202,7 @@ Storage::saveSymbol(SymbolNode node, const Symbol &symbol, SymbolFacts facts) {
     return std::unexpected(std::make_error_code(std::errc::invalid_argument));
   }
 
-  auto transaction = database_.write();
+  auto transaction = writeTransaction();
   if (!transaction) {
     return std::unexpected(transaction.error());
   }
@@ -233,13 +233,13 @@ Storage::saveSymbol(SymbolNode node, const Symbol &symbol, SymbolFacts facts) {
             .transform([id] { return id; });
       })
       .and_then([&](SymbolId id) {
-        return transaction->commit().transform([id] { return id; });
+        return commit(*transaction).transform([id] { return id; });
       });
 }
 
 std::expected<Symbol, std::error_code>
 Storage::loadSymbol(SymbolNode node, SymbolId id, SymbolFacts facts) {
-  auto transaction = database_.read();
+  auto transaction = readTransaction();
   if (!transaction) {
     return std::unexpected(transaction.error());
   }
@@ -249,8 +249,8 @@ Storage::loadSymbol(SymbolNode node, SymbolId id, SymbolFacts facts) {
         return loadFacts(std::move(symbol), facts);
       })
       .and_then([&](Symbol symbol) {
-        return transaction->commit().transform(
-            [symbol = std::move(symbol)]() mutable {
+        return commit(*transaction)
+            .transform([symbol = std::move(symbol)]() mutable {
               return std::move(symbol);
             });
       });
@@ -262,7 +262,7 @@ Storage::loadSymbol(SymbolNode node, std::string_view usr, SymbolFacts facts) {
     return std::unexpected(std::make_error_code(std::errc::invalid_argument));
   }
 
-  auto transaction = database_.read();
+  auto transaction = readTransaction();
   if (!transaction) {
     return std::unexpected(transaction.error());
   }
@@ -282,8 +282,8 @@ Storage::loadSymbol(SymbolNode node, std::string_view usr, SymbolFacts facts) {
             });
       })
       .and_then([&](std::optional<Symbol> symbol) {
-        return transaction->commit().transform(
-            [symbol = std::move(symbol)]() mutable {
+        return commit(*transaction)
+            .transform([symbol = std::move(symbol)]() mutable {
               return std::move(symbol);
             });
       });
