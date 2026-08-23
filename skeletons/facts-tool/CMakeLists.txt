@@ -68,6 +68,7 @@ target_include_directories(facts-model INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src
 target_link_libraries(facts-model INTERFACE facts-clang)
 
 add_library(facts-storage STATIC
+  src/storage/DependencyDatabase.cpp
   src/storage/FileDatabase.cpp
   src/storage/FileManager.cpp
   src/storage/Definition.cpp
@@ -131,6 +132,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/ValueDecl.cpp
   src/ast/extractors/VarDecl.cpp
   src/ast/visitors/SymbolCollector.cpp
+  src/ast/visitors/IncludeVisitor.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
 )
@@ -148,6 +150,7 @@ target_link_libraries(facts-platform PRIVATE facts-clang)
 
 # Commands own application behavior and remain independent of CLI11.
 add_library(facts-commands STATIC
+  src/commands/Dependency.cpp
   src/commands/Extract.cpp
   src/commands/Import.cpp
 )
@@ -262,7 +265,59 @@ if(BUILD_TESTING)
   target_link_libraries(sqlite-command-test PRIVATE facts-storage
                                                     SQLite3::SQLite3)
   add_test(NAME sqlite-command COMMAND sqlite-command-test)
+  add_executable(dependency-database-test tests/DependencyDatabaseTest.cpp)
+  target_link_libraries(dependency-database-test PRIVATE facts-storage
+                                                         SQLite3::SQLite3)
   add_test(NAME sqlite-generator-demo COMMAND sqlite-generator-demo)
+  set(dependency_config
+      ${CMAKE_CURRENT_BINARY_DIR}/dependency-analysis.sqlite)
+  set(dependency_output
+      ${CMAKE_CURRENT_BINARY_DIR}/dependency-analysis-output.sqlite)
+  set(dependency_fixture
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/dependency)
+  add_test(
+    NAME dependency-analysis-import
+    COMMAND facts-tool import
+            --conf ${dependency_config}
+            --extra-arg=-std=c++23
+            --extra-arg=-I${dependency_fixture}
+            ${dependency_fixture}/root.cpp
+  )
+  add_test(
+    NAME dependency-analysis-first
+    COMMAND facts-tool analyses dependency
+            --conf ${dependency_config}
+            ${dependency_fixture}/root.cpp
+  )
+  set_tests_properties(dependency-analysis-first PROPERTIES
+    DEPENDS dependency-analysis-import)
+  add_test(
+    NAME dependency-analysis-second
+    COMMAND facts-tool analyses dependency
+            --conf ${dependency_config}
+            ${dependency_fixture}/root.cpp
+  )
+  set_tests_properties(dependency-analysis-second PROPERTIES
+    DEPENDS dependency-analysis-first)
+  add_test(
+    NAME dependency-analysis-extract
+    COMMAND facts-tool extract
+            --output ${dependency_output}
+            --conf ${dependency_config}
+            ${dependency_fixture}/root.cpp
+  )
+  set_tests_properties(dependency-analysis-extract PROPERTIES
+    DEPENDS dependency-analysis-second)
+  add_test(
+    NAME dependency-analysis-verify
+    COMMAND dependency-database-test
+            ${dependency_config}
+            ${dependency_fixture}/root.cpp
+            ${dependency_fixture}/b.h
+            ${dependency_fixture}/c.h
+  )
+  set_tests_properties(dependency-analysis-verify PROPERTIES
+    DEPENDS dependency-analysis-extract)
   add_test(
     NAME multi-tu-project-import
     COMMAND facts-tool import

@@ -20,6 +20,11 @@ struct ImportOptions {
   std::vector<std::string> sources;
 };
 
-using Command = std::variant<ExtractOptions, ImportOptions>;
+struct DependencyOptions {
+  std::string configuration;
+  std::vector<std::string> sources;
+};
+
+using Command = std::variant<ExtractOptions, ImportOptions, DependencyOptions>;
 
 } // namespace facts::cli
