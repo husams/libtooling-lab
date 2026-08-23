@@ -9,8 +9,8 @@
 // The sqlite3* stays private, the way Storage and FileDatabase keep theirs:
 // prepare, bind, step and finalize live inside the generators in
 // SqliteQuery.h, so callers never see a statement handle or a result code.
-// Because the streams are lazy, the Database must outlive any range taken
-// from it.
+// Lazy streams share the internal connection state, so they remain valid after
+// the Database value is moved or destroyed.
 
 #include "storage/Generator.h"
 #include "storage/Sqlite.h"
@@ -28,42 +28,47 @@
 
 namespace facts::storage {
 
-struct ConnectionDeleter {
-  void operator()(sqlite3 *database) const noexcept { sqlite3_close(database); }
-};
-
 class Database {
 public:
   static constexpr int readOnly = SQLITE_OPEN_READONLY;
   static constexpr int readWrite = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
 
-  static std::expected<Database, std::error_code>
-  open(const std::string &path, int flags = readOnly) {
+  static std::expected<Database, std::error_code> open(const std::string &path,
+                                                       int flags = readOnly) {
     sqlite3 *raw = nullptr;
     const int status = sqlite3_open_v2(path.c_str(), &raw, flags, nullptr);
-    Database database(raw);
     if (status != SQLITE_OK) {
-      return std::unexpected(
-          raw ? sqliteError(raw)
-              : std::error_code(status, std::generic_category()));
+      const auto error = raw ? sqliteError(raw)
+                             : std::error_code(status, std::generic_category());
+      if (raw) {
+        sqlite3_close_v2(raw);
+      }
+      return std::unexpected(error);
     }
     sqlite3_busy_timeout(raw, 10000);
-    return database;
+    return Database(detail::Connection(
+        raw, [](sqlite3 *database) { sqlite3_close_v2(database); }));
   }
 
+  Database(Database &&) noexcept = default;
+  Database &operator=(Database &&) noexcept = default;
+  Database(const Database &) = delete;
+  Database &operator=(const Database &) = delete;
+
   // The raw row stream: cheapest, but a Row only lives until the next step.
-  template <detail::Bindable... Binds>
-  Generator<Row> rows(std::string sql, Binds... binds) const {
-    return detail::rowStream(handle(), std::move(sql), std::move(binds)...);
+  template <typename... Binds>
+  Generator<Row> rows(std::string sql, Binds &&...binds) const {
+    return detail::rowStream(connection_, std::move(sql),
+                             detail::ownBind(std::forward<Binds>(binds))...);
   }
 
   // The composable one: each row is mapped to an owned value while it is still
   // valid, so the result pipes into std::ranges views like any other range.
-  template <typename Map, detail::Bindable... Binds>
-  auto query(std::string sql, Map map, Binds... binds) const
+  template <typename Map, typename... Binds>
+  auto query(std::string sql, Map map, Binds &&...binds) const
       -> Generator<std::invoke_result_t<Map &, const Row &>> {
-    return detail::valueStream(handle(), std::move(sql), std::move(map),
-                               std::move(binds)...);
+    return detail::valueStream(connection_, std::move(sql), std::move(map),
+                               detail::ownBind(std::forward<Binds>(binds))...);
   }
 
   std::expected<void, std::error_code> execute(std::string_view sql) {
@@ -78,14 +83,17 @@ public:
     return Transaction::write(handle());
   }
 
-  explicit operator bool() const noexcept { return connection_ != nullptr; }
+  explicit operator bool() const noexcept {
+    return connection_ && connection_.get() != nullptr;
+  }
 
 private:
-  explicit Database(sqlite3 *connection) : connection_(connection) {}
+  explicit Database(detail::Connection connection)
+      : connection_(std::move(connection)) {}
 
   sqlite3 *handle() const noexcept { return connection_.get(); }
 
-  std::unique_ptr<sqlite3, ConnectionDeleter> connection_;
+  detail::Connection connection_;
 };
 
 } // namespace facts::storage
