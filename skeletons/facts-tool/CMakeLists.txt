@@ -158,6 +158,10 @@ target_link_libraries(facts-cli PRIVATE facts-commands CLI11::CLI11)
 add_executable(facts-tool src/main.cpp)
 target_link_libraries(facts-tool PRIVATE facts-cli)
 
+add_executable(sqlite-generator-demo examples/sqlite_generator_demo.cpp)
+target_link_libraries(sqlite-generator-demo PRIVATE facts-storage
+                                                    SQLite3::SQLite3)
+
 include(CTest)
 if(BUILD_TESTING)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -233,6 +237,11 @@ if(BUILD_TESTING)
   target_link_libraries(sqlite-query-test PRIVATE facts-storage
                                                   SQLite3::SQLite3)
   add_test(NAME sqlite-query COMMAND sqlite-query-test)
+  add_executable(sqlite-command-test tests/SqliteCommandTest.cpp)
+  target_link_libraries(sqlite-command-test PRIVATE facts-storage
+                                                    SQLite3::SQLite3)
+  add_test(NAME sqlite-command COMMAND sqlite-command-test)
+  add_test(NAME sqlite-generator-demo COMMAND sqlite-generator-demo)
   add_test(
     NAME multi-tu-project-import
     COMMAND facts-tool import

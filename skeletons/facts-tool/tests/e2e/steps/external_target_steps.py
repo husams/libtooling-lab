@@ -72,16 +72,31 @@ def when_extract_indexes_external_targets(
 
 
 def extract_fixture(context: FactsToolContext, source: Path) -> None:
+    imported = run(
+        [
+            str(context.facts_tool),
+            "import",
+            "--conf",
+            str(context.files_database_path),
+            "--compilation-database",
+            str(context.run_root_path),
+            str(source),
+        ]
+    )
+    require(
+        imported.returncode == 0,
+        f"expected import exit code 0, got {imported.returncode}:\n"
+        + imported.stdout
+        + imported.stderr,
+    )
     completed = run(
         [
             str(context.facts_tool),
-            "-p",
-            str(context.run_root_path),
-            "--facts-out",
+            "extract",
+            "--output",
             str(context.facts_database_path),
-            "--project-config",
+            "--conf",
             str(context.files_database_path),
-            "--refresh-project-config",
             str(source),
         ]
     )

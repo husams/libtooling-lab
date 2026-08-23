@@ -3,8 +3,9 @@
 // The registry is the SQLite database facts-tool writes with --files-out: one
 // `file(id, path)` row per translation unit and header it saw.
 //
-// This example is deliberately outside the CMake build, so it can be compiled
-// on its own:
+// The CMake target is also a repository-native test. With no argument it uses
+// an in-memory registry; pass a facts-tool file registry to query real data.
+// It can still be compiled on its own:
 //
 //   LLVM=$(brew --prefix llvm)
 //   $LLVM/bin/clang++ -std=c++23 -I src examples/sqlite_generator_demo.cpp \
@@ -18,6 +19,8 @@
 #include <print>
 #include <ranges>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -32,16 +35,49 @@ bool isHeader(const facts::FileRecord &record) {
 } // namespace
 
 int main(int argc, const char **argv) {
-  if (argc != 2) {
-    std::println(stderr, "usage: sqlite-generator-demo <files.sqlite>");
+  if (argc > 2) {
+    std::println(stderr, "usage: sqlite-generator-demo [files.sqlite]");
     return 2;
   }
 
-  auto database = facts::storage::Database::open(argv[1]);
+  const bool selfContained = argc == 1;
+  auto database = facts::storage::Database::open(
+      selfContained ? ":memory:" : argv[1],
+      selfContained ? facts::storage::Database::readWrite
+                    : facts::storage::Database::readOnly);
   if (!database) {
-    std::println(stderr, "cannot open {}: {}", argv[1],
+    std::println(stderr, "cannot open {}: {}",
+                 selfContained ? ":memory:" : argv[1],
                  database.error().message());
     return 1;
+  }
+
+  if (selfContained) {
+    const auto schema = database->executeCommand(
+        "CREATE TABLE file(id INTEGER PRIMARY KEY, path TEXT)");
+    auto seed = std::views::iota(0, 4) | std::views::transform([](int index) {
+                  return std::pair{
+                      index + 1, index % 2 == 0
+                                     ? "file" + std::to_string(index) + ".h"
+                                     : "file" + std::to_string(index) + ".cpp"};
+                });
+    const auto inserted =
+        seed | database->bulk("INSERT INTO file(id, path) VALUES (?1, ?2)",
+                              [](sqlite3_stmt *statement, const auto &file) {
+                                return facts::storage::bindParameters(
+                                    statement, file.first, file.second);
+                              });
+    auto transaction = database->write();
+    const auto updated = database->executeCommand(
+        "UPDATE file SET path = 'src/' || path WHERE id = 1");
+    const auto committed = transaction ? transaction->commit()
+                                       : std::unexpected(transaction.error());
+    const auto removed =
+        database->executeCommand("DELETE FROM file WHERE id = 4");
+    if (!schema || !inserted || !updated || !committed || !removed) {
+      std::println(stderr, "cannot prepare the in-memory demonstration");
+      return 1;
+    }
   }
 
   // 1. Rows straight from the database object — no handle, no statement, no
@@ -74,9 +110,8 @@ int main(int argc, const char **argv) {
 
   // 4. And the eager form, for callers that want a vector and an error value
   //    instead of a stream.
-  const auto all =
-      facts::storage::collect(database->query("SELECT id, path FROM file",
-                                              toRecord));
+  const auto all = facts::storage::collect(
+      database->query("SELECT id, path FROM file", toRecord));
   if (!all) {
     std::println(stderr, "query failed: {}", all.error().message());
     return 1;
