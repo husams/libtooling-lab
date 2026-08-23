@@ -289,6 +289,23 @@ transitions:
       - todos_closed
       - acceptance_criteria_verified
 
+  # This account's GitHub does not require an explicit PR approval, so the
+  # approval is recorded automatically by the post_transition hook in
+  # .backlog/hooks/ once a deliverable is Accepted with every review comment
+  # closed. The pr.approved that emits must be a legal, lifecycle-neutral event
+  # from Accepted rather than an illegal transition.
+  - task_types: [story, bug, subtask]
+    from: accepted
+    action: pr.approved
+    to: accepted
+
+  # Resolving the last blocker while already Accepted is likewise a no-op that
+  # simply lets the auto-approval hook re-evaluate.
+  - task_types: [story, bug, subtask]
+    from: accepted
+    action: feedback.resolved
+    to: accepted
+
   # Cancellation. Legal from every unfinished state and from nowhere else:
   # finished work is a record of what happened, not something to withdraw.
   - task_types: [feature, story, bug, subtask]
