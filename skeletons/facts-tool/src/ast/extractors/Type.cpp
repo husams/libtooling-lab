@@ -94,6 +94,14 @@ public:
     return declarationId(type->getTemplateName().getAsTemplateDecl());
   }
 
+  TypeResult VisitPackExpansionType(const clang::PackExpansionType *type) {
+    return Visit(type->getPattern().getTypePtr());
+  }
+
+  TypeResult VisitDecltypeType(const clang::DecltypeType *type) {
+    return Visit(type->getUnderlyingType().getTypePtr());
+  }
+
   TypeResult VisitType(const clang::Type *) {
     return std::unexpected(typeFailure("<unsupported type>", "<unavailable>",
                                        "type is not supported"));
