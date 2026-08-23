@@ -66,6 +66,12 @@ CREATE TABLE IF NOT EXISTS file (
   UNIQUE(directory_id, name)
 );
 
+CREATE TABLE IF NOT EXISTS include_dependency (
+  src_file_id INTEGER NOT NULL REFERENCES file(id) ON DELETE CASCADE,
+  dst_file_id INTEGER NOT NULL REFERENCES file(id) ON DELETE CASCADE,
+  PRIMARY KEY(src_file_id, dst_file_id)
+);
+
 )sql";
 
 } // namespace facts

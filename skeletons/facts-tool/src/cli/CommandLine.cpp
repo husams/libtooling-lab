@@ -1,6 +1,7 @@
 #include "cli/CommandLine.h"
 
 #include "cli/Options.h"
+#include "commands/Dependency.h"
 #include "commands/Extract.h"
 #include "commands/Import.h"
 
@@ -24,6 +25,11 @@ public:
         "extract", "Extract facts using a stored project configuration"));
     configureImport(*app_.add_subcommand(
         "import", "Import compile commands into a project configuration"));
+    analysesCommand_ =
+        app_.add_subcommand("analyses", "Run explicitly requested analyses");
+    analysesCommand_->require_subcommand(1, 1);
+    configureDependency(*analysesCommand_->add_subcommand(
+        "dependency", "Build the direct include dependency graph"));
   }
 
   std::expected<Command, int> parse(int argc, char **argv) {
@@ -33,8 +39,11 @@ public:
       return std::unexpected(app_.exit(error));
     }
 
-    return extractCommand_->parsed() ? Command{std::move(extract_)}
-                                     : Command{std::move(import_)};
+    if (extractCommand_->parsed()) {
+      return Command{std::move(extract_)};
+    }
+    return importCommand_->parsed() ? Command{std::move(import_)}
+                                    : Command{std::move(dependency_)};
   }
 
 private:
@@ -91,11 +100,27 @@ private:
         "--extra-arg arguments");
   }
 
+  void configureDependency(CLI::App &command) {
+    dependencyCommand_ = &command;
+    command
+        .add_option("-c,--conf", dependency_.configuration,
+                    "Full path to the stored project configuration")
+        ->required()
+        ->type_name("FILE");
+    command
+        .add_option("sources", dependency_.sources,
+                    "Translation-unit roots to analyse")
+        ->required();
+  }
+
   CLI::App app_;
   CLI::App *extractCommand_ = nullptr;
   CLI::App *importCommand_ = nullptr;
+  CLI::App *analysesCommand_ = nullptr;
+  CLI::App *dependencyCommand_ = nullptr;
   ExtractOptions extract_;
   ImportOptions import_;
+  DependencyOptions dependency_;
 };
 
 int report(std::expected<int, std::string> result) {
@@ -112,8 +137,10 @@ int dispatch(Command command) {
         using Options = decltype(options);
         if constexpr (std::same_as<Options, ExtractOptions>) {
           return report(commands::runExtract(options));
-        } else {
+        } else if constexpr (std::same_as<Options, ImportOptions>) {
           return report(commands::runImport(options));
+        } else {
+          return report(commands::runDependency(options));
         }
       },
       std::move(command));

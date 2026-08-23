@@ -21,6 +21,7 @@ Feature: Facts and file storage boundaries
       | component         |
       | directory         |
       | file              |
+      | include_dependency |
       | repository        |
       | semantic_universe |
     And the facts and files databases use different paths
