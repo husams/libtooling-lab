@@ -1,0 +1,345 @@
+version: 1
+name: default
+
+states:
+  - slug: created
+    display: Created
+    category: backlog
+    initial: true
+    task_types: [feature, story, bug, subtask]
+
+  - slug: incomplete
+    display: Incomplete
+    category: backlog
+    task_types: [feature, story, bug, subtask]
+
+  - slug: ready
+    display: Ready
+    category: ready
+    task_types: [feature, story, bug, subtask]
+
+  - slug: in_progress
+    display: In Progress
+    category: active
+    task_types: [feature, story, bug, subtask]
+
+  - slug: in_review
+    display: In Review
+    category: review
+    task_types: [feature, story, bug, subtask]
+
+  - slug: needs_work
+    display: Needs Work
+    category: active
+    task_types: [feature, story, bug, subtask]
+
+  - slug: accepted
+    display: Accepted
+    category: done
+    satisfies_dependencies: true
+    task_types: [feature, story, bug, subtask]
+
+  - slug: done
+    display: Done
+    category: done
+    satisfies_dependencies: true
+    terminal: true
+    task_types: [feature, story, bug, subtask]
+
+  # Work abandoned before it was finished. It satisfies dependents, because
+  # nothing should wait on work that is never going to arrive, and it is
+  # terminal: a cancelled item is reopened by creating new work, not by
+  # transitioning back out of it.
+  - slug: cancelled
+    display: Cancelled
+    category: dropped
+    satisfies_dependencies: true
+    terminal: true
+    task_types: [feature, story, bug, subtask]
+
+  - slug: planned
+    display: Planned
+    category: backlog
+    initial: true
+    task_types: [iteration]
+
+  - slug: open
+    display: Open
+    category: active
+    task_types: [iteration]
+
+  - slug: closed
+    display: Closed
+    category: done
+    satisfies_dependencies: true
+    terminal: true
+    task_types: [iteration]
+
+transitions:
+  - task_types: [iteration]
+    from: planned
+    action: iteration.opened
+    to: open
+
+  - task_types: [iteration]
+    from: open
+    action: iteration.closed
+    to: closed
+    gates:
+      - iteration_members_finished
+      - iteration_comments_closed
+      - iteration_retrospective_actions_clear
+
+  - task_types: [iteration]
+    from: closed
+    action: iteration.reopened
+    to: open
+    gates: [iteration_members_finished]
+
+  # Iteration comments are review-managed lifecycle events. They are explicit
+  # no-ops in every Iteration state; closure is gated independently below.
+  - task_types: [iteration]
+    from: planned
+    action: feedback.posted
+    to: planned
+
+  - task_types: [iteration]
+    from: planned
+    action: feedback.reopened
+    to: planned
+
+  - task_types: [iteration]
+    from: planned
+    action: feedback.resolved
+    to: planned
+
+  - task_types: [iteration]
+    from: open
+    action: feedback.posted
+    to: open
+
+  - task_types: [iteration]
+    from: open
+    action: feedback.reopened
+    to: open
+
+  - task_types: [iteration]
+    from: open
+    action: feedback.resolved
+    to: open
+
+  - task_types: [iteration]
+    from: closed
+    action: feedback.posted
+    to: closed
+
+  - task_types: [iteration]
+    from: closed
+    action: feedback.reopened
+    to: closed
+
+  - task_types: [iteration]
+    from: closed
+    action: feedback.resolved
+    to: closed
+
+  # Backlog refinement
+  - task_types: [feature, story, bug, subtask]
+    from: created
+    action: refinement.marked_incomplete
+    to: incomplete
+
+  - task_types: [feature, story, bug, subtask]
+    from: created
+    action: refinement.accepted
+    to: ready
+
+  - task_types: [feature, story, bug, subtask]
+    from: incomplete
+    action: refinement.accepted
+    to: ready
+
+  # A blocker thread is not a task transition. The review subsystem emits
+  # feedback.resolved only when every blocker was accepted by a reviewer.
+  - task_types: [feature, story, bug, subtask]
+    from: incomplete
+    action: feedback.resolved
+    to: ready
+
+  # A new or reopened blocker invalidates refinement readiness.
+  - task_types: [feature, story, bug, subtask]
+    from: ready
+    action: feedback.posted
+    to: incomplete
+
+  - task_types: [feature, story, bug, subtask]
+    from: ready
+    action: feedback.reopened
+    to: incomplete
+
+  # Implementation
+  - task_types: [feature, story, bug, subtask]
+    from: ready
+    action: work.started
+    to: in_progress
+    gates: [dependencies_clear, review_threads_closed]
+
+  - task_types: [feature, story, bug, subtask]
+    from: needs_work
+    action: work.resumed
+    to: in_progress
+
+  - task_types: [feature, story, bug, subtask]
+    from: needs_work
+    action: work.started
+    to: in_progress
+
+  # Submission for implementation review
+  - task_types: [feature, story, bug, subtask]
+    from: in_progress
+    action: work.completed
+    to: in_review
+    gates: [todos_closed]
+
+  - task_types: [feature, story, bug, subtask]
+    from: in_progress
+    action: review.submitted
+    to: in_review
+    gates: [todos_closed]
+
+  - task_types: [story, bug, subtask]
+    from: in_progress
+    action: pr.created
+    to: in_review
+    gates: [todos_closed]
+
+  - task_types: [story, bug, subtask]
+    from: in_progress
+    action: pr.marked_ready
+    to: in_review
+    gates: [todos_closed]
+
+  # Review requested more work
+  - task_types: [feature, story, bug, subtask]
+    from: in_review
+    action: review.changes_requested
+    to: needs_work
+
+  - task_types: [feature, story, bug, subtask]
+    from: in_review
+    action: delivery.rejected
+    to: needs_work
+
+  - task_types: [feature, story, bug, subtask]
+    from: in_review
+    action: check.failed
+    to: needs_work
+
+  - task_types: [story, bug, subtask]
+    from: in_review
+    action: pr.changes_requested
+    to: needs_work
+
+  - task_types: [story, bug, subtask]
+    from: in_review
+    action: pr.closed
+    to: needs_work
+
+  - task_types: [feature, story, bug, subtask]
+    from: accepted
+    action: check.failed
+    to: needs_work
+
+  - task_types: [story, bug, subtask]
+    from: accepted
+    action: pr.changes_requested
+    to: needs_work
+
+  # Implementation accepted
+  - task_types: [feature, story, bug, subtask]
+    from: in_review
+    action: review.approved
+    to: accepted
+    gates:
+      - review_threads_closed
+      - children_complete
+      - required_validations_pass
+      - todos_closed
+      - acceptance_criteria_verified
+
+  - task_types: [feature, story, bug, subtask]
+    from: in_review
+    action: delivery.accepted
+    to: accepted
+    gates:
+      - review_threads_closed
+      - children_complete
+      - required_validations_pass
+      - todos_closed
+      - acceptance_criteria_verified
+
+  - task_types: [story, bug, subtask]
+    from: in_review
+    action: pr.approved
+    to: accepted
+    gates:
+      - review_threads_closed
+      - children_complete
+      - required_validations_pass
+      - todos_closed
+      - acceptance_criteria_verified
+
+  # Cancellation. Legal from every unfinished state and from nowhere else:
+  # finished work is a record of what happened, not something to withdraw.
+  - task_types: [feature, story, bug, subtask]
+    from: created
+    action: item.cancelled
+    to: cancelled
+
+  - task_types: [feature, story, bug, subtask]
+    from: incomplete
+    action: item.cancelled
+    to: cancelled
+
+  - task_types: [feature, story, bug, subtask]
+    from: ready
+    action: item.cancelled
+    to: cancelled
+
+  - task_types: [feature, story, bug, subtask]
+    from: in_progress
+    action: item.cancelled
+    to: cancelled
+
+  - task_types: [feature, story, bug, subtask]
+    from: in_review
+    action: item.cancelled
+    to: cancelled
+
+  - task_types: [feature, story, bug, subtask]
+    from: needs_work
+    action: item.cancelled
+    to: cancelled
+
+  # Delivery completed
+  - task_types: [feature]
+    from: accepted
+    action: delivery.released
+    to: done
+    gates:
+      - children_complete
+      - required_validations_pass
+      - todos_closed
+      - acceptance_criteria_verified
+
+  - task_types: [story, bug, subtask]
+    from: accepted
+    action: pr.merged
+    to: done
+    gates:
+      - review_threads_closed
+      - children_complete
+      - required_validations_pass
+      - pr_merged
+      - todos_closed
+      - acceptance_criteria_verified
