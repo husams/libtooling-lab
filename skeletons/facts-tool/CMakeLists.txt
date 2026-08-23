@@ -230,6 +230,10 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-fresh.sqlite
             ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-legacy.sqlite
   )
+  add_executable(sqlite-query-test tests/SqliteQueryTest.cpp)
+  target_link_libraries(sqlite-query-test PRIVATE facts-storage
+                                                  SQLite3::SQLite3)
+  add_test(NAME sqlite-query COMMAND sqlite-query-test)
   add_test(
     NAME multi-tu-project-import
     COMMAND facts-tool import

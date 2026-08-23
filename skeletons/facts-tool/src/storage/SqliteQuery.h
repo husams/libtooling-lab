@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -42,11 +43,21 @@
 
 namespace facts::storage {
 
+namespace detail {
+template <typename Value>
+struct IsOptional : std::false_type {};
+
+template <typename Value>
+struct IsOptional<std::optional<Value>> : std::true_type {};
+} // namespace detail
+
 class QueryError : public std::system_error {
 public:
   QueryError(std::error_code code, const std::string &message)
       : std::system_error(code, message) {}
 };
+
+using Blob = std::vector<std::byte>;
 
 [[noreturn]] inline void raiseQueryError(sqlite3 *database) {
   throw QueryError(sqliteError(database), sqlite3_errmsg(database));
@@ -85,11 +96,109 @@ public:
     return columnText(statement_, column);
   }
 
+  Blob blob(int column) const {
+    checkColumn(column);
+    requireType(column, SQLITE_BLOB, "blob");
+    const auto *bytes =
+        static_cast<const std::byte *>(sqlite3_column_blob(statement_, column));
+    const auto size = sqlite3_column_bytes(statement_, column);
+    return bytes ? Blob(bytes, bytes + size) : Blob{};
+  }
+
+  template <typename Value>
+  Value get(int column) const {
+    checkColumn(column);
+    if constexpr (detail::IsOptional<Value>::value) {
+      using Inner = typename Value::value_type;
+      return isNull(column) ? Value{} : Value{get<Inner>(column)};
+    } else {
+      requireNotNull(column);
+      if constexpr (std::same_as<Value, SymbolId>) {
+        requireType(column, SQLITE_INTEGER, "integer");
+        return unpackSymbolId(static_cast<std::uint64_t>(integer(column)));
+      } else if constexpr (std::same_as<Value, bool>) {
+        requireType(column, SQLITE_INTEGER, "integer");
+        return integer(column) != 0;
+      } else if constexpr (std::integral<Value>) {
+        requireType(column, SQLITE_INTEGER, "integer");
+        return static_cast<Value>(integer(column));
+      } else if constexpr (std::is_enum_v<Value>) {
+        requireType(column, SQLITE_INTEGER, "integer");
+        return static_cast<Value>(integer(column));
+      } else if constexpr (std::floating_point<Value>) {
+        requireNumeric(column);
+        return static_cast<Value>(real(column));
+      } else if constexpr (std::same_as<Value, std::string>) {
+        requireType(column, SQLITE_TEXT, "text");
+        return string(column);
+      } else if constexpr (std::same_as<Value, Blob>) {
+        return blob(column);
+      } else {
+        static_assert(alwaysFalse<Value>, "unsupported SQLite column type");
+      }
+    }
+  }
+
 private:
+  template <typename>
+  static constexpr bool alwaysFalse = false;
+
+  [[noreturn]] static void decodeError(int column, std::string message) {
+    throw QueryError(std::make_error_code(std::errc::invalid_argument),
+                     "column " + std::to_string(column) + ": " + message);
+  }
+
+  void checkColumn(int column) const {
+    if (column < 0 || column >= columns()) {
+      decodeError(column, "out of range");
+    }
+  }
+
+  void requireNotNull(int column) const {
+    if (isNull(column)) {
+      decodeError(column, "unexpected null");
+    }
+  }
+
+  void requireType(int column, int expected, std::string_view name) const {
+    if (sqlite3_column_type(statement_, column) != expected) {
+      decodeError(column, "expected " + std::string{name});
+    }
+  }
+
+  void requireNumeric(int column) const {
+    const int type = sqlite3_column_type(statement_, column);
+    if (type != SQLITE_INTEGER && type != SQLITE_FLOAT) {
+      decodeError(column, "expected number");
+    }
+  }
+
   sqlite3_stmt *statement_;
 };
 
 namespace detail {
+
+using Connection = std::shared_ptr<sqlite3>;
+
+template <typename Value>
+concept ByteRange = std::ranges::contiguous_range<Value> &&
+                    std::same_as<std::ranges::range_value_t<Value>, std::byte>;
+
+template <typename Value>
+auto ownBind(Value &&value) {
+  using Decayed = std::remove_cvref_t<Value>;
+  if constexpr (std::convertible_to<Value, std::string_view>) {
+    return std::string{std::string_view{value}};
+  } else if constexpr (IsOptional<Decayed>::value) {
+    using Owned = decltype(ownBind(*value));
+    return value ? std::optional<Owned>{ownBind(*value)}
+                 : std::optional<Owned>{};
+  } else if constexpr (ByteRange<Decayed>) {
+    return Blob(value.begin(), value.end());
+  } else {
+    return Decayed(std::forward<Value>(value));
+  }
+}
 
 // Bind parameters are 1-based. Constrained overloads keep an `int` argument
 // from being ambiguous between the integer and floating-point forms.
@@ -101,13 +210,20 @@ bool bindOne(sqlite3_stmt *statement, int position, Value value) {
 
 template <std::floating_point Value>
 bool bindOne(sqlite3_stmt *statement, int position, Value value) {
-  return sqlite3_bind_double(statement, position,
-                             static_cast<double>(value)) == SQLITE_OK;
+  return sqlite3_bind_double(statement, position, static_cast<double>(value)) ==
+         SQLITE_OK;
 }
 
 inline bool bindOne(sqlite3_stmt *statement, int position,
                     std::string_view value) {
   return bindText(statement, position, value);
+}
+
+template <ByteRange Value>
+bool bindOne(sqlite3_stmt *statement, int position, const Value &value) {
+  return sqlite3_bind_blob64(statement, position, std::ranges::data(value),
+                             std::ranges::size(value),
+                             SQLITE_TRANSIENT) == SQLITE_OK;
 }
 
 inline bool bindOne(sqlite3_stmt *statement, int position, std::nullptr_t) {
@@ -130,10 +246,10 @@ inline bool bindOne(sqlite3_stmt *statement, int position, SymbolId id) {
 // in its own namespace. ADL finds it here, so nothing in this header has to
 // know about the type.
 template <typename Value>
-concept SelfBinding = requires(sqlite3_stmt *statement, int position,
-                               const Value &value) {
-  { bindValue(statement, position, value) } -> std::same_as<bool>;
-};
+concept SelfBinding =
+    requires(sqlite3_stmt *statement, int position, const Value &value) {
+      { bindValue(statement, position, value) } -> std::same_as<bool>;
+    };
 
 template <SelfBinding Value>
 bool bindOne(sqlite3_stmt *statement, int position, const Value &value) {
@@ -153,16 +269,18 @@ bool bindOne(sqlite3_stmt *statement, int position,
 // Constraining the pack turns a wrong argument type into one short error at
 // the call site instead of a template instantiation dump.
 template <typename Value>
-concept Bindable = requires(sqlite3_stmt *statement, int position,
-                            const Value &value) {
-  { bindOne(statement, position, value) } -> std::same_as<bool>;
-};
+concept Bindable =
+    requires(sqlite3_stmt *statement, int position, const Value &value) {
+      { bindOne(statement, position, value) } -> std::same_as<bool>;
+    };
 
 // Streams a result set. Nothing is prepared until the first iteration, and the
 // statement is finalized when the generator dies -- including on an early
 // break, or when an exception unwinds the loop.
 template <Bindable... Binds>
-Generator<Row> rowStream(sqlite3 *database, std::string sql, Binds... binds) {
+Generator<Row> rowStream(Connection connection, std::string sql,
+                         Binds... binds) {
+  sqlite3 *database = connection.get();
   auto statement = prepare(database, sql);
   if (!statement) {
     raiseQueryError(database);
@@ -172,12 +290,12 @@ Generator<Row> rowStream(sqlite3 *database, std::string sql, Binds... binds) {
   // wise bind to NULL and answer with a silently empty result set.
   if (sqlite3_bind_parameter_count(statement->get()) !=
       static_cast<int>(sizeof...(Binds))) {
-    throw QueryError(std::make_error_code(std::errc::invalid_argument),
-                     "expected " +
-                         std::to_string(sqlite3_bind_parameter_count(
-                             statement->get())) +
-                         " bind argument(s), got " +
-                         std::to_string(sizeof...(Binds)) + ": " + sql);
+    throw QueryError(
+        std::make_error_code(std::errc::invalid_argument),
+        "expected " +
+            std::to_string(sqlite3_bind_parameter_count(statement->get())) +
+            " bind argument(s), got " + std::to_string(sizeof...(Binds)) +
+            ": " + sql);
   }
 
   int position = 0;
@@ -205,10 +323,11 @@ Generator<Row> rowStream(sqlite3 *database, std::string sql, Binds... binds) {
 // Same stream, mapped while the row is still alive, so what comes out owns
 // itself and survives the next step.
 template <typename Map, Bindable... Binds>
-auto valueStream(sqlite3 *database, std::string sql, Map map, Binds... binds)
+auto valueStream(Connection connection, std::string sql, Map map,
+                 Binds... binds)
     -> Generator<std::invoke_result_t<Map &, const Row &>> {
   for (const Row &row :
-       rowStream(database, std::move(sql), std::move(binds)...)) {
+       rowStream(std::move(connection), std::move(sql), std::move(binds)...)) {
     co_yield std::invoke(map, row);
   }
 }
