@@ -51,6 +51,22 @@ public:
     return Visit(type->getOriginalType().getTypePtr());
   }
 
+  TypeResult VisitParenType(const clang::ParenType *type) {
+    return Visit(type->getInnerType().getTypePtr());
+  }
+
+  TypeResult VisitAutoType(const clang::AutoType *type) {
+    const auto deduced = type->getDeducedType();
+    return deduced.isNull() ? std::unexpected(typeFailure(
+                                  "<undeduced auto>", "<unavailable>",
+                                  "auto type does not have a deduced type"))
+                            : Visit(deduced.getTypePtr());
+  }
+
+  TypeResult VisitFunctionType(const clang::FunctionType *type) {
+    return Visit(type->getReturnType().getTypePtr());
+  }
+
   TypeResult VisitTypedefType(const clang::TypedefType *type) {
     return declarationId(type->getDecl());
   }
@@ -102,9 +118,10 @@ public:
     return Visit(type->getUnderlyingType().getTypePtr());
   }
 
-  TypeResult VisitType(const clang::Type *) {
-    return std::unexpected(typeFailure("<unsupported type>", "<unavailable>",
-                                       "type is not supported"));
+  TypeResult VisitType(const clang::Type *type) {
+    return std::unexpected(typeFailure(
+        "<unsupported type>", "<unavailable>",
+        "type is not supported: " + std::string{type->getTypeClassName()}));
   }
 
 private:

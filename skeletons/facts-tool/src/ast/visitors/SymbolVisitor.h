@@ -21,6 +21,7 @@ public:
   bool TraverseFieldDecl(clang::FieldDecl *decl);
   bool TraverseTranslationUnitDecl(clang::TranslationUnitDecl *decl);
   bool TraverseParmVarDecl(clang::ParmVarDecl *decl);
+  bool TraverseUsingDirectiveDecl(clang::UsingDirectiveDecl *decl);
   bool VisitCXXRecordDecl(clang::CXXRecordDecl *decl);
   bool VisitEnumConstantDecl(clang::EnumConstantDecl *decl);
   bool VisitEnumDecl(clang::EnumDecl *decl);

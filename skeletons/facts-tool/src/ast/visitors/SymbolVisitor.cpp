@@ -49,6 +49,10 @@ bool SymbolVisitor::TraverseFieldDecl(clang::FieldDecl *decl) {
 
 bool SymbolVisitor::TraverseParmVarDecl(clang::ParmVarDecl *) { return true; }
 
+bool SymbolVisitor::TraverseUsingDirectiveDecl(clang::UsingDirectiveDecl *) {
+  return true;
+}
+
 bool SymbolVisitor::VisitFunctionDecl(clang::FunctionDecl *decl) {
   status_.record(collectSymbol(*decl, context_, files_, store_));
   return true;

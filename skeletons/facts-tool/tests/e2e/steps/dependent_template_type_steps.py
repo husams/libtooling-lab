@@ -155,6 +155,48 @@ def then_dependent_decltype_alias_is_captured(context: FactsToolContext) -> None
     )
 
 
+@then("deduced variables and parenthesized function types are captured")
+def then_deduced_and_function_types_are_resolvable(
+    context: FactsToolContext,
+) -> None:
+    symbols = set(
+        query(
+            context.facts_database_path,
+            "SELECT qualified_name,node FROM symbol "
+            "WHERE qualified_name IN ('b004::migrationSql','b004::Writer')",
+        )
+    )
+    require(
+        symbols == {("b004::migrationSql", 4), ("b004::Writer", 5)},
+        f"missing deduced variable or function-pointer alias: {symbols}",
+    )
+
+    aliases = query(
+        context.facts_database_path,
+        "SELECT destination.qualified_name FROM relation r "
+        "JOIN symbol source ON source.id=r.source_id "
+        "JOIN symbol destination ON destination.id=r.destination_id "
+        "WHERE source.qualified_name='Owned' AND r.kind=19",
+    )
+    require(
+        ("b004::Widget",) in aliases,
+        f"missing deduced auto alias relation: {aliases}",
+    )
+
+    function_parameters = query(
+        context.facts_database_path,
+        "SELECT p.is_pointer,p.type_id FROM template_parameter p "
+        "JOIN symbol source ON source.id=p.symbol_id "
+        "WHERE source.qualified_name='b004::valueStream' AND p.position=0",
+    )
+    require(
+        len(function_parameters) == 1
+        and function_parameters[0][0] == 1
+        and function_parameters[0][1] != 0,
+        f"function-pointer template argument was not resolved: {function_parameters}",
+    )
+
+
 @then("dependent function-template instances point to their primary templates")
 def then_dependent_instances_point_to_primary(context: FactsToolContext) -> None:
     relations = set(

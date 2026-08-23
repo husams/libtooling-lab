@@ -2,6 +2,15 @@ namespace b004 {
 
 struct Widget {};
 
+namespace support {
+struct Marker {};
+} // namespace support
+
+using namespace support;
+
+inline constexpr auto migrationSql = "ALTER TABLE symbol";
+using Writer = bool (*)(const Widget &, unsigned long);
+
 template <typename T>
 T identity(T value) {
   return value;
@@ -33,6 +42,24 @@ auto dependentAlias(Value &&value) {
   return Owned{};
 }
 
+template <typename Value>
+auto ownBind(Value value) {
+  return value;
+}
+
+template <typename Value>
+auto deducedAlias(Value *value) {
+  using Owned = decltype(ownBind(*value));
+  return Owned{};
+}
+
+template <typename Map, typename... Values>
+auto valueStream(Map map, Values... values) -> decltype(map(values...)) {
+  return map(values...);
+}
+
+bool writeWidget(const Widget &, unsigned long) { return true; }
+
 template <typename... Values>
 void parameterPack(Values &&...values) {
   ((void)values, ...);
@@ -55,6 +82,9 @@ Widget instantiate(Widget value) {
   (void)lvalue(value);
   (void)rvalue(static_cast<Widget &&>(value));
   (void)dependentAlias(address);
+  (void)deducedAlias(address);
+  Writer writer = writeWidget;
+  (void)valueStream(writer, value, 1UL);
   parameterPack(value, 1);
   (void)Nested<Widget>::instantiate(value);
   return identity(value);
