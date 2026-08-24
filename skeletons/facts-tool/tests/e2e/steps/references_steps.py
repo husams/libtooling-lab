@@ -93,8 +93,11 @@ def then_template_and_nested_owners_are_canonical(context: FactsToolContext) -> 
             "SELECT destination.qualified_name FROM relation r "
             "JOIN symbol source ON source.id=r.source_id "
             "JOIN symbol destination ON destination.id=r.destination_id "
+            # A lambda's enclosing class has no name of its own, and clang
+            # spells it differently across releases ("(lambda)" since LLVM 22,
+            # "(anonymous class)" before); match on the call operator instead.
             "WHERE r.kind=7 AND (source.qualified_name LIKE '%Local%method%' "
-            "OR source.qualified_name LIKE '%lambda%operator()%')",
+            "OR source.qualified_name LIKE '%operator()%')",
         )
     }
     require(
