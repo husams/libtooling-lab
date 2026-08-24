@@ -274,7 +274,7 @@ if(BUILD_TESTING)
   )
   add_executable(reference-extraction-test tests/ReferenceExtractionTest.cpp)
   target_link_libraries(reference-extraction-test PRIVATE
-    facts-ast facts-storage facts-model facts-clang SQLite3::SQLite3)
+    facts-ast facts-storage facts-model facts-clang facts-sqlite)
   add_test(
     NAME reference-extraction
     COMMAND reference-extraction-test
