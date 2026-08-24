@@ -85,6 +85,7 @@ add_library(facts-storage STATIC
   src/storage/RecordInstance.cpp
   src/storage/RecordTemplate.cpp
   src/storage/Relation.cpp
+  src/storage/RelationSite.cpp
   src/storage/SchemaMigration.cpp
   src/storage/Sqlite.cpp
   src/storage/Storage.cpp
@@ -125,6 +126,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/Parameters.cpp
   src/ast/extractors/RecordDecl.cpp
   src/ast/extractors/RecordInstance.cpp
+  src/ast/extractors/Reference.cpp
   src/ast/extractors/TargetResolution.cpp
   src/ast/extractors/TemplatePattern.cpp
   src/ast/extractors/TemplateSpecialization.cpp
@@ -133,6 +135,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/VarDecl.cpp
   src/ast/visitors/SymbolCollector.cpp
   src/ast/visitors/IncludeVisitor.cpp
+  src/ast/visitors/BodyVisitor.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
 )
@@ -247,6 +250,17 @@ if(BUILD_TESTING)
     COMMAND storage-schema-test
             ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-fresh.sqlite
             ${CMAKE_CURRENT_BINARY_DIR}/storage-schema-legacy.sqlite
+  )
+  add_executable(reference-extraction-test tests/ReferenceExtractionTest.cpp)
+  target_link_libraries(reference-extraction-test PRIVATE
+    facts-ast facts-storage facts-model facts-clang SQLite3::SQLite3)
+  add_test(
+    NAME reference-extraction
+    COMMAND reference-extraction-test
+            $<TARGET_FILE:facts-tool>
+            ${CMAKE_CXX_COMPILER}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/e2e
+            ${CMAKE_CURRENT_BINARY_DIR}/reference-extraction-artifacts
   )
   add_executable(file-database-persistence-test
                  tests/FileDatabasePersistenceTest.cpp)

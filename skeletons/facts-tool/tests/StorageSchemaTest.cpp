@@ -509,7 +509,16 @@ SELECT group_concat(record, char(10)) FROM (
                          std::to_string(destinationKey) +
                          " AND access='protected' AND is_virtual_base=1 AND "
                          "is_implicit=1 AND is_lexical=1") == 1,
-              "relation semantic columns are incorrect");
+              "relation semantic columns are incorrect") &&
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
+                               "'relation_site')") == 8,
+              "fresh relation-site schema is incomplete") &&
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_foreign_key_list("
+                               "'relation_site') WHERE [table]='relation' "
+                               "AND on_delete='CASCADE'") == 4,
+              "relation-site cascade key is incorrect") &&
+      require(scalar(database, "PRAGMA user_version") == 7,
+              "fresh schema version was not recorded");
   sqlite3_close(database);
   return valid;
 }
@@ -603,7 +612,7 @@ bool verifyVersionOneMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version one") &&
-      require(scalar(database, "PRAGMA user_version") == 6,
+      require(scalar(database, "PRAGMA user_version") == 7,
               "version-one migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -646,7 +655,7 @@ bool verifyVersionTwoMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version two") &&
-      require(scalar(database, "PRAGMA user_version") == 6,
+      require(scalar(database, "PRAGMA user_version") == 7,
               "version-two migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -686,7 +695,7 @@ PRAGMA user_version=5;
   const auto valid =
       require(usrIsOnlySymbolIdentity(database),
               "version-five migration retained a separate symbol identity") &&
-      require(scalar(database, "PRAGMA user_version") == 6,
+      require(scalar(database, "PRAGMA user_version") == 7,
               "version-five migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -753,7 +762,10 @@ bool verifyMigration(const std::string &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'enumerator')") == 3,
               "enumerator schema was not migrated") &&
-      require(scalar(database, "PRAGMA user_version") == 6,
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
+                               "'relation_site')") == 8,
+              "relation-site schema was not migrated") &&
+      require(scalar(database, "PRAGMA user_version") == 7,
               "migration version was not recorded");
   sqlite3_close(database);
   return valid;

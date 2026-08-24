@@ -86,6 +86,17 @@ public:
   }
 
   std::expected<void, std::error_code>
+  addRelationSites(std::span<const RelationSite> sites) {
+    return storage_.addRelationSites(sites);
+  }
+
+  std::expected<void, std::error_code>
+  addUseFacts(std::span<const Relation> relations,
+              std::span<const RelationSite> sites) {
+    return storage_.addUseFacts(relations, sites);
+  }
+
+  std::expected<void, std::error_code>
   addTemplateArguments(SymbolId id,
                        std::span<const TemplateArgument> arguments) {
     return storage_.addTemplateArguments(id, arguments);

@@ -279,6 +279,24 @@ CREATE UNIQUE INDEX idx_symbol_unique_usr ON symbol(usr);
 PRAGMA user_version=6;
 )sql";
 
+inline constexpr auto relationSiteMigrationSql = R"sql(
+CREATE TABLE IF NOT EXISTS relation_site (
+  source_id      INTEGER NOT NULL,
+  destination_id INTEGER NOT NULL,
+  kind           INTEGER NOT NULL,
+  position       INTEGER NOT NULL DEFAULT 0,
+  file_id        INTEGER NOT NULL,
+  line           INTEGER NOT NULL,
+  col            INTEGER NOT NULL,
+  offset         INTEGER NOT NULL,
+  PRIMARY KEY (source_id, destination_id, kind, position, file_id, offset),
+  FOREIGN KEY (source_id, destination_id, kind, position)
+    REFERENCES relation(source_id, destination_id, kind, position)
+    ON DELETE CASCADE
+) WITHOUT ROWID;
+PRAGMA user_version=7;
+)sql";
+
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
@@ -321,6 +339,12 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
             .and_then([database] {
               return schemaVersion(database).and_then([database](int version) {
                 return version < 6 ? execute(database, usrIdentityMigrationSql)
+                                   : std::expected<void, std::error_code>{};
+              });
+            })
+            .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 7 ? execute(database, relationSiteMigrationSql)
                                    : std::expected<void, std::error_code>{};
               });
             });

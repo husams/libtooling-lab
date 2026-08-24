@@ -1,9 +1,7 @@
 #include "ast/visitors/SymbolVisitor.h"
 
-#include "ast/extractors/EnumConstantDecl.h"
-#include "ast/extractors/EnumDecl.h"
-#include "ast/extractors/FieldDecl.h"
-#include "ast/extractors/VarDecl.h"
+#include "ast/extractors/Reference.h"
+#include "ast/visitors/BodyVisitor.h"
 #include "ast/visitors/SymbolCollector.h"
 
 #include <algorithm>
@@ -34,7 +32,7 @@ bool SymbolVisitor::TraverseCXXMethodDecl(clang::CXXMethodDecl *decl) {
 }
 
 bool SymbolVisitor::TraverseFieldDecl(clang::FieldDecl *decl) {
-  if (decl == nullptr || !VisitFieldDecl(decl)) {
+  if (decl == nullptr || !VisitNamedDecl(decl)) {
     return decl == nullptr;
   }
 
@@ -49,43 +47,50 @@ bool SymbolVisitor::TraverseFieldDecl(clang::FieldDecl *decl) {
 
 bool SymbolVisitor::TraverseParmVarDecl(clang::ParmVarDecl *) { return true; }
 
+bool SymbolVisitor::TraverseStmt(clang::Stmt *statement) {
+  return statement == nullptr || bodyOwners_.contains(statement) ||
+         Base::TraverseStmt(statement);
+}
+
 bool SymbolVisitor::TraverseUsingDirectiveDecl(clang::UsingDirectiveDecl *) {
   return true;
 }
 
 bool SymbolVisitor::VisitFunctionDecl(clang::FunctionDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
+  schedule(*decl);
   return true;
 }
 
-bool SymbolVisitor::VisitCXXRecordDecl(clang::CXXRecordDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_,
-                               decl->isThisDeclarationADefinition()));
-  return true;
+void SymbolVisitor::schedule(const clang::FunctionDecl &decl) {
+  const auto &owner = referenceOwner(decl);
+  if (!owner.doesThisDeclarationHaveABody()) {
+    return;
+  }
+  auto *body = owner.getBody();
+  if (body != nullptr && bodyOwners_.try_emplace(body, &owner).second) {
+    pendingBodies_.emplace_back(&owner, body);
+  }
 }
 
-bool SymbolVisitor::VisitEnumDecl(clang::EnumDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
-bool SymbolVisitor::VisitEnumConstantDecl(clang::EnumConstantDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
-bool SymbolVisitor::VisitFieldDecl(clang::FieldDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
-bool SymbolVisitor::VisitVarDecl(clang::VarDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
+IndexingResult SymbolVisitor::flushBodies() {
+  for (const auto &[owner, body] : pendingBodies_) {
+    if (!visitedBodies_.insert(body).second) {
+      continue;
+    }
+    BodyVisitor visitor(*owner, context_, files_, store_, status_);
+    if (!visitor.TraverseStmt(body)) {
+      return std::unexpected(IndexingError{"cannot traverse function body"});
+    }
+    auto flushed = visitor.flush();
+    if (!flushed) {
+      return flushed;
+    }
+  }
+  return {};
 }
 
 bool SymbolVisitor::VisitNamedDecl(clang::NamedDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
+  status_.record(collectDeclaredSymbol(*decl, context_, files_, store_));
   return true;
 }
 

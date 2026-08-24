@@ -12,6 +12,9 @@ Feature: Canonical source file registry
       | dependent_template_types.cpp |
       | external_targets.cpp |
       | external_template_specialization.cpp |
+      | references.hpp |
+      | references_one.cpp |
+      | references_two.cpp |
       | shared.hpp |
       | system/external_base.hpp |
       | one.cpp    |

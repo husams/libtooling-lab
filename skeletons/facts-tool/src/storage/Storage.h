@@ -3,6 +3,7 @@
 
 #include "model/AnySymbol.h"
 #include "model/Relation.h"
+#include "model/RelationSite.h"
 #include "model/TemplateArgument.h"
 #include "model/TemplateParameter.h"
 #include "storage/SqliteDatabase.h"
@@ -50,6 +51,11 @@ public:
 
   std::expected<void, std::error_code>
   addRelations(std::span<const Relation> relations);
+  std::expected<void, std::error_code>
+  addRelationSites(std::span<const RelationSite> sites);
+  std::expected<void, std::error_code>
+  addUseFacts(std::span<const Relation> relations,
+              std::span<const RelationSite> sites);
   std::expected<void, std::error_code>
   addTemplateArguments(SymbolId id,
                        std::span<const TemplateArgument> arguments);
@@ -137,6 +143,8 @@ private:
   std::expected<void, std::error_code>
   addTemplateParameters(SymbolId id,
                         std::span<const TemplateParameter> parameters);
+  std::expected<void, std::error_code>
+  recomputeUseCounts(std::span<const Relation> relations);
 
   template <typename Model>
   std::expected<SymbolId, std::error_code>
