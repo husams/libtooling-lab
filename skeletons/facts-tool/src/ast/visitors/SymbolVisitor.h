@@ -30,13 +30,8 @@ public:
   bool TraverseParmVarDecl(clang::ParmVarDecl *decl);
   bool TraverseStmt(clang::Stmt *statement);
   bool TraverseUsingDirectiveDecl(clang::UsingDirectiveDecl *decl);
-  bool VisitCXXRecordDecl(clang::CXXRecordDecl *decl);
-  bool VisitEnumConstantDecl(clang::EnumConstantDecl *decl);
-  bool VisitEnumDecl(clang::EnumDecl *decl);
-  bool VisitFieldDecl(clang::FieldDecl *decl);
   bool VisitFunctionDecl(clang::FunctionDecl *decl);
   bool VisitNamedDecl(clang::NamedDecl *decl);
-  bool VisitVarDecl(clang::VarDecl *decl);
 
   IndexingResult flushBodies();
 

@@ -101,9 +101,37 @@ def then_template_and_nested_owners_are_canonical(context: FactsToolContext) -> 
         nested_targets
         == {
             "reference_fixture::primaryTarget",
+            "reference_fixture::nestedDeclarations()::Local::localField",
             "reference_fixture::secondaryTarget",
         },
         f"unexpected nested callable ownership: {nested_targets}",
+    )
+
+
+@then("body-nested declarations retain their specialized facts")
+def then_body_nested_declarations_retain_specialized_facts(
+    context: FactsToolContext,
+) -> None:
+    enum_symbols = query(
+        context.facts_database_path,
+        "SELECT qualified_name FROM symbol WHERE qualified_name LIKE "
+        "'%LocalEnum' OR qualified_name LIKE "
+        "'%nestedDeclarations%LocalAlpha' OR qualified_name LIKE "
+        "'%nestedDeclarations%LocalBeta'",
+    )
+    require(len(enum_symbols) == 3, f"missing nested enum facts: {enum_symbols}")
+
+    field_facts = query(
+        context.facts_database_path,
+        "SELECT field.is_definition,owner.qualified_name FROM symbol field "
+        "JOIN relation r ON r.source_id=field.id "
+        "JOIN symbol owner ON owner.id=r.destination_id WHERE r.kind=8 AND "
+        "field.qualified_name LIKE '%nestedDeclarations%localField' AND "
+        "owner.qualified_name LIKE '%Local'",
+    )
+    require(
+        field_facts and all(row[0] == 1 for row in field_facts),
+        f"missing specialized nested field facts: {field_facts}",
     )
 
 

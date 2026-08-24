@@ -40,11 +40,15 @@ inline int redeclaredOwner() { return primaryTarget; }
 
 inline int nestedDeclarations() {
   struct Local {
-    int method() const { return primaryTarget; }
+    int localField = 4;
+
+    int method() const { return localField + primaryTarget; }
   };
 
+  enum LocalEnum { LocalAlpha, LocalBeta };
+
   auto lambda = [] { return secondaryTarget; };
-  return Local{}.method() + lambda();
+  return Local{}.method() + lambda() + LocalAlpha + LocalBeta;
 }
 
 } // namespace reference_fixture

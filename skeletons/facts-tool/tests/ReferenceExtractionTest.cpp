@@ -167,6 +167,18 @@ void verifyFacts(const std::filesystem::path &databasePath) {
                 "source.qualified_name LIKE '%operator()' AND "
                 "destination.qualified_name="
                 "'reference_fixture::secondaryTarget'") == 1);
+  assert(scalar(database,
+                "SELECT COUNT(*) FROM symbol WHERE qualified_name LIKE "
+                "'%LocalEnum' OR qualified_name LIKE "
+                "'%nestedDeclarations%LocalAlpha' OR qualified_name LIKE "
+                "'%nestedDeclarations%LocalBeta'") == 3);
+  assert(scalar(database,
+                "SELECT COUNT(*) FROM symbol field JOIN relation r ON "
+                "r.source_id=field.id JOIN symbol owner ON "
+                "owner.id=r.destination_id WHERE r.kind=8 AND "
+                "field.qualified_name LIKE '%nestedDeclarations%localField' "
+                "AND field.is_definition=1 AND "
+                "owner.qualified_name LIKE '%Local'") == 1);
   assert(scalar(database, "SELECT COUNT(*) FROM symbol WHERE qualified_name IN "
                           "('localValue','lambda')") == 0);
   assert(scalar(database,

@@ -1,10 +1,6 @@
 #include "ast/visitors/SymbolVisitor.h"
 
-#include "ast/extractors/EnumConstantDecl.h"
-#include "ast/extractors/EnumDecl.h"
-#include "ast/extractors/FieldDecl.h"
 #include "ast/extractors/Reference.h"
-#include "ast/extractors/VarDecl.h"
 #include "ast/visitors/BodyVisitor.h"
 #include "ast/visitors/SymbolCollector.h"
 
@@ -36,7 +32,7 @@ bool SymbolVisitor::TraverseCXXMethodDecl(clang::CXXMethodDecl *decl) {
 }
 
 bool SymbolVisitor::TraverseFieldDecl(clang::FieldDecl *decl) {
-  if (decl == nullptr || !VisitFieldDecl(decl)) {
+  if (decl == nullptr || !VisitNamedDecl(decl)) {
     return decl == nullptr;
   }
 
@@ -61,7 +57,6 @@ bool SymbolVisitor::TraverseUsingDirectiveDecl(clang::UsingDirectiveDecl *) {
 }
 
 bool SymbolVisitor::VisitFunctionDecl(clang::FunctionDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
   schedule(*decl);
   return true;
 }
@@ -94,34 +89,8 @@ IndexingResult SymbolVisitor::flushBodies() {
   return {};
 }
 
-bool SymbolVisitor::VisitCXXRecordDecl(clang::CXXRecordDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_,
-                               decl->isThisDeclarationADefinition()));
-  return true;
-}
-
-bool SymbolVisitor::VisitEnumDecl(clang::EnumDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
-bool SymbolVisitor::VisitEnumConstantDecl(clang::EnumConstantDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
-bool SymbolVisitor::VisitFieldDecl(clang::FieldDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
-bool SymbolVisitor::VisitVarDecl(clang::VarDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
 bool SymbolVisitor::VisitNamedDecl(clang::NamedDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
+  status_.record(collectDeclaredSymbol(*decl, context_, files_, store_));
   return true;
 }
 

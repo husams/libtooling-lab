@@ -79,7 +79,7 @@ bool BodyVisitor::TraverseFunctionDecl(clang::FunctionDecl *decl) {
   if (decl == nullptr) {
     return true;
   }
-  status_.record(collectSymbol(*decl, context_, files_, store_));
+  status_.record(collectDeclaredSymbol(*decl, context_, files_, store_));
   schedule(*decl);
   return true;
 }
@@ -100,9 +100,10 @@ bool BodyVisitor::TraverseLambdaExpr(clang::LambdaExpr *expression) {
   }
 
   auto *closure = expression->getLambdaClass();
-  status_.record(collectSymbol(*closure, context_, files_, store_, true));
+  status_.record(collectDeclaredSymbol(*closure, context_, files_, store_));
   auto *callOperator = expression->getCallOperator();
-  status_.record(collectSymbol(*callOperator, context_, files_, store_));
+  status_.record(
+      collectDeclaredSymbol(*callOperator, context_, files_, store_));
   schedule(*callOperator);
   return true;
 }
@@ -118,34 +119,8 @@ bool BodyVisitor::VisitMemberExpr(clang::MemberExpr *expression) {
   return true;
 }
 
-bool BodyVisitor::VisitCXXRecordDecl(clang::CXXRecordDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_,
-                               decl->isThisDeclarationADefinition()));
-  return true;
-}
-
-bool BodyVisitor::VisitEnumDecl(clang::EnumDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
-bool BodyVisitor::VisitEnumConstantDecl(clang::EnumConstantDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
-bool BodyVisitor::VisitFieldDecl(clang::FieldDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
-bool BodyVisitor::VisitVarDecl(clang::VarDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
-  return true;
-}
-
 bool BodyVisitor::VisitNamedDecl(clang::NamedDecl *decl) {
-  status_.record(collectSymbol(*decl, context_, files_, store_));
+  status_.record(collectDeclaredSymbol(*decl, context_, files_, store_));
   return true;
 }
 

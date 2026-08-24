@@ -22,6 +22,9 @@ IndexingResult collectSymbol(clang::CXXRecordDecl &node,
                              FactStore &store, bool isDefinition);
 IndexingResult collectSymbol(clang::NamedDecl &node, clang::ASTContext &context,
                              FileManager &files, FactStore &store);
+IndexingResult collectDeclaredSymbol(clang::NamedDecl &node,
+                                     clang::ASTContext &context,
+                                     FileManager &files, FactStore &store);
 
 } // namespace facts
 

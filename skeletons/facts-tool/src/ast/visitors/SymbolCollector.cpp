@@ -1,10 +1,14 @@
 #include "ast/visitors/SymbolCollector.h"
 #include "ast/StoreExtracted.h"
 
+#include "ast/extractors/EnumConstantDecl.h"
+#include "ast/extractors/EnumDecl.h"
+#include "ast/extractors/FieldDecl.h"
 #include "ast/extractors/File.h"
 #include "ast/extractors/FunctionDecl.h"
 #include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/RecordDecl.h"
+#include "ast/extractors/VarDecl.h"
 #include "model/AnySymbol.h"
 #include "model/Relation.h"
 #include "storage/FactStore.h"
@@ -126,6 +130,31 @@ IndexingResult collectSymbol(clang::NamedDecl &node, clang::ASTContext &context,
                               return classifySymbol(std::move(symbol));
                             }),
                         context, files, store);
+}
+
+IndexingResult collectDeclaredSymbol(clang::NamedDecl &node,
+                                     clang::ASTContext &context,
+                                     FileManager &files, FactStore &store) {
+  if (auto *record = llvm::dyn_cast<clang::CXXRecordDecl>(&node)) {
+    return collectSymbol(*record, context, files, store,
+                         record->isThisDeclarationADefinition());
+  }
+  if (auto *enumeration = llvm::dyn_cast<clang::EnumDecl>(&node)) {
+    return collectSymbol(*enumeration, context, files, store);
+  }
+  if (auto *enumerator = llvm::dyn_cast<clang::EnumConstantDecl>(&node)) {
+    return collectSymbol(*enumerator, context, files, store);
+  }
+  if (auto *field = llvm::dyn_cast<clang::FieldDecl>(&node)) {
+    return collectSymbol(*field, context, files, store);
+  }
+  if (auto *function = llvm::dyn_cast<clang::FunctionDecl>(&node)) {
+    return collectSymbol(*function, context, files, store);
+  }
+  if (auto *variable = llvm::dyn_cast<clang::VarDecl>(&node)) {
+    return collectSymbol(*variable, context, files, store);
+  }
+  return collectSymbol(node, context, files, store);
 }
 
 } // namespace facts

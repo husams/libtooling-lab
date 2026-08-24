@@ -25,14 +25,9 @@ public:
   bool TraverseFunctionDecl(clang::FunctionDecl *decl);
   bool TraverseLambdaExpr(clang::LambdaExpr *expression);
 
-  bool VisitCXXRecordDecl(clang::CXXRecordDecl *decl);
   bool VisitDeclRefExpr(clang::DeclRefExpr *expression);
-  bool VisitEnumConstantDecl(clang::EnumConstantDecl *decl);
-  bool VisitEnumDecl(clang::EnumDecl *decl);
-  bool VisitFieldDecl(clang::FieldDecl *decl);
   bool VisitMemberExpr(clang::MemberExpr *expression);
   bool VisitNamedDecl(clang::NamedDecl *decl);
-  bool VisitVarDecl(clang::VarDecl *decl);
 
   IndexingResult flush();
 
