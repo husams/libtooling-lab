@@ -40,10 +40,29 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
 find_package(SQLite3 REQUIRED)
-# CMake >= 4.3 names the imported target SQLite3::SQLite3; older CMake (RHEL 9
-# ships 3.31) only defines the now-deprecated SQLite::SQLite3.
-if(NOT TARGET SQLite3::SQLite3)
-  add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+
+# One target for SQLite, whatever find_package produced. CMake >= 4.3 names the
+# imported target SQLite3::SQLite3; older CMake (RHEL 9 ships 3.31) only defines
+# the now-deprecated SQLite::SQLite3, and a hand-pointed SQLite3_LIBRARY may
+# yield no imported target at all.
+add_library(facts-sqlite INTERFACE)
+if(TARGET SQLite3::SQLite3)
+  target_link_libraries(facts-sqlite INTERFACE SQLite3::SQLite3)
+elseif(TARGET SQLite::SQLite3)
+  target_link_libraries(facts-sqlite INTERFACE SQLite::SQLite3)
+else()
+  target_include_directories(facts-sqlite SYSTEM INTERFACE
+                             ${SQLite3_INCLUDE_DIRS})
+  target_link_libraries(facts-sqlite INTERFACE ${SQLite3_LIBRARIES})
+endif()
+# A static libsqlite3.a (what scripts/build-rhel9.sh builds, because RHEL 9's
+# 3.34 has no RETURNING) carries no dependencies of its own; the threading,
+# dlopen and math symbols it references have to come from the link line.
+get_filename_component(FACTS_SQLITE_SUFFIX "${SQLite3_LIBRARY}" LAST_EXT)
+if(FACTS_SQLITE_SUFFIX STREQUAL "${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  find_package(Threads REQUIRED)
+  target_link_libraries(facts-sqlite INTERFACE Threads::Threads
+                                               ${CMAKE_DL_LIBS} m)
 endif()
 message(STATUS "Building against LLVM ${LLVM_PACKAGE_VERSION} at ${LLVM_DIR}")
 
@@ -96,9 +115,11 @@ target_include_directories(facts-storage
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
   PRIVATE ${itlib_SOURCE_DIR}/include
 )
+# PUBLIC: storage's own headers include <sqlite3.h>, so every target that
+# includes them needs the SQLite include path too.
 target_link_libraries(facts-storage
-  PUBLIC facts-model
-  PRIVATE facts-clang SQLite3::SQLite3
+  PUBLIC facts-model facts-sqlite
+  PRIVATE facts-clang
 )
 
 add_library(facts-tooling STATIC
@@ -107,7 +128,7 @@ add_library(facts-tooling STATIC
 )
 target_include_directories(facts-tooling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang
-                                            SQLite3::SQLite3)
+                                            facts-sqlite)
 
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
@@ -178,7 +199,7 @@ target_link_libraries(facts-tool PRIVATE facts-cli)
 
 add_executable(sqlite-generator-demo examples/sqlite_generator_demo.cpp)
 target_link_libraries(sqlite-generator-demo PRIVATE facts-storage
-                                                    SQLite3::SQLite3)
+                                                    facts-sqlite)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -198,14 +219,14 @@ if(BUILD_TESTING)
 
   add_executable(fact-store-test tests/FactStoreTest.cpp)
   target_link_libraries(fact-store-test PRIVATE facts-storage facts-model
-                                              SQLite3::SQLite3)
+                                              facts-sqlite)
   add_test(
     NAME fact-store
     COMMAND fact-store-test ${CMAKE_CURRENT_BINARY_DIR}/fact-store-test.sqlite
   )
   add_executable(file-manager-test tests/FileManagerTest.cpp)
   target_link_libraries(file-manager-test PRIVATE facts-storage facts-model
-                                                facts-clang SQLite3::SQLite3)
+                                                facts-clang facts-sqlite)
   add_test(
     NAME file-manager
     COMMAND file-manager-test
@@ -226,7 +247,7 @@ if(BUILD_TESTING)
                  tests/StoredCompilationDatabaseTest.cpp)
   target_link_libraries(stored-compilation-database-test
                         PRIVATE facts-tooling facts-storage facts-clang
-                                SQLite3::SQLite3)
+                                facts-sqlite)
   add_test(
     NAME stored-compilation-database
     COMMAND stored-compilation-database-test
@@ -235,7 +256,7 @@ if(BUILD_TESTING)
   add_executable(project-configuration-test tests/ProjectConfigurationTest.cpp)
   target_link_libraries(project-configuration-test
                         PRIVATE facts-tooling facts-storage facts-clang
-                                SQLite3::SQLite3)
+                                facts-sqlite)
   add_test(
     NAME project-configuration
     COMMAND project-configuration-test
@@ -244,7 +265,7 @@ if(BUILD_TESTING)
   )
   add_executable(storage-schema-test tests/StorageSchemaTest.cpp)
   target_link_libraries(storage-schema-test PRIVATE facts-storage facts-model
-                                                    SQLite3::SQLite3)
+                                                    facts-sqlite)
   add_test(
     NAME storage-schema
     COMMAND storage-schema-test
@@ -265,7 +286,7 @@ if(BUILD_TESTING)
   add_executable(file-database-persistence-test
                  tests/FileDatabasePersistenceTest.cpp)
   target_link_libraries(file-database-persistence-test
-                        PRIVATE facts-storage facts-model SQLite3::SQLite3)
+                        PRIVATE facts-storage facts-model facts-sqlite)
   add_test(
     NAME file-database-persistence
     COMMAND file-database-persistence-test
@@ -274,15 +295,15 @@ if(BUILD_TESTING)
   )
   add_executable(sqlite-query-test tests/SqliteQueryTest.cpp)
   target_link_libraries(sqlite-query-test PRIVATE facts-storage
-                                                  SQLite3::SQLite3)
+                                                  facts-sqlite)
   add_test(NAME sqlite-query COMMAND sqlite-query-test)
   add_executable(sqlite-command-test tests/SqliteCommandTest.cpp)
   target_link_libraries(sqlite-command-test PRIVATE facts-storage
-                                                    SQLite3::SQLite3)
+                                                    facts-sqlite)
   add_test(NAME sqlite-command COMMAND sqlite-command-test)
   add_executable(dependency-database-test tests/DependencyDatabaseTest.cpp)
   target_link_libraries(dependency-database-test PRIVATE facts-storage
-                                                         SQLite3::SQLite3)
+                                                         facts-sqlite)
   add_test(NAME sqlite-generator-demo COMMAND sqlite-generator-demo)
   set(dependency_config
       ${CMAKE_CURRENT_BINARY_DIR}/dependency-analysis.sqlite)
