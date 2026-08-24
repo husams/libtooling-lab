@@ -62,6 +62,93 @@ bool addDistinctSymbol(const std::filesystem::path &databasePath,
 
 using Writer = bool (*)(const std::filesystem::path &, std::size_t);
 
+void verifyUseSiteAggregation(const std::filesystem::path &databasePath,
+                              bool reverseOrder) {
+  std::filesystem::remove(databasePath);
+  facts::SymbolId owner;
+  facts::SymbolId target;
+  {
+    facts::FactStore seed(databasePath.string());
+    const auto savedOwner =
+        seed.save(30, makeSymbol<facts::Function>("c:@F@owner", "owner"));
+    const auto savedTarget =
+        seed.save(31, makeSymbol<facts::Variable>("c:@V@target", "target"));
+    assert(savedOwner && savedTarget);
+    owner = *savedOwner;
+    target = *savedTarget;
+  }
+
+  const std::array relation{facts::Relation{
+      .source = owner,
+      .destination = target,
+      .kind = facts::RelationKind::Uses,
+  }};
+  const std::array firstSites{
+      facts::RelationSite{
+          .source = owner,
+          .destination = target,
+          .file = 31,
+          .location = {.line = 4, .column = 5, .offset = 40},
+      },
+      facts::RelationSite{
+          .source = owner,
+          .destination = target,
+          .file = 31,
+          .location = {.line = 5, .column = 6, .offset = 50},
+      },
+  };
+  const std::array secondSites{
+      firstSites.back(),
+      facts::RelationSite{
+          .source = owner,
+          .destination = target,
+          .file = 32,
+          .location = {.line = 6, .column = 7, .offset = 60},
+      },
+  };
+
+  const auto write = [&](std::span<const facts::RelationSite> sites) {
+    facts::FactStore store(databasePath.string());
+    assert(store.addUseFacts(relation, sites));
+  };
+  if (reverseOrder) {
+    write(secondSites);
+    write(firstSites);
+  } else {
+    write(firstSites);
+    write(secondSites);
+  }
+
+  {
+    facts::FactStore store(databasePath.string());
+    const std::array invalidRelation{facts::Relation{
+        .source = owner,
+        .destination = {.file = 99, .index = 1},
+        .kind = facts::RelationKind::Uses,
+    }};
+    const std::array invalidSite{facts::RelationSite{
+        .source = owner,
+        .destination = invalidRelation.front().destination,
+        .file = 31,
+        .location = {.line = 9, .column = 1, .offset = 90},
+    }};
+    assert(!store.addUseFacts(invalidRelation, invalidSite));
+  }
+
+  sqlite3 *database = nullptr;
+  assert(sqlite3_open(databasePath.c_str(), &database) == SQLITE_OK);
+  assert(scalar(database, "SELECT COUNT(*) FROM relation") == 1);
+  assert(scalar(database, "SELECT count FROM relation") == 3);
+  assert(scalar(database, "SELECT COUNT(*) FROM relation_site") == 3);
+  assert(scalar(database,
+                "SELECT COUNT(*) FROM relation_site WHERE "
+                "(file_id=31 AND line=4 AND col=5 AND offset=40) OR "
+                "(file_id=31 AND line=5 AND col=6 AND offset=50) OR "
+                "(file_id=32 AND line=6 AND col=7 AND offset=60)") == 3);
+  sqlite3_close(database);
+  std::filesystem::remove(databasePath);
+}
+
 void runConcurrentWriters(const std::filesystem::path &databasePath,
                           Writer writer) {
   std::array<pid_t, 8> children{};
@@ -352,4 +439,7 @@ int main(int argc, char **argv) {
     assert(loadedAfterCommit && *loadedAfterCommit);
   }
   std::filesystem::remove(transactionDatabasePath);
+
+  verifyUseSiteAggregation(databasePath.string() + ".uses-forward", false);
+  verifyUseSiteAggregation(databasePath.string() + ".uses-reverse", true);
 }

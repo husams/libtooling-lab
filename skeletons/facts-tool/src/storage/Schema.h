@@ -219,12 +219,27 @@ CREATE TABLE IF NOT EXISTS relation (
   PRIMARY KEY (source_id, destination_id, kind, position)
 ) WITHOUT ROWID;
 
+CREATE TABLE IF NOT EXISTS relation_site (
+  source_id      INTEGER NOT NULL,
+  destination_id INTEGER NOT NULL,
+  kind           INTEGER NOT NULL,
+  position       INTEGER NOT NULL DEFAULT 0,
+  file_id        INTEGER NOT NULL,
+  line           INTEGER NOT NULL,
+  col            INTEGER NOT NULL,
+  offset         INTEGER NOT NULL,
+  PRIMARY KEY (source_id, destination_id, kind, position, file_id, offset),
+  FOREIGN KEY (source_id, destination_id, kind, position)
+    REFERENCES relation(source_id, destination_id, kind, position)
+    ON DELETE CASCADE
+) WITHOUT ROWID;
+
 -- Forwards is the primary key's own prefix; backwards -- who calls this, who
 -- derives from this -- needs its own.
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=6;
+PRAGMA user_version=7;
 
 )sql";
 
