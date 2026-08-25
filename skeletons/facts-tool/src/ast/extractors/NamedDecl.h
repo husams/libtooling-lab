@@ -22,6 +22,12 @@ class FileManager;
 
 ExtractionResult<std::string> extractUsr(const clang::NamedDecl &node);
 
+// The qualified name as Clang spells it, except that lambda scopes are named
+// after their source coordinates so the result does not change with the Clang
+// release or the absolute path of the checkout.
+std::string extractQualifiedName(const clang::NamedDecl &node,
+                                 const clang::SourceManager &sourceManager);
+
 template <>
 ExtractionResult<Symbol> extractSymbol<Symbol, clang::NamedDecl>(
     const clang::NamedDecl &node, const clang::SourceManager &sourceManager);

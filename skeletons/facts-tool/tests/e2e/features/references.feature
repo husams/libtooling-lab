@@ -16,5 +16,6 @@ Feature: Function-body reference facts
       | reference_fixture::redeclaredOwner      | reference_fixture::primaryTarget   | 1     | 1     |
     And direct calls and construction targets are not stored as Uses
     And template and nested callable Uses have canonical owners
+    And lambda names carry no toolchain spelling and no checkout path
     And body-nested declarations retain their specialized facts
     And every Uses site has an exact valid location with no duplicates

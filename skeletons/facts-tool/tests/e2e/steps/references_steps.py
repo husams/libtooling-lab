@@ -86,6 +86,25 @@ def then_template_and_nested_owners_are_canonical(context: FactsToolContext) -> 
         f"unexpected template ownership: {template_edges}",
     )
 
+    # A lambda closure is named after where it was written, so its owner is an
+    # exact name rather than something reached by a wildcard.
+    lambda_owners = [
+        row[0]
+        for row in query(
+            context.facts_database_path,
+            "SELECT qualified_name FROM symbol WHERE qualified_name GLOB "
+            "'reference_fixture::nestedDeclarations()::<lambda@[0-9]*:[0-9]*>"
+            "::operator()' ORDER BY qualified_name",
+        )
+    ]
+    require(
+        len(lambda_owners) == 1,
+        f"expected one lambda call operator, got: {lambda_owners}",
+    )
+
+    owners = ["reference_fixture::nestedDeclarations()::Local::method"]
+    owners.extend(lambda_owners)
+    named = ",".join(f"'{owner}'" for owner in owners)
     nested_targets = {
         row[0]
         for row in query(
@@ -93,11 +112,7 @@ def then_template_and_nested_owners_are_canonical(context: FactsToolContext) -> 
             "SELECT destination.qualified_name FROM relation r "
             "JOIN symbol source ON source.id=r.source_id "
             "JOIN symbol destination ON destination.id=r.destination_id "
-            # A lambda's enclosing class has no name of its own, and clang
-            # spells it differently across releases ("(lambda)" since LLVM 22,
-            # "(anonymous class)" before); match on the call operator instead.
-            "WHERE r.kind=7 AND (source.qualified_name LIKE '%Local%method%' "
-            "OR source.qualified_name LIKE '%operator()%')",
+            f"WHERE r.kind=7 AND source.qualified_name IN ({named})",
         )
     }
     require(
@@ -109,6 +124,24 @@ def then_template_and_nested_owners_are_canonical(context: FactsToolContext) -> 
         },
         f"unexpected nested callable ownership: {nested_targets}",
     )
+
+
+@then("lambda names carry no toolchain spelling and no checkout path")
+def then_lambda_names_are_portable(context: FactsToolContext) -> None:
+    unstable = query(
+        context.facts_database_path,
+        "SELECT qualified_name FROM symbol WHERE qualified_name LIKE "
+        "'%(lambda%' OR qualified_name LIKE '%(anonymous%' OR "
+        "qualified_name LIKE '%/%'",
+    )
+    require(not unstable, f"unstable names stored: {unstable}")
+
+    closures = query(
+        context.facts_database_path,
+        "SELECT qualified_name FROM symbol WHERE qualified_name GLOB "
+        "'*<lambda@[0-9]*:[0-9]*>*' ORDER BY qualified_name",
+    )
+    require(len(closures) == 2, f"expected two lambda facts, got: {closures}")
 
 
 @then("body-nested declarations retain their specialized facts")
