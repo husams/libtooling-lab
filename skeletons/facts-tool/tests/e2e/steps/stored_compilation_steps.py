@@ -25,14 +25,17 @@ def when_a_stored_command_is_missing(context: FactsToolContext) -> None:
     context.run_with_missing_stored_command("two.cpp")
 
 
-@when("the real facts-tool extracts one.cpp while two.cpp keeps a missing include directory")
+@when(
+    "the real facts-tool imports and extracts one.cpp "
+    "while two.cpp keeps a missing include directory"
+)
 def when_unrelated_command_has_a_missing_include_root(
     context: FactsToolContext,
 ) -> None:
     context.run_with_unrelated_missing_include_root()
 
 
-@when("the real facts-tool extracts one.cpp with a missing include directory")
+@when("the real facts-tool imports and extracts one.cpp with a missing include directory")
 def when_selected_command_has_a_missing_include_root(
     context: FactsToolContext,
 ) -> None:
@@ -97,20 +100,21 @@ def then_diagnostic_rejects_files_out(context: FactsToolContext) -> None:
     )
 
 
-@then("no diagnostic reports a pre-import failure")
-def then_no_pre_import_failure(context: FactsToolContext) -> None:
+@then("no diagnostic reports a file registration failure")
+def then_no_file_registration_failure(context: FactsToolContext) -> None:
+    combined = context.import_output + context.last_output
     require(
-        "cannot pre-import files" not in context.last_output,
-        f"unexpected pre-import failure:\n{context.last_output}",
+        "cannot register compilation files" not in combined,
+        f"unexpected file registration failure:\n{combined}",
     )
 
 
-@then("the diagnostic reports the skipped include directory")
-def then_diagnostic_reports_skipped_include_directory(
+@then("the import diagnostic reports the skipped include directory")
+def then_import_diagnostic_reports_skipped_include_directory(
     context: FactsToolContext,
 ) -> None:
     require(
         f"skipping unavailable include directory '{context.missing_include_root}'"
-        in context.last_output,
-        f"missing skipped-include diagnostic:\n{context.last_output}",
+        in context.import_output,
+        f"missing skipped-include diagnostic:\n{context.import_output}",
     )

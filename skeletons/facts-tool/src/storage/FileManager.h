@@ -2,6 +2,7 @@
 #define FACTS_TOOL_STORAGE_FILE_MANAGER_H
 
 #include "model/SymbolId.h"
+#include "storage/FileAccess.h"
 #include "storage/ProjectConfiguration.h"
 
 #include <expected>
@@ -18,7 +19,8 @@ class FileDatabase;
 
 class FileManager {
 public:
-  explicit FileManager(std::string databasePath);
+  explicit FileManager(std::string databasePath,
+                       FileAccess access = FileAccess::readWrite);
   ~FileManager();
 
   FileManager(const FileManager &) = delete;

@@ -10,29 +10,11 @@
 #include <clang/Basic/SourceManager.h>
 #include <clang/Index/IndexSymbol.h>
 
-#include <array>
 #include <optional>
 #include <utility>
 
 namespace facts {
 namespace {
-
-std::expected<FileId, std::error_code>
-registerExternalFile(const clang::NamedDecl &target,
-                     const clang::SourceManager &sourceManager,
-                     FileManager &files) {
-  const auto expansion = sourceManager.getExpansionLoc(target.getLocation());
-  if (expansion.isInvalid()) {
-    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
-  }
-
-  return extractFilePath(sourceManager, sourceManager.getFileID(expansion))
-      .and_then([&files](std::string path) {
-        const std::array paths{path};
-        return files.addBulk(paths).and_then(
-            [&files, path = std::move(path)] { return files.getId(path); });
-      });
-}
 
 Symbol externalSymbol(const clang::NamedDecl &target, std::string usr) {
   Symbol symbol{};
@@ -55,7 +37,7 @@ std::expected<SymbolId, std::error_code> findOrStoreSymbolTarget(
         if (destination) {
           return *destination;
         }
-        return registerExternalFile(target, sourceManager, files)
+        return resolveFile(sourceManager, target.getLocation(), files)
             .and_then([&](FileId file) {
               return store.save(file, externalSymbol(target, usr));
             });

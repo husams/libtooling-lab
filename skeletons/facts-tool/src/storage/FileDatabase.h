@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_STORAGE_FILE_DATABASE_H
 #define FACTS_TOOL_STORAGE_FILE_DATABASE_H
 
+#include "storage/FileAccess.h"
 #include "storage/ProjectConfiguration.h"
 #include "storage/SqliteDatabase.h"
 
@@ -16,7 +17,8 @@ namespace facts {
 
 class FileDatabase {
 public:
-  explicit FileDatabase(const std::string &path);
+  explicit FileDatabase(const std::string &path,
+                        FileAccess access = FileAccess::readWrite);
   ~FileDatabase();
 
   FileDatabase(const FileDatabase &) = delete;

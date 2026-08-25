@@ -65,10 +65,10 @@ canonicalIdentities(std::span<const std::string> paths,
 
 } // namespace
 
-FileManager::FileManager(std::string databasePath)
+FileManager::FileManager(std::string databasePath, FileAccess access)
     : databasePath_(
           std::filesystem::absolute(databasePath).lexically_normal().string()),
-      database_(std::make_unique<FileDatabase>(databasePath_)) {}
+      database_(std::make_unique<FileDatabase>(databasePath_, access)) {}
 
 FileManager::~FileManager() = default;
 

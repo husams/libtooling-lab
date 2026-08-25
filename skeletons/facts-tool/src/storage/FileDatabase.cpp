@@ -523,7 +523,43 @@ std::expected<void, std::error_code> initializeFileSchema(sqlite3 *database) {
       });
 }
 
-storage::Database openFileDatabase(const std::string &path) {
+// A consumer opens the registry read-only, so an outdated layout cannot be
+// migrated in place; say so instead of failing later on an unreadable table.
+std::expected<void, std::error_code>
+requireCurrentFileSchema(sqlite3 *database) {
+  return usesLegacyFileSchema(database)
+      .and_then([&](bool legacy) {
+        return legacy ? std::expected<bool, std::error_code>{true}
+                      : usesFlatDirectorySchema(database);
+      })
+      .and_then([](bool outdated) {
+        return outdated ? std::unexpected(
+                              std::make_error_code(std::errc::invalid_argument))
+                        : std::expected<void, std::error_code>{};
+      });
+}
+
+storage::Database openReadOnlyFileDatabase(const std::string &path) {
+  constexpr int flags = storage::Database::readOnly | SQLITE_OPEN_FULLMUTEX;
+  auto opened = storage::Database::open(path, flags);
+  if (!opened) {
+    throw std::runtime_error("cannot open project configuration read-only: " +
+                             opened.error().message());
+  }
+  auto database = std::move(*opened);
+  auto usable = database.executeScript("PRAGMA foreign_keys=ON").and_then([&] {
+    return requireCurrentFileSchema(database.nativeHandle());
+  });
+  if (!usable) {
+    throw std::runtime_error(
+        "project configuration uses an outdated file registry; "
+        "re-run 'facts-tool import' to migrate it: " +
+        usable.error().message());
+  }
+  return database;
+}
+
+storage::Database openWritableFileDatabase(const std::string &path) {
   constexpr int flags = storage::Database::readWrite | SQLITE_OPEN_FULLMUTEX;
   auto opened = storage::Database::open(path, flags);
   if (!opened) {
@@ -543,10 +579,15 @@ storage::Database openFileDatabase(const std::string &path) {
   return database;
 }
 
+storage::Database openFileDatabase(const std::string &path, FileAccess access) {
+  return access == FileAccess::readOnly ? openReadOnlyFileDatabase(path)
+                                        : openWritableFileDatabase(path);
+}
+
 } // namespace
 
-FileDatabase::FileDatabase(const std::string &path)
-    : database_(openFileDatabase(path)) {}
+FileDatabase::FileDatabase(const std::string &path, FileAccess access)
+    : database_(openFileDatabase(path, access)) {}
 
 FileDatabase::~FileDatabase() = default;
 

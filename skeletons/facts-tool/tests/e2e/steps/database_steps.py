@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pytest_bdd import then
-from support.database import query, require, table_names
+from pytest_bdd import given, then, when
+from support.database import query, require, scalar, table_names
 from support.scenario import FactsToolContext
 from support.table import Table, table_records
 
@@ -60,4 +60,53 @@ def then_database_paths_are_different(context: FactsToolContext) -> None:
     require(
         context.facts_database_path != context.files_database_path,
         "database paths must differ",
+    )
+
+
+@given("a project configuration imported from a compilation database")
+def given_imported_project_configuration(context: FactsToolContext) -> None:
+    context.import_isolated_configuration()
+
+
+@given("the project configuration database is read-only")
+def given_read_only_project_configuration(context: FactsToolContext) -> None:
+    context.make_configuration_read_only()
+
+
+@when("the real facts-tool extracts one translation unit")
+def when_facts_tool_extracts_one_translation_unit(
+    context: FactsToolContext,
+) -> None:
+    context.extract_single_translation_unit()
+
+
+@then("extraction succeeds")
+def then_extraction_succeeds(context: FactsToolContext) -> None:
+    require(
+        context.last_returncode == 0,
+        f"facts-tool exited with {context.last_returncode}:\n{context.last_output}",
+    )
+    require(
+        "symbol(s) recorded" in context.last_output,
+        f"missing extraction summary:\n{context.last_output}",
+    )
+
+
+@then("the facts database contains the extracted symbols")
+def then_facts_database_contains_extracted_symbols(
+    context: FactsToolContext,
+) -> None:
+    symbols = scalar(context.facts_database_path, "SELECT COUNT(*) FROM symbol")
+    require(symbols > 0, "extraction recorded no symbols")
+
+
+@then("the project configuration database is unchanged")
+def then_project_configuration_is_unchanged(context: FactsToolContext) -> None:
+    require(
+        context.configuration_bytes is not None,
+        "no project configuration snapshot was taken",
+    )
+    require(
+        context.files_database_path.read_bytes() == context.configuration_bytes,
+        "extraction modified the project configuration database",
     )
