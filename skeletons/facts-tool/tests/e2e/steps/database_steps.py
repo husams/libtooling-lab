@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from pytest_bdd import given, then, when
 from support.database import query, require, scalar, table_names
 from support.scenario import FactsToolContext
@@ -162,6 +163,11 @@ def then_import_reports_incomplete_registry(context: FactsToolContext) -> None:
 
 @given("a compile command that includes a precompiled header")
 def given_precompiled_header_command(context: FactsToolContext) -> None:
+    if context.clang_driver is None:
+        pytest.skip(
+            "a clang++ matching the linked libClang is required to write a "
+            "precompiled header this tool can read"
+        )
     context.prepare()
 
 
