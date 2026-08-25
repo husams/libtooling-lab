@@ -65,10 +65,31 @@ canonicalIdentities(std::span<const std::string> paths,
 
 } // namespace
 
+namespace {
+
+std::string identityPath(const std::string &databasePath) {
+  return std::filesystem::absolute(databasePath).lexically_normal().string();
+}
+
+} // namespace
+
 FileManager::FileManager(std::string databasePath)
-    : databasePath_(
-          std::filesystem::absolute(databasePath).lexically_normal().string()),
+    : databasePath_(identityPath(databasePath)),
       database_(std::make_unique<FileDatabase>(databasePath_)) {}
+
+FileManager::FileManager(std::string databasePath,
+                         std::unique_ptr<FileDatabase> database)
+    : databasePath_(std::move(databasePath)), database_(std::move(database)) {}
+
+std::expected<std::unique_ptr<FileManager>, std::string>
+FileManager::openReadOnly(std::string databasePath) {
+  auto identity = identityPath(databasePath);
+  return FileDatabase::openReadOnly(identity).transform(
+      [&](std::unique_ptr<FileDatabase> database) {
+        return std::unique_ptr<FileManager>(
+            new FileManager(std::move(identity), std::move(database)));
+      });
+}
 
 FileManager::~FileManager() = default;
 

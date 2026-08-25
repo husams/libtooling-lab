@@ -25,8 +25,10 @@ class FactsToolContext:
     files_database: Optional[Path] = None
     initial_files: list[tuple] = field(default_factory=list)
     initial_symbols: list[tuple] = field(default_factory=list)
+    configuration_bytes: Optional[bytes] = None
     last_returncode: Optional[int] = None
     last_output: str = ""
+    import_output: str = ""
     prepared: bool = False
     extracted: bool = False
 
@@ -92,7 +94,119 @@ class FactsToolContext:
             completed.returncode == 0,
             f"facts-tool import exited with {completed.returncode}:\n{self.last_output}",
         )
+        self.import_output = self.last_output
         return self.last_output
+
+    def import_isolated_configuration(self) -> None:
+        """Import a project configuration into a run root of its own."""
+        self.prepared = False
+        self.extracted = False
+        self.prepare()
+        self.run_import()
+        self.configuration_bytes = self.files_database_path.read_bytes()
+
+    def make_configuration_read_only(self) -> None:
+        self.files_database_path.chmod(0o444)
+
+    def extract_single_translation_unit(self) -> None:
+        try:
+            self._run(self._tool_command((self.sources[0],)))
+        finally:
+            self.files_database_path.chmod(0o644)
+
+    def outdate_file_registry(self) -> None:
+        """Leave the registry on a layout only a read-write import can migrate."""
+        with sqlite3.connect(self.files_database_path) as connection:
+            connection.execute("ALTER TABLE file ADD COLUMN path TEXT")
+
+    def extract_translation_unit(self) -> None:
+        self._run(self._tool_command((self.sources[0],)))
+
+    def import_before_the_prefix_header_is_compiled(self) -> None:
+        """Import a -include-pch command whose PCH has not been produced yet."""
+        self._prepare_prefix_header_project()
+        self._run(self.import_command((self.prefix_header_source,)))
+
+    def import_and_extract_with_a_compiled_prefix_header(self) -> None:
+        self._prepare_prefix_header_project()
+        self._compile_prefix_header()
+        self.run_import((self.prefix_header_source,))
+        self._run(self._tool_command((self.prefix_header_source,)))
+
+    @property
+    def prefix_header_source(self) -> Path:
+        return self.run_root_path / "pch_tu.cpp"
+
+    def _compile_prefix_header(self) -> None:
+        completed = subprocess.run(
+            [
+                str(self.compiler),
+                "-std=c++23",
+                "-x",
+                "c++-header",
+                str(self.run_root_path / "pch_prefix.hpp"),
+                "-o",
+                str(self.run_root_path / "pch_prefix.pch"),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        require(
+            completed.returncode == 0,
+            f"cannot compile the prefix header:\n{completed.stderr}",
+        )
+
+    def _prepare_prefix_header_project(self) -> None:
+        self.prepared = False
+        self.extracted = False
+        self.prepare()
+        (self.run_root_path / "pch_prefix.hpp").write_text(
+            "#include <string_view>\n"
+            "#include <expected>\n"
+            "\n"
+            "namespace pch {\n"
+            "struct Holder {\n"
+            "  std::string_view name;\n"
+            "};\n"
+            "using Result = std::expected<int, Holder>;\n"
+            "Result make() { return 1; }\n"
+            "} // namespace pch\n",
+            encoding="utf-8",
+        )
+        self.prefix_header_source.write_text(
+            "pch::Result consume() {\n"
+            "  auto value = pch::make();\n"
+            "  std::string_view text = value ? \"ok\" : value.error().name;\n"
+            "  return value;\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        require(
+            not (self.run_root_path / "pch_prefix.pch").exists(),
+            "the prefix header must not be compiled yet",
+        )
+        self._write_compilation_database(
+            sources=(self.prefix_header_source,),
+            extra_options={
+                self.prefix_header_source.name: [
+                    "-include-pch",
+                    str(self.run_root_path / "pch_prefix.pch"),
+                ]
+            },
+        )
+
+    def import_with_unpreprocessable_source(self) -> None:
+        self.prepared = False
+        self.extracted = False
+        self.prepare()
+        source = self.run_root_path / "unpreprocessable.cpp"
+        source.write_text(
+            '#include "definitely_missing_header.hpp"\nint value() { return 1; }\n',
+            encoding="utf-8",
+        )
+        self._write_compilation_database(sources=(source,))
+        self._run(self.import_command((source,)))
 
     def run_concurrently(self) -> list[str]:
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
@@ -160,24 +274,18 @@ class FactsToolContext:
         self._run_with_missing_include_root("one.cpp")
 
     def _run_with_missing_include_root(self, filename: str) -> None:
-        self.extract()
-        self._store_compile_options(self._compile_options())
+        """Import a project whose command for `filename` names an absent -I root."""
+        self.prepared = False
+        self.extracted = False
+        self.prepare()
         require(
             not self.missing_include_root.exists(),
             "the missing include root must not exist",
         )
-        with sqlite3.connect(self.files_database_path) as connection:
-            connection.execute(
-                "UPDATE file SET driver=?,compile_options=? WHERE name=?",
-                (
-                    str(self.compiler),
-                    json.dumps(
-                        self._compile_options() + [f"-I{self.missing_include_root}"]
-                    ),
-                    filename,
-                ),
-            )
-        self._remove_compilation_database()
+        self._write_compilation_database(
+            extra_options={filename: [f"-I{self.missing_include_root}"]}
+        )
+        self.run_import()
         self._select_facts_database(f"missing-include-root-{filename}.sqlite")
         self._run(self._tool_command((self.sources[0],)))
 
@@ -330,19 +438,20 @@ class FactsToolContext:
         return self.files_database
 
     def _write_compilation_database(
-        self, sources: Optional[tuple[Path, ...]] = None
+        self,
+        sources: Optional[tuple[Path, ...]] = None,
+        extra_options: Optional[dict[str, list[str]]] = None,
     ) -> None:
         selected_sources = sources or self.sources
+        options = extra_options or {}
         commands = [
             {
                 "directory": str(self.fixture_root),
                 "file": str(source),
                 "arguments": [
                     str(self.compiler),
-                    "-std=c++23",
-                    f"-I{self.fixture_root}",
-                    "-isystem",
-                    str(self.fixture_root / "system"),
+                    *self._compile_options(),
+                    *options.get(source.name, []),
                     "-c",
                     str(source),
                 ],

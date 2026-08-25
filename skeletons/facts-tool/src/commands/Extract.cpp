@@ -7,7 +7,6 @@
 #include "platform/PlatformFlags.h"
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
-#include "tooling/CompilationFiles.h"
 #include "tooling/StoredCompilationDatabase.h"
 
 #include <clang/Tooling/Tooling.h>
@@ -78,71 +77,77 @@ selectSources(const CompilationDatabase &database,
   return requested.empty() ? database.getAllFiles() : requested;
 }
 
-void reportDiagnostics(const std::vector<std::string> &diagnostics) {
-  for (const auto &diagnostic : diagnostics) {
-    std::cerr << "facts-tool: " << diagnostic << '\n';
-  }
-}
-
+// The project configuration is a consumed input: every identity extraction
+// needs must already have been registered by 'facts-tool import'.
 std::expected<void, std::string>
-registerFiles(FileManager &files, const CompilationDatabase &database,
-              const std::vector<std::string> &sources) {
-  return timePhase("discover compilation files",
-                   [&] { return discoverCompilationFiles(database, sources); })
-      .and_then([&](CompilationFiles discovered) {
-        reportDiagnostics(discovered.diagnostics);
-        return timePhase("register compilation files",
-                         [&] { return files.addBulk(discovered.files); })
-            .transform_error([](std::error_code error) {
-              return "cannot pre-import files: " + error.message();
-            });
-      });
+requireRegisteredSources(FileManager &files,
+                         const std::vector<std::string> &sources) {
+  for (const auto &source : sources) {
+    if (!files.getId(source)) {
+      return std::unexpected(
+          "source file has no identity in the project configuration; "
+          "run 'facts-tool import' first: " +
+          source);
+    }
+  }
+  return {};
 }
 
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
                                         CompilationDatabasePtr database) {
   const auto openProjectStarted = TimingClock::now();
-  FileManager files(options.configuration);
+  auto opened = FileManager::openReadOnly(options.configuration);
   reportTiming("open project database", openProjectStarted);
+  if (!opened) {
+    return std::expected<int, std::string>{std::unexpected(opened.error())};
+  }
+  auto &files = **opened;
   auto sources = timePhase("select sources", [&] {
     return selectSources(*database, options.sources);
   });
-  return registerFiles(files, *database, sources).and_then([&] {
-    const auto configureToolStarted = TimingClock::now();
-    auto configured = configurePlatformCompilationDatabase(*database, sources);
-    if (!configured) {
-      return std::expected<int, std::string>{
-          std::unexpected(configured.error())};
-    }
-    clang::tooling::ClangTool tool(**configured, sources);
-    reportTiming("configure Clang tool", configureToolStarted);
+  return timePhase("resolve registered sources",
+                   [&] { return requireRegisteredSources(files, sources); })
+      .and_then([&] {
+        const auto configureToolStarted = TimingClock::now();
+        auto configured =
+            configurePlatformCompilationDatabase(*database, sources);
+        if (!configured) {
+          return std::expected<int, std::string>{
+              std::unexpected(configured.error())};
+        }
+        clang::tooling::ClangTool tool(**configured, sources);
+        reportTiming("configure Clang tool", configureToolStarted);
 
-    const auto openOutputStarted = TimingClock::now();
-    FactStore store(options.output);
-    reportTiming("open output database", openOutputStarted);
-    IndexingStatus indexing;
-    auto started =
-        timePhase("begin output transaction", [&] { return store.begin(); });
-    if (!started) {
-      return std::expected<int, std::string>{std::unexpected(
-          "cannot begin output transaction: " + started.error().message())};
-    }
-    const auto toolResult = timePhase("Clang parse and AST extraction", [&] {
-      return tool.run(createFactExtractorFactory(files, store, indexing).get());
-    });
-    const auto result = toolResult != 0       ? toolResult
-                        : indexing.complete() ? 0
-                                              : 1;
-    auto finished = result == 0 ? timePhase("commit output transaction",
-                                            [&] { return store.end(); })
-                                : timePhase("rollback output transaction",
-                                            [&] { return store.rollback(); });
-    if (!finished) {
-      return std::expected<int, std::string>{std::unexpected(
-          "cannot finish output transaction: " + finished.error().message())};
-    }
-    return std::expected<int, std::string>{result};
-  });
+        const auto openOutputStarted = TimingClock::now();
+        FactStore store(options.output);
+        reportTiming("open output database", openOutputStarted);
+        IndexingStatus indexing;
+        auto started = timePhase("begin output transaction",
+                                 [&] { return store.begin(); });
+        if (!started) {
+          return std::expected<int, std::string>{std::unexpected(
+              "cannot begin output transaction: " + started.error().message())};
+        }
+        const auto toolResult =
+            timePhase("Clang parse and AST extraction", [&] {
+              return tool.run(
+                  createFactExtractorFactory(files, store, indexing).get());
+            });
+        const auto result = toolResult != 0       ? toolResult
+                            : indexing.complete() ? 0
+                                                  : 1;
+        auto finished = result == 0
+                            ? timePhase("commit output transaction",
+                                        [&] { return store.end(); })
+                            : timePhase("rollback output transaction",
+                                        [&] { return store.rollback(); });
+        if (!finished) {
+          return std::expected<int, std::string>{
+              std::unexpected("cannot finish output transaction: " +
+                              finished.error().message())};
+        }
+        return std::expected<int, std::string>{result};
+      });
 }
 
 } // namespace

@@ -7,6 +7,7 @@
 #include "model/SymbolId.h"
 
 #include <expected>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -16,7 +17,15 @@ namespace facts {
 
 class FileDatabase {
 public:
+  // Read-write: creates the registry and migrates an outdated one in place.
+  // Throws when that is impossible, as the rest of the storage layer does.
   explicit FileDatabase(const std::string &path);
+
+  // Read-only: never throws. An unreadable, incomplete or outdated registry
+  // comes back as a message the calling command can report.
+  static std::expected<std::unique_ptr<FileDatabase>, std::string>
+  openReadOnly(const std::string &path);
+
   ~FileDatabase();
 
   FileDatabase(const FileDatabase &) = delete;
@@ -35,6 +44,8 @@ public:
   std::expected<FileId, std::error_code> getId(std::string_view identity);
 
 private:
+  explicit FileDatabase(storage::Database database);
+
   storage::Database database_;
 };
 

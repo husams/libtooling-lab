@@ -168,6 +168,9 @@ def main() -> None:
 
         first = root / "first.cpp"
         second = root / "second.cpp"
+        # import now discovers and registers files, so the sources must exist.
+        first.write_text("int first() { return 1; }\n", encoding="utf-8")
+        second.write_text("int second() { return 2; }\n", encoding="utf-8")
         compilation_database.write_text(
             json.dumps(
                 [
