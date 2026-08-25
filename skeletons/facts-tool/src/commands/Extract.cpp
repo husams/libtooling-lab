@@ -4,6 +4,7 @@
 
 #include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
+#include "cli/Verbose.h"
 #include "platform/PlatformFlags.h"
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
@@ -62,6 +63,14 @@ decltype(auto) timePhase(std::string_view phase, Operation &&operation) {
   }
 }
 
+template <typename Operation>
+decltype(auto) runExtractStage(const cli::ExtractOptions &options,
+                               std::string_view stage, Operation &&operation) {
+  return cli::runStage(options.verbosity, "extract", stage, [&] {
+    return timePhase(stage, std::forward<Operation>(operation));
+  });
+}
+
 std::expected<CompilationDatabasePtr, std::string>
 requireStoredCommands(CompilationDatabasePtr database) {
   if (database->getAllCompileCommands().empty()) {
@@ -95,52 +104,57 @@ requireRegisteredSources(FileManager &files,
 
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
                                         CompilationDatabasePtr database) {
-  const auto openProjectStarted = TimingClock::now();
-  auto opened = FileManager::openReadOnly(options.configuration);
-  reportTiming("open project database", openProjectStarted);
+  auto opened = runExtractStage(options, "open project database", [&] {
+    return FileManager::openReadOnly(options.configuration);
+  });
   if (!opened) {
     return std::expected<int, std::string>{std::unexpected(opened.error())};
   }
   auto &files = **opened;
-  auto sources = timePhase("select sources", [&] {
+  auto sources = runExtractStage(options, "select sources", [&] {
     return selectSources(*database, options.sources);
   });
-  return timePhase("resolve registered sources",
-                   [&] { return requireRegisteredSources(files, sources); })
+  cli::logVerbose(options.verbosity, 2,
+                  "facts-tool: extract: selected_sources={}", sources.size());
+  return runExtractStage(
+             options, "resolve registered sources",
+             [&] { return requireRegisteredSources(files, sources); })
       .and_then([&] {
-        const auto configureToolStarted = TimingClock::now();
-        auto configured =
-            configurePlatformCompilationDatabase(*database, sources);
+        auto configured = runExtractStage(options, "configure Clang tool", [&] {
+          return configurePlatformCompilationDatabase(*database, sources);
+        });
         if (!configured) {
           return std::expected<int, std::string>{
               std::unexpected(configured.error())};
         }
         clang::tooling::ClangTool tool(**configured, sources);
-        reportTiming("configure Clang tool", configureToolStarted);
 
+        cli::logVerbose(options.verbosity, 1,
+                        "facts-tool: extract: open output database");
         const auto openOutputStarted = TimingClock::now();
         FactStore store(options.output);
         reportTiming("open output database", openOutputStarted);
         IndexingStatus indexing;
-        auto started = timePhase("begin output transaction",
-                                 [&] { return store.begin(); });
+        auto started = runExtractStage(options, "begin output transaction",
+                                       [&] { return store.begin(); });
         if (!started) {
           return std::expected<int, std::string>{std::unexpected(
               "cannot begin output transaction: " + started.error().message())};
         }
         const auto toolResult =
-            timePhase("Clang parse and AST extraction", [&] {
+            runExtractStage(options, "Clang parse and AST extraction", [&] {
               return tool.run(
                   createFactExtractorFactory(files, store, indexing).get());
             });
         const auto result = toolResult != 0       ? toolResult
                             : indexing.complete() ? 0
                                                   : 1;
-        auto finished = result == 0
-                            ? timePhase("commit output transaction",
-                                        [&] { return store.end(); })
-                            : timePhase("rollback output transaction",
-                                        [&] { return store.rollback(); });
+        auto finished =
+            result == 0
+                ? runExtractStage(options, "commit output transaction",
+                                  [&] { return store.end(); })
+                : runExtractStage(options, "rollback output transaction",
+                                  [&] { return store.rollback(); });
         if (!finished) {
           return std::expected<int, std::string>{
               std::unexpected("cannot finish output transaction: " +
@@ -153,24 +167,28 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
 } // namespace
 
 std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
-  return timePhase("validate database paths",
-                   [&] {
-                     return validateDatabasePaths(options.output,
-                                                  options.configuration);
-                   })
+  return runExtractStage(options, "validate database paths",
+                         [&] {
+                           return validateDatabasePaths(options.output,
+                                                        options.configuration);
+                         })
       .and_then([&] {
-        return timePhase("load compilation database", [&] {
+        return runExtractStage(options, "load compilation database", [&] {
           return loadStoredCompilationDatabase(options.configuration);
         });
       })
-      .and_then([](CompilationDatabasePtr database) {
-        return timePhase("validate stored commands", [&] {
+      .and_then([&](CompilationDatabasePtr database) {
+        return runExtractStage(options, "validate stored commands", [&] {
           return requireStoredCommands(std::move(database));
         });
       })
       .and_then([&](CompilationDatabasePtr database) {
-        return timePhase("extract total",
-                         [&] { return extract(options, std::move(database)); });
+        return cli::runStage(options.verbosity, "extract", "extract facts",
+                             [&] {
+                               return timePhase("extract total", [&] {
+                                 return extract(options, std::move(database));
+                               });
+                             });
       });
 }
 

@@ -1,6 +1,7 @@
 #include "commands/Import.h"
 
 #include "ast/visitors/IncludeVisitor.h"
+#include "cli/Verbose.h"
 #include "platform/PlatformFlags.h"
 #include "storage/FileManager.h"
 #include "tooling/CompilationFiles.h"
@@ -142,14 +143,26 @@ registerFiles(FileManager &files, const CompilationDatabase &database,
 std::expected<int, std::string> import(const cli::ImportOptions &options,
                                        std::vector<ProjectComponent> components,
                                        CompilationDatabasePtr database) {
+  cli::logVerbose(options.verbosity, 2,
+                  "facts-tool: import: requested_sources={}, components={}",
+                  options.sources.size(), components.size());
+  cli::logVerbose(options.verbosity, 1,
+                  "facts-tool: import: open project database");
   FileManager files(options.configuration);
   ProjectImportOptions importOptions;
   importOptions.components = std::move(components);
-  return importProjectConfiguration(files, *database, options.sources,
-                                    importOptions)
+  return cli::runStage(options.verbosity, "import", "store compile commands",
+                       [&] {
+                         return importProjectConfiguration(
+                             files, *database, options.sources, importOptions);
+                       })
       .and_then([&](const ProjectImportResult &result) {
         reportDiagnostics(result.diagnostics);
-        return registerFiles(files, *database, options.sources)
+        return cli::runStage(options.verbosity, "import", "register files",
+                             [&] {
+                               return registerFiles(files, *database,
+                                                    options.sources);
+                             })
             .transform([&](std::size_t registered) {
               std::cout << "Imported " << result.importedFiles
                         << " compile command(s)\n";
@@ -162,10 +175,13 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
 } // namespace
 
 std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
-  return parseComponents(options.components)
+  return cli::runStage(options.verbosity, "import", "parse components",
+                       [&] { return parseComponents(options.components); })
       .and_then([&](std::vector<ProjectComponent> components) {
-        return loadCompilationDatabase(options).and_then(
-            [&](CompilationDatabasePtr database) {
+        return cli::runStage(options.verbosity, "import",
+                             "load compilation database",
+                             [&] { return loadCompilationDatabase(options); })
+            .and_then([&](CompilationDatabasePtr database) {
               return import(options, std::move(components),
                             std::move(database));
             });
