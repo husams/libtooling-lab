@@ -2,6 +2,7 @@
 
 #include "ast/visitors/IncludeVisitor.h"
 #include "cli/Options.h"
+#include "cli/Verbose.h"
 #include "commands/DatabasePaths.h"
 #include "model/Dependency.h"
 #include "platform/PlatformFlags.h"
@@ -25,6 +26,23 @@
 
 namespace facts::commands {
 namespace {
+
+template <typename Operation>
+decltype(auto) runDependencyStage(const cli::DependencyOptions &options,
+                                  std::string_view stage,
+                                  Operation &&operation) {
+  return cli::runStage(options.verbosity, "dependency", stage,
+                       std::forward<Operation>(operation));
+}
+
+std::expected<void, std::string>
+validateSources(const cli::DependencyOptions &options) {
+  if (options.sources.empty()) {
+    return std::unexpected(
+        "dependency analysis requires at least one translation-unit source");
+  }
+  return {};
+}
 
 using CompilationDatabase = clang::tooling::CompilationDatabase;
 using CompilationDatabasePtr = std::unique_ptr<CompilationDatabase>;
@@ -159,24 +177,49 @@ toStoredGraph(const IncludeGraphFacts &facts,
 
 std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
                                         CompilationDatabasePtr database) {
+  cli::logVerbose(options.verbosity, 1,
+                  "facts-tool: dependency: open project database");
   FileManager files(options.configuration);
-  return registerFiles(files, *database, options.sources)
+  return runDependencyStage(
+             options, "register files",
+             [&] { return registerFiles(files, *database, options.sources); })
       .and_then([&](std::vector<std::string> registered) {
-        return collectIncludes(*database, options.sources)
+        return runDependencyStage(
+                   options, "collect includes",
+                   [&] { return collectIncludes(*database, options.sources); })
             .and_then([&, registered = std::move(registered)](
                           IncludeGraphFacts facts) mutable {
-              return registerIncludeFiles(files, std::move(registered), facts)
+              return runDependencyStage(options, "register included files",
+                                        [&] {
+                                          return registerIncludeFiles(
+                                              files, std::move(registered),
+                                              facts);
+                                        })
                   .and_then([&, facts = std::move(facts)](
                                 std::vector<std::string> paths) mutable {
-                    return resolveRegisteredFiles(files, paths)
+                    return runDependencyStage(
+                               options, "resolve registered files",
+                               [&] {
+                                 return resolveRegisteredFiles(files, paths);
+                               })
                         .and_then([&, facts = std::move(facts)](auto ids) {
-                          return toStoredGraph(facts, ids);
+                          return runDependencyStage(
+                              options, "build graph",
+                              [&] { return toStoredGraph(facts, ids); });
                         });
                   })
                   .and_then([&](StoredGraph graph) {
-                    return replaceDependencies(options.output,
-                                               graph.visitedSources,
-                                               graph.edges)
+                    cli::logVerbose(
+                        options.verbosity, 2,
+                        "facts-tool: dependency: visited_sources={}, edges={}",
+                        graph.visitedSources.size(), graph.edges.size());
+                    return runDependencyStage(options, "persist graph",
+                                              [&] {
+                                                return replaceDependencies(
+                                                    options.output,
+                                                    graph.visitedSources,
+                                                    graph.edges);
+                                              })
                         .transform_error([](std::error_code error) {
                           return "cannot persist dependency graph: " +
                                  error.message();
@@ -191,16 +234,27 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
 
 std::expected<int, std::string>
 runDependency(const cli::DependencyOptions &options) {
-  if (options.sources.empty()) {
-    return std::unexpected(
-        "dependency analysis requires at least one translation-unit source");
-  }
-  return validateDatabasePaths(options.output, options.configuration)
-      .and_then(
-          [&] { return loadStoredCompilationDatabase(options.configuration); })
-      .and_then(requireStoredCommands)
+  return runDependencyStage(options, "validate sources",
+                            [&] { return validateSources(options); })
+      .and_then([&] {
+        return runDependencyStage(options, "validate database paths", [&] {
+          return validateDatabasePaths(options.output, options.configuration);
+        });
+      })
+      .and_then([&] {
+        return runDependencyStage(options, "load compilation database", [&] {
+          return loadStoredCompilationDatabase(options.configuration);
+        });
+      })
       .and_then([&](CompilationDatabasePtr database) {
-        return analyse(options, std::move(database));
+        return runDependencyStage(options, "validate stored commands", [&] {
+          return requireStoredCommands(std::move(database));
+        });
+      })
+      .and_then([&](CompilationDatabasePtr database) {
+        return runDependencyStage(options, "analyse dependency graph", [&] {
+          return analyse(options, std::move(database));
+        });
       });
 }
 

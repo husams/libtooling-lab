@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 
-def run(tool: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+def run(
+    tool: Path, *arguments: str, environment: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(tool), *arguments], capture_output=True, text=True, check=False
+        [str(tool), *arguments],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=os.environ | (environment or {}),
     )
 
 
@@ -42,13 +49,19 @@ def main() -> None:
     extract_help = run(tool, "extract", "--help")
     require(extract_help.returncode == 0, output(extract_help))
     require(
-        "--output" in output(extract_help) and "--conf" in output(extract_help),
+        "--output" in output(extract_help)
+        and "--conf" in output(extract_help)
+        and "--verbose" in output(extract_help),
         output(extract_help),
     )
 
     import_help = run(tool, "import", "--help")
     require(import_help.returncode == 0, output(import_help))
-    require("--compilation-database" in output(import_help), output(import_help))
+    require(
+        "--compilation-database" in output(import_help)
+        and "--verbose" in output(import_help),
+        output(import_help),
+    )
     require(
         "Source files to import; filter compilation database commands or"
         in output(import_help)
@@ -60,7 +73,8 @@ def main() -> None:
     require(dependency_help.returncode == 0, output(dependency_help))
     require(
         "--output" in output(dependency_help)
-        and "--conf" in output(dependency_help),
+        and "--conf" in output(dependency_help)
+        and "--verbose" in output(dependency_help),
         output(dependency_help),
     )
 
@@ -95,6 +109,110 @@ def main() -> None:
             missing_import_source,
             "import requires --compilation-database or at least one source",
         )
+        require(
+            "facts-tool: import: starting" not in output(missing_import_source),
+            output(missing_import_source),
+        )
+
+        verbose_import = run(
+            tool, "import", "-v", "--conf", str(configuration)
+        )
+        require_failure(
+            verbose_import,
+            "import requires --compilation-database or at least one source",
+        )
+        require(
+            "facts-tool: import: starting" in verbose_import.stderr
+            and "facts-tool: import: parse components" in verbose_import.stderr
+            and "compilation_database=" not in verbose_import.stderr
+            and "facts-tool: import:" not in verbose_import.stdout,
+            output(verbose_import),
+        )
+
+        detailed_import = run(
+            tool,
+            "import",
+            "--verbose",
+            "2",
+            "--conf",
+            str(configuration),
+        )
+        require_failure(
+            detailed_import,
+            "import requires --compilation-database or at least one source",
+        )
+        require(
+            "compilation_database='fixed commands'" in detailed_import.stderr
+            and "requested_sources=0" in detailed_import.stderr
+            and "facts-tool: import:" not in detailed_import.stdout,
+            output(detailed_import),
+        )
+
+        combined_verbosity = run(
+            tool,
+            "import",
+            "-v",
+            "--verbose",
+            "0",
+            "--conf",
+            str(configuration),
+        )
+        require_failure(
+            combined_verbosity,
+            "import requires --compilation-database or at least one source",
+        )
+        require(
+            "facts-tool: import: starting" in combined_verbosity.stderr,
+            output(combined_verbosity),
+        )
+
+        invalid_verbosity = run(
+            tool,
+            "extract",
+            "--verbose",
+            "3",
+            "--output",
+            str(root / "invalid.sqlite"),
+            "--conf",
+            str(configuration),
+        )
+        require(invalid_verbosity.returncode != 0, output(invalid_verbosity))
+        require(
+            "range" in output(invalid_verbosity).lower(),
+            output(invalid_verbosity),
+        )
+
+        invalid_import_verbosity = run(
+            tool,
+            "import",
+            "--verbose",
+            "3",
+            "--conf",
+            str(configuration),
+        )
+        require(
+            invalid_import_verbosity.returncode != 0
+            and "range" in output(invalid_import_verbosity).lower(),
+            output(invalid_import_verbosity),
+        )
+
+        invalid_dependency_verbosity = run(
+            tool,
+            "analyses",
+            "dependency",
+            "--verbose",
+            "3",
+            "--output",
+            str(root / "invalid-dependency.sqlite"),
+            "--conf",
+            str(configuration),
+            "source.cpp",
+        )
+        require(
+            invalid_dependency_verbosity.returncode != 0
+            and "range" in output(invalid_dependency_verbosity).lower(),
+            output(invalid_dependency_verbosity),
+        )
 
         same_database = root / "same.sqlite"
         identical_databases = run(
@@ -110,6 +228,48 @@ def main() -> None:
             "output and project configuration require separate databases",
         )
 
+        detailed_extract = run(
+            tool,
+            "extract",
+            "--verbose",
+            "2",
+            "--output",
+            str(same_database),
+            "--conf",
+            str(same_database),
+        )
+        require_failure(
+            detailed_extract,
+            "output and project configuration require separate databases",
+        )
+        require(
+            "facts-tool: extract: starting" in detailed_extract.stderr
+            and "requested_sources=0" in detailed_extract.stderr
+            and "facts-tool: extract: validate database paths"
+            in detailed_extract.stderr
+            and "facts-tool: extract:" not in detailed_extract.stdout,
+            output(detailed_extract),
+        )
+
+        short_extract = run(
+            tool,
+            "extract",
+            "-v",
+            "--output",
+            str(same_database),
+            "--conf",
+            str(same_database),
+        )
+        require_failure(
+            short_extract,
+            "output and project configuration require separate databases",
+        )
+        require(
+            "facts-tool: extract: validate database paths"
+            in short_extract.stderr,
+            output(short_extract),
+        )
+
         identical_dependency_databases = run(
             tool,
             "analyses",
@@ -123,6 +283,52 @@ def main() -> None:
         require_failure(
             identical_dependency_databases,
             "output and project configuration require separate databases",
+        )
+
+        detailed_dependency = run(
+            tool,
+            "analyses",
+            "dependency",
+            "--verbose",
+            "2",
+            "--output",
+            str(same_database),
+            "--conf",
+            str(same_database),
+            "source.cpp",
+        )
+        require_failure(
+            detailed_dependency,
+            "output and project configuration require separate databases",
+        )
+        require(
+            "facts-tool: dependency: starting" in detailed_dependency.stderr
+            and "facts-tool: dependency: validate sources"
+            in detailed_dependency.stderr
+            and "roots=1" in detailed_dependency.stderr
+            and "facts-tool: dependency:" not in detailed_dependency.stdout,
+            output(detailed_dependency),
+        )
+
+        short_dependency = run(
+            tool,
+            "analyses",
+            "dependency",
+            "-v",
+            "--output",
+            str(same_database),
+            "--conf",
+            str(same_database),
+            "source.cpp",
+        )
+        require_failure(
+            short_dependency,
+            "output and project configuration require separate databases",
+        )
+        require(
+            "facts-tool: dependency: validate sources"
+            in short_dependency.stderr,
+            output(short_dependency),
         )
 
         compilation_database = root / "compile_commands.json"
@@ -197,6 +403,24 @@ def main() -> None:
         require(
             "Imported 1 compile command(s)" in output(filtered_import),
             output(filtered_import),
+        )
+
+        timed_extract = run(
+            tool,
+            "extract",
+            "--output",
+            str(root / "timed-facts.sqlite"),
+            "--conf",
+            str(root / "filtered.sqlite"),
+            str(first),
+            environment={"FACTS_TOOL_TIMING": "1"},
+        )
+        require(timed_extract.returncode != 0, output(timed_extract))
+        require(
+            "facts-tool timing: open output database:" in timed_extract.stderr
+            and "facts-tool timing: extract total:" in timed_extract.stderr
+            and "facts-tool: extract: starting" not in timed_extract.stderr,
+            output(timed_extract),
         )
 
 

@@ -7,12 +7,14 @@
 namespace facts::cli {
 
 struct ExtractOptions {
+  int verbosity = 0;
   std::string output;
   std::string configuration;
   std::vector<std::string> sources;
 };
 
 struct ImportOptions {
+  int verbosity = 0;
   std::string configuration;
   std::string compilationDatabase;
   std::vector<std::string> components;
@@ -21,6 +23,7 @@ struct ImportOptions {
 };
 
 struct DependencyOptions {
+  int verbosity = 0;
   std::string output;
   std::string configuration;
   std::vector<std::string> sources;

@@ -1,14 +1,16 @@
 #include "cli/CommandLine.h"
 
 #include "cli/Options.h"
+#include "cli/Verbose.h"
 #include "commands/Dependency.h"
 #include "commands/Extract.h"
 #include "commands/Import.h"
 
 #include <CLI/CLI.hpp>
 
-#include <concepts>
+#include <algorithm>
 #include <expected>
+#include <format>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -40,15 +42,33 @@ public:
     }
 
     if (extractCommand_->parsed()) {
-      return Command{std::move(extract_)};
+      return makeCommand(std::move(extract_), extractVerbose_);
     }
-    return importCommand_->parsed() ? Command{std::move(import_)}
-                                    : Command{std::move(dependency_)};
+    return importCommand_->parsed()
+               ? makeCommand(std::move(import_), importVerbose_)
+               : makeCommand(std::move(dependency_), dependencyVerbose_);
   }
 
 private:
+  template <typename Options>
+  static Command makeCommand(Options options, bool stagesEnabled) {
+    options.verbosity = std::max(options.verbosity, stagesEnabled ? 1 : 0);
+    return Command{std::move(options)};
+  }
+
+  static void configureVerbosity(CLI::App &command, int &verbosity,
+                                 bool &stagesEnabled) {
+    command.add_flag("-v", stagesEnabled, "Enable at least stage output");
+    command
+        .add_option("--verbose", verbosity,
+                    "Verbosity level: 0=quiet, 1=stages, 2=details")
+        ->check(CLI::Range(0, maximumVerbosity))
+        ->type_name("LEVEL");
+  }
+
   void configureExtract(CLI::App &command) {
     extractCommand_ = &command;
+    configureVerbosity(command, extract_.verbosity, extractVerbose_);
     command
         .add_option("-o,--output", extract_.output,
                     "SQLite database for extracted facts")
@@ -66,6 +86,7 @@ private:
 
   void configureImport(CLI::App &command) {
     importCommand_ = &command;
+    configureVerbosity(command, import_.verbosity, importVerbose_);
     command
         .add_option("-c,--conf", import_.configuration,
                     "Full path for the stored project configuration")
@@ -102,6 +123,7 @@ private:
 
   void configureDependency(CLI::App &command) {
     dependencyCommand_ = &command;
+    configureVerbosity(command, dependency_.verbosity, dependencyVerbose_);
     command
         .add_option("-o,--output", dependency_.output,
                     "SQLite database for extracted dependency facts")
@@ -126,7 +148,50 @@ private:
   ExtractOptions extract_;
   ImportOptions import_;
   DependencyOptions dependency_;
+  bool extractVerbose_ = false;
+  bool importVerbose_ = false;
+  bool dependencyVerbose_ = false;
 };
+
+std::string_view commandName(const ExtractOptions &) { return "extract"; }
+
+std::string_view commandName(const ImportOptions &) { return "import"; }
+
+std::string_view commandName(const DependencyOptions &) { return "dependency"; }
+
+std::string commandDetails(const ExtractOptions &options) {
+  return std::format("configuration='{}', output='{}', requested_sources={}",
+                     options.configuration, options.output,
+                     options.sources.size());
+}
+
+std::string commandDetails(const ImportOptions &options) {
+  return std::format(
+      "configuration='{}', compilation_database='{}', requested_sources={}, "
+      "components={}",
+      options.configuration,
+      options.compilationDatabase.empty() ? "fixed commands"
+                                          : options.compilationDatabase,
+      options.sources.size(), options.components.size());
+}
+
+std::string commandDetails(const DependencyOptions &options) {
+  return std::format("configuration='{}', output='{}', roots={}",
+                     options.configuration, options.output,
+                     options.sources.size());
+}
+
+std::expected<int, std::string> execute(const ExtractOptions &options) {
+  return commands::runExtract(options);
+}
+
+std::expected<int, std::string> execute(const ImportOptions &options) {
+  return commands::runImport(options);
+}
+
+std::expected<int, std::string> execute(const DependencyOptions &options) {
+  return commands::runDependency(options);
+}
 
 int report(std::expected<int, std::string> result) {
   if (!result) {
@@ -139,14 +204,14 @@ int report(std::expected<int, std::string> result) {
 int dispatch(Command command) {
   return std::visit(
       [](auto options) {
-        using Options = decltype(options);
-        if constexpr (std::same_as<Options, ExtractOptions>) {
-          return report(commands::runExtract(options));
-        } else if constexpr (std::same_as<Options, ImportOptions>) {
-          return report(commands::runImport(options));
-        } else {
-          return report(commands::runDependency(options));
-        }
+        const auto name = commandName(options);
+        logVerbose(options.verbosity, 1, "facts-tool: {}: starting", name);
+        logVerbose(options.verbosity, 2, "facts-tool: {}: {}", name,
+                   commandDetails(options));
+        auto result = execute(options);
+        logVerbose(options.verbosity, 1, "facts-tool: {}: {}", name,
+                   result ? "complete" : "failed");
+        return report(std::move(result));
       },
       std::move(command));
 }
