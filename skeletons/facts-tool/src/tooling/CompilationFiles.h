@@ -4,7 +4,6 @@
 #include <expected>
 #include <span>
 #include <string>
-#include <system_error>
 #include <vector>
 
 namespace clang::tooling {
@@ -13,10 +12,14 @@ class CompilationDatabase;
 
 namespace facts {
 
-std::expected<std::vector<std::string>, std::error_code>
-discoverCompilationFiles(
+struct CompilationFiles {
+  std::vector<std::string> files;
+  std::vector<std::string> diagnostics;
+};
+
+std::expected<CompilationFiles, std::string> discoverCompilationFiles(
     const clang::tooling::CompilationDatabase &compilations,
-    std::span<const std::string> fallbackSources);
+    std::span<const std::string> selectedSources);
 
 } // namespace facts
 

@@ -41,3 +41,15 @@ Feature: Stored compilation options
     When the real facts-tool is invoked with the deprecated --files-out option
     Then the facts-tool run fails
     And the diagnostic reports --files-out as an unknown option
+
+  Scenario: An unrelated stored command's missing include directory does not block extraction
+    Given realistic shared-header declarations, definitions, parameters, and relations
+    When the real facts-tool extracts one.cpp while two.cpp keeps a missing include directory
+    Then the facts-tool run succeeds
+    And no diagnostic reports a pre-import failure
+
+  Scenario: A missing include directory on the selected command is skipped with a diagnostic
+    Given realistic shared-header declarations, definitions, parameters, and relations
+    When the real facts-tool extracts one.cpp with a missing include directory
+    Then the facts-tool run succeeds
+    And the diagnostic reports the skipped include directory

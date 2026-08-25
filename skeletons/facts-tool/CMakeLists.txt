@@ -247,6 +247,7 @@ if(BUILD_TESTING)
     COMMAND compilation-files-test
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_one.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures
+            ${CMAKE_CURRENT_BINARY_DIR}/compilation-files-scratch
   )
   add_executable(stored-compilation-database-test
                  tests/StoredCompilationDatabaseTest.cpp)

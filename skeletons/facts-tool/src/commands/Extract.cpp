@@ -78,20 +78,25 @@ selectSources(const CompilationDatabase &database,
   return requested.empty() ? database.getAllFiles() : requested;
 }
 
+void reportDiagnostics(const std::vector<std::string> &diagnostics) {
+  for (const auto &diagnostic : diagnostics) {
+    std::cerr << "facts-tool: " << diagnostic << '\n';
+  }
+}
+
 std::expected<void, std::string>
 registerFiles(FileManager &files, const CompilationDatabase &database,
               const std::vector<std::string> &sources) {
-  auto imported = timePhase("discover compilation files", [&] {
-                    return discoverCompilationFiles(database, sources);
-                  }).and_then([&files](std::vector<std::string> paths) {
-    return timePhase("register compilation files",
-                     [&] { return files.addBulk(paths); });
-  });
-  if (!imported) {
-    return std::unexpected("cannot pre-import files: " +
-                           imported.error().message());
-  }
-  return {};
+  return timePhase("discover compilation files",
+                   [&] { return discoverCompilationFiles(database, sources); })
+      .and_then([&](CompilationFiles discovered) {
+        reportDiagnostics(discovered.diagnostics);
+        return timePhase("register compilation files",
+                         [&] { return files.addBulk(discovered.files); })
+            .transform_error([](std::error_code error) {
+              return "cannot pre-import files: " + error.message();
+            });
+      });
 }
 
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
