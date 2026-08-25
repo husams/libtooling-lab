@@ -1,5 +1,6 @@
 #include "ast/extractors/Type.h"
 
+#include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/TargetResolution.h"
 #include "storage/FactStore.h"
 
@@ -132,13 +133,15 @@ private:
     }
 
     const auto target = declaration->getQualifiedNameAsString();
-    llvm::SmallString<128> usr;
-    if (clang::index::generateUSRForDecl(declaration, usr)) {
+    // Through extractUsr, not generateUSRForDecl: a lambda's USR carries a
+    // discriminator this lookup has to match.
+    const auto usr = extractUsr(*declaration);
+    if (!usr) {
       return std::unexpected(
           typeFailure(target, "<unavailable>", "type USR is unavailable"));
     }
 
-    const auto usrText = std::string{usr.data(), usr.size()};
+    const auto usrText = *usr;
     return store_.findId(usrText)
         .transform_error([&](std::error_code error) {
           return typeFailure(target, usrText, error.message());

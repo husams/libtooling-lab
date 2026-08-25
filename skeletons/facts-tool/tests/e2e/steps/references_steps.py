@@ -87,7 +87,9 @@ def then_template_and_nested_owners_are_canonical(context: FactsToolContext) -> 
     )
 
     # A lambda closure is named after where it was written, so its owner is an
-    # exact name rather than something reached by a wildcard.
+    # exact name rather than something reached by a wildcard. The two lambdas
+    # in nestedDeclarations() share one lexical scope: both must survive, and
+    # each must keep the target it actually names.
     lambda_owners = [
         row[0]
         for row in query(
@@ -98,31 +100,45 @@ def then_template_and_nested_owners_are_canonical(context: FactsToolContext) -> 
         )
     ]
     require(
-        len(lambda_owners) == 1,
-        f"expected one lambda call operator, got: {lambda_owners}",
+        len(lambda_owners) == 2 and len(set(lambda_owners)) == 2,
+        f"expected two distinct lambda call operators, got: {lambda_owners}",
     )
 
     owners = ["reference_fixture::nestedDeclarations()::Local::method"]
     owners.extend(lambda_owners)
     named = ",".join(f"'{owner}'" for owner in owners)
-    nested_targets = {
-        row[0]
+    ownership = {
+        (row[0], row[1])
         for row in query(
             context.facts_database_path,
-            "SELECT destination.qualified_name FROM relation r "
+            "SELECT source.qualified_name,destination.qualified_name "
+            "FROM relation r "
             "JOIN symbol source ON source.id=r.source_id "
             "JOIN symbol destination ON destination.id=r.destination_id "
             f"WHERE r.kind=7 AND source.qualified_name IN ({named})",
         )
     }
     require(
-        nested_targets
+        {destination for _, destination in ownership}
         == {
             "reference_fixture::primaryTarget",
             "reference_fixture::nestedDeclarations()::Local::localField",
             "reference_fixture::secondaryTarget",
         },
-        f"unexpected nested callable ownership: {nested_targets}",
+        f"unexpected nested callable ownership: {ownership}",
+    )
+    by_lambda = {
+        source: destination
+        for source, destination in ownership
+        if source in lambda_owners
+    }
+    require(
+        sorted(by_lambda.items())
+        == [
+            (lambda_owners[0], "reference_fixture::secondaryTarget"),
+            (lambda_owners[1], "reference_fixture::primaryTarget"),
+        ],
+        f"lambda targets are not attributed to their own closure: {by_lambda}",
     )
 
 
@@ -141,7 +157,10 @@ def then_lambda_names_are_portable(context: FactsToolContext) -> None:
         "SELECT qualified_name FROM symbol WHERE qualified_name GLOB "
         "'*<lambda@[0-9]*:[0-9]*>*' ORDER BY qualified_name",
     )
-    require(len(closures) == 2, f"expected two lambda facts, got: {closures}")
+    require(
+        len(closures) == 4 and len(set(row[0] for row in closures)) == 4,
+        f"expected four distinct lambda facts, got: {closures}",
+    )
 
 
 @then("body-nested declarations retain their specialized facts")

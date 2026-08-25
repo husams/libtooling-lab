@@ -118,6 +118,30 @@ rewriteLambdaScopes(std::string_view spelling,
   return rewritten;
 }
 
+// Clang gives every lambda in one function the same USR — it ends in "@Sa"
+// with nothing to tell two closures apart — so the second lambda would take
+// over the first one's identity, and its call operator and relations with it.
+// The source coordinates that name the closure disambiguate it here too.
+std::string lambdaDiscriminator(const clang::NamedDecl &node,
+                                const clang::SourceManager &sourceManager) {
+  std::vector<const clang::Decl *> closures = unnamedScopes(node);
+  closures.push_back(&node);
+  std::string discriminator;
+  for (const clang::Decl *scope : closures) {
+    const auto *closure = asLambda(scope);
+    if (closure == nullptr) {
+      continue;
+    }
+    const auto location = extractLocation(sourceManager, closure->getLocation());
+    if (!location) {
+      continue;
+    }
+    discriminator += "@" + std::to_string(location->line) + ":" +
+                     std::to_string(location->column);
+  }
+  return discriminator;
+}
+
 } // namespace
 
 std::string extractQualifiedName(const clang::NamedDecl &node,
@@ -165,7 +189,8 @@ ExtractionResult<std::string> extractUsr(const clang::NamedDecl &node) {
   if (clang::index::generateUSRForDecl(&node, usr)) {
     return std::unexpected(ExtractionError::InvalidUsr);
   }
-  return std::string{usr};
+  return std::string{usr} +
+         lambdaDiscriminator(node, node.getASTContext().getSourceManager());
 }
 
 TypeResult extractAliasTarget(const clang::TypedefNameDecl &node,

@@ -48,7 +48,8 @@ inline int nestedDeclarations() {
   enum LocalEnum { LocalAlpha, LocalBeta };
 
   auto lambda = [] { return secondaryTarget; };
-  return Local{}.method() + lambda() + LocalAlpha + LocalBeta;
+  auto sibling = [] { return primaryTarget; };
+  return Local{}.method() + lambda() + sibling() + LocalAlpha + LocalBeta;
 }
 
 } // namespace reference_fixture
