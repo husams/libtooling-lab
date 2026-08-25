@@ -57,12 +57,16 @@ int main(int argc, char **argv) {
                            SQLITE_TRANSIENT) == SQLITE_OK);
   assert(sqlite3_step(component) == SQLITE_DONE);
   sqlite3_finalize(component);
-  execute(database,
-          "INSERT INTO directory(id,component_id,path) VALUES(11,7,'');"
-          "INSERT INTO file(id,directory_id,name,driver,compile_options) "
-          "VALUES(23,11,'source.cpp','/usr/bin/clang++',"
-          "'[\"-I<fixture>/include\",\"-o\",\"discard.o\","
-          "\"-DVALUE=1\",\"-Werror\"]')");
+  execute(
+      database,
+      "INSERT INTO directory(id,component_id,path) VALUES(11,7,'');"
+      "INSERT INTO file(id,directory_id,name,driver,compile_options) "
+      "VALUES(23,11,'source.cpp','/opt/rh/gcc-toolset-15/root/usr/bin/g++-15',"
+      "'[\"-I<fixture>/include\",\"-o\",\"discard.o\","
+      "\"-DVALUE=1\",\"--target=x86_64-redhat-linux\","
+      "\"--gcc-toolchain=/opt/rh/gcc-toolset-15/root/usr\","
+      "\"--sysroot=/target-sysroot\",\"-stdlib=libstdc++\","
+      "\"-Werror\"]')");
   sqlite3_close(database);
 
   auto stored = facts::loadStoredCompilationDatabase(databasePath.string());
@@ -70,9 +74,14 @@ int main(int argc, char **argv) {
   const auto commands = (*stored)->getCompileCommands(source.string());
   assert(commands.size() == 1);
   const auto &arguments = commands.front().CommandLine;
-  assert(arguments.front() == "/usr/bin/clang++");
+  assert(arguments.front() == "/opt/rh/gcc-toolset-15/root/usr/bin/g++-15");
   assert(contains(arguments, "-I" + include.string()));
   assert(contains(arguments, "-DVALUE=1"));
+  assert(contains(arguments, "--target=x86_64-redhat-linux"));
+  assert(
+      contains(arguments, "--gcc-toolchain=/opt/rh/gcc-toolset-15/root/usr"));
+  assert(contains(arguments, "--sysroot=/target-sysroot"));
+  assert(contains(arguments, "-stdlib=libstdc++"));
   assert(contains(arguments, source.string()));
   assert(!contains(arguments, "-o"));
   assert(!contains(arguments, "discard.o"));

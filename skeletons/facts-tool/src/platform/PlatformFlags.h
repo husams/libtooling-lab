@@ -1,18 +1,21 @@
-// platform/PlatformFlags.h — make the embedded front-end able to find headers.
-//
-// The embedded front-end can't locate headers on its own; point it at what's
-// already installed. Every ClangTool this process creates goes through here.
-
 #ifndef FACTS_TOOL_PLATFORMFLAGS_H
 #define FACTS_TOOL_PLATFORMFLAGS_H
 
+#include <expected>
+#include <memory>
+#include <span>
+#include <string>
+
 namespace clang::tooling {
-class ClangTool;
+class CompilationDatabase;
 } // namespace clang::tooling
 
 namespace facts {
 
-void addPlatformFlags(clang::tooling::ClangTool &tool);
+std::expected<std::unique_ptr<clang::tooling::CompilationDatabase>, std::string>
+configurePlatformCompilationDatabase(
+    const clang::tooling::CompilationDatabase &database,
+    std::span<const std::string> sources);
 
 } // namespace facts
 

@@ -73,14 +73,18 @@ registerFiles(FileManager &files, const CompilationDatabase &database,
 std::expected<IncludeGraphFacts, std::string>
 collectIncludes(const CompilationDatabase &database,
                 const std::vector<std::string> &sources) {
-  IncludeGraphFacts facts;
-  clang::tooling::ClangTool tool(database, sources);
-  addPlatformFlags(tool);
-  const auto result = tool.run(createIncludeVisitorFactory(facts).get());
-  if (result != 0) {
-    return std::unexpected("dependency analysis failed while parsing sources");
-  }
-  return facts;
+  return configurePlatformCompilationDatabase(database, sources)
+      .and_then([&](auto configured)
+                    -> std::expected<IncludeGraphFacts, std::string> {
+        IncludeGraphFacts facts;
+        clang::tooling::ClangTool tool(*configured, sources);
+        const auto result = tool.run(createIncludeVisitorFactory(facts).get());
+        if (result != 0) {
+          return std::unexpected(
+              "dependency analysis failed while parsing sources");
+        }
+        return facts;
+      });
 }
 
 std::expected<std::vector<std::string>, std::string>

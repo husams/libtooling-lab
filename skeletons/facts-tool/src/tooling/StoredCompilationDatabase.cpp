@@ -652,11 +652,13 @@ std::string compilerDriver(const clang::tooling::CompileCommand &command,
                            const std::filesystem::path &source) {
   const auto candidate = command.CommandLine[start];
   const auto name = std::filesystem::path(candidate).filename().string();
+  const auto gnuCxx = name == "g++" || name.starts_with("g++-") ||
+                      name.ends_with("-g++") ||
+                      name.find("-g++-") != std::string::npos;
   const auto compilerName =
       name == "clang" || name.starts_with("clang++") ||
       (name.starts_with("clang-") && name != "clang-tool") || name == "gcc" ||
-      name.starts_with("gcc-") || name == "cc" || name == "c++" ||
-      name == "g++";
+      name.starts_with("gcc-") || name == "cc" || name == "c++" || gnuCxx;
   const auto usablePath =
       !candidate.contains('/') || std::filesystem::exists(candidate);
   const auto compiler = compilerName && usablePath;

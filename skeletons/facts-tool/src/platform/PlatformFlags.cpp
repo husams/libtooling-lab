@@ -1,106 +1,127 @@
 #include "platform/PlatformFlags.h"
 
-// GetResourcesPath moved into the clangOptions library in LLVM 22; before that
-// it was a static member of the driver.
-#if __has_include("clang/Options/OptionUtils.h")
-#include "clang/Options/OptionUtils.h"
-#else
-#include "clang/Driver/Driver.h"
-#endif
-#include "clang/Basic/Version.h"
-#include "clang/Tooling/ArgumentsAdjusters.h"
-#include "clang/Tooling/Tooling.h"
+#include "platform/DriverIncludes.h"
+#include "platform/ResourceDirectory.h"
 
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
+#include <clang/Tooling/CompilationDatabase.h>
 
-#include <dlfcn.h>
-#include <string>
-
-using namespace clang;
-using namespace clang::tooling;
+#include <cstdio>
+#include <filesystem>
+#include <optional>
+#include <ranges>
+#include <utility>
 
 namespace facts {
 namespace {
 
-// A resource directory is only useful if it actually holds the builtin headers
-// (stddef.h, stdarg.h) that libc and libstdc++ headers include.
-bool holdsBuiltinHeaders(llvm::StringRef directory) {
-  if (directory.empty())
-    return false;
-  llvm::SmallString<128> probe(directory);
-  llvm::sys::path::append(probe, "include", "stddef.h");
-  return llvm::sys::fs::exists(probe);
+using Commands = std::vector<clang::tooling::CompileCommand>;
+
+std::filesystem::path commandPath(const std::string &directory,
+                                  const std::string &value) {
+  const std::filesystem::path path(value);
+  return (path.is_absolute() ? path : std::filesystem::path(directory) / path)
+      .lexically_normal();
 }
 
-std::string siblingResourceDir(llvm::StringRef libraryDir,
-                               llvm::StringRef libName) {
-  llvm::SmallString<128> candidate(libraryDir);
-  if (!libName.empty())
-    llvm::sys::path::append(candidate, "..", libName);
-  llvm::sys::path::append(candidate, "clang",
-                          std::to_string(CLANG_VERSION_MAJOR));
-  return std::string(candidate);
-}
+class PlatformCompilationDatabase final
+    : public clang::tooling::CompilationDatabase {
+public:
+  explicit PlatformCompilationDatabase(Commands commands)
+      : commands_(std::move(commands)) {}
 
-// Distributions disagree on where the builtin headers sit relative to
-// libclang-cpp: Homebrew keeps lib/clang/<major> next to the library, while
-// RHEL's llvm21 package splits lib64/ and lib/. Probe the layouts instead of
-// trusting the computed default, which silently yields a directory with no
-// headers in it and only fails later, deep inside a system header.
-std::string resolveResourceDir(llvm::StringRef libraryPath,
-                               std::string computed) {
-  if (holdsBuiltinHeaders(computed))
-    return computed;
-  llvm::StringRef dir = llvm::sys::path::parent_path(libraryPath);
-  for (llvm::StringRef libName : {"", "lib", "lib64"}) {
-    std::string candidate = siblingResourceDir(dir, libName);
-    if (holdsBuiltinHeaders(candidate))
-      return candidate;
+  std::vector<clang::tooling::CompileCommand>
+  getCompileCommands(llvm::StringRef filePath) const override {
+    auto selected = commands_ | std::views::filter([&](const auto &command) {
+                      return commandPath(command.Directory, command.Filename) ==
+                             commandPath(command.Directory, filePath.str());
+                    });
+    return {selected.begin(), selected.end()};
   }
-  return computed;
+
+  std::vector<std::string> getAllFiles() const override {
+    auto files = commands_ | std::views::transform([](const auto &command) {
+                   return command.Filename;
+                 });
+    return {files.begin(), files.end()};
+  }
+
+  std::vector<clang::tooling::CompileCommand>
+  getAllCompileCommands() const override {
+    return commands_;
+  }
+
+private:
+  Commands commands_;
+};
+
+std::expected<Commands, std::string>
+selectedCommands(const clang::tooling::CompilationDatabase &database,
+                 std::span<const std::string> sources) {
+  Commands selected;
+  for (const auto &source : sources) {
+    auto commands = database.getCompileCommands(source);
+    if (commands.empty())
+      return std::unexpected("no compile command for source: " + source);
+    selected.insert(selected.end(), std::make_move_iterator(commands.begin()),
+                    std::make_move_iterator(commands.end()));
+  }
+  return selected;
 }
 
-// The builtin-header dir comes from the LLVM install this binary is linked
-// against — dladdr finds its libclang-cpp.dylib.
-void addResourceDir(ClangTool &tool) {
-#if __has_include("clang/Options/OptionUtils.h")
-  auto *resourcePathFn =
-      static_cast<std::string (*)(llvm::StringRef)>(&clang::GetResourcesPath);
+std::optional<std::filesystem::path> macosSdkRoot() {
+#ifdef __APPLE__
+  FILE *process = popen("xcrun --show-sdk-path 2>/dev/null", "r");
+  if (process == nullptr)
+    return std::nullopt;
+  char buffer[1024]{};
+  const bool read = fgets(buffer, sizeof(buffer), process) != nullptr;
+  pclose(process);
+  if (!read)
+    return std::nullopt;
+  std::string value(buffer);
+  value.erase(value.find_last_not_of("\r\n") + 1);
+  if (!value.starts_with('/'))
+    return std::nullopt;
+  return std::filesystem::path(value);
 #else
-  auto *resourcePathFn = &clang::driver::Driver::GetResourcesPath;
+  return std::nullopt;
 #endif
-  Dl_info info;
-  if (!dladdr((void *)resourcePathFn, &info) || !info.dli_fname)
-    return;
-  std::string resourceDir =
-      resolveResourceDir(info.dli_fname, resourcePathFn(info.dli_fname));
-  tool.appendArgumentsAdjuster(getInsertArgumentAdjuster(
-      {"-resource-dir", resourceDir}, ArgumentInsertPosition::END));
 }
 
-// The SDK comes from xcrun.
-void addSysroot(ClangTool &tool) {
-  FILE *p = popen("xcrun --show-sdk-path 2>/dev/null", "r");
-  if (!p)
-    return;
-  char buf[256] = {};
-  if (fgets(buf, sizeof(buf), p) && buf[0] == '/') {
-    std::string sdk(buf);
-    sdk.erase(sdk.find_last_not_of('\n') + 1);
-    tool.appendArgumentsAdjuster(getInsertArgumentAdjuster(
-        {"-isysroot", sdk}, ArgumentInsertPosition::END));
+std::expected<Commands, std::string>
+configureCommands(Commands commands,
+                  const std::filesystem::path &resourceDirectory) {
+  Commands configured;
+  configured.reserve(commands.size());
+  const auto sdkRoot = macosSdkRoot();
+  for (auto &command : commands) {
+    auto result = platform::configureCommand(std::move(command),
+                                             resourceDirectory, sdkRoot);
+    if (!result)
+      return std::unexpected(result.error());
+    configured.push_back(std::move(*result));
   }
-  pclose(p);
+  return configured;
 }
 
 } // namespace
 
-void addPlatformFlags(ClangTool &tool) {
-  addResourceDir(tool);
-  addSysroot(tool);
+std::expected<std::unique_ptr<clang::tooling::CompilationDatabase>, std::string>
+configurePlatformCompilationDatabase(
+    const clang::tooling::CompilationDatabase &database,
+    std::span<const std::string> sources) {
+  return platform::resolveLinkedResourceDirectory().and_then(
+      [&](const auto &resourceDirectory) {
+        return selectedCommands(database, sources)
+            .and_then([&](auto commands) {
+              return configureCommands(std::move(commands), resourceDirectory);
+            })
+            .transform([](auto commands) {
+              return std::unique_ptr<clang::tooling::CompilationDatabase>(
+                  std::make_unique<PlatformCompilationDatabase>(
+                      std::move(commands)));
+            });
+      });
 }
 
 } // namespace facts
