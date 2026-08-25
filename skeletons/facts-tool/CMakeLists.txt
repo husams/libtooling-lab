@@ -167,9 +167,14 @@ target_link_libraries(facts-ast
 )
 
 add_library(facts-platform STATIC
+  src/platform/DriverIncludes.cpp
   src/platform/PlatformFlags.cpp
+  src/platform/ResourceDirectory.cpp
 )
 target_include_directories(facts-platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(
+  facts-platform PRIVATE FACTS_LINKED_CLANG_CPP="$<TARGET_FILE:clang-cpp>"
+)
 target_link_libraries(facts-platform PRIVATE facts-clang)
 
 # Commands own application behavior and remain independent of CLI11.
@@ -252,6 +257,13 @@ if(BUILD_TESTING)
     NAME stored-compilation-database
     COMMAND stored-compilation-database-test
             ${CMAKE_CURRENT_BINARY_DIR}/stored-compilation-database.sqlite
+  )
+  add_executable(platform-flags-test tests/PlatformFlagsTest.cpp)
+  target_link_libraries(platform-flags-test PRIVATE facts-platform facts-clang)
+  add_test(
+    NAME platform-flags
+    COMMAND platform-flags-test
+            ${CMAKE_CURRENT_BINARY_DIR}/platform-flags-layouts
   )
   add_executable(project-configuration-test tests/ProjectConfigurationTest.cpp)
   target_link_libraries(project-configuration-test

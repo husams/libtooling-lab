@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
 from pytest_bdd import given, then, when
 from support.database import query, require
 from support.scenario import FactsToolContext
@@ -14,24 +17,30 @@ def run(command: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def prepare_compile_database(
-    context: FactsToolContext, fixture_name: str, database_stem: str
+    context: FactsToolContext,
+    fixture_name: str,
+    database_stem: str,
+    driver: Path | None = None,
+    expected_library: str | None = None,
 ) -> Path:
     context.prepare()
     source = (context.fixture_root / fixture_name).resolve(strict=True)
     context.facts_database = context.run_root_path / f"{database_stem}.sqlite"
-    context.files_database = (
-        context.run_root_path / f"{database_stem}-project.sqlite"
-    )
+    context.files_database = context.run_root_path / f"{database_stem}-project.sqlite"
+    selected_driver = driver or context.compiler
+    expected_option = {
+        "libstdc++": "-DFACTS_EXPECT_LIBSTDCXX",
+        "libc++": "-DFACTS_EXPECT_LIBCPP",
+    }.get(expected_library)
+    arguments = [str(selected_driver), "-std=c++23", "-c"]
+    if expected_option:
+        arguments.append(expected_option)
+    arguments.append(str(source))
     compilation_database = [
         {
             "directory": str(context.fixture_root),
             "file": str(source),
-            "arguments": [
-                str(context.compiler),
-                "-std=c++23",
-                "-c",
-                str(source),
-            ],
+            "arguments": arguments,
         }
     ]
     (context.run_root_path / "compile_commands.json").write_text(
@@ -40,13 +49,76 @@ def prepare_compile_database(
     return source
 
 
+def compiler_output(driver: Path) -> str:
+    return run([str(driver), "--version"]).stdout.lower()
+
+
+def selected_standard_library(driver: Path) -> str:
+    completed = subprocess.run(
+        [str(driver), "-dM", "-E", "-x", "c++", "-"],
+        input="#include <string_view>\n",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    require(
+        completed.returncode == 0,
+        f"cannot probe target standard library for {driver}:\n{completed.stderr}",
+    )
+    if "__GLIBCXX__" in completed.stdout:
+        return "libstdc++"
+    if "_LIBCPP_VERSION" in completed.stdout:
+        return "libc++"
+    raise AssertionError(f"target driver selected no known C++ library: {driver}")
+
+
+def target_driver(environment: str, fallback: str) -> Path | None:
+    configured = os.environ.get(environment)
+    found = configured or shutil.which(fallback)
+    return Path(found).resolve() if found else None
+
+
 @given(
     "a reproducing compile database for filtered external targets",
     target_fixture="external_target_source",
 )
 def given_external_target_compile_database(context: FactsToolContext) -> Path:
+    return prepare_compile_database(context, "external_targets.cpp", "external-targets")
+
+
+@given(
+    "a reproducing clang++ compile database for filtered external targets",
+    target_fixture="external_target_source",
+)
+def given_clang_external_target_compile_database(
+    context: FactsToolContext,
+) -> Path:
+    configured = Path(context.compiler)
+    driver = (
+        configured.resolve()
+        if "clang++" in configured.name
+        else target_driver("FACTS_CLANGXX", "clang++")
+    )
+    if driver is None:
+        pytest.skip("clang++ target driver is not installed")
+    expected = selected_standard_library(driver)
     return prepare_compile_database(
-        context, "external_targets.cpp", "external-targets"
+        context, "toolchain_targets.cpp", "external-targets-clang", driver, expected
+    )
+
+
+@given(
+    "a reproducing GNU g++ compile database for filtered external targets",
+    target_fixture="external_target_source",
+)
+def given_gnu_external_target_compile_database(
+    context: FactsToolContext,
+) -> Path:
+    driver = target_driver("FACTS_GXX", "g++")
+    if driver is None or "clang" in compiler_output(driver):
+        pytest.skip("a GNU g++ target driver is not installed")
+    return prepare_compile_database(
+        context, "toolchain_targets.cpp", "external-targets-gxx", driver, "libstdc++"
     )
 
 
@@ -102,6 +174,21 @@ def extract_fixture(context: FactsToolContext, source: Path) -> None:
     )
     context.last_returncode = completed.returncode
     context.last_output = completed.stdout + completed.stderr
+
+
+@then("the stored external-target driver is preserved")
+def then_stored_external_target_driver_is_preserved(
+    context: FactsToolContext,
+) -> None:
+    rows = query(
+        context.files_database_path,
+        "SELECT driver FROM file WHERE driver IS NOT NULL",
+    )
+    compile_database = json.loads(
+        (context.run_root_path / "compile_commands.json").read_text(encoding="utf-8")
+    )
+    expected = str(Path(compile_database[0]["arguments"][0]).resolve())
+    require(rows == [(expected,)], f"unexpected stored driver: {rows}")
 
 
 @when(

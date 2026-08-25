@@ -104,8 +104,12 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
   });
   return registerFiles(files, *database, sources).and_then([&] {
     const auto configureToolStarted = TimingClock::now();
-    clang::tooling::ClangTool tool(*database, sources);
-    addPlatformFlags(tool);
+    auto configured = configurePlatformCompilationDatabase(*database, sources);
+    if (!configured) {
+      return std::expected<int, std::string>{
+          std::unexpected(configured.error())};
+    }
+    clang::tooling::ClangTool tool(**configured, sources);
     reportTiming("configure Clang tool", configureToolStarted);
 
     const auto openOutputStarted = TimingClock::now();

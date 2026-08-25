@@ -17,6 +17,7 @@ Feature: Canonical source file registry
       | references_two.cpp |
       | shared.hpp |
       | system/external_base.hpp |
+      | toolchain_targets.cpp |
       | one.cpp    |
       | two.cpp    |
     And every registered FileId is greater than zero
