@@ -20,6 +20,7 @@ class FactsToolContext:
     compiler: Path
     output_root: Path
     sources: tuple[Path, Path]
+    clang_driver: Optional[Path] = None
     run_root: Optional[Path] = None
     facts_database: Optional[Path] = None
     files_database: Optional[Path] = None
@@ -39,6 +40,7 @@ class FactsToolContext:
         fixture_root: Path,
         compiler: Path,
         output_root: Path,
+        clang_driver: Optional[Path] = None,
     ) -> FactsToolContext:
         fixture_root = fixture_root.resolve(strict=True)
         sources = tuple(
@@ -49,6 +51,7 @@ class FactsToolContext:
             facts_tool=facts_tool.resolve(strict=True),
             fixture_root=fixture_root,
             compiler=compiler.resolve(strict=True),
+            clang_driver=clang_driver.resolve(strict=True) if clang_driver else None,
             output_root=output_root.resolve(),
             sources=(sources[0], sources[1]),
         )
@@ -124,23 +127,37 @@ class FactsToolContext:
 
     def import_before_the_prefix_header_is_compiled(self) -> None:
         """Import a -include-pch command whose PCH has not been produced yet."""
-        self._prepare_prefix_header_project()
+        self._prepare_prefix_header_project(self.prefix_header_driver)
         self._run(self.import_command((self.prefix_header_source,)))
 
     def import_and_extract_with_a_compiled_prefix_header(self) -> None:
-        self._prepare_prefix_header_project()
-        self._compile_prefix_header()
+        driver = self.prefix_header_driver
+        self._prepare_prefix_header_project(driver)
+        self._compile_prefix_header(driver)
         self.run_import((self.prefix_header_source,))
         self._run(self._tool_command((self.prefix_header_source,)))
+
+    @property
+    def prefix_header_driver(self) -> Path:
+        """The clang++ that matches the libClang facts-tool links against.
+
+        A precompiled header is only readable by the exact Clang that wrote it,
+        so CMAKE_CXX_COMPILER will not do when it is GCC.
+        """
+        require(
+            self.clang_driver is not None,
+            "no matching clang++ driver was supplied",
+        )
+        return self.clang_driver
 
     @property
     def prefix_header_source(self) -> Path:
         return self.run_root_path / "pch_tu.cpp"
 
-    def _compile_prefix_header(self) -> None:
+    def _compile_prefix_header(self, driver: Path) -> None:
         completed = subprocess.run(
             [
-                str(self.compiler),
+                str(driver),
                 "-std=c++23",
                 "-x",
                 "c++-header",
@@ -157,7 +174,7 @@ class FactsToolContext:
             f"cannot compile the prefix header:\n{completed.stderr}",
         )
 
-    def _prepare_prefix_header_project(self) -> None:
+    def _prepare_prefix_header_project(self, driver: Path) -> None:
         self.prepared = False
         self.extracted = False
         self.prepare()
@@ -194,6 +211,7 @@ class FactsToolContext:
                     str(self.run_root_path / "pch_prefix.pch"),
                 ]
             },
+            driver=driver,
         )
 
     def import_with_unpreprocessable_source(self) -> None:
@@ -441,6 +459,7 @@ class FactsToolContext:
         self,
         sources: Optional[tuple[Path, ...]] = None,
         extra_options: Optional[dict[str, list[str]]] = None,
+        driver: Optional[Path] = None,
     ) -> None:
         selected_sources = sources or self.sources
         options = extra_options or {}
@@ -449,7 +468,7 @@ class FactsToolContext:
                 "directory": str(self.fixture_root),
                 "file": str(source),
                 "arguments": [
-                    str(self.compiler),
+                    str(driver or self.compiler),
                     *self._compile_options(),
                     *options.get(source.name, []),
                     "-c",

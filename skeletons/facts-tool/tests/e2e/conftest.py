@@ -36,6 +36,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption("--facts-tool", type=Path, required=True)
     group.addoption("--fixture-root", type=Path, required=True)
     group.addoption("--compiler", type=Path, required=True)
+    group.addoption("--clang-driver", type=Path, default=None)
     group.addoption("--output-root", type=Path, required=True)
 
 
@@ -45,5 +46,6 @@ def context(pytestconfig: pytest.Config) -> FactsToolContext:
         facts_tool=pytestconfig.getoption("--facts-tool"),
         fixture_root=pytestconfig.getoption("--fixture-root"),
         compiler=pytestconfig.getoption("--compiler"),
+        clang_driver=pytestconfig.getoption("--clang-driver"),
         output_root=pytestconfig.getoption("--output-root"),
     )

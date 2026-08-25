@@ -413,6 +413,15 @@ if(BUILD_TESTING)
             $<TARGET_FILE:facts-tool>
   )
 
+  # A precompiled header is only readable by the exact Clang that wrote it, so
+  # the prefix-header scenarios need the clang++ that ships beside the libClang
+  # this tool links -- CMAKE_CXX_COMPILER may be GCC, whose PCH Clang rejects.
+  # Where that driver is absent those scenarios skip themselves.
+  set(FACTS_E2E_CLANG_DRIVER_ARGUMENT)
+  if(EXISTS "${LLVM_TOOLS_BINARY_DIR}/clang++")
+    set(FACTS_E2E_CLANG_DRIVER_ARGUMENT
+        --clang-driver "${LLVM_TOOLS_BINARY_DIR}/clang++")
+  endif()
   add_test(
     NAME facts-tool-e2e
     COMMAND
@@ -422,6 +431,7 @@ if(BUILD_TESTING)
       --facts-tool $<TARGET_FILE:facts-tool>
       --fixture-root ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/e2e
       --compiler ${CMAKE_CXX_COMPILER}
+      ${FACTS_E2E_CLANG_DRIVER_ARGUMENT}
       --output-root ${CMAKE_CURRENT_BINARY_DIR}/e2e-artifacts
   )
   # The suite parses every fixture once per scenario; a slower box needs well
