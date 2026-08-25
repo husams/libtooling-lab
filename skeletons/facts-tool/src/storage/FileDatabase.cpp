@@ -523,40 +523,85 @@ std::expected<void, std::error_code> initializeFileSchema(sqlite3 *database) {
       });
 }
 
-// A consumer opens the registry read-only, so an outdated layout cannot be
-// migrated in place; say so instead of failing later on an unreadable table.
-std::expected<void, std::error_code>
-requireCurrentFileSchema(sqlite3 *database) {
-  return usesLegacyFileSchema(database)
-      .and_then([&](bool legacy) {
-        return legacy ? std::expected<bool, std::error_code>{true}
-                      : usesFlatDirectorySchema(database);
-      })
-      .and_then([](bool outdated) {
-        return outdated ? std::unexpected(
-                              std::make_error_code(std::errc::invalid_argument))
-                        : std::expected<void, std::error_code>{};
-      });
+std::expected<bool, std::error_code> hasTable(sqlite3 *database,
+                                              std::string_view name) {
+  constexpr auto sql = "SELECT EXISTS(SELECT 1 FROM sqlite_master "
+                       "WHERE type='table' AND name=?1)";
+  return legacyPrepare(database, sql).and_then([&](Statement statement) {
+    return legacyBindText(database, statement.get(), 1, name).and_then([&] {
+      if (sqlite3_step(statement.get()) != SQLITE_ROW) {
+        return std::expected<bool, std::error_code>{
+            std::unexpected(legacySqliteError(database))};
+      }
+      return std::expected<bool, std::error_code>{
+          sqlite3_column_int(statement.get(), 0) != 0};
+    });
+  });
 }
 
-storage::Database openReadOnlyFileDatabase(const std::string &path) {
-  constexpr int flags = storage::Database::readOnly | SQLITE_OPEN_FULLMUTEX;
-  auto opened = storage::Database::open(path, flags);
-  if (!opened) {
-    throw std::runtime_error("cannot open project configuration read-only: " +
-                             opened.error().message());
+std::expected<void, std::string> requireCompleteFileSchema(sqlite3 *database) {
+  constexpr std::array required{"clone", "component",  "directory",
+                                "file",  "repository", "semantic_universe"};
+  for (const auto *table : required) {
+    auto present = hasTable(database, table);
+    if (!present) {
+      return std::unexpected("cannot read the project configuration: " +
+                             present.error().message());
+    }
+    if (!*present) {
+      return std::unexpected(
+          "not a project configuration database: the file registry has no '" +
+          std::string(table) + "' table");
+    }
   }
-  auto database = std::move(*opened);
-  auto usable = database.executeScript("PRAGMA foreign_keys=ON").and_then([&] {
-    return requireCurrentFileSchema(database.nativeHandle());
+  return {};
+}
+
+// A consumer opens the registry read-only, so an outdated layout cannot be
+// migrated in place; say so instead of failing later on an unreadable table.
+// An unreadable database, a missing table and an outdated layout each get
+// their own message, because each calls for a different response.
+std::expected<void, std::string> requireCurrentFileSchema(sqlite3 *database) {
+  return requireCompleteFileSchema(database).and_then([&] {
+    return usesLegacyFileSchema(database)
+        .and_then([&](bool legacy) {
+          return legacy ? std::expected<bool, std::error_code>{true}
+                        : usesFlatDirectorySchema(database);
+        })
+        .transform_error([](std::error_code error) {
+          return "cannot inspect the project configuration schema: " +
+                 error.message();
+        })
+        .and_then([](bool outdated) {
+          return outdated ? std::unexpected(std::string(
+                                "project configuration uses an outdated "
+                                "file registry; re-run 'facts-tool "
+                                "import' to migrate it"))
+                          : std::expected<void, std::string>{};
+        });
   });
-  if (!usable) {
-    throw std::runtime_error(
-        "project configuration uses an outdated file registry; "
-        "re-run 'facts-tool import' to migrate it: " +
-        usable.error().message());
-  }
-  return database;
+}
+
+std::expected<storage::Database, std::string>
+openReadOnlyFileDatabase(const std::string &path) {
+  constexpr int flags = storage::Database::readOnly | SQLITE_OPEN_FULLMUTEX;
+  return storage::Database::open(path, flags)
+      .transform_error([&](std::error_code error) {
+        return "cannot open project configuration read-only: " +
+               error.message();
+      })
+      .and_then([](storage::Database database)
+                    -> std::expected<storage::Database, std::string> {
+        return database.executeScript("PRAGMA foreign_keys=ON")
+            .transform_error([](std::error_code error) {
+              return "cannot open project configuration read-only: " +
+                     error.message();
+            })
+            .and_then([&] {
+              return requireCurrentFileSchema(database.nativeHandle());
+            })
+            .transform([&] { return std::move(database); });
+      });
 }
 
 storage::Database openWritableFileDatabase(const std::string &path) {
@@ -579,15 +624,20 @@ storage::Database openWritableFileDatabase(const std::string &path) {
   return database;
 }
 
-storage::Database openFileDatabase(const std::string &path, FileAccess access) {
-  return access == FileAccess::readOnly ? openReadOnlyFileDatabase(path)
-                                        : openWritableFileDatabase(path);
-}
-
 } // namespace
 
-FileDatabase::FileDatabase(const std::string &path, FileAccess access)
-    : database_(openFileDatabase(path, access)) {}
+FileDatabase::FileDatabase(const std::string &path)
+    : database_(openWritableFileDatabase(path)) {}
+
+FileDatabase::FileDatabase(storage::Database database)
+    : database_(std::move(database)) {}
+
+std::expected<std::unique_ptr<FileDatabase>, std::string>
+FileDatabase::openReadOnly(const std::string &path) {
+  return openReadOnlyFileDatabase(path).transform([](storage::Database opened) {
+    return std::unique_ptr<FileDatabase>(new FileDatabase(std::move(opened)));
+  });
+}
 
 FileDatabase::~FileDatabase() = default;
 

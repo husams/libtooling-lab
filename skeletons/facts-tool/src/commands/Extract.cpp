@@ -96,8 +96,12 @@ requireRegisteredSources(FileManager &files,
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
                                         CompilationDatabasePtr database) {
   const auto openProjectStarted = TimingClock::now();
-  FileManager files(options.configuration, FileAccess::readOnly);
+  auto opened = FileManager::openReadOnly(options.configuration);
   reportTiming("open project database", openProjectStarted);
+  if (!opened) {
+    return std::expected<int, std::string>{std::unexpected(opened.error())};
+  }
+  auto &files = **opened;
   auto sources = timePhase("select sources", [&] {
     return selectSources(*database, options.sources);
   });

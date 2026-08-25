@@ -90,25 +90,28 @@ void sortUnique(std::vector<std::string> &values) {
 
 // Preprocessing each translation unit yields exactly the files extraction will
 // later resolve, including the system headers that carry external targets.
-std::vector<std::string> includedFiles(const CompilationDatabase &database,
-                                       const std::vector<std::string> &sources,
-                                       std::vector<std::string> &diagnostics) {
-  auto configured = configurePlatformCompilationDatabase(database, sources);
-  if (!configured) {
-    diagnostics.push_back("cannot resolve included files: " +
-                          configured.error());
-    return {};
-  }
-
-  IncludeGraphFacts facts;
-  clang::tooling::ClangTool tool(**configured, sources);
-  if (tool.run(createIncludeVisitorFactory(facts).get()) != 0) {
-    diagnostics.push_back(
-        "some translation units did not preprocess cleanly; their included "
-        "files may be missing from the registry");
-  }
-  sortUnique(facts.visitedSources);
-  return std::move(facts.visitedSources);
+// Extraction can only consume a complete registry, so a translation unit that
+// fails to preprocess fails the import rather than leaving a silent gap.
+std::expected<std::vector<std::string>, std::string>
+includedFiles(const CompilationDatabase &database,
+              const std::vector<std::string> &sources) {
+  return configurePlatformCompilationDatabase(database, sources)
+      .transform_error([](std::string error) {
+        return "cannot resolve included files: " + std::move(error);
+      })
+      .and_then([&](auto configured)
+                    -> std::expected<std::vector<std::string>, std::string> {
+        IncludeGraphFacts facts;
+        clang::tooling::ClangTool tool(*configured, sources);
+        if (tool.run(createIncludeVisitorFactory(facts).get()) != 0) {
+          return std::unexpected(
+              "cannot enumerate included files: at least one translation unit "
+              "failed to preprocess; fix the compile commands and import "
+              "again");
+        }
+        sortUnique(facts.visitedSources);
+        return std::move(facts.visitedSources);
+      });
 }
 
 // Import owns the file registry: every path a later command can resolve is
@@ -118,17 +121,21 @@ registerFiles(FileManager &files, const CompilationDatabase &database,
               const std::vector<std::string> &sources) {
   return discoverCompilationFiles(database, sources)
       .and_then([&](CompilationFiles discovered) {
-        auto selected = sources.empty() ? database.getAllFiles() : sources;
-        auto included =
-            includedFiles(database, selected, discovered.diagnostics);
         reportDiagnostics(discovered.diagnostics);
-        std::ranges::move(included, std::back_inserter(discovered.files));
-        sortUnique(discovered.files);
-        return files.addBulk(discovered.files)
-            .transform_error([](std::error_code error) {
-              return "cannot register compilation files: " + error.message();
-            })
-            .transform([count = discovered.files.size()] { return count; });
+        const auto selected =
+            sources.empty() ? database.getAllFiles() : sources;
+        return includedFiles(database, selected)
+            .and_then([&, identities = std::move(discovered.files)](
+                          std::vector<std::string> included) mutable {
+              std::ranges::move(included, std::back_inserter(identities));
+              sortUnique(identities);
+              return files.addBulk(identities)
+                  .transform_error([](std::error_code error) {
+                    return "cannot register compilation files: " +
+                           error.message();
+                  })
+                  .transform([count = identities.size()] { return count; });
+            });
       });
 }
 

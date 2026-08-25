@@ -33,3 +33,25 @@ Feature: Facts and file storage boundaries
     Then extraction succeeds
     And the facts database contains the extracted symbols
     And the project configuration database is unchanged
+
+  Scenario: An outdated project configuration is reported, not crashed on
+    Given a project configuration imported from a compilation database
+    And the project configuration uses an outdated file registry
+    When the real facts-tool extracts one translation unit for the registry check
+    Then extraction fails with an outdated-registry diagnostic
+
+  Scenario: Import refuses to report success when a translation unit cannot be preprocessed
+    Given a compilation database whose translation unit includes a missing header
+    When the real facts-tool imports that project
+    Then import fails with an incomplete-registry diagnostic
+
+  Scenario: Import refuses a prefix header that has not been compiled yet
+    Given a compile command that includes a precompiled header
+    When the real facts-tool imports before the prefix header is compiled
+    Then import fails with an incomplete-registry diagnostic
+
+  Scenario: A compiled prefix header supplies the identities extraction resolves
+    Given a compile command that includes a precompiled header
+    When the real facts-tool imports and extracts with the prefix header compiled
+    Then extraction succeeds
+    And the facts database contains the precompiled-header declarations
