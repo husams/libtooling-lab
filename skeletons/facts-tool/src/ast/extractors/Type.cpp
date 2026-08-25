@@ -72,11 +72,17 @@ public:
     return declarationId(type->getDecl());
   }
 
-#if CLANG_VERSION_MAJOR >= 22
+  // A using-declaration brings a name in from elsewhere — libstdc++'s <cstdint>
+  // writes "using ::uint16_t;" where libc++ writes a typedef — and the fact
+  // belongs to what was brought in, not to the using-declaration. The shadow
+  // declaration is reached by a different accessor before LLVM 22.
   TypeResult VisitUsingType(const clang::UsingType *type) {
+#if CLANG_VERSION_MAJOR >= 22
     return declarationId(type->getDecl()->getTargetDecl());
-  }
+#else
+    return declarationId(type->getFoundDecl()->getTargetDecl());
 #endif
+  }
 
   TypeResult VisitTagType(const clang::TagType *type) {
     return declarationId(type->getDecl());
