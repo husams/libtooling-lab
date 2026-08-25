@@ -25,6 +25,20 @@ def when_a_stored_command_is_missing(context: FactsToolContext) -> None:
     context.run_with_missing_stored_command("two.cpp")
 
 
+@when("the real facts-tool extracts one.cpp while two.cpp keeps a missing include directory")
+def when_unrelated_command_has_a_missing_include_root(
+    context: FactsToolContext,
+) -> None:
+    context.run_with_unrelated_missing_include_root()
+
+
+@when("the real facts-tool extracts one.cpp with a missing include directory")
+def when_selected_command_has_a_missing_include_root(
+    context: FactsToolContext,
+) -> None:
+    context.run_with_missing_include_root_on_selected_source()
+
+
 @when("the real facts-tool is invoked with the deprecated --files-out option")
 def when_deprecated_files_out_is_used(context: FactsToolContext) -> None:
     context.run_with_deprecated_files_out_option()
@@ -80,4 +94,23 @@ def then_diagnostic_rejects_files_out(context: FactsToolContext) -> None:
             or "unrecognized" in context.last_output.lower()
         ),
         f"missing unknown-option diagnostic:\n{context.last_output}",
+    )
+
+
+@then("no diagnostic reports a pre-import failure")
+def then_no_pre_import_failure(context: FactsToolContext) -> None:
+    require(
+        "cannot pre-import files" not in context.last_output,
+        f"unexpected pre-import failure:\n{context.last_output}",
+    )
+
+
+@then("the diagnostic reports the skipped include directory")
+def then_diagnostic_reports_skipped_include_directory(
+    context: FactsToolContext,
+) -> None:
+    require(
+        f"skipping unavailable include directory '{context.missing_include_root}'"
+        in context.last_output,
+        f"missing skipped-include diagnostic:\n{context.last_output}",
     )

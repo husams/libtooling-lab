@@ -8,18 +8,35 @@
 #include <optional>
 #include <ranges>
 #include <string_view>
+#include <system_error>
 
 namespace facts {
 namespace {
 
 using Paths = std::vector<std::filesystem::path>;
 
-std::expected<std::string, std::error_code>
-canonicalIdentity(const std::filesystem::path &path) {
+struct Discovery {
+  std::vector<std::string> files;
+  std::vector<std::string> diagnostics;
+  Paths roots;
+};
+
+std::string describe(std::string_view action, const std::filesystem::path &path,
+                     const std::error_code &error) {
+  return std::string(action) + " '" + path.string() + "': " + error.message();
+}
+
+bool missing(const std::error_code &error) {
+  return error == std::errc::no_such_file_or_directory ||
+         error == std::errc::not_a_directory;
+}
+
+std::expected<std::string, std::string>
+requireSourceIdentity(const std::filesystem::path &path) {
   std::error_code error;
   auto identity = std::filesystem::canonical(path, error);
   if (error) {
-    return std::unexpected(error);
+    return std::unexpected(describe("cannot resolve source file", path, error));
   }
   return identity.lexically_normal().string();
 }
@@ -77,102 +94,133 @@ Paths includeRoots(const clang::tooling::CompileCommand &command) {
   return roots | std::ranges::to<Paths>();
 }
 
-std::expected<void, std::error_code>
+void appendSourceIdentity(std::string identity, Discovery &discovery) {
+  discovery.roots.push_back(std::filesystem::path(identity).parent_path());
+  discovery.files.push_back(std::move(identity));
+}
+
+std::expected<void, std::string>
 appendCommand(const clang::tooling::CompileCommand &command,
-              std::vector<std::string> &files, Paths &roots) {
-  auto identity = canonicalIdentity(
-      resolve(std::filesystem::path(command.Directory), command.Filename));
+              Discovery &discovery) {
+  return requireSourceIdentity(resolve(std::filesystem::path(command.Directory),
+                                       command.Filename))
+      .transform([&](std::string identity) {
+        appendSourceIdentity(std::move(identity), discovery);
+        auto commandRoots = includeRoots(command);
+        std::ranges::move(commandRoots, std::back_inserter(discovery.roots));
+      });
+}
+
+std::expected<void, std::string>
+appendSelectedSource(const clang::tooling::CompilationDatabase &compilations,
+                     const std::string &source, Discovery &discovery) {
+  auto identity = requireSourceIdentity(source);
   if (!identity) {
     return std::unexpected(identity.error());
   }
-  files.push_back(*identity);
-  roots.push_back(std::filesystem::path(*identity).parent_path());
-  auto commandRoots = includeRoots(command);
-  std::ranges::move(commandRoots, std::back_inserter(roots));
-  return {};
-}
-
-std::expected<void, std::error_code>
-appendDirectoryFiles(const std::filesystem::path &root,
-                     std::vector<std::string> &files) {
-  std::error_code error;
-  if (!std::filesystem::is_directory(root, error)) {
-    return error ? std::unexpected(error)
-                 : std::expected<void, std::error_code>{};
-  }
-
-  constexpr auto options =
-      std::filesystem::directory_options::skip_permission_denied;
-  std::filesystem::recursive_directory_iterator entry(root, options, error);
-  const std::filesystem::recursive_directory_iterator end;
-  while (!error && entry != end) {
-    if (entry->is_regular_file(error)) {
-      auto identity = canonicalIdentity(entry->path());
-      if (!identity) {
-        return std::unexpected(identity.error());
-      }
-      files.push_back(std::move(*identity));
-    }
-    entry.increment(error);
-  }
-  return error ? std::unexpected(error)
-               : std::expected<void, std::error_code>{};
-}
-
-std::expected<void, std::error_code>
-appendFallbackSource(std::string_view source, std::vector<std::string> &files,
-                     Paths &roots) {
-  auto identity = canonicalIdentity(source);
-  if (!identity) {
-    return std::unexpected(identity.error());
-  }
-  files.push_back(*identity);
-  roots.push_back(std::filesystem::path(*identity).parent_path());
-  return {};
-}
-
-} // namespace
-
-std::expected<std::vector<std::string>, std::error_code>
-discoverCompilationFiles(
-    const clang::tooling::CompilationDatabase &compilations,
-    std::span<const std::string> fallbackSources) {
-  std::vector<std::string> files;
-  Paths roots;
-  const auto commands = compilations.getAllCompileCommands();
-  if (commands.empty()) {
-    for (const auto &source : fallbackSources) {
-      auto appended = appendFallbackSource(source, files, roots);
-      if (!appended) {
-        return std::unexpected(appended.error());
-      }
-      for (const auto &command : compilations.getCompileCommands(source)) {
-        appended = appendCommand(command, files, roots);
-        if (!appended) {
-          return std::unexpected(appended.error());
-        }
-      }
-    }
-  } else {
-    for (const auto &command : commands) {
-      auto appended = appendCommand(command, files, roots);
-      if (!appended) {
-        return std::unexpected(appended.error());
-      }
-    }
-  }
-
-  std::ranges::sort(roots);
-  roots.erase(std::ranges::unique(roots).begin(), roots.end());
-  for (const auto &root : roots) {
-    auto appended = appendDirectoryFiles(root, files);
+  appendSourceIdentity(std::move(*identity), discovery);
+  for (const auto &command : compilations.getCompileCommands(source)) {
+    auto appended = appendCommand(command, discovery);
     if (!appended) {
       return std::unexpected(appended.error());
     }
   }
-  std::ranges::sort(files);
-  files.erase(std::ranges::unique(files).begin(), files.end());
-  return files;
+  return {};
+}
+
+std::expected<void, std::string>
+appendCommandSources(const clang::tooling::CompilationDatabase &compilations,
+                     std::span<const std::string> selectedSources,
+                     Discovery &discovery) {
+  if (selectedSources.empty()) {
+    for (const auto &command : compilations.getAllCompileCommands()) {
+      auto appended = appendCommand(command, discovery);
+      if (!appended) {
+        return std::unexpected(appended.error());
+      }
+    }
+    return {};
+  }
+  for (const auto &source : selectedSources) {
+    auto appended = appendSelectedSource(compilations, source, discovery);
+    if (!appended) {
+      return std::unexpected(appended.error());
+    }
+  }
+  return {};
+}
+
+std::expected<void, std::string>
+appendDirectoryEntries(const std::filesystem::path &root,
+                       Discovery &discovery) {
+  std::error_code error;
+  std::filesystem::recursive_directory_iterator entry(root, error);
+  const std::filesystem::recursive_directory_iterator end;
+  while (!error && entry != end) {
+    if (entry->is_regular_file(error)) {
+      std::error_code identityError;
+      auto identity = std::filesystem::canonical(entry->path(), identityError);
+      if (identityError && !missing(identityError)) {
+        return std::unexpected(
+            describe("cannot resolve file", entry->path(), identityError));
+      }
+      if (!identityError) {
+        discovery.files.push_back(identity.lexically_normal().string());
+      }
+    }
+    entry.increment(error);
+  }
+  return error ? std::unexpected(
+                     describe("cannot scan include directory", root, error))
+               : std::expected<void, std::string>{};
+}
+
+std::expected<void, std::string>
+appendDirectoryFiles(const std::filesystem::path &root, Discovery &discovery) {
+  std::error_code error;
+  const bool directory = std::filesystem::is_directory(root, error);
+  if (missing(error)) {
+    discovery.diagnostics.push_back(
+        describe("skipping unavailable include directory", root, error));
+    return {};
+  }
+  if (error) {
+    return std::unexpected(
+        describe("cannot inspect include directory", root, error));
+  }
+  return directory ? appendDirectoryEntries(root, discovery)
+                   : std::expected<void, std::string>{};
+}
+
+std::expected<void, std::string> appendDiscoveredFiles(Discovery &discovery) {
+  std::ranges::sort(discovery.roots);
+  discovery.roots.erase(std::ranges::unique(discovery.roots).begin(),
+                        discovery.roots.end());
+  for (const auto &root : discovery.roots) {
+    auto appended = appendDirectoryFiles(root, discovery);
+    if (!appended) {
+      return std::unexpected(appended.error());
+    }
+  }
+  return {};
+}
+
+CompilationFiles finalize(Discovery discovery) {
+  std::ranges::sort(discovery.files);
+  discovery.files.erase(std::ranges::unique(discovery.files).begin(),
+                        discovery.files.end());
+  return {std::move(discovery.files), std::move(discovery.diagnostics)};
+}
+
+} // namespace
+
+std::expected<CompilationFiles, std::string> discoverCompilationFiles(
+    const clang::tooling::CompilationDatabase &compilations,
+    std::span<const std::string> selectedSources) {
+  Discovery discovery;
+  return appendCommandSources(compilations, selectedSources, discovery)
+      .and_then([&] { return appendDiscoveredFiles(discovery); })
+      .transform([&] { return finalize(std::move(discovery)); });
 }
 
 } // namespace facts

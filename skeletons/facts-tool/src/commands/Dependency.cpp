@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -56,15 +57,15 @@ std::expected<std::vector<std::string>, std::string>
 registerFiles(FileManager &files, const CompilationDatabase &database,
               const std::vector<std::string> &sources) {
   return discoverCompilationFiles(database, sources)
-      .transform_error([](std::error_code error) {
-        return "cannot discover compilation files: " + error.message();
-      })
-      .and_then([&](std::vector<std::string> paths) {
-        return files.addBulk(paths)
+      .and_then([&](CompilationFiles discovered) {
+        for (const auto &diagnostic : discovered.diagnostics) {
+          std::cerr << "facts-tool: " << diagnostic << '\n';
+        }
+        return files.addBulk(discovered.files)
             .transform_error([](std::error_code error) {
               return "cannot register compilation files: " + error.message();
             })
-            .transform([paths = std::move(paths)]() mutable {
+            .transform([paths = std::move(discovered.files)]() mutable {
               return std::move(paths);
             });
       });

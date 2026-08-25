@@ -153,6 +153,38 @@ class FactsToolContext:
         self._select_facts_database("missing-stored-command-facts.sqlite")
         self._run(self.stored_tool_command())
 
+    def run_with_unrelated_missing_include_root(self) -> None:
+        self._run_with_missing_include_root("two.cpp")
+
+    def run_with_missing_include_root_on_selected_source(self) -> None:
+        self._run_with_missing_include_root("one.cpp")
+
+    def _run_with_missing_include_root(self, filename: str) -> None:
+        self.extract()
+        self._store_compile_options(self._compile_options())
+        require(
+            not self.missing_include_root.exists(),
+            "the missing include root must not exist",
+        )
+        with sqlite3.connect(self.files_database_path) as connection:
+            connection.execute(
+                "UPDATE file SET driver=?,compile_options=? WHERE name=?",
+                (
+                    str(self.compiler),
+                    json.dumps(
+                        self._compile_options() + [f"-I{self.missing_include_root}"]
+                    ),
+                    filename,
+                ),
+            )
+        self._remove_compilation_database()
+        self._select_facts_database(f"missing-include-root-{filename}.sqlite")
+        self._run(self._tool_command((self.sources[0],)))
+
+    @property
+    def missing_include_root(self) -> Path:
+        return self.run_root_path / "missing-include-root"
+
     def run_with_deprecated_files_out_option(self) -> None:
         self.prepare()
         self._select_facts_database("deprecated-files-out-facts.sqlite")
