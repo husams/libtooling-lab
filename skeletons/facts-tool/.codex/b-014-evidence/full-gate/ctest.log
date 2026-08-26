@@ -1,0 +1,9 @@
+Test project /Users/husam/.claude/worktrees/libtooling-lab/fix-b-014-symlinked-compilation-sources/skeletons/facts-tool/build
+    Start 21: facts-tool-cli-contract
+1/2 Test #21: facts-tool-cli-contract ..........   Passed    0.47 sec
+    Start 22: facts-tool-e2e
+2/2 Test #22: facts-tool-e2e ...................   Passed   14.07 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =  14.55 sec

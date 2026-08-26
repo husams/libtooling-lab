@@ -41,6 +41,16 @@ canonicalIdentity(std::string_view path) {
   });
 }
 
+// The path as the caller spelled it, normalized but with its symlinks intact.
+// The registry stores a symlinked in-project source where the project puts it,
+// so that spelling has to be tried before the resolved one.
+std::expected<std::string, std::error_code>
+requestedIdentity(std::string_view path) {
+  return absoluteIdentityPath(path).transform([](auto absolute) {
+    return absolute.lexically_normal().string();
+  });
+}
+
 std::expected<std::vector<std::string>, std::error_code>
 canonicalIdentities(std::span<const std::string> paths,
                     std::string_view registryPath) {
@@ -108,7 +118,7 @@ FileManager::addBulk(std::span<const std::string> paths) {
       });
 }
 
-std::expected<void, std::error_code> FileManager::replaceProjectConfiguration(
+std::expected<void, std::string> FileManager::replaceProjectConfiguration(
     const ProjectConfiguration &configuration) {
   return database_->replaceProjectConfiguration(configuration);
 }
@@ -155,26 +165,40 @@ FileManager::getId(std::string_view path) {
         });
   };
 
-  return canonicalIdentity(path)
-      .transform([&](std::string identity) {
-        cli::logVerbose(verbosity_, 3,
-                        "facts-tool: trace: file canonical identity='{}'",
-                        identity);
-        return identity;
-      })
-      .transform_error([&](std::error_code error) {
-        cli::logVerbose(verbosity_, 3,
-                        "facts-tool: trace: file canonical result=failure "
-                        "requested='{}' error='{}'",
-                        path, error.message());
-        return error;
-      })
-      .and_then([&](std::string identity) {
-        return getCachedOrStored(identity).transform([&](FileId id) {
-          fileIds_.try_emplace(std::move(identity), id);
-          return id;
-        });
-      });
+  const auto resolve = [&](std::string identity) {
+    return getCachedOrStored(identity).transform([&](FileId id) {
+      fileIds_.try_emplace(std::move(identity), id);
+      return id;
+    });
+  };
+
+  auto canonical = canonicalIdentity(path);
+  if (canonical) {
+    cli::logVerbose(verbosity_, 3,
+                    "facts-tool: trace: file canonical identity='{}'",
+                    *canonical);
+  } else {
+    cli::logVerbose(verbosity_, 3,
+                    "facts-tool: trace: file canonical result=failure "
+                    "requested='{}' error='{}'",
+                    path, canonical.error().message());
+  }
+
+  // The spelling the caller used comes first: a generated source symlinked
+  // into the project is registered where the project puts it, not where the
+  // symlink points. Everything else canonicalizes to the same string, so the
+  // resolved identity still answers every other lookup.
+  if (auto requested = requestedIdentity(path);
+      requested && requested != canonical) {
+    cli::logVerbose(verbosity_, 3,
+                    "facts-tool: trace: file requested identity='{}'",
+                    *requested);
+    if (auto found = resolve(*requested)) {
+      return found;
+    }
+  }
+
+  return std::move(canonical).and_then(resolve);
 }
 
 } // namespace facts

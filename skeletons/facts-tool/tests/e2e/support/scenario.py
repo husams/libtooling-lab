@@ -3,8 +3,10 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,6 +34,7 @@ class FactsToolContext:
     import_output: str = ""
     prepared: bool = False
     extracted: bool = False
+    symlink_target_root: Optional[Path] = None
 
     @classmethod
     def create(
@@ -213,6 +216,102 @@ class FactsToolContext:
             },
             driver=driver,
         )
+
+    # --- symlinked generated sources -------------------------------------
+    #
+    # A compilation database names its sources logically. A generated source
+    # that is a symlink into a build mirror still belongs to the project the
+    # database describes, so neither the project root nor the file identity may
+    # follow the symlink out of the repository.
+
+    @property
+    def symlink_project_root(self) -> Path:
+        return self.run_root_path / "project"
+
+    @property
+    def symlinked_source(self) -> Path:
+        return self.symlink_project_root / "generated" / "source.cpp"
+
+    def start_git_rooted_project(self) -> None:
+        self.prepared = False
+        self.extracted = False
+        self.prepare()
+        (self.symlink_project_root / "generated").mkdir(parents=True)
+        # gitRoot() accepts a .git directory or file; neither needs Git itself.
+        (self.symlink_project_root / ".git").mkdir()
+        (self.symlink_project_root / "main.cpp").write_text(
+            "int main() { return 0; }\n", encoding="utf-8"
+        )
+
+    def link_generated_source_outside_the_project(self) -> None:
+        """Target a directory that shares no near ancestor with the project.
+
+        The defect only collapses the common root all the way to "/" when the
+        two trees diverge at the top, which is what a shadow workspace or a
+        /vtmp mirror does in the field.
+        """
+        self.symlink_target_root = Path(
+            tempfile.mkdtemp(prefix="facts-tool-symlink-target-")
+        ).resolve()
+        target = self.symlink_target_root / "generated_source.cpp"
+        target.write_text(
+            "int generated_value() { return 41; }\n", encoding="utf-8"
+        )
+        self.symlinked_source.symlink_to(target)
+        require(
+            self.symlinked_source.is_symlink(),
+            "the generated source must be a symlink",
+        )
+        require(
+            self.symlinked_source.resolve() == target,
+            "the symlink must resolve outside the project root",
+        )
+
+    def write_symlinked_compilation_database(self) -> None:
+        commands = [
+            {
+                "directory": str(self.symlink_project_root),
+                "file": str(self.symlinked_source),
+                "arguments": [
+                    str(self.compiler),
+                    "-std=c++23",
+                    "-c",
+                    str(self.symlinked_source),
+                ],
+            }
+        ]
+        (self.symlink_project_root / "compile_commands.json").write_text(
+            json.dumps(commands, indent=2) + "\n", encoding="utf-8"
+        )
+
+    def symlinked_import_command(self) -> list[str]:
+        return [
+            str(self.facts_tool),
+            "import",
+            "--conf",
+            str(self.files_database_path),
+            "--compilation-database",
+            str(self.symlink_project_root),
+        ]
+
+    def import_symlinked_project(self) -> None:
+        self._run(self.symlinked_import_command())
+
+    def import_and_extract_symlinked_project(self) -> None:
+        completed = self._run(self.symlinked_import_command())
+        require(
+            completed.returncode == 0,
+            f"facts-tool import exited with {completed.returncode}:"
+            f"\n{self.last_output}",
+        )
+        self.import_output = self.last_output
+        self._select_facts_database("symlinked-facts.sqlite")
+        self._run(self._tool_command((self.symlinked_source,)))
+
+    def discard_symlink_target(self) -> None:
+        if self.symlink_target_root is not None:
+            shutil.rmtree(self.symlink_target_root, ignore_errors=True)
+            self.symlink_target_root = None
 
     def import_with_unpreprocessable_source(self) -> None:
         self.prepared = False

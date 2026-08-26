@@ -1,0 +1,116 @@
+# B-014 baseline: main WITHOUT the fix — the two new scenarios must fail
+implementation revision : b0b28bf2d720538dac47b72d8a620035f9d12f43  (b0b28bf = current main; src/ untouched)
+test assets added       : tests/e2e/features/project_import.feature, tests/e2e/steps/project_import_steps.py,
+                          tests/e2e/support/scenario.py, tests/e2e/conftest.py  (from the B-014 branch)
+worktree                : /Users/husam/.claude/worktrees/libtooling-lab/b-014-baseline/skeletons/facts-tool
+binary                  : build/facts-tool  sha256=912a04888a5559ab4dcec51a7c8ad38c0c327b3f274e84df4dfbb66582522b67
+compiler                : Homebrew clang version 22.1.8
+date (UTC)              : 2026-08-26T15:59:37Z
+
+$ git status --short -- src tests   # no implementation change
+   M tests/e2e/conftest.py
+   M tests/e2e/support/scenario.py
+  ?? tests/e2e/features/project_import.feature
+  ?? tests/e2e/steps/project_import_steps.py
+
+$ cd tests/e2e && python -m pytest test_facts_tool_features.py -o addopts= -k symlink -v \
+      --facts-tool ../../build/facts-tool --fixture-root ../fixtures/e2e \
+      --compiler /opt/homebrew/opt/llvm/bin/clang++ --output-root ../../build/e2e-artifacts
+
+============================= test session starts ==============================
+platform darwin -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/.codex/qa-venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/husam/.claude/worktrees/libtooling-lab/b-014-baseline/skeletons/facts-tool
+configfile: pytest.ini
+plugins: bdd-8.1.0
+collecting ... collected 149 items / 147 deselected / 2 selected
+
+test_facts_tool_features.py::test_import_accepts_valid_commands_whose_sources_resolve_through_symlinks FAILED [ 50%]
+test_facts_tool_features.py::test_extraction_attributes_a_symlinked_source_to_its_inproject_identity FAILED [100%]
+
+=================================== FAILURES ===================================
+__ test_import_accepts_valid_commands_whose_sources_resolve_through_symlinks ___
+
+fixturefunc = <function then_import_succeeds at 0x10b77c680>
+request = <FixtureRequest for <Function test_import_accepts_valid_commands_whose_sources_resolve_through_symlinks>>
+kwargs = {'context': FactsToolContext(facts_tool=PosixPath('/Users/husam/.claude/worktrees/libtooling-lab/b-014-baseline/skelet...roject configuration: Invalid argument\n', import_output='', prepared=True, extracted=False, symlink_target_root=None)}
+
+    def call_fixture_func(
+        fixturefunc: _FixtureFunc[FixtureValue], request: FixtureRequest, kwargs
+    ) -> FixtureValue:
+        if inspect.isgeneratorfunction(fixturefunc):
+            fixturefunc = cast(Callable[..., Generator[FixtureValue]], fixturefunc)
+            generator = fixturefunc(**kwargs)
+            try:
+                fixture_result = next(generator)
+            except StopIteration:
+                raise ValueError(f"{request.fixturename} did not yield a value") from None
+            finalizer = functools.partial(_teardown_yield_fixture, fixturefunc, generator)
+            request.addfinalizer(finalizer)
+        else:
+            fixturefunc = cast(Callable[..., FixtureValue], fixturefunc)
+>           fixture_result = fixturefunc(**kwargs)
+                             ^^^^^^^^^^^^^^^^^^^^^
+
+/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/.codex/qa-venv/lib/python3.12/site-packages/_pytest/fixtures.py:1005: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+steps/project_import_steps.py:45: in then_import_succeeds
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'import exited with 1:\nfacts-tool: cannot store project configuration: Invalid argument\n'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise AssertionError(message)
+E           AssertionError: import exited with 1:
+E           facts-tool: cannot store project configuration: Invalid argument
+
+support/database.py:12: AssertionError
+___ test_extraction_attributes_a_symlinked_source_to_its_inproject_identity ____
+
+fixturefunc = <function when_the_symlinked_source_is_extracted at 0x10b77c540>
+request = <FixtureRequest for <Function test_extraction_attributes_a_symlinked_source_to_its_inproject_identity>>
+kwargs = {'context': FactsToolContext(facts_tool=PosixPath('/Users/husam/.claude/worktrees/libtooling-lab/b-014-baseline/skelet..._target_root=PosixPath('/private/var/folders/07/p__xlp357ps_8_fb3yhffmrh0000gn/T/facts-tool-symlink-target-7y0njind'))}
+
+    def call_fixture_func(
+        fixturefunc: _FixtureFunc[FixtureValue], request: FixtureRequest, kwargs
+    ) -> FixtureValue:
+        if inspect.isgeneratorfunction(fixturefunc):
+            fixturefunc = cast(Callable[..., Generator[FixtureValue]], fixturefunc)
+            generator = fixturefunc(**kwargs)
+            try:
+                fixture_result = next(generator)
+            except StopIteration:
+                raise ValueError(f"{request.fixturename} did not yield a value") from None
+            finalizer = functools.partial(_teardown_yield_fixture, fixturefunc, generator)
+            request.addfinalizer(finalizer)
+        else:
+            fixturefunc = cast(Callable[..., FixtureValue], fixturefunc)
+>           fixture_result = fixturefunc(**kwargs)
+                             ^^^^^^^^^^^^^^^^^^^^^
+
+/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/.codex/qa-venv/lib/python3.12/site-packages/_pytest/fixtures.py:1005: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+steps/project_import_steps.py:39: in when_the_symlinked_source_is_extracted
+    context.import_and_extract_symlinked_project()
+support/scenario.py:302: in import_and_extract_symlinked_project
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'facts-tool import exited with 1:\nfacts-tool: cannot store project configuration: Invalid argument\n'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise AssertionError(message)
+E           AssertionError: facts-tool import exited with 1:
+E           facts-tool: cannot store project configuration: Invalid argument
+
+support/database.py:12: AssertionError
+=========================== short test summary info ============================
+FAILED test_facts_tool_features.py::test_import_accepts_valid_commands_whose_sources_resolve_through_symlinks
+FAILED test_facts_tool_features.py::test_extraction_attributes_a_symlinked_source_to_its_inproject_identity
+====================== 2 failed, 147 deselected in 0.43s =======================
+exit=1

@@ -639,12 +639,54 @@ resolveCommandPath(const clang::tooling::CompileCommand &command,
                           : std::filesystem::path(command.Directory) / path);
 }
 
-std::string normalizePathValue(const clang::tooling::CompileCommand &command,
+// The paths a compilation database names are logical: a generated source may
+// sit inside the project through a symlink whose target lives in a build
+// mirror. Normalizing without resolving symlinks keeps such a source where the
+// database put it, so project identity stays inside the repository.
+std::filesystem::path logicalPath(std::filesystem::path path) {
+  return (path.is_absolute() ? std::move(path) : std::filesystem::absolute(path))
+      .lexically_normal();
+}
+
+std::filesystem::path
+logicalCommandPath(const clang::tooling::CompileCommand &command,
+                   std::string_view value) {
+  const std::filesystem::path path(value);
+  return logicalPath(path.is_absolute()
+                         ? path
+                         : std::filesystem::path(command.Directory) / path);
+}
+
+// The project root in both spellings: as the compilation database names it,
+// and as the filesystem canonically identifies it.
+struct ProjectRoot {
+  std::filesystem::path logical;
+  std::filesystem::path canonical;
+};
+
+// Anchor a command path to the canonical project root while honouring where
+// the database placed it. A path the database puts inside the project keeps
+// that place; anything genuinely outside keeps its own canonical identity.
+std::filesystem::path
+projectPath(const ProjectRoot &root,
+            const clang::tooling::CompileCommand &command,
+            std::string_view value) {
+  const auto logical = logicalCommandPath(command, value);
+  if (!ownsPath(root.logical, logical)) {
+    return resolveCommandPath(command, value);
+  }
+  const auto relative = logical.lexically_relative(root.logical);
+  return relative.empty() || relative == "."
+             ? root.canonical
+             : (root.canonical / relative).lexically_normal();
+}
+
+std::string normalizePathValue(const ProjectRoot &root,
+                               const clang::tooling::CompileCommand &command,
                                std::string value,
                                const ProjectComponent &component,
                                const ProjectClone &clone) {
-  const auto resolved = resolveCommandPath(command, value);
-  return portablePath(resolved, component, clone);
+  return portablePath(projectPath(root, command, value), component, clone);
 }
 
 std::string compilerDriver(const clang::tooling::CompileCommand &command,
@@ -666,7 +708,8 @@ std::string compilerDriver(const clang::tooling::CompileCommand &command,
 }
 
 std::vector<std::string>
-normalizePathOptions(const clang::tooling::CompileCommand &command,
+normalizePathOptions(const ProjectRoot &root,
+                     const clang::tooling::CompileCommand &command,
                      std::vector<std::string> options,
                      const ProjectComponent &component,
                      const ProjectClone &clone) {
@@ -696,7 +739,7 @@ normalizePathOptions(const clang::tooling::CompileCommand &command,
       result.push_back(std::move(option));
       if (index < options.size()) {
         result.push_back(normalizePathValue(
-            command, std::move(options[index++]), component, clone));
+            root, command, std::move(options[index++]), component, clone));
       }
       continue;
     }
@@ -704,39 +747,59 @@ normalizePathOptions(const clang::tooling::CompileCommand &command,
     if (value.starts_with('=')) {
       value.erase(0, 1);
     }
-    result.push_back(
-        std::string(flag) + (flag.starts_with("--") ? "=" : "") +
-        normalizePathValue(command, std::move(value), component, clone));
+    result.push_back(std::string(flag) + (flag.starts_with("--") ? "=" : "") +
+                     normalizePathValue(root, command, std::move(value),
+                                        component, clone));
   }
   return result;
 }
 
+using PathSpelling = std::filesystem::path (*)(
+    const clang::tooling::CompileCommand &, std::string_view);
+
 std::filesystem::path
-commonRoot(const std::vector<clang::tooling::CompileCommand> &commands) {
-  auto root = absolutePath(commands.front().Directory);
-  for (const auto &command : commands) {
-    auto directory = absolutePath(command.Directory);
-    while (!ownsPath(root, directory)) {
+canonicalSpelling(const clang::tooling::CompileCommand &command,
+                  std::string_view value) {
+  return resolveCommandPath(command, value);
+}
+
+std::filesystem::path
+logicalSpelling(const clang::tooling::CompileCommand &command,
+                std::string_view value) {
+  return logicalCommandPath(command, value);
+}
+
+std::filesystem::path
+commonRoot(const std::vector<clang::tooling::CompileCommand> &commands,
+           PathSpelling spelling) {
+  auto root = spelling(commands.front(), commands.front().Directory);
+  const auto lift = [&root](const std::filesystem::path &path) {
+    while (!ownsPath(root, path)) {
       const auto parent = root.parent_path();
       if (parent == root) {
-        return root;
+        return false;
       }
       root = parent;
     }
-    auto source = resolveCommandPath(command, command.Filename);
-    while (!ownsPath(root, source)) {
-      const auto parent = root.parent_path();
-      if (parent == root) {
-        return root;
-      }
-      root = parent;
+    return true;
+  };
+  for (const auto &command : commands) {
+    if (!lift(spelling(command, command.Directory)) ||
+        !lift(spelling(command, command.Filename))) {
+      return root;
     }
   }
   return root;
 }
 
+std::size_t depth(const std::filesystem::path &path) {
+  return static_cast<std::size_t>(std::ranges::distance(path));
+}
+
+// Walks logical parents: stat() follows the symlinks on the way, so a project
+// reached through one still finds its own .git rather than the target's.
 std::optional<std::filesystem::path> gitRoot(std::filesystem::path directory) {
-  auto current = absolutePath(std::move(directory));
+  auto current = logicalPath(std::move(directory));
   while (true) {
     std::error_code error;
     const auto dotGit = current / ".git";
@@ -750,6 +813,28 @@ std::optional<std::filesystem::path> gitRoot(std::filesystem::path directory) {
     }
     current = parent;
   }
+}
+
+// A compilation database spells its paths logically, and the two spellings
+// disagree in opposite directions: canonicalizing lets one symlinked generated
+// source drag the root out of the repository, while a database that already
+// resolved its sources but not its command directories only agrees once
+// canonicalized. Whichever spelling lands inside a repository wins, and a
+// project without one keeps the more specific of the two.
+ProjectRoot selectProjectRoot(
+    const std::vector<clang::tooling::CompileCommand> &commands) {
+  const auto anchor = [](std::filesystem::path root) {
+    return ProjectRoot{root, absolutePath(root)};
+  };
+  const auto logical = commonRoot(commands, logicalSpelling);
+  const auto canonical = commonRoot(commands, canonicalSpelling);
+  if (auto repository = gitRoot(logical)) {
+    return anchor(std::move(*repository));
+  }
+  if (auto repository = gitRoot(canonical)) {
+    return anchor(std::move(*repository));
+  }
+  return anchor(depth(canonical) > depth(logical) ? canonical : logical);
 }
 
 std::string repositoryName(const std::filesystem::path &cloneRoot) {
@@ -785,13 +870,14 @@ struct PreparedCommand {
 };
 
 std::expected<PreparedCommand, std::string>
-prepareCommand(const clang::tooling::CompileCommand &command,
+prepareCommand(const ProjectRoot &root,
+               const clang::tooling::CompileCommand &command,
                std::span<const ProjectComponent> components,
                const ProjectClone &clone) {
   if (command.CommandLine.empty()) {
     return std::unexpected("compile command has no arguments");
   }
-  const auto source = resolveCommandPath(command, command.Filename);
+  const auto source = projectPath(root, command, command.Filename);
   const auto component = selectOwningComponent(components, clone, source);
   if (!component) {
     return std::unexpected("source is outside every configured component: " +
@@ -808,15 +894,15 @@ prepareCommand(const clang::tooling::CompileCommand &command,
   std::erase_if(options, [&](const std::string &option) {
     return option == command.Filename || option == source.string() ||
            (!option.starts_with('-') &&
-            resolveCommandPath(command, option) == source);
+            projectPath(root, command, option) == source);
   });
   auto sanitized = sanitize(std::move(options));
-  sanitized = normalizePathOptions(command, std::move(sanitized),
+  sanitized = normalizePathOptions(root, command, std::move(sanitized),
                                    components[*component], clone);
-  const auto root = effectiveComponentRoot(components[*component], clone);
-  const auto directory = source.lexically_relative(root).parent_path();
+  const auto componentRoot = effectiveComponentRoot(components[*component], clone);
+  const auto directory = source.lexically_relative(componentRoot).parent_path();
   const auto workingDirectory =
-      portablePath(resolveCommandPath(command, command.Directory),
+      portablePath(projectPath(root, command, command.Directory),
                    components[*component], clone);
   std::ostringstream key;
   key << source.string() << '\x1f' << command.Directory << '\x1f'
@@ -886,9 +972,8 @@ importProjectConfiguration(FileManager &files,
   }
 
   ProjectConfiguration configuration;
-  const auto commandRoot = commonRoot(commands);
-  configuration.activeClone.path =
-      gitRoot(commandRoot).value_or(commandRoot).string();
+  const auto root = selectProjectRoot(commands);
+  configuration.activeClone.path = root.canonical.string();
   configuration.repositoryName =
       options.repositoryName.empty()
           ? repositoryName(configuration.activeClone.path)
@@ -909,7 +994,7 @@ importProjectConfiguration(FileManager &files,
   std::map<std::string, PreparedCommand> selected;
   ProjectImportResult result;
   for (const auto &command : commands) {
-    auto prepared = prepareCommand(command, configuration.components,
+    auto prepared = prepareCommand(root, command, configuration.components,
                                    configuration.activeClone);
     if (!prepared) {
       return std::unexpected(prepared.error());
@@ -947,7 +1032,7 @@ importProjectConfiguration(FileManager &files,
   if (auto imported = files.replaceProjectConfiguration(configuration);
       !imported) {
     return std::unexpected("cannot store project configuration: " +
-                           imported.error().message());
+                           imported.error());
   }
   return result;
 }

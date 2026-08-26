@@ -39,7 +39,9 @@ public:
   // registered adds none, so a repeated import reports zero.
   std::expected<std::size_t, std::error_code>
   addBulk(std::span<const std::string> paths);
-  std::expected<void, std::error_code>
+  // Refuses with the name of the offending repository, clone, component or
+  // file field; storage failures come back as their own message.
+  std::expected<void, std::string>
   replaceProjectConfiguration(const ProjectConfiguration &configuration);
   std::expected<void, std::error_code>
   switchActiveClone(std::string_view repositoryName,

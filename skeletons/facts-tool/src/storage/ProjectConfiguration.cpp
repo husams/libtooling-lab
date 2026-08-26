@@ -1,6 +1,7 @@
 #include "storage/ProjectConfiguration.h"
 
 #include <algorithm>
+#include <set>
 #include <system_error>
 
 namespace facts {
@@ -62,7 +63,11 @@ std::optional<std::size_t>
 selectOwningComponent(std::span<const ProjectComponent> components,
                       const ProjectClone &activeClone,
                       const std::filesystem::path &source) {
-  const auto identity = absolutePath(source);
+  // An absolute source is already the identity the caller chose. Resolving it
+  // again would undo the mapping that keeps a symlinked in-project source
+  // inside its component.
+  const auto identity =
+      source.is_absolute() ? source.lexically_normal() : absolutePath(source);
   std::optional<std::size_t> owner;
   for (std::size_t index = 0; index < components.size(); ++index) {
     const auto root = effectiveComponentRoot(components[index], activeClone);
@@ -75,6 +80,51 @@ selectOwningComponent(std::span<const ProjectComponent> components,
     }
   }
   return owner;
+}
+
+std::expected<void, std::string>
+validateProjectConfiguration(const ProjectConfiguration &configuration) {
+  const auto &clone = configuration.activeClone;
+  if (clone.path.empty()) {
+    return std::unexpected("active clone path is empty");
+  }
+  if (configuration.repositoryName.empty()) {
+    return std::unexpected(
+        "repository name is empty: the project root '" + clone.path +
+        "' has no directory name to derive one from; pass an explicit "
+        "repository name or import a compilation database whose commands "
+        "share a project root");
+  }
+  if (configuration.components.empty()) {
+    return std::unexpected("project has no components");
+  }
+  std::set<std::string> paths;
+  for (const auto &component : configuration.components) {
+    if (component.path.empty()) {
+      return std::unexpected("component '" + component.name +
+                             "' has an empty path");
+    }
+    if (!paths.insert(component.path).second) {
+      return std::unexpected("component path '" + component.path +
+                             "' is configured twice");
+    }
+  }
+  for (const auto &file : configuration.files) {
+    if (file.name.empty()) {
+      return std::unexpected("file in component '" + file.componentPath +
+                             "' has an empty name");
+    }
+    if (!paths.contains(file.componentPath)) {
+      return std::unexpected("file '" + file.name +
+                             "' names an unconfigured component '" +
+                             file.componentPath + "'");
+    }
+    if (file.compileOptions.empty()) {
+      return std::unexpected("file '" + file.componentPath + "/" + file.name +
+                             "' has no compile options");
+    }
+  }
+  return {};
 }
 
 } // namespace facts
