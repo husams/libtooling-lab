@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Darwin-clang++"
+	tests="2"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname="mac.senussi.me"
+	time="14"
+	timestamp="2026-08-26T16:59:43"
+	>
+	<testcase name="facts-tool-cli-contract" classname="facts-tool-cli-contract" time="0.472205" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="facts-tool-e2e" classname="facts-tool-e2e" time="14.0705" status="run">
+		<properties/>
+		<system-out>============================= test session starts ==============================
+platform darwin -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/.codex/qa-venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/husam/.claude/worktrees/libtooling-lab/fix-b-014-symlinked-compilation-sources/skeletons/facts-tool
+configfile: pytest.ini
+plugins: bdd-8.1.0
+collecting ... collected 149 items
+
+../tests/e2e/test_facts_tool_features.py::test_typedef_and_using_declarations_are_symbols_with_alias_relations PASSED [  0%]
+../tests/e2e/test_facts_tool_features.py::test_alias_templates_retain_their_nontype_slots_and_target_relation PASSED [  1%]
+../tests/e2e/test_facts_tool_features.py::test_enum_facts_and_computed_enumerator_values_are_queryable PASSED [  2%]
+../tests/e2e/test_facts_tool_features.py::test_default_expressions_and_scalar_values_are_queryable PASSED [  2%]
+../tests/e2e/test_facts_tool_features.py::test_initializer_expressions_and_scalar_valu...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+</testsuite>

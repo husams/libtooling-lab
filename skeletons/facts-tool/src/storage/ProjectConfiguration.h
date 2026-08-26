@@ -2,6 +2,7 @@
 #define FACTS_TOOL_STORAGE_PROJECT_CONFIGURATION_H
 
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -66,6 +67,12 @@ std::optional<std::size_t>
 selectOwningComponent(std::span<const ProjectComponent> components,
                       const ProjectClone &activeClone,
                       const std::filesystem::path &source);
+
+// Names the repository, clone, component or file field that makes a
+// configuration unstorable, so a caller reports the cause instead of a bare
+// "Invalid argument".
+std::expected<void, std::string>
+validateProjectConfiguration(const ProjectConfiguration &configuration);
 
 } // namespace facts
 

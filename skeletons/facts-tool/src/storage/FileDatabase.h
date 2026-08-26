@@ -37,7 +37,9 @@ public:
   // Returns how many file rows the call added; a repeated import adds none.
   std::expected<std::size_t, std::error_code>
   addBulk(std::span<const std::string> identities);
-  std::expected<void, std::error_code>
+  // Refuses with the name of the offending repository, clone, component or
+  // file field; storage failures come back as their own message.
+  std::expected<void, std::string>
   replaceProjectConfiguration(const ProjectConfiguration &configuration);
   std::expected<void, std::error_code>
   switchActiveClone(std::string_view repositoryName,
@@ -49,6 +51,9 @@ public:
 
 private:
   explicit FileDatabase(storage::Database database);
+
+  std::expected<void, std::error_code>
+  storeProjectConfiguration(const ProjectConfiguration &configuration);
 
   storage::Database database_;
 };

@@ -1,0 +1,13 @@
+Test project /Users/husam/.claude/worktrees/libtooling-lab/b-014-baseline/skeletons/facts-tool/build
+    Start 1: fact-store
+1/1 Test #1: fact-store .......................Subprocess aborted***Exception:   0.36 sec
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   0.36 sec
+
+The following tests FAILED:
+	  1 - fact-store (Subprocess aborted)
+Errors while running CTest
+Output from these tests are in: /Users/husam/.claude/worktrees/libtooling-lab/b-014-baseline/skeletons/facts-tool/build/Testing/Temporary/LastTest.log
+Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.

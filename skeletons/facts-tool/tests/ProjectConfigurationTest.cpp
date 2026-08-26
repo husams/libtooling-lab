@@ -134,13 +134,59 @@ int main(int argc, char **argv) {
   assert(commands.front().Directory == cloneTwo.string());
   assert(commands.front().Filename == (cloneTwo / sourceRelative).string());
 
-  facts::ProjectConfiguration invalid;
-  invalid.repositoryName = "cpp-indexer";
-  invalid.activeClone.path = cloneTwo.string();
-  invalid.components.push_back({.name = "cpp-indexer", .path = "."});
-  invalid.files.push_back(
-      {.componentPath = "missing", .name = "bad.cpp", .compileOptions = "[]"});
-  assert(!files.replaceProjectConfiguration(invalid));
+  // Every rejection the storage boundary makes names the field it refused,
+  // so a caller can report the cause instead of "Invalid argument".
+  const auto valid = [&] {
+    facts::ProjectConfiguration configuration;
+    configuration.repositoryName = "cpp-indexer";
+    configuration.activeClone.path = cloneTwo.string();
+    configuration.components.push_back({.name = "cpp-indexer", .path = "."});
+    configuration.files.push_back({.componentPath = ".",
+                                   .name = "good.cpp",
+                                   .compileOptions = "[]"});
+    return configuration;
+  };
+  const auto refusal = [&](facts::ProjectConfiguration configuration) {
+    auto replaced = files.replaceProjectConfiguration(configuration);
+    assert(!replaced);
+    return std::move(replaced).error();
+  };
+
+  auto emptyClone = valid();
+  emptyClone.activeClone.path.clear();
+  assert(refusal(emptyClone).contains("active clone path is empty"));
+
+  auto emptyRepository = valid();
+  emptyRepository.repositoryName.clear();
+  assert(refusal(emptyRepository).contains("repository name is empty"));
+
+  auto noComponents = valid();
+  noComponents.components.clear();
+  noComponents.files.clear();
+  assert(refusal(noComponents).contains("no components"));
+
+  auto emptyComponentPath = valid();
+  emptyComponentPath.components.front().path.clear();
+  assert(refusal(emptyComponentPath).contains("has an empty path"));
+
+  auto repeatedComponent = valid();
+  repeatedComponent.components.push_back({.name = "twin", .path = "."});
+  assert(refusal(repeatedComponent).contains("is configured twice"));
+
+  auto unnamedFile = valid();
+  unnamedFile.files.front().name.clear();
+  assert(refusal(unnamedFile).contains("has an empty name"));
+
+  auto unknownComponent = valid();
+  unknownComponent.files.front().componentPath = "missing";
+  const auto unknown = refusal(unknownComponent);
+  assert(unknown.contains("unconfigured component"));
+  assert(unknown.contains("missing"));
+
+  auto withoutOptions = valid();
+  withoutOptions.files.front().compileOptions.clear();
+  assert(refusal(withoutOptions).contains("no compile options"));
+
   stored = facts::loadStoredCompilationDatabase(databasePath.string());
   assert(stored && (*stored)->getAllCompileCommands().size() == 1);
 }

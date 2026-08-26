@@ -740,14 +740,19 @@ FileDatabase::addBulk(std::span<const std::string> identities) {
       [added = static_cast<std::size_t>(*after - *before)] { return added; });
 }
 
-std::expected<void, std::error_code> FileDatabase::replaceProjectConfiguration(
+std::expected<void, std::string> FileDatabase::replaceProjectConfiguration(
     const ProjectConfiguration &configuration) {
-  if (configuration.repositoryName.empty() ||
-      configuration.activeClone.path.empty() ||
-      configuration.components.empty()) {
-    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
-  }
+  // Every rejection reason a caller can act on is a field of the
+  // configuration, so the storage boundary names it rather than collapsing the
+  // lot into "Invalid argument".
+  return validateProjectConfiguration(configuration).and_then([&] {
+    return storeProjectConfiguration(configuration)
+        .transform_error([](std::error_code error) { return error.message(); });
+  });
+}
 
+std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
+    const ProjectConfiguration &configuration) {
   auto transaction = database_.write();
   if (!transaction) {
     return std::unexpected(transaction.error());
@@ -774,22 +779,12 @@ std::expected<void, std::error_code> FileDatabase::replaceProjectConfiguration(
                   "AND path='/' AND kind='external'");
             })
             .and_then([&] {
+              // validateProjectConfiguration() has already refused an empty
+              // or repeated component path, an unnamed file, a file naming an
+              // unconfigured component, and a file without compile options.
               std::map<std::string, std::int64_t> componentIds;
               for (const auto &component : configuration.components) {
-                if (component.path.empty() ||
-                    componentIds.contains(component.path)) {
-                  return std::expected<void, std::error_code>{std::unexpected(
-                      std::make_error_code(std::errc::invalid_argument))};
-                }
                 componentIds.emplace(component.path, 0);
-              }
-              for (const auto &file : configuration.files) {
-                const auto component = componentIds.find(file.componentPath);
-                if (component == componentIds.end() || file.name.empty() ||
-                    file.compileOptions.empty()) {
-                  return std::expected<void, std::error_code>{std::unexpected(
-                      std::make_error_code(std::errc::invalid_argument))};
-                }
               }
 
               auto components = database_.executeBulk(

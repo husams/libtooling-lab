@@ -1,0 +1,37 @@
+# B-014 FIXED implementation — the same two scenarios must pass
+base revision : b0b28bf2d720538dac47b72d8a620035f9d12f43  [38aa988 + the B-014 working-tree fix]
+worktree      : /Users/husam/.claude/worktrees/libtooling-lab/fix-b-014-symlinked-compilation-sources/skeletons/facts-tool
+binary        : build/facts-tool  sha256=551a22bbc275986d6b795901b2c7d583398e1302b2c34580ae9625b1bc526ab0
+compiler      : Homebrew clang version 22.1.8
+date (UTC)    : 2026-08-26T15:58:24Z
+
+$ git status --short -- src tests
+   M src/ast/extractors/File.cpp
+   M src/storage/FileDatabase.cpp
+   M src/storage/FileDatabase.h
+   M src/storage/FileManager.cpp
+   M src/storage/FileManager.h
+   M src/storage/ProjectConfiguration.cpp
+   M src/storage/ProjectConfiguration.h
+   M src/tooling/StoredCompilationDatabase.cpp
+   M tests/ProjectConfigurationTest.cpp
+   M tests/e2e/conftest.py
+   M tests/e2e/support/scenario.py
+  ?? tests/e2e/features/project_import.feature
+  ?? tests/e2e/steps/project_import_steps.py
+
+$ cd tests/e2e && python -m pytest test_facts_tool_features.py -o addopts= -k symlink ...
+
+============================= test session starts ==============================
+platform darwin -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/.codex/qa-venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/husam/.claude/worktrees/libtooling-lab/fix-b-014-symlinked-compilation-sources/skeletons/facts-tool
+configfile: pytest.ini
+plugins: bdd-8.1.0
+collecting ... collected 149 items / 147 deselected / 2 selected
+
+test_facts_tool_features.py::test_import_accepts_valid_commands_whose_sources_resolve_through_symlinks PASSED [ 50%]
+test_facts_tool_features.py::test_extraction_attributes_a_symlinked_source_to_its_inproject_identity PASSED [100%]
+
+====================== 2 passed, 147 deselected in 0.12s =======================
+exit=0
