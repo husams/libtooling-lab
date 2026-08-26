@@ -11,6 +11,7 @@
 #include <clang/Tooling/Tooling.h>
 
 #include <algorithm>
+#include <cstddef>
 
 #include <filesystem>
 #include <iostream>
@@ -115,6 +116,13 @@ includedFiles(const CompilationDatabase &database,
       });
 }
 
+std::expected<std::size_t, std::string>
+registeredFileCount(FileManager &files) {
+  return files.fileCount().transform_error([](std::error_code error) {
+    return "cannot read the file registry: " + error.message();
+  });
+}
+
 // Import owns the file registry: every path a later command can resolve is
 // discovered and stored here, so extraction only ever reads it.
 std::expected<std::size_t, std::string>
@@ -134,8 +142,7 @@ registerFiles(FileManager &files, const CompilationDatabase &database,
                   .transform_error([](std::error_code error) {
                     return "cannot register compilation files: " +
                            error.message();
-                  })
-                  .transform([count = identities.size()] { return count; });
+                  });
             });
       });
 }
@@ -151,23 +158,36 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
   FileManager files(options.configuration);
   ProjectImportOptions importOptions;
   importOptions.components = std::move(components);
-  return cli::runStage(options.verbosity, "import", "store compile commands",
-                       [&] {
-                         return importProjectConfiguration(
-                             files, *database, options.sources, importOptions);
-                       })
-      .and_then([&](const ProjectImportResult &result) {
-        reportDiagnostics(result.diagnostics);
-        return cli::runStage(options.verbosity, "import", "register files",
-                             [&] {
-                               return registerFiles(files, *database,
-                                                    options.sources);
-                             })
-            .transform([&](std::size_t registered) {
-              std::cout << "Imported " << result.importedFiles
-                        << " compile command(s)\n";
-              std::cout << "Registered " << registered << " file(s)\n";
-              return 0;
+  // Storing the compile commands registers the sources themselves, so the
+  // reported figure is what the whole import added to the registry: a repeated
+  // import of an unchanged project adds nothing and says so.
+  return cli::runStage(options.verbosity, "import", "read file registry",
+                       [&] { return registeredFileCount(files); })
+      .and_then([&](std::size_t before) {
+        return cli::runStage(
+                   options.verbosity, "import", "store compile commands",
+                   [&] {
+                     return importProjectConfiguration(
+                         files, *database, options.sources, importOptions);
+                   })
+            .and_then([&](const ProjectImportResult &result) {
+              reportDiagnostics(result.diagnostics);
+              return cli::runStage(options.verbosity, "import",
+                                   "register files",
+                                   [&] {
+                                     return registerFiles(files, *database,
+                                                          options.sources);
+                                   })
+                  .and_then([&](std::size_t) {
+                    return registeredFileCount(files);
+                  })
+                  .transform([&](std::size_t after) {
+                    std::cout << "Imported " << result.importedFiles
+                              << " compile command(s)\n";
+                    std::cout << "Registered " << (after - before)
+                              << " file(s)\n";
+                    return 0;
+                  });
             });
       });
 }

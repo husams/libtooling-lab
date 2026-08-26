@@ -96,7 +96,11 @@ FileManager::openReadOnly(std::string databasePath, int verbosity) {
 
 FileManager::~FileManager() = default;
 
-std::expected<void, std::error_code>
+std::expected<std::size_t, std::error_code> FileManager::fileCount() {
+  return database_->fileCount();
+}
+
+std::expected<std::size_t, std::error_code>
 FileManager::addBulk(std::span<const std::string> paths) {
   return canonicalIdentities(paths, databasePath_)
       .and_then([this](std::vector<std::string> identities) {

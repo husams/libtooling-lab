@@ -15,6 +15,7 @@
 #include <clang/Tooling/Tooling.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -83,9 +84,8 @@ registerFiles(FileManager &files, const CompilationDatabase &database,
             .transform_error([](std::error_code error) {
               return "cannot register compilation files: " + error.message();
             })
-            .transform([paths = std::move(discovered.files)]() mutable {
-              return std::move(paths);
-            });
+            .transform([paths = std::move(discovered.files)](
+                           std::size_t) mutable { return std::move(paths); });
       });
 }
 
@@ -116,7 +116,7 @@ registerIncludeFiles(FileManager &files, std::vector<std::string> registered,
         return "cannot register included files: " + error.message();
       })
       .transform([registered = std::move(registered),
-                  included = std::move(included)]() mutable {
+                  included = std::move(included)](std::size_t) mutable {
         std::ranges::move(included, std::back_inserter(registered));
         sortUnique(registered);
         return registered;
