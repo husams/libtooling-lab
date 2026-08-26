@@ -1,0 +1,35 @@
+[0/1] Re-running CMake...
+-- Could NOT find FFI (missing: FFI_LIBRARIES HAVE_FFI_CALL)
+-- Could NOT find ZLIB (missing: ZLIB_LIBRARY ZLIB_INCLUDE_DIR)
+-- Could NOT find LibXml2 (missing: LIBXML2_LIBRARY LIBXML2_INCLUDE_DIR)
+-- Could NOT find FFI (missing: FFI_LIBRARIES HAVE_FFI_CALL)
+-- Could NOT find ZLIB (missing: ZLIB_LIBRARY ZLIB_INCLUDE_DIR)
+-- Could NOT find LibXml2 (missing: LIBXML2_LIBRARY LIBXML2_INCLUDE_DIR)
+-- Building against LLVM 21.1.8 at /usr/lib64/llvm21/lib64/cmake/llvm
+-- Configuring done (0.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/facts-tool-bdd-1NKkld/build
+[1/24] Building CXX object CMakeFiles/file-manager-test.dir/tests/FileManagerTest.cpp.o
+[2/24] Building CXX object CMakeFiles/platform-flags-test.dir/tests/PlatformFlagsTest.cpp.o
+[3/24] Linking CXX executable file-manager-test
+[4/24] Building CXX object CMakeFiles/compilation-files-test.dir/tests/CompilationFilesTest.cpp.o
+[5/24] Linking CXX executable platform-flags-test
+[6/24] Linking CXX executable compilation-files-test
+[7/24] Building CXX object CMakeFiles/stored-compilation-database-test.dir/tests/StoredCompilationDatabaseTest.cpp.o
+[8/24] Linking CXX executable stored-compilation-database-test
+[9/24] Building CXX object CMakeFiles/fact-store-test.dir/tests/FactStoreTest.cpp.o
+[10/24] Building CXX object CMakeFiles/project-configuration-test.dir/tests/ProjectConfigurationTest.cpp.o
+[11/24] Linking CXX executable fact-store-test
+[12/24] Building CXX object CMakeFiles/storage-schema-test.dir/tests/StorageSchemaTest.cpp.o
+[13/24] Linking CXX executable project-configuration-test
+[14/24] Linking CXX executable storage-schema-test
+[15/24] Building CXX object CMakeFiles/file-database-persistence-test.dir/tests/FileDatabasePersistenceTest.cpp.o
+[16/24] Linking CXX executable file-database-persistence-test
+[17/24] Building CXX object CMakeFiles/dependency-database-test.dir/tests/DependencyDatabaseTest.cpp.o
+[18/24] Building CXX object CMakeFiles/sqlite-command-test.dir/tests/SqliteCommandTest.cpp.o
+[19/24] Linking CXX executable dependency-database-test
+[20/24] Linking CXX executable sqlite-command-test
+[21/24] Building CXX object CMakeFiles/sqlite-query-test.dir/tests/SqliteQueryTest.cpp.o
+[22/24] Linking CXX executable sqlite-query-test
+[23/24] Building CXX object CMakeFiles/reference-extraction-test.dir/tests/ReferenceExtractionTest.cpp.o
+[24/24] Linking CXX executable reference-extraction-test

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Linux-g++"
+	tests="2"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname="linux-dev"
+	time="30"
+	timestamp="2026-08-26T07:44:18"
+	>
+	<testcase name="facts-tool-cli-contract" classname="facts-tool-cli-contract" time="0.542048" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="facts-tool-e2e" classname="facts-tool-e2e" time="29.9641" status="run">
+		<properties/>
+		<system-out>============================= test session starts ==============================
+platform linux -- Python 3.9.25, pytest-8.4.2, pluggy-1.6.0 -- /home/husam/libtooling-lab/skeletons/facts-tool/.venv-rhel9/bin/python3
+cachedir: .pytest_cache
+rootdir: /
+plugins: bdd-8.1.0
+collecting ... collected 147 items
+
+../tests/e2e/test_facts_tool_features.py::test_typedef_and_using_declarations_are_symbols_with_alias_relations PASSED [  0%]
+../tests/e2e/test_facts_tool_features.py::test_alias_templates_retain_their_nontype_slots_and_target_relation PASSED [  1%]
+../tests/e2e/test_facts_tool_features.py::test_enum_facts_and_computed_enumerator_values_are_queryable PASSED [  2%]
+../tests/e2e/test_facts_tool_features.py::test_default_expressions_and_scalar_values_are_queryable PASSED [  2%]
+../tests/e2e/test_facts_tool_features.py::test_initializer_expressions_and_scalar_values_are_queryable PASSED [  3%]
+../tests/e2e/test_facts_tool_features.py::test_static_data_members_retain_flags_ownership_and_type_relations PASSED [  4%]...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+</testsuite>

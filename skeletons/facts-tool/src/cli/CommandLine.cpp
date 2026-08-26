@@ -1,19 +1,13 @@
 #include "cli/CommandLine.h"
 
-#include "cli/Options.h"
+#include "cli/Dispatch.h"
 #include "cli/Verbose.h"
-#include "commands/Dependency.h"
-#include "commands/Extract.h"
-#include "commands/Import.h"
+#include "cli/catalog/Configure.h"
 
 #include <CLI/CLI.hpp>
 
 #include <expected>
-#include <format>
-#include <iostream>
-#include <string>
 #include <utility>
-#include <variant>
 
 namespace facts::cli {
 namespace {
@@ -31,6 +25,9 @@ public:
     analysesCommand_->require_subcommand(1, 1);
     configureDependency(*analysesCommand_->add_subcommand(
         "dependency", "Build the direct include dependency graph"));
+    repositoryCommand_ = configureRepository(app_, repository_);
+    componentCommand_ = configureComponent(app_, component_);
+    directoryCommand_ = configureDirectory(app_, directory_);
   }
 
   std::expected<Command, int> parse(int argc, char **argv) {
@@ -43,6 +40,12 @@ public:
     if (extractCommand_->parsed()) {
       return Command{std::move(extract_)};
     }
+    if (repositoryCommand_->parsed())
+      return Command{std::move(repository_)};
+    if (componentCommand_->parsed())
+      return Command{std::move(component_)};
+    if (directoryCommand_->parsed())
+      return Command{std::move(directory_)};
     return importCommand_->parsed() ? Command{std::move(import_)}
                                     : Command{std::move(dependency_)};
   }
@@ -141,70 +144,13 @@ private:
   ExtractOptions extract_;
   ImportOptions import_;
   DependencyOptions dependency_;
+  CLI::App *repositoryCommand_ = nullptr;
+  CLI::App *componentCommand_ = nullptr;
+  CLI::App *directoryCommand_ = nullptr;
+  RepositoryOptions repository_;
+  ComponentOptions component_;
+  DirectoryOptions directory_;
 };
-
-std::string_view commandName(const ExtractOptions &) { return "extract"; }
-
-std::string_view commandName(const ImportOptions &) { return "import"; }
-
-std::string_view commandName(const DependencyOptions &) { return "dependency"; }
-
-std::string commandDetails(const ExtractOptions &options) {
-  return std::format("configuration='{}', output='{}', requested_sources={}",
-                     options.configuration, options.output,
-                     options.sources.size());
-}
-
-std::string commandDetails(const ImportOptions &options) {
-  return std::format(
-      "configuration='{}', compilation_database='{}', requested_sources={}, "
-      "components={}",
-      options.configuration,
-      options.compilationDatabase.empty() ? "fixed commands"
-                                          : options.compilationDatabase,
-      options.sources.size(), options.components.size());
-}
-
-std::string commandDetails(const DependencyOptions &options) {
-  return std::format("configuration='{}', output='{}', roots={}",
-                     options.configuration, options.output,
-                     options.sources.size());
-}
-
-std::expected<int, std::string> execute(const ExtractOptions &options) {
-  return commands::runExtract(options);
-}
-
-std::expected<int, std::string> execute(const ImportOptions &options) {
-  return commands::runImport(options);
-}
-
-std::expected<int, std::string> execute(const DependencyOptions &options) {
-  return commands::runDependency(options);
-}
-
-int report(std::expected<int, std::string> result) {
-  if (!result) {
-    std::cerr << "facts-tool: " << result.error() << '\n';
-    return 1;
-  }
-  return *result;
-}
-
-int dispatch(Command command) {
-  return std::visit(
-      [](auto options) {
-        const auto name = commandName(options);
-        logVerbose(options.verbosity, 1, "facts-tool: {}: starting", name);
-        logVerbose(options.verbosity, 2, "facts-tool: {}: {}", name,
-                   commandDetails(options));
-        auto result = execute(options);
-        logVerbose(options.verbosity, 1, "facts-tool: {}: {}", name,
-                   result ? "complete" : "failed");
-        return report(std::move(result));
-      },
-      std::move(command));
-}
 
 } // namespace
 

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Darwin-clang++"
+	tests="20"
+	failures="1"
+	disabled="0"
+	skipped="0"
+	hostname="mac.senussi.me"
+	time="2"
+	timestamp="2026-08-26T08:40:32"
+	>
+	<testcase name="fact-store" classname="fact-store" time="0.238436" status="fail">
+		<failure message="Subprocess aborted"/>
+		<properties/>
+		<system-out>libc++abi: terminating due to uncaught exception of type std::runtime_error: cannot initialize SQLite database: not an error
+libc++abi: terminating due to uncaught exception of type std::bad_alloc: std::bad_alloc
+</system-out>
+	</testcase>
+	<testcase name="file-manager" classname="file-manager" time="0.119321" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="compilation-files" classname="compilation-files" time="0.120196" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="stored-compilation-database" classname="stored-compilation-database" time="0.125512" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="platform-flags" classname="platform-flags" time="0.124275" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="project-configuration" classname="project-configuration" time="0.134638" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="storage-schema" classname="storage-schema" time="0.166135" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="reference-extraction" classname="reference-extraction" time="0.132064" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="file-database-persistence" classname="file-database-persistence" time="0.183089" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="sqlite-query" classname="sqlite-query" time="0.127176" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="sqlite-command" classname="sqlite-command" time="0.120175" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="sqlite-generator-demo" classname="sqlite-generator-demo" time="0.126209" status="run">
+		<properties/>
+		<system-out>all files
+    1  src/file0.h
+    2  file1.cpp
+    3  file2.h
+first two headers, by path
+    3  file2.h
+    1  src/file0.h
+longest path: src/file0.h
+3 file(s) in the registry
+</system-out>
+	</testcase>
+	<testcase name="dependency-analysis-import" classname="dependency-analysis-import" time="0.0336469" status="run">
+		<properties/>
+		<system-out>Imported 1 compile command(s)
+Registered 0 file(s)
+</system-out>
+	</testcase>
+	<testcase name="dependency-analysis-first" classname="dependency-analysis-first" time="0.0298959" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="dependency-analysis-second" classname="dependency-analysis-second" time="0.0298482" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="dependency-analysis-extract" classname="dependency-analysis-extract" time="0.0291837" status="run">
+		<properties/>
+		<system-out>facts-tool: 3 symbol(s) recorded from 3 file(s)
+</system-out>
+	</testcase>
+	<testcase name="dependency-analysis-verify" classname="dependency-analysis-verify" time="0.117405" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="multi-tu-project-import" classname="multi-tu-project-import" time="0.0326493" status="run">
+		<properties/>
+		<system-out>[1/2] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/tests/fixtures/tu_one.cpp.
+[2/2] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/tests/fixtures/tu_two.cpp.
+Imported 2 compile command(s)
+Registered 19 file(s)
+</system-out>
+	</testcase>
+	<testcase name="multi-tu-file-registry" classname="multi-tu-file-registry" time="0.0340514" status="run">
+		<properties/>
+		<system-out>[1/2] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/tests/fixtures/tu_one.cpp.
+[2/2] Processing file /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/tests/fixtures/tu_two.cpp.
+facts-tool: 4 symbol(s) recorded from 3 file(s)
+</system-out>
+	</testcase>
+	<testcase name="multi-tu-project-cleanup" classname="multi-tu-project-cleanup" time="0.00495879" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+</testsuite>

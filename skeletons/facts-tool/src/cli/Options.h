@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cli/catalog/Options.h"
+
 #include <string>
 #include <variant>
 #include <vector>
@@ -29,6 +31,8 @@ struct DependencyOptions {
   std::vector<std::string> sources;
 };
 
-using Command = std::variant<ExtractOptions, ImportOptions, DependencyOptions>;
+using Command =
+    std::variant<ExtractOptions, ImportOptions, DependencyOptions,
+                 RepositoryOptions, ComponentOptions, DirectoryOptions>;
 
 } // namespace facts::cli

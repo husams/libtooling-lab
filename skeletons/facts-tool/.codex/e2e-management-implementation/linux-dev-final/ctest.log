@@ -1,0 +1,10 @@
+Internal ctest changing into directory: /tmp/facts-tool-bdd-1NKkld/build
+Test project /tmp/facts-tool-bdd-1NKkld/build
+    Start 21: facts-tool-cli-contract
+1/2 Test #21: facts-tool-cli-contract ..........   Passed    0.54 sec
+    Start 22: facts-tool-e2e
+2/2 Test #22: facts-tool-e2e ...................   Passed   29.96 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Total Test time (real) =  30.51 sec

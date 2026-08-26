@@ -1,0 +1,22 @@
+{
+  "macos-final": {
+    "tests": 147,
+    "passed": 146,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 1,
+    "seconds": 15.638,
+    "timestamp": "2026-08-26T08:43:57.386869+01:00",
+    "ctest_passed": 2
+  },
+  "linux-dev-final": {
+    "tests": 147,
+    "passed": 147,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 29.571,
+    "timestamp": "2026-08-26T07:44:19.755543+00:00",
+    "ctest_passed": 2
+  }
+}

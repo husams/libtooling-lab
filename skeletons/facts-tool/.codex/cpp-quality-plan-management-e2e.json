@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "name": "build-current-macos-source",
+      "kind": "build",
+      "argv": [
+        "cmake",
+        "--build",
+        "build",
+        "-j",
+        "4"
+      ],
+      "timeout_seconds": 1200
+    },
+    {
+      "name": "all-real-executable-e2e",
+      "kind": "test",
+      "argv": [
+        "bash",
+        "scripts/run-e2e.sh",
+        "build",
+        ".codex/e2e-management-implementation/macos-final"
+      ],
+      "timeout_seconds": 1200
+    }
+  ]
+}

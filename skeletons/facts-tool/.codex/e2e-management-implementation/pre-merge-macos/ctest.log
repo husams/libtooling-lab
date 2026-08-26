@@ -1,0 +1,9 @@
+Test project /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/build
+    Start 21: facts-tool-cli-contract
+1/2 Test #21: facts-tool-cli-contract ..........   Passed    0.85 sec
+    Start 22: facts-tool-e2e
+2/2 Test #22: facts-tool-e2e ...................   Passed   14.68 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =  15.53 sec

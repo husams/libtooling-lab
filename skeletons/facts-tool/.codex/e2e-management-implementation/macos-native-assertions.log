@@ -1,0 +1,57 @@
+Test project /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/build
+      Start  1: fact-store
+ 1/20 Test  #1: fact-store .......................Subprocess aborted***Exception:   0.43 sec
+libc++abi: terminating due to uncaught exception of type std::bad_alloc: std::bad_alloc
+
+      Start  2: file-manager
+ 2/20 Test  #2: file-manager .....................   Passed    0.28 sec
+      Start  3: compilation-files
+ 3/20 Test  #3: compilation-files ................   Passed    0.13 sec
+      Start  4: stored-compilation-database
+ 4/20 Test  #4: stored-compilation-database ......   Passed    0.23 sec
+      Start  5: platform-flags
+ 5/20 Test  #5: platform-flags ...................   Passed    0.33 sec
+      Start  6: project-configuration
+ 6/20 Test  #6: project-configuration ............Subprocess aborted***Exception:   0.30 sec
+Assertion failed: (scalarText(databasePath, "SELECT name FROM repository") == "cpp-indexer"), function main, file ProjectConfigurationTest.cpp, line 96.
+
+      Start  7: storage-schema
+ 7/20 Test  #7: storage-schema ...................   Passed    0.14 sec
+      Start  8: reference-extraction
+ 8/20 Test  #8: reference-extraction .............Subprocess aborted***Exception:   0.30 sec
+libc++abi: terminating due to uncaught exception of type std::bad_alloc: std::bad_alloc
+
+      Start  9: file-database-persistence
+ 9/20 Test  #9: file-database-persistence ........   Passed    0.17 sec
+      Start 10: sqlite-query
+10/20 Test #10: sqlite-query .....................   Passed    0.12 sec
+      Start 11: sqlite-command
+11/20 Test #11: sqlite-command ...................   Passed    0.11 sec
+      Start 12: sqlite-generator-demo
+12/20 Test #12: sqlite-generator-demo ............   Passed    0.02 sec
+      Start 13: dependency-analysis-import
+13/20 Test #13: dependency-analysis-import .......   Passed    0.03 sec
+      Start 14: dependency-analysis-first
+14/20 Test #14: dependency-analysis-first ........   Passed    0.03 sec
+      Start 15: dependency-analysis-second
+15/20 Test #15: dependency-analysis-second .......   Passed    0.03 sec
+      Start 16: dependency-analysis-extract
+16/20 Test #16: dependency-analysis-extract ......   Passed    0.03 sec
+      Start 17: dependency-analysis-verify
+17/20 Test #17: dependency-analysis-verify .......   Passed    0.13 sec
+      Start 18: multi-tu-project-import
+18/20 Test #18: multi-tu-project-import ..........   Passed    0.03 sec
+      Start 19: multi-tu-file-registry
+19/20 Test #19: multi-tu-file-registry ...........   Passed    0.03 sec
+      Start 20: multi-tu-project-cleanup
+20/20 Test #20: multi-tu-project-cleanup .........   Passed    0.00 sec
+
+85% tests passed, 3 tests failed out of 20
+
+Total Test time (real) =   2.88 sec
+
+The following tests FAILED:
+	  1 - fact-store (Subprocess aborted)
+	  6 - project-configuration (Subprocess aborted)
+	  8 - reference-extraction (Subprocess aborted)
+Errors while running CTest

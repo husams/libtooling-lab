@@ -1,0 +1,54 @@
+Internal ctest changing into directory: /tmp/facts-tool-bdd-1NKkld/build
+Test project /tmp/facts-tool-bdd-1NKkld/build
+      Start  1: fact-store
+ 1/20 Test  #1: fact-store .......................Subprocess aborted***Exception:   0.57 sec
+fact-store-test: /tmp/facts-tool-bdd-1NKkld/tests/FactStoreTest.cpp:178: void {anonymous}::runConcurrentWriters(const std::filesystem::__cxx11::path&, Writer): Assertion `WIFEXITED(status)' failed.
+
+      Start  2: file-manager
+ 2/20 Test  #2: file-manager .....................   Passed    0.21 sec
+      Start  3: compilation-files
+ 3/20 Test  #3: compilation-files ................   Passed    0.02 sec
+      Start  4: stored-compilation-database
+ 4/20 Test  #4: stored-compilation-database ......   Passed    0.07 sec
+      Start  5: platform-flags
+ 5/20 Test  #5: platform-flags ...................   Passed    0.02 sec
+      Start  6: project-configuration
+ 6/20 Test  #6: project-configuration ............   Passed    0.07 sec
+      Start  7: storage-schema
+ 7/20 Test  #7: storage-schema ...................   Passed    0.49 sec
+      Start  8: reference-extraction
+ 8/20 Test  #8: reference-extraction .............***Exception: Illegal  0.25 sec
+
+      Start  9: file-database-persistence
+ 9/20 Test  #9: file-database-persistence ........   Passed    0.08 sec
+      Start 10: sqlite-query
+10/20 Test #10: sqlite-query .....................   Passed    0.03 sec
+      Start 11: sqlite-command
+11/20 Test #11: sqlite-command ...................   Passed    0.02 sec
+      Start 12: sqlite-generator-demo
+12/20 Test #12: sqlite-generator-demo ............   Passed    0.01 sec
+      Start 13: dependency-analysis-import
+13/20 Test #13: dependency-analysis-import .......   Passed    0.05 sec
+      Start 14: dependency-analysis-first
+14/20 Test #14: dependency-analysis-first ........   Passed    0.06 sec
+      Start 15: dependency-analysis-second
+15/20 Test #15: dependency-analysis-second .......   Passed    0.06 sec
+      Start 16: dependency-analysis-extract
+16/20 Test #16: dependency-analysis-extract ......   Passed    0.04 sec
+      Start 17: dependency-analysis-verify
+17/20 Test #17: dependency-analysis-verify .......   Passed    0.04 sec
+      Start 18: multi-tu-project-import
+18/20 Test #18: multi-tu-project-import ..........   Passed    0.05 sec
+      Start 19: multi-tu-file-registry
+19/20 Test #19: multi-tu-file-registry ...........   Passed    0.05 sec
+      Start 20: multi-tu-project-cleanup
+20/20 Test #20: multi-tu-project-cleanup .........   Passed    0.01 sec
+
+90% tests passed, 2 tests failed out of 20
+
+Total Test time (real) =   2.18 sec
+
+The following tests FAILED:
+	  1 - fact-store (Subprocess aborted)
+	  8 - reference-extraction (ILLEGAL)
+Errors while running CTest

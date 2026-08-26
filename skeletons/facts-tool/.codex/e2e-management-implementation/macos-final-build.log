@@ -1,0 +1,29 @@
+[0/1] Re-running CMake...
+-- Building against LLVM 22.1.8 at /opt/homebrew/opt/llvm/lib/cmake/llvm
+-- Configuring done (0.8s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/build
+[1/25] Building CXX object CMakeFiles/file-manager-test.dir/tests/FileManagerTest.cpp.o
+[2/25] Building CXX object CMakeFiles/stored-compilation-database-test.dir/tests/StoredCompilationDatabaseTest.cpp.o
+[3/25] Building CXX object CMakeFiles/compilation-files-test.dir/tests/CompilationFilesTest.cpp.o
+[4/25] Building CXX object CMakeFiles/platform-flags-test.dir/tests/PlatformFlagsTest.cpp.o
+[5/25] Building CXX object CMakeFiles/project-configuration-test.dir/tests/ProjectConfigurationTest.cpp.o
+[6/25] Building CXX object CMakeFiles/fact-store-test.dir/tests/FactStoreTest.cpp.o
+[7/25] Building CXX object CMakeFiles/storage-schema-test.dir/tests/StorageSchemaTest.cpp.o
+[8/25] Building CXX object CMakeFiles/file-database-persistence-test.dir/tests/FileDatabasePersistenceTest.cpp.o
+[9/25] Building CXX object CMakeFiles/dependency-database-test.dir/tests/DependencyDatabaseTest.cpp.o
+[10/25] Linking CXX executable fact-store-test
+[11/25] Linking CXX executable file-manager-test
+[12/25] Building CXX object CMakeFiles/sqlite-query-test.dir/tests/SqliteQueryTest.cpp.o
+[13/25] Linking CXX executable compilation-files-test
+[14/25] Building CXX object CMakeFiles/sqlite-command-test.dir/tests/SqliteCommandTest.cpp.o
+[15/25] Linking CXX executable stored-compilation-database-test
+[16/25] Linking CXX executable project-configuration-test
+[17/25] Linking CXX executable platform-flags-test
+[18/25] Linking CXX executable storage-schema-test
+[19/25] Linking CXX executable file-database-persistence-test
+[20/25] Linking CXX executable sqlite-query-test
+[21/25] Linking CXX executable sqlite-command-test
+[22/25] Linking CXX executable dependency-database-test
+[23/25] Building CXX object CMakeFiles/reference-extraction-test.dir/tests/ReferenceExtractionTest.cpp.o
+[24/25] Linking CXX executable reference-extraction-test

@@ -87,6 +87,13 @@ target_include_directories(facts-model INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src
 target_link_libraries(facts-model INTERFACE facts-clang)
 
 add_library(facts-storage STATIC
+  src/storage/catalog/Database.cpp
+  src/storage/catalog/Repository.cpp
+  src/storage/catalog/Component.cpp
+  src/storage/catalog/Directory.cpp
+  src/storage/catalog/Clone.cpp
+  src/storage/catalog/Registration.cpp
+  src/storage/catalog/Removal.cpp
   src/storage/DependencyDatabase.cpp
   src/storage/FileDatabase.cpp
   src/storage/FileManager.cpp
@@ -179,6 +186,11 @@ target_link_libraries(facts-platform PRIVATE facts-clang)
 
 # Commands own application behavior and remain independent of CLI11.
 add_library(facts-commands STATIC
+  src/commands/catalog/Repository.cpp
+  src/commands/catalog/Component.cpp
+  src/commands/catalog/Directory.cpp
+  src/commands/catalog/Display.cpp
+  src/commands/catalog/Export.cpp
   src/commands/DatabasePaths.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
@@ -194,7 +206,13 @@ target_link_libraries(facts-commands PRIVATE
 )
 
 # CLI parsing is isolated so command behavior can be reused without parser state.
-add_library(facts-cli STATIC src/cli/CommandLine.cpp)
+add_library(facts-cli STATIC
+  src/cli/CommandLine.cpp
+  src/cli/Dispatch.cpp
+  src/cli/catalog/Repository.cpp
+  src/cli/catalog/Component.cpp
+  src/cli/catalog/Directory.cpp
+)
 target_include_directories(facts-cli PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-cli PRIVATE facts-commands CLI11::CLI11)
 

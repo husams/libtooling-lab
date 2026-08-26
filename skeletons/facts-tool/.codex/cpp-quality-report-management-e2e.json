@@ -1,0 +1,47 @@
+{
+  "scope": "catalog implementation and complete executable E2E gate",
+  "finished_at": "2026-08-26T07:46:04.030296+00:00",
+  "passed": true,
+  "catalog_bdd_cases": 67,
+  "platforms": {
+    "macos-final": {
+      "tests": 147,
+      "passed": 146,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 1,
+      "seconds": 15.638,
+      "timestamp": "2026-08-26T08:43:57.386869+01:00",
+      "ctest_passed": 2
+    },
+    "linux-dev-final": {
+      "tests": 147,
+      "passed": 147,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 29.571,
+      "timestamp": "2026-08-26T07:44:19.755543+00:00",
+      "ctest_passed": 2
+    }
+  },
+  "evidence": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/.codex/e2e-management-implementation/summary.md",
+  "native_suite_passed": false,
+  "native_suite_note": "Additional native diagnostics failed; temporary assertion flags reverted. See evidence; not part of the passing E2E gate.",
+  "semantic_index_verified": false,
+  "source_manifest_sha256": "800669ed14a6a50438e4549a367ecc95658a1ec1dda51ef511e5260679e5b6ce",
+  "pre_merge_parent": "38aa988467868d5a31cc6fb0e90c751a09c0b29f",
+  "pre_merge_results": {
+    "macos": {
+      "passed": 146,
+      "skipped": 1,
+      "total": 147
+    },
+    "linux": {
+      "passed": 147,
+      "skipped": 0,
+      "total": 147
+    }
+  },
+  "pre_merge_source_manifest_sha256": "4412527d48f60cf97919ef11cb93eb30d2f2e0d574108ca8c89a2b512fc8dc88"
+}
