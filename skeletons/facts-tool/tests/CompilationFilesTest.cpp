@@ -8,6 +8,7 @@
 #include <cassert>
 #include <expected>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <string>
@@ -48,6 +49,10 @@ std::filesystem::path resetScratchDirectory(const std::filesystem::path &path) {
   std::filesystem::remove_all(path, error);
   std::filesystem::create_directories(path);
   return std::filesystem::canonical(path);
+}
+
+void writeFile(const std::filesystem::path &path) {
+  std::ofstream(path) << "// " << path.filename().string() << '\n';
 }
 
 std::expected<facts::CompilationFiles, std::string>
@@ -125,6 +130,89 @@ int main(int argc, char **argv) {
                                     missingSelection.front() + "'"));
 
   const auto scratch = resetScratchDirectory(argv[3]);
+
+  // A source directory and an include root hold different things. Only C and
+  // C++ inputs belong in the registry from either, and a suffix-less name is a
+  // header only where headers are searched for: the standard library and Qt
+  // spell theirs that way, while a project spells its README that way.
+  const auto projectRoot = scratch / "project";
+  const auto headerRoot = scratch / "include";
+  std::filesystem::create_directories(projectRoot);
+  std::filesystem::create_directories(headerRoot / "nested");
+  const auto projectSource = projectRoot / "main.cpp";
+  writeFile(projectSource);
+
+  const std::vector<std::filesystem::path> compilable = {
+      projectSource,
+      projectRoot / "helper.cxx",
+      projectRoot / "unit.ixx",
+      headerRoot / "header.hpp",
+      headerRoot / "legacy.H",
+      headerRoot / "fragment.inc",
+      headerRoot / "table.def",
+      headerRoot / "kernel.cu",
+      headerRoot / "kernel.cuh",
+      headerRoot / "interface.cppm",
+      headerRoot / "partition.ccm",
+      headerRoot / "legacy.cxxm",
+      headerRoot / "clang.mpp",
+      headerRoot / "nested" / "string",
+      headerRoot / "nested" / "QString"};
+  const std::vector<std::filesystem::path> rejected = {
+      projectRoot / "conftest.py",
+      projectRoot / "conftest.cpython-312-pytest-9.1.1.pyc",
+      projectRoot / "requirements.txt",
+      projectRoot / "LICENSE.TXT",
+      projectRoot / "registry.feature",
+      projectRoot / "TargetLibraryInfo.td",
+      projectRoot / "module.modulemap",
+      projectRoot / ".clang-format",
+      // Suffix-less, and in a source directory rather than a header search
+      // path, so nothing here is a header.
+      projectRoot / "README",
+      projectRoot / "Makefile",
+      projectRoot / "LICENSE",
+      projectRoot / "notes",
+      // Documentation stays documentation even inside an include root.
+      headerRoot / "README",
+      headerRoot / "COPYING"};
+  std::ranges::for_each(compilable, writeFile);
+  std::ranges::for_each(rejected, writeFile);
+
+  const std::vector<std::string> mixedArguments = {
+      "clang++", "-std=c++23", "-I", headerRoot.string()};
+  FullCompilationDatabase mixedCompilations({
+      {projectRoot.string(), projectSource.string(), mixedArguments, ""},
+  });
+  const std::vector<std::string> mixedSelection = {projectSource.string()};
+  const auto mixed =
+      facts::discoverCompilationFiles(mixedCompilations, mixedSelection);
+  assert(mixed);
+  assert(std::ranges::all_of(compilable, [&](const auto &path) {
+    return std::ranges::binary_search(mixed->files, path.string());
+  }));
+  assert(std::ranges::none_of(rejected, [&](const auto &path) {
+    return std::ranges::binary_search(mixed->files, path.string());
+  }));
+  assert(mixed->diagnostics.empty());
+
+  // The same directory named both ways is a header search path: naming it with
+  // -I must not narrow what the walk admits.
+  const std::vector<std::string> sharedArguments = {
+      "clang++", "-std=c++23", "-I", projectRoot.string(), "-I",
+      headerRoot.string()};
+  FullCompilationDatabase sharedRootCompilations({
+      {projectRoot.string(), projectSource.string(), sharedArguments, ""},
+  });
+  const auto sharedRoot =
+      facts::discoverCompilationFiles(sharedRootCompilations, mixedSelection);
+  assert(sharedRoot);
+  assert(std::ranges::binary_search(sharedRoot->files,
+                                    (projectRoot / "notes").string()));
+  assert(!std::ranges::binary_search(sharedRoot->files,
+                                     (projectRoot / "README").string()));
+  assert(!std::ranges::binary_search(sharedRoot->files,
+                                     (projectRoot / "conftest.py").string()));
 
   // An include root that exists but cannot be resolved to a directory stays
   // fatal. A self-referential symlink is the portable, privilege-independent

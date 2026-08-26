@@ -662,11 +662,36 @@ FileDatabase::openReadOnly(const std::string &path) {
 
 FileDatabase::~FileDatabase() = default;
 
-std::expected<void, std::error_code>
+namespace {
+
+std::expected<std::int64_t, std::error_code>
+currentFileCount(storage::Database &database) {
+  auto counts = storage::detail::toItlibGenerator(database.query(
+      "SELECT COUNT(*) FROM file",
+      [](const storage::Row &row) { return row.get<std::int64_t>(0); }));
+  return storage::detail::collectOne(std::move(counts));
+}
+
+} // namespace
+
+std::expected<std::size_t, std::error_code> FileDatabase::fileCount() {
+  return currentFileCount(database_).transform(
+      [](std::int64_t count) { return static_cast<std::size_t>(count); });
+}
+
+std::expected<std::size_t, std::error_code>
 FileDatabase::addBulk(std::span<const std::string> identities) {
   auto transaction = database_.write();
   if (!transaction) {
     return std::unexpected(transaction.error());
+  }
+
+  // The insert avoids conflicts, so its change count also counts the rows that
+  // were already registered. Only the size of the table before and after the
+  // statement tells how many files this call actually added.
+  auto before = currentFileCount(database_);
+  if (!before) {
+    return std::unexpected(before.error());
   }
 
   std::vector<FileIdentity> files;
@@ -706,7 +731,13 @@ FileDatabase::addBulk(std::span<const std::string> identities) {
   if (!stored) {
     return std::unexpected(stored.error());
   }
-  return transaction->commit();
+
+  auto after = currentFileCount(database_);
+  if (!after) {
+    return std::unexpected(after.error());
+  }
+  return transaction->commit().transform(
+      [added = static_cast<std::size_t>(*after - *before)] { return added; });
 }
 
 std::expected<void, std::error_code> FileDatabase::replaceProjectConfiguration(

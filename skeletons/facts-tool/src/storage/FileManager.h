@@ -4,6 +4,7 @@
 #include "model/SymbolId.h"
 #include "storage/ProjectConfiguration.h"
 
+#include <cstddef>
 #include <expected>
 #include <memory>
 #include <span>
@@ -31,7 +32,12 @@ public:
   FileManager(const FileManager &) = delete;
   FileManager &operator=(const FileManager &) = delete;
 
-  std::expected<void, std::error_code>
+  // How many files the registry holds right now.
+  std::expected<std::size_t, std::error_code> fileCount();
+
+  // Returns how many file rows the registry gained. A path that is already
+  // registered adds none, so a repeated import reports zero.
+  std::expected<std::size_t, std::error_code>
   addBulk(std::span<const std::string> paths);
   std::expected<void, std::error_code>
   replaceProjectConfiguration(const ProjectConfiguration &configuration);

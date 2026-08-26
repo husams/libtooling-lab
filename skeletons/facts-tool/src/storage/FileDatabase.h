@@ -31,7 +31,11 @@ public:
   FileDatabase(const FileDatabase &) = delete;
   FileDatabase &operator=(const FileDatabase &) = delete;
 
-  std::expected<void, std::error_code>
+  // How many files the registry holds right now.
+  std::expected<std::size_t, std::error_code> fileCount();
+
+  // Returns how many file rows the call added; a repeated import adds none.
+  std::expected<std::size_t, std::error_code>
   addBulk(std::span<const std::string> identities);
   std::expected<void, std::error_code>
   replaceProjectConfiguration(const ProjectConfiguration &configuration);

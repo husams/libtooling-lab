@@ -3,10 +3,12 @@
 #include <clang/Tooling/CompilationDatabase.h>
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <iterator>
 #include <optional>
 #include <ranges>
+#include <string>
 #include <string_view>
 #include <system_error>
 
@@ -18,7 +20,11 @@ using Paths = std::vector<std::filesystem::path>;
 struct Discovery {
   std::vector<std::string> files;
   std::vector<std::string> diagnostics;
-  Paths roots;
+  // A source directory is a project tree and an include root is a header
+  // search path. The two are walked under different rules, so they are kept
+  // apart.
+  Paths sourceRoots;
+  Paths includeRoots;
 };
 
 std::string describe(std::string_view action, const std::filesystem::path &path,
@@ -95,7 +101,8 @@ Paths includeRoots(const clang::tooling::CompileCommand &command) {
 }
 
 void appendSourceIdentity(std::string identity, Discovery &discovery) {
-  discovery.roots.push_back(std::filesystem::path(identity).parent_path());
+  discovery.sourceRoots.push_back(
+      std::filesystem::path(identity).parent_path());
   discovery.files.push_back(std::move(identity));
 }
 
@@ -107,7 +114,8 @@ appendCommand(const clang::tooling::CompileCommand &command,
       .transform([&](std::string identity) {
         appendSourceIdentity(std::move(identity), discovery);
         auto commandRoots = includeRoots(command);
-        std::ranges::move(commandRoots, std::back_inserter(discovery.roots));
+        std::ranges::move(commandRoots,
+                          std::back_inserter(discovery.includeRoots));
       });
 }
 
@@ -150,14 +158,64 @@ appendCommandSources(const clang::tooling::CompilationDatabase &compilations,
   return {};
 }
 
+// Whether a suffix-less name may be a header. Only an include root spells one
+// that way.
+enum class SuffixlessNames { reject, admit };
+
+// The walk sees everything that happens to live beside the headers: Python
+// helpers, TableGen inputs, licences, build caches. None of that is a
+// translation unit or a header extraction can ever resolve, so only C and C++
+// inputs enter the registry. A suffix decides that for every named form,
+// including the module units and CUDA sources a project may only reach through
+// the walk.
+bool compilableSuffix(std::string_view suffix) {
+  static constexpr std::string_view suffixes[] = {
+      ".c",   ".cc",   ".cp",  ".cpp", ".cxx", ".c++", ".m",    ".mm",
+      ".h",   ".hh",   ".hp",  ".hpp", ".hxx", ".h++", ".def",  ".inc",
+      ".inl", ".ipp",  ".tcc", ".tpp", ".cu",  ".cuh", ".ixx",  ".cppm",
+      ".ccm", ".cxxm", ".mpp"};
+  const auto lowered =
+      suffix | std::views::transform([](unsigned char character) {
+        return static_cast<char>(std::tolower(character));
+      }) |
+      std::ranges::to<std::string>();
+  return std::ranges::contains(suffixes, lowered);
+}
+
+// A suffix-less file is how the C++ standard library and Qt spell a header
+// (<string>, <__config>, <QString>), and also how a project spells README,
+// LICENSE and Makefile. The first kind lives in a header search path and the
+// second in a project tree, so only an include root admits a suffix-less name
+// — and never one of the spellings that is documentation wherever it is found.
+bool projectMetadata(std::string_view name) {
+  static constexpr std::string_view names[] = {
+      "AUTHORS",  "CHANGELOG", "CHANGES",     "CONTRIBUTING", "COPYING",
+      "CREDITS",  "Dockerfile", "Doxyfile",   "GNUmakefile",  "INSTALL",
+      "LICENCE",  "LICENSE",   "MANIFEST",    "Makefile",     "NEWS",
+      "NOTICE",   "README",    "TODO",        "VERSION",      "makefile"};
+  return std::ranges::contains(names, name);
+}
+
+bool compilableInput(const std::filesystem::path &path,
+                     SuffixlessNames suffixless) {
+  const auto name = path.filename().string();
+  const auto suffix = path.extension().string();
+  if (!suffix.empty()) {
+    return compilableSuffix(suffix);
+  }
+  return suffixless == SuffixlessNames::admit && !name.empty() &&
+         !name.starts_with('.') && !projectMetadata(name);
+}
+
 std::expected<void, std::string>
 appendDirectoryEntries(const std::filesystem::path &root,
-                       Discovery &discovery) {
+                       SuffixlessNames suffixless, Discovery &discovery) {
   std::error_code error;
   std::filesystem::recursive_directory_iterator entry(root, error);
   const std::filesystem::recursive_directory_iterator end;
   while (!error && entry != end) {
-    if (entry->is_regular_file(error)) {
+    if (compilableInput(entry->path(), suffixless) &&
+        entry->is_regular_file(error)) {
       std::error_code identityError;
       auto identity = std::filesystem::canonical(entry->path(), identityError);
       if (identityError && !missing(identityError)) {
@@ -176,7 +234,8 @@ appendDirectoryEntries(const std::filesystem::path &root,
 }
 
 std::expected<void, std::string>
-appendDirectoryFiles(const std::filesystem::path &root, Discovery &discovery) {
+appendDirectoryFiles(const std::filesystem::path &root,
+                     SuffixlessNames suffixless, Discovery &discovery) {
   std::error_code error;
   const bool directory = std::filesystem::is_directory(root, error);
   if (missing(error)) {
@@ -188,16 +247,36 @@ appendDirectoryFiles(const std::filesystem::path &root, Discovery &discovery) {
     return std::unexpected(
         describe("cannot inspect include directory", root, error));
   }
-  return directory ? appendDirectoryEntries(root, discovery)
+  return directory ? appendDirectoryEntries(root, suffixless, discovery)
                    : std::expected<void, std::string>{};
 }
 
+void sortUniquePaths(Paths &paths) {
+  std::ranges::sort(paths);
+  paths.erase(std::ranges::unique(paths).begin(), paths.end());
+}
+
 std::expected<void, std::string> appendDiscoveredFiles(Discovery &discovery) {
-  std::ranges::sort(discovery.roots);
-  discovery.roots.erase(std::ranges::unique(discovery.roots).begin(),
-                        discovery.roots.end());
-  for (const auto &root : discovery.roots) {
-    auto appended = appendDirectoryFiles(root, discovery);
+  sortUniquePaths(discovery.sourceRoots);
+  sortUniquePaths(discovery.includeRoots);
+  // A directory named both ways is a header search path first: the wider rule
+  // wins, and it is only walked once.
+  const auto shared = std::ranges::remove_if(
+      discovery.sourceRoots, [&](const std::filesystem::path &root) {
+        return std::ranges::binary_search(discovery.includeRoots, root);
+      });
+  discovery.sourceRoots.erase(shared.begin(), shared.end());
+
+  for (const auto &root : discovery.includeRoots) {
+    auto appended =
+        appendDirectoryFiles(root, SuffixlessNames::admit, discovery);
+    if (!appended) {
+      return std::unexpected(appended.error());
+    }
+  }
+  for (const auto &root : discovery.sourceRoots) {
+    auto appended =
+        appendDirectoryFiles(root, SuffixlessNames::reject, discovery);
     if (!appended) {
       return std::unexpected(appended.error());
     }
