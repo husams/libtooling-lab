@@ -221,6 +221,27 @@ currentSplitIdentity(storage::Database &database, std::string_view identity) {
       });
 }
 
+std::expected<void, std::error_code>
+currentMigratePlaceholderRepository(storage::Database &database,
+                                    const ProjectConfiguration &configuration) {
+  const std::array configurations{&configuration};
+  return database
+      .executeBulk(
+          "UPDATE repository SET name=?1,remote_url=?2 "
+          "WHERE name='facts-tool' AND NOT EXISTS("
+          "SELECT 1 FROM repository replacement WHERE replacement.name=?1) "
+          "AND EXISTS(SELECT 1 FROM clone WHERE "
+          "clone.repository_id=repository.id AND clone.path=?3)",
+          configurations,
+          [](sqlite3_stmt *statement, const ProjectConfiguration *candidate) {
+            return storage::bindParameters(statement, candidate->repositoryName,
+                                           candidate->remoteUrl,
+                                           candidate->activeClone.path);
+          },
+          {.atomic = false})
+      .transform([](const storage::BulkResult &) {});
+}
+
 std::expected<std::int64_t, std::error_code>
 currentUpsertRepository(storage::Database &database,
                         const ProjectConfiguration &configuration) {
@@ -701,7 +722,9 @@ std::expected<void, std::error_code> FileDatabase::replaceProjectConfiguration(
     return std::unexpected(transaction.error());
   }
 
-  return currentUpsertRepository(database_, configuration)
+  return currentMigratePlaceholderRepository(database_, configuration)
+      .and_then(
+          [&] { return currentUpsertRepository(database_, configuration); })
       .and_then([&](std::int64_t repositoryId) {
         return currentUpsertClone(database_, repositoryId,
                                   configuration.activeClone)
@@ -712,6 +735,12 @@ std::expected<void, std::error_code> FileDatabase::replaceProjectConfiguration(
               return database_.execute(
                   "UPDATE file SET compile_options=NULL, driver=NULL, "
                   "working_directory=NULL");
+            })
+            .and_then([&] {
+              return database_.execute(
+                  "UPDATE component SET name='external' "
+                  "WHERE repository_id IS NULL AND name='facts-tool' "
+                  "AND path='/' AND kind='external'");
             })
             .and_then([&] {
               std::map<std::string, std::int64_t> componentIds;

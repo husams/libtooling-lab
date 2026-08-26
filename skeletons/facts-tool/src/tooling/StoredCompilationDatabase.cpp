@@ -735,6 +735,46 @@ commonRoot(const std::vector<clang::tooling::CompileCommand> &commands) {
   return root;
 }
 
+std::optional<std::filesystem::path> gitRoot(std::filesystem::path directory) {
+  auto current = absolutePath(std::move(directory));
+  while (true) {
+    std::error_code error;
+    const auto dotGit = current / ".git";
+    if (std::filesystem::is_directory(dotGit, error) ||
+        std::filesystem::is_regular_file(dotGit, error)) {
+      return current;
+    }
+    const auto parent = current.parent_path();
+    if (parent == current) {
+      return std::nullopt;
+    }
+    current = parent;
+  }
+}
+
+std::string repositoryName(const std::filesystem::path &cloneRoot) {
+  auto name = cloneRoot.filename().string();
+  if (name.empty()) {
+    name = cloneRoot.parent_path().filename().string();
+  }
+  return name;
+}
+
+ProjectComponent normalizeComponent(ProjectComponent component,
+                                    const ProjectClone &clone) {
+  const auto path = std::filesystem::path(component.path);
+  const auto resolved = absolutePath(
+      path.is_absolute() ? path : std::filesystem::path(clone.path) / path);
+  const auto cloneRoot = absolutePath(clone.path);
+  if (ownsPath(cloneRoot, resolved)) {
+    const auto relative = resolved.lexically_relative(cloneRoot);
+    component.path = relative.empty() ? "." : relative.generic_string();
+  } else {
+    component.path = resolved.generic_string();
+  }
+  return component;
+}
+
 struct PreparedCommand {
   std::filesystem::path source;
   std::size_t component = 0;
@@ -846,16 +886,23 @@ importProjectConfiguration(FileManager &files,
   }
 
   ProjectConfiguration configuration;
-  configuration.repositoryName = options.repositoryName;
+  const auto commandRoot = commonRoot(commands);
+  configuration.activeClone.path =
+      gitRoot(commandRoot).value_or(commandRoot).string();
+  configuration.repositoryName =
+      options.repositoryName.empty()
+          ? repositoryName(configuration.activeClone.path)
+          : options.repositoryName;
   configuration.remoteUrl = options.remoteUrl;
-  configuration.activeClone.path = commonRoot(commands).string();
   configuration.activeClone.label = options.cloneLabel;
   configuration.components = options.components;
   if (configuration.components.empty()) {
-    configuration.components.push_back(
-        ProjectComponent{.name = "facts-tool", .path = ".", .kind = "repo"});
+    configuration.components.push_back(ProjectComponent{
+        .name = configuration.repositoryName, .path = ".", .kind = "repo"});
   }
   for (auto &component : configuration.components) {
+    component =
+        normalizeComponent(std::move(component), configuration.activeClone);
     component.repositoryId = 1;
   }
 

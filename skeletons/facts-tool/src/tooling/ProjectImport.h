@@ -15,7 +15,7 @@ namespace facts {
 class FileManager;
 
 struct ProjectImportOptions {
-  std::string repositoryName = "facts-tool";
+  std::string repositoryName;
   std::string remoteUrl;
   std::string cloneLabel = "active";
   std::vector<ProjectComponent> components;
