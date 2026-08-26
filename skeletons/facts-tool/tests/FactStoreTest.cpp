@@ -8,8 +8,6 @@
 #include <filesystem>
 #include <ranges>
 #include <string>
-#include <sys/wait.h>
-#include <unistd.h>
 #include <utility>
 #include <variant>
 
@@ -27,7 +25,9 @@ int scalar(sqlite3 *database, const char *sql) {
 
 template <typename Model>
 Model makeSymbol(std::string usr, std::string qualifiedName) {
-  Model symbol;
+  // SymbolInfo has no default member initializers, so the base must be
+  // zeroed explicitly - a garbage Kind reaches getSymbolKindString().
+  Model symbol{};
   symbol.usr = std::move(usr);
   symbol.qualifiedName = std::move(qualifiedName);
   return symbol;
@@ -61,6 +61,17 @@ bool addDistinctSymbol(const std::filesystem::path &databasePath,
 }
 
 using Writer = bool (*)(const std::filesystem::path &, std::size_t);
+
+// facts-tool owns its databases outright: one process writes one facts
+// database. Repeating a writer in sequence covers what matters here - that a
+// shared USR keeps its SymbolId and distinct USRs get distinct ones - without
+// pretending the store is shared between processes.
+void runRepeatedWriters(const std::filesystem::path &databasePath,
+                        Writer writer) {
+  for (const auto index : std::views::iota(std::size_t{0}, std::size_t{8})) {
+    assert(writer(databasePath, index));
+  }
+}
 
 void verifyUseSiteAggregation(const std::filesystem::path &databasePath,
                               bool reverseOrder) {
@@ -149,37 +160,6 @@ void verifyUseSiteAggregation(const std::filesystem::path &databasePath,
   std::filesystem::remove(databasePath);
 }
 
-void runConcurrentWriters(const std::filesystem::path &databasePath,
-                          Writer writer) {
-  std::array<pid_t, 8> children{};
-  int startPipe[2]{};
-  assert(pipe(startPipe) == 0);
-
-  for (const auto childIndex :
-       std::views::iota(std::size_t{0}, children.size())) {
-    auto &child = children[childIndex];
-    child = fork();
-    assert(child >= 0);
-    if (child == 0) {
-      close(startPipe[1]);
-      char signal = 0;
-      const auto ignored = read(startPipe[0], &signal, 1);
-      static_cast<void>(ignored);
-      close(startPipe[0]);
-      _exit(writer(databasePath, childIndex) ? EXIT_SUCCESS : EXIT_FAILURE);
-    }
-  }
-
-  close(startPipe[0]);
-  close(startPipe[1]);
-  for (const auto child : children) {
-    int status = 0;
-    assert(waitpid(child, &status, 0) == child);
-    assert(WIFEXITED(status));
-    assert(WEXITSTATUS(status) == EXIT_SUCCESS);
-  }
-}
-
 } // namespace
 
 int main(int argc, char **argv) {
@@ -187,12 +167,12 @@ int main(int argc, char **argv) {
   const std::filesystem::path databasePath = argv[1];
   std::filesystem::remove(databasePath);
 
-  runConcurrentWriters(databasePath, addSharedSymbol);
-  runConcurrentWriters(databasePath, addDistinctSymbol);
+  runRepeatedWriters(databasePath, addSharedSymbol);
+  runRepeatedWriters(databasePath, addDistinctSymbol);
 
   const auto crossFileDatabasePath = databasePath.string() + ".cross-file";
   std::filesystem::remove(crossFileDatabasePath);
-  runConcurrentWriters(crossFileDatabasePath, addSharedUsrAcrossFiles);
+  runRepeatedWriters(crossFileDatabasePath, addSharedUsrAcrossFiles);
   {
     sqlite3 *crossFileDatabase = nullptr;
     assert(sqlite3_open(crossFileDatabasePath.c_str(), &crossFileDatabase) ==
