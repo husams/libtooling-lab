@@ -8,7 +8,6 @@
 
 #include <CLI/CLI.hpp>
 
-#include <algorithm>
 #include <expected>
 #include <format>
 #include <iostream>
@@ -42,33 +41,27 @@ public:
     }
 
     if (extractCommand_->parsed()) {
-      return makeCommand(std::move(extract_), extractVerbose_);
+      return Command{std::move(extract_)};
     }
-    return importCommand_->parsed()
-               ? makeCommand(std::move(import_), importVerbose_)
-               : makeCommand(std::move(dependency_), dependencyVerbose_);
+    return importCommand_->parsed() ? Command{std::move(import_)}
+                                    : Command{std::move(dependency_)};
   }
 
 private:
-  template <typename Options>
-  static Command makeCommand(Options options, bool stagesEnabled) {
-    options.verbosity = std::max(options.verbosity, stagesEnabled ? 1 : 0);
-    return Command{std::move(options)};
-  }
-
-  static void configureVerbosity(CLI::App &command, int &verbosity,
-                                 bool &stagesEnabled) {
-    command.add_flag("-v", stagesEnabled, "Enable at least stage output");
+  static void configureVerbosity(CLI::App &command, int &verbosity) {
     command
-        .add_option("--verbose", verbosity,
-                    "Verbosity level: 0=quiet, 1=stages, 2=details")
+        .add_option("-v,--verbose", verbosity,
+                    "Verbosity level: 0=quiet, 1=stages, 2=details, 3=trace; "
+                    "defaults to 1 when omitted")
+        ->expected(0, 1)
+        ->default_str("1")
         ->check(CLI::Range(0, maximumVerbosity))
         ->type_name("LEVEL");
   }
 
   void configureExtract(CLI::App &command) {
     extractCommand_ = &command;
-    configureVerbosity(command, extract_.verbosity, extractVerbose_);
+    configureVerbosity(command, extract_.verbosity);
     command
         .add_option("-o,--output", extract_.output,
                     "SQLite database for extracted facts")
@@ -86,7 +79,7 @@ private:
 
   void configureImport(CLI::App &command) {
     importCommand_ = &command;
-    configureVerbosity(command, import_.verbosity, importVerbose_);
+    configureVerbosity(command, import_.verbosity);
     command
         .add_option("-c,--conf", import_.configuration,
                     "Full path for the stored project configuration")
@@ -123,7 +116,7 @@ private:
 
   void configureDependency(CLI::App &command) {
     dependencyCommand_ = &command;
-    configureVerbosity(command, dependency_.verbosity, dependencyVerbose_);
+    configureVerbosity(command, dependency_.verbosity);
     command
         .add_option("-o,--output", dependency_.output,
                     "SQLite database for extracted dependency facts")
@@ -148,9 +141,6 @@ private:
   ExtractOptions extract_;
   ImportOptions import_;
   DependencyOptions dependency_;
-  bool extractVerbose_ = false;
-  bool importVerbose_ = false;
-  bool dependencyVerbose_ = false;
 };
 
 std::string_view commandName(const ExtractOptions &) { return "extract"; }

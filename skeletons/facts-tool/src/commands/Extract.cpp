@@ -105,7 +105,7 @@ requireRegisteredSources(FileManager &files,
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
                                         CompilationDatabasePtr database) {
   auto opened = runExtractStage(options, "open project database", [&] {
-    return FileManager::openReadOnly(options.configuration);
+    return FileManager::openReadOnly(options.configuration, options.verbosity);
   });
   if (!opened) {
     return std::expected<int, std::string>{std::unexpected(opened.error())};
@@ -132,7 +132,7 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         cli::logVerbose(options.verbosity, 1,
                         "facts-tool: extract: open output database");
         const auto openOutputStarted = TimingClock::now();
-        FactStore store(options.output);
+        FactStore store(options.output, options.verbosity);
         reportTiming("open output database", openOutputStarted);
         IndexingStatus indexing;
         auto started = runExtractStage(options, "begin output transaction",

@@ -148,29 +148,30 @@ def main() -> None:
             output(detailed_import),
         )
 
-        combined_verbosity = run(
+        short_detailed_import = run(
             tool,
             "import",
             "-v",
-            "--verbose",
-            "0",
+            "2",
             "--conf",
             str(configuration),
         )
         require_failure(
-            combined_verbosity,
+            short_detailed_import,
             "import requires --compilation-database or at least one source",
         )
         require(
-            "facts-tool: import: starting" in combined_verbosity.stderr,
-            output(combined_verbosity),
+            "compilation_database='fixed commands'"
+            in short_detailed_import.stderr
+            and "requested_sources=0" in short_detailed_import.stderr,
+            output(short_detailed_import),
         )
 
         invalid_verbosity = run(
             tool,
             "extract",
             "--verbose",
-            "3",
+            "4",
             "--output",
             str(root / "invalid.sqlite"),
             "--conf",
@@ -185,8 +186,8 @@ def main() -> None:
         invalid_import_verbosity = run(
             tool,
             "import",
-            "--verbose",
-            "3",
+            "-v",
+            "4",
             "--conf",
             str(configuration),
         )
@@ -201,7 +202,7 @@ def main() -> None:
             "analyses",
             "dependency",
             "--verbose",
-            "3",
+            "4",
             "--output",
             str(root / "invalid-dependency.sqlite"),
             "--conf",
@@ -372,10 +373,14 @@ def main() -> None:
             "--extra-arg cannot be used with --compilation-database",
         )
 
-        first = root / "first.cpp"
-        second = root / "second.cpp"
+        first = (root / "first.cpp").resolve()
+        second = (root / "second.cpp").resolve()
         # import now discovers and registers files, so the sources must exist.
-        first.write_text("int first() { return 1; }\n", encoding="utf-8")
+        first.write_text(
+            "struct Base {}; struct Derived : Base {}; "
+            "int first() { return 1; }\n",
+            encoding="utf-8",
+        )
         second.write_text("int second() { return 2; }\n", encoding="utf-8")
         compilation_database.write_text(
             json.dumps(
@@ -405,6 +410,31 @@ def main() -> None:
             output(filtered_import),
         )
 
+        traced_extract = run(
+            tool,
+            "extract",
+            "-v",
+            "3",
+            "--output",
+            str(root / "traced-facts.sqlite"),
+            "--conf",
+            str(root / "filtered.sqlite"),
+            str(first),
+        )
+        require(traced_extract.returncode == 0, output(traced_extract))
+        require(
+            "facts-tool: trace: file resolve requested='" in traced_extract.stderr
+            and "facts-tool: trace: file canonical identity='"
+            in traced_extract.stderr
+            and "facts-tool: trace: ast node kind='CXXRecord' name='Base'"
+            in traced_extract.stderr
+            and "facts-tool: trace: symbol persisted kind='struct' name='Base'"
+            in traced_extract.stderr
+            and "facts-tool: trace: relation kind='inherits'"
+            in traced_extract.stderr,
+            output(traced_extract),
+        )
+
         timed_extract = run(
             tool,
             "extract",
@@ -415,7 +445,7 @@ def main() -> None:
             str(first),
             environment={"FACTS_TOOL_TIMING": "1"},
         )
-        require(timed_extract.returncode != 0, output(timed_extract))
+        require(timed_extract.returncode == 0, output(timed_extract))
         require(
             "facts-tool timing: open output database:" in timed_extract.stderr
             and "facts-tool timing: extract total:" in timed_extract.stderr

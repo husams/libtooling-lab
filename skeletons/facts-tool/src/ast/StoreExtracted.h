@@ -65,13 +65,42 @@ template <typename Node, typename Result, typename Stored>
 IndexingResult storeExtracted(Node &node, Result symbol,
                               clang::ASTContext &context, FileManager &files,
                               FactStore &store, Stored stored) {
+  const auto *nodeKind =
+      static_cast<const clang::Decl &>(node).getDeclKindName();
   if (!symbol) {
+    cli::logVerbose(store.verbosity(), 3,
+                    "facts-tool: trace: node extraction kind='{}' name='{}' "
+                    "result={} reason='{}'",
+                    nodeKind, node.getQualifiedNameAsString(),
+                    isFilteredExtraction(symbol.error()) ? "filtered"
+                                                         : "failure",
+                    extractionErrorName(symbol.error()));
     return extractionFailure(node, symbol.error());
   }
 
   const auto name = node.getQualifiedNameAsString();
+  cli::logVerbose(store.verbosity(), 3,
+                  "facts-tool: trace: node extraction kind='{}' name='{}' "
+                  "result=success",
+                  nodeKind, name);
   return withContext(
-             resolveFile(context.getSourceManager(), node.getLocation(), files),
+             resolveFile(context.getSourceManager(), node.getLocation(), files)
+                 .transform([&](FileId file) {
+                   cli::logVerbose(
+                       store.verbosity(), 3,
+                       "facts-tool: trace: node file resolution kind='{}' "
+                       "name='{}' result=found file_id={}",
+                       nodeKind, name, file);
+                   return file;
+                 })
+                 .transform_error([&](std::error_code error) {
+                   cli::logVerbose(
+                       store.verbosity(), 3,
+                       "facts-tool: trace: node file resolution kind='{}' "
+                       "name='{}' result=failure error='{}'",
+                       nodeKind, name, error.message());
+                   return error;
+                 }),
              "cannot resolve source file for '" + name + "'")
       .and_then([&store, &symbol, &name](FileId file) {
         return withContext(store.save(file, std::move(*symbol)),

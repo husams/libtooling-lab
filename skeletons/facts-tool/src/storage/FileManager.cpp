@@ -1,5 +1,6 @@
 #include "storage/FileManager.h"
 
+#include "cli/Verbose.h"
 #include "storage/FileDatabase.h"
 
 #include <algorithm>
@@ -73,21 +74,23 @@ std::string identityPath(const std::string &databasePath) {
 
 } // namespace
 
-FileManager::FileManager(std::string databasePath)
+FileManager::FileManager(std::string databasePath, int verbosity)
     : databasePath_(identityPath(databasePath)),
-      database_(std::make_unique<FileDatabase>(databasePath_)) {}
+      database_(std::make_unique<FileDatabase>(databasePath_)),
+      verbosity_(verbosity) {}
 
 FileManager::FileManager(std::string databasePath,
-                         std::unique_ptr<FileDatabase> database)
-    : databasePath_(std::move(databasePath)), database_(std::move(database)) {}
+                         std::unique_ptr<FileDatabase> database, int verbosity)
+    : databasePath_(std::move(databasePath)), database_(std::move(database)),
+      verbosity_(verbosity) {}
 
 std::expected<std::unique_ptr<FileManager>, std::string>
-FileManager::openReadOnly(std::string databasePath) {
+FileManager::openReadOnly(std::string databasePath, int verbosity) {
   auto identity = identityPath(databasePath);
   return FileDatabase::openReadOnly(identity).transform(
       [&](std::unique_ptr<FileDatabase> database) {
-        return std::unique_ptr<FileManager>(
-            new FileManager(std::move(identity), std::move(database)));
+        return std::unique_ptr<FileManager>(new FileManager(
+            std::move(identity), std::move(database), verbosity));
       });
 }
 
@@ -120,19 +123,54 @@ FileManager::addClone(std::string_view repositoryName,
 
 std::expected<FileId, std::error_code>
 FileManager::getId(std::string_view path) {
+  cli::logVerbose(verbosity_, 3,
+                  "facts-tool: trace: file resolve requested='{}'", path);
   const auto getCachedOrStored = [this](const std::string &identity) {
     if (const auto found = fileIds_.find(identity); found != fileIds_.end()) {
+      cli::logVerbose(
+          verbosity_, 3,
+          "facts-tool: trace: file lookup identity='{}' source=cache "
+          "result=found file_id={}",
+          identity, found->second);
       return std::expected<FileId, std::error_code>{found->second};
     }
-    return database_->getId(identity);
+    return database_->getId(identity)
+        .transform([&](FileId id) {
+          cli::logVerbose(verbosity_, 3,
+                          "facts-tool: trace: file lookup identity='{}' "
+                          "source=project-database result=found file_id={}",
+                          identity, id);
+          return id;
+        })
+        .transform_error([&](std::error_code error) {
+          cli::logVerbose(verbosity_, 3,
+                          "facts-tool: trace: file lookup identity='{}' "
+                          "source=project-database result=missing error='{}'",
+                          identity, error.message());
+          return error;
+        });
   };
 
-  return canonicalIdentity(path).and_then([&](std::string identity) {
-    return getCachedOrStored(identity).transform([&](FileId id) {
-      fileIds_.try_emplace(std::move(identity), id);
-      return id;
-    });
-  });
+  return canonicalIdentity(path)
+      .transform([&](std::string identity) {
+        cli::logVerbose(verbosity_, 3,
+                        "facts-tool: trace: file canonical identity='{}'",
+                        identity);
+        return identity;
+      })
+      .transform_error([&](std::error_code error) {
+        cli::logVerbose(verbosity_, 3,
+                        "facts-tool: trace: file canonical result=failure "
+                        "requested='{}' error='{}'",
+                        path, error.message());
+        return error;
+      })
+      .and_then([&](std::string identity) {
+        return getCachedOrStored(identity).transform([&](FileId id) {
+          fileIds_.try_emplace(std::move(identity), id);
+          return id;
+        });
+      });
 }
 
 } // namespace facts

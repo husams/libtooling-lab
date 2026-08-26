@@ -3,6 +3,8 @@
 #include "ast/extractors/Reference.h"
 #include "ast/visitors/BodyVisitor.h"
 #include "ast/visitors/SymbolCollector.h"
+#include "cli/Verbose.h"
+#include "storage/FactStore.h"
 
 #include <algorithm>
 #include <clang/Basic/SourceManager.h>
@@ -90,7 +92,31 @@ IndexingResult SymbolVisitor::flushBodies() {
 }
 
 bool SymbolVisitor::VisitNamedDecl(clang::NamedDecl *decl) {
-  status_.record(collectDeclaredSymbol(*decl, context_, files_, store_));
+  const auto presumed = context_.getSourceManager().getPresumedLoc(
+      context_.getSourceManager().getExpansionLoc(decl->getLocation()));
+  if (presumed.isValid()) {
+    cli::logVerbose(
+        store_.verbosity(), 3,
+        "facts-tool: trace: ast node kind='{}' name='{}' file='{}' line={} "
+        "column={} implicit={}",
+        decl->getDeclKindName(), decl->getQualifiedNameAsString(),
+        presumed.getFilename(), presumed.getLine(), presumed.getColumn(),
+        decl->isImplicit());
+  } else {
+    cli::logVerbose(store_.verbosity(), 3,
+                    "facts-tool: trace: ast node kind='{}' name='{}' "
+                    "location=invalid implicit={}",
+                    decl->getDeclKindName(), decl->getQualifiedNameAsString(),
+                    decl->isImplicit());
+  }
+
+  auto result = collectDeclaredSymbol(*decl, context_, files_, store_);
+  cli::logVerbose(store_.verbosity(), 3,
+                  "facts-tool: trace: ast node complete kind='{}' name='{}' "
+                  "result={}",
+                  decl->getDeclKindName(), decl->getQualifiedNameAsString(),
+                  result ? "success" : "failure");
+  status_.record(std::move(result));
   return true;
 }
 

@@ -19,12 +19,12 @@ class FileDatabase;
 class FileManager {
 public:
   // Read-write: creates and migrates the registry; throws when it cannot.
-  explicit FileManager(std::string databasePath);
+  explicit FileManager(std::string databasePath, int verbosity = 0);
 
   // Read-only: never throws. An unreadable, incomplete or outdated registry
   // comes back as a message the calling command can report.
   static std::expected<std::unique_ptr<FileManager>, std::string>
-  openReadOnly(std::string databasePath);
+  openReadOnly(std::string databasePath, int verbosity = 0);
 
   ~FileManager();
 
@@ -44,11 +44,13 @@ public:
   std::expected<FileId, std::error_code> getId(std::string_view path);
 
 private:
-  FileManager(std::string databasePath, std::unique_ptr<FileDatabase> database);
+  FileManager(std::string databasePath, std::unique_ptr<FileDatabase> database,
+              int verbosity);
 
   std::string databasePath_;
   std::unique_ptr<FileDatabase> database_;
   std::unordered_map<std::string, FileId> fileIds_;
+  int verbosity_ = 0;
 };
 
 } // namespace facts

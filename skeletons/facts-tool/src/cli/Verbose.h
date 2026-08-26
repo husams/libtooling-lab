@@ -8,7 +8,7 @@
 
 namespace facts::cli {
 
-inline constexpr int maximumVerbosity = 2;
+inline constexpr int maximumVerbosity = 3;
 
 template <typename... Arguments>
 void logVerbose(int configuredLevel, int requiredLevel,

@@ -6,7 +6,8 @@
 
 namespace facts {
 
-FactStore::FactStore(std::string path) : storage_(std::move(path)) {}
+FactStore::FactStore(std::string path, int verbosity)
+    : storage_(std::move(path)), verbosity_(verbosity) {}
 
 std::expected<void, std::error_code> FactStore::begin() {
   return storage_.begin();
@@ -39,19 +40,45 @@ bool FactStore::contains(std::string_view usr) const {
 
 std::expected<std::optional<SymbolId>, std::error_code>
 FactStore::findId(std::string_view usr) {
+  cli::logVerbose(verbosity_, 3, "facts-tool: trace: symbol lookup usr='{}'",
+                  usr);
   if (usr.empty()) {
+    cli::logVerbose(verbosity_, 3,
+                    "facts-tool: trace: symbol lookup result=failure "
+                    "reason='empty USR'");
     return std::unexpected(std::make_error_code(std::errc::invalid_argument));
   }
   if (const auto cached = idsByUsr_.find(std::string{usr});
       cached != idsByUsr_.end()) {
+    cli::logVerbose(
+        verbosity_, 3,
+        "facts-tool: trace: symbol lookup source=cache result=found id={}:{}",
+        cached->second.file, cached->second.index);
     return cached->second;
   }
-  return storage_.findId(usr).transform([this, usr](auto id) {
-    if (id) {
-      remember(usr, *id);
-    }
-    return id;
-  });
+  return storage_.findId(usr)
+      .transform([this, usr](auto id) {
+        if (id) {
+          remember(usr, *id);
+          cli::logVerbose(
+              verbosity_, 3,
+              "facts-tool: trace: symbol lookup source=database result=found "
+              "id={}:{}",
+              id->file, id->index);
+        } else {
+          cli::logVerbose(verbosity_, 3,
+                          "facts-tool: trace: symbol lookup source=database "
+                          "result=missing");
+        }
+        return id;
+      })
+      .transform_error([this](std::error_code error) {
+        cli::logVerbose(verbosity_, 3,
+                        "facts-tool: trace: symbol lookup source=database "
+                        "result=failure error='{}'",
+                        error.message());
+        return error;
+      });
 }
 
 } // namespace facts
