@@ -136,6 +136,51 @@ def then_extraction_reports_outdated_registry(context: FactsToolContext) -> None
     )
 
 
+@given("a current project configuration whose registry lacks an included header")
+def given_incomplete_imported_registry(context: FactsToolContext) -> None:
+    context.import_isolated_configuration()
+    context.remove_registered_header()
+
+
+@then("extraction reports the incomplete project configuration once")
+def then_extraction_reports_incomplete_registry_once(
+    context: FactsToolContext,
+) -> None:
+    require(
+        context.last_returncode == 1,
+        f"expected a reported failure, got {context.last_returncode}:"
+        f"\n{context.last_output}",
+    )
+    require(
+        context.last_output.count("project configuration is incomplete") == 1,
+        f"expected one incomplete-registry diagnostic:\n{context.last_output}",
+    )
+    require(
+        "facts-tool import" in context.last_output,
+        f"missing import recovery command:\n{context.last_output}",
+    )
+
+
+@then("extraction emits no per-symbol incomplete diagnostics")
+def then_extraction_emits_no_per_symbol_diagnostics(
+    context: FactsToolContext,
+) -> None:
+    require(
+        "indexing incomplete" not in context.last_output,
+        f"unexpected per-symbol diagnostics:\n{context.last_output}",
+    )
+
+
+@then("extraction commits zero symbols")
+def then_extraction_commits_zero_symbols(context: FactsToolContext) -> None:
+    symbols = (
+        scalar(context.facts_database_path, "SELECT COUNT(*) FROM symbol")
+        if context.facts_database_path.exists()
+        else 0
+    )
+    require(symbols == 0, f"incomplete extraction committed {symbols} symbols")
+
+
 @given("a compilation database whose translation unit includes a missing header")
 def given_unpreprocessable_translation_unit(context: FactsToolContext) -> None:
     context.prepare()

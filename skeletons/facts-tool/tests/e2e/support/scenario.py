@@ -125,6 +125,15 @@ class FactsToolContext:
         with sqlite3.connect(self.files_database_path) as connection:
             connection.execute("ALTER TABLE file ADD COLUMN path TEXT")
 
+    def remove_registered_header(self) -> None:
+        """Remove one imported header while preserving its source command."""
+        with sqlite3.connect(self.files_database_path) as connection:
+            row = connection.execute(
+                "SELECT id,name FROM file WHERE driver IS NULL AND name='shared.hpp'"
+            ).fetchone()
+            require(row is not None, "the imported registry contains no shared.hpp")
+            connection.execute("DELETE FROM file WHERE id=?", (row[0],))
+
     def extract_translation_unit(self) -> None:
         self._run(self._tool_command((self.sources[0],)))
 

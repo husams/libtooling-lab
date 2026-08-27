@@ -1,14 +1,13 @@
 #include "commands/Import.h"
 
-#include "ast/visitors/IncludeVisitor.h"
+#include "commands/IncludedFiles.h"
+
 #include "cli/Verbose.h"
-#include "platform/PlatformFlags.h"
 #include "storage/FileManager.h"
 #include "tooling/CompilationFiles.h"
 #include "tooling/ProjectImport.h"
 
 #include <clang/Tooling/CompilationDatabase.h>
-#include <clang/Tooling/Tooling.h>
 
 #include <algorithm>
 #include <cstddef>
@@ -85,37 +84,6 @@ void reportDiagnostics(const std::vector<std::string> &diagnostics) {
   }
 }
 
-void sortUnique(std::vector<std::string> &values) {
-  std::ranges::sort(values);
-  values.erase(std::ranges::unique(values).begin(), values.end());
-}
-
-// Preprocessing each translation unit yields exactly the files extraction will
-// later resolve, including the system headers that carry external targets.
-// Extraction can only consume a complete registry, so a translation unit that
-// fails to preprocess fails the import rather than leaving a silent gap.
-std::expected<std::vector<std::string>, std::string>
-includedFiles(const CompilationDatabase &database,
-              const std::vector<std::string> &sources) {
-  return configurePlatformCompilationDatabase(database, sources)
-      .transform_error([](std::string error) {
-        return "cannot resolve included files: " + std::move(error);
-      })
-      .and_then([&](auto configured)
-                    -> std::expected<std::vector<std::string>, std::string> {
-        IncludeGraphFacts facts;
-        clang::tooling::ClangTool tool(*configured, sources);
-        if (tool.run(createIncludeVisitorFactory(facts).get()) != 0) {
-          return std::unexpected(
-              "cannot enumerate included files: at least one translation unit "
-              "failed to preprocess; fix the compile commands and import "
-              "again");
-        }
-        sortUnique(facts.visitedSources);
-        return std::move(facts.visitedSources);
-      });
-}
-
 std::expected<std::size_t, std::string>
 registeredFileCount(FileManager &files) {
   return files.fileCount().transform_error([](std::error_code error) {
@@ -133,11 +101,13 @@ registerFiles(FileManager &files, const CompilationDatabase &database,
         reportDiagnostics(discovered.diagnostics);
         const auto selected =
             sources.empty() ? database.getAllFiles() : sources;
-        return includedFiles(database, selected)
+        return discoverIncludedFiles(database, selected)
             .and_then([&, identities = std::move(discovered.files)](
                           std::vector<std::string> included) mutable {
               std::ranges::move(included, std::back_inserter(identities));
-              sortUnique(identities);
+              std::ranges::sort(identities);
+              identities.erase(std::ranges::unique(identities).begin(),
+                               identities.end());
               return files.addBulk(identities)
                   .transform_error([](std::error_code error) {
                     return "cannot register compilation files: " +

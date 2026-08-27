@@ -97,7 +97,7 @@ FileManager::FileManager(std::string databasePath,
 std::expected<std::unique_ptr<FileManager>, std::string>
 FileManager::openReadOnly(std::string databasePath, int verbosity) {
   auto identity = identityPath(databasePath);
-  return FileDatabase::openReadOnly(identity).transform(
+  return FileDatabase::openImportedReadOnly(identity).transform(
       [&](std::unique_ptr<FileDatabase> database) {
         return std::unique_ptr<FileManager>(new FileManager(
             std::move(identity), std::move(database), verbosity));

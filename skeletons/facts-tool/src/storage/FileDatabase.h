@@ -21,10 +21,14 @@ public:
   // Throws when that is impossible, as the rest of the storage layer does.
   explicit FileDatabase(const std::string &path);
 
-  // Read-only: never throws. An unreadable, incomplete or outdated registry
-  // comes back as a message the calling command can report.
+  // Read-only: never throws. An unreadable or outdated registry comes back as
+  // a message the calling command can report.
   static std::expected<std::unique_ptr<FileDatabase>, std::string>
   openReadOnly(const std::string &path);
+
+  // Extraction additionally requires at least one stored compile command.
+  static std::expected<std::unique_ptr<FileDatabase>, std::string>
+  openImportedReadOnly(const std::string &path);
 
   ~FileDatabase();
 

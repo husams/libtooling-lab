@@ -40,6 +40,13 @@ Feature: Facts and file storage boundaries
     When the real facts-tool extracts one translation unit for the registry check
     Then extraction fails with an outdated-registry diagnostic
 
+  Scenario: Extraction refuses an incomplete imported file registry
+    Given a current project configuration whose registry lacks an included header
+    When the real facts-tool extracts one translation unit for the registry check
+    Then extraction reports the incomplete project configuration once
+    And extraction emits no per-symbol incomplete diagnostics
+    And extraction commits zero symbols
+
   Scenario: Import refuses to report success when a translation unit cannot be preprocessed
     Given a compilation database whose translation unit includes a missing header
     When the real facts-tool imports that project

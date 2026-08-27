@@ -62,6 +62,12 @@ int main(int argc, char **argv) {
                           "WHERE name IN ('directory_id', 'name')") == 2);
   sqlite3_close(database);
 
+  const auto sourceOnly =
+      facts::FileManager::openReadOnly(databasePath.string());
+  assert(!sourceOnly);
+  assert(sourceOnly.error().contains("project configuration is incomplete"));
+  assert(sourceOnly.error().contains("facts-tool import"));
+
   const auto additivePath = databasePath.string() + ".working-directory";
   std::filesystem::remove(additivePath);
   {
