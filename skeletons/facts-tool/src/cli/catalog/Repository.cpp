@@ -5,9 +5,8 @@ namespace facts::cli {
 
 CLI::App *configureRepository(CLI::App &app, RepositoryOptions &options) {
   using Action = RepositoryOptions::Action;
-  auto *group =
-      app.add_subcommand("repo", "Manage repositories and checkout clones");
-  group->require_subcommand(1, 1);
+  auto *group = &catalogGroup(app, "repo",
+                              "Manage repositories and checkout clones", options);
   catalogLeaf(*group, "list", "List repositories", options, Action::list)
       .alias("ls");
   catalogLeaf(*group, "show", "Show clones and components", options,

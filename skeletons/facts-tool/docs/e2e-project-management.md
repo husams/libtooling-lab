@@ -11,11 +11,11 @@ Append `--conf /path/to/project.sqlite` to each command.
 | --- | --- |
 | `repo` | `list` / `ls`, `show NAME`, `add-clone NAME PATH [--label LABEL]`, `switch NAME LABEL_OR_PATH`, `rm NAME [--delete-components] [--dry-run]` |
 | `component` | `list` / `ls`, `show NAME`, `add --path PATH [--name NAME] [--repo REPO] [--kind repo\|external] [--version VERSION] [--no-git]`, `set-version NAME [VERSION]`, `compile-commands NAME`, `rm SELECTOR [--dry-run]` |
-| `dir` | `list` / `ls` `[-c COMPONENT]`, `rm SELECTOR [-c COMPONENT] [--dry-run]` |
+| `dir` | `list` / `ls` `[--component COMPONENT]`, `rm SELECTOR [--component COMPONENT] [--dry-run]` |
 
 Component removal requires exactly one of `--id`, `--name`, or `--path`.
 Directory removal requires exactly one of `--id` or `--path`. Directory paths
-are relative to the component; `-c` / `--component` resolves ambiguity. Removal
+are relative to the component; `--component` resolves ambiguity. Removal
 affects the exact indexed directory and its files, not descendant directories.
 
 Registration can create a fresh configuration without importing or extracting.

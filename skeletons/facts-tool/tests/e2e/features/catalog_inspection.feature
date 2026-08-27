@@ -21,4 +21,4 @@ Feature: Inspect the persisted project catalog
       | repo show demo      | core     |
       | component list      | neighbor |
       | component show core | core     |
-      | dir list -c core    | src/deep |
+      | dir list --component core    | src/deep |

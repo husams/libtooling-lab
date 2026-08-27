@@ -5,8 +5,8 @@ namespace facts::cli {
 
 CLI::App *configureComponent(CLI::App &app, ComponentOptions &options) {
   using Action = ComponentOptions::Action;
-  auto *group = app.add_subcommand("component", "Manage project components");
-  group->require_subcommand(1, 1);
+  auto *group =
+      &catalogGroup(app, "component", "Manage project components", options);
   catalogLeaf(*group, "list", "List components", options, Action::list)
       .alias("ls");
   catalogLeaf(*group, "show", "Show a component", options, Action::show)

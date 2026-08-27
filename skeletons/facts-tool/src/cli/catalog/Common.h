@@ -5,20 +5,41 @@
 
 namespace facts::cli {
 
+// Shared options accepted both on a catalog group (`repo`, `component`, `dir`)
+// and on each of its leaves, so `-c` works on either side of the subcommand.
+template <typename Options>
+void catalogOptions(CLI::App &command, Options &options) {
+  command
+      .add_option("-c,--conf", options.configuration,
+                  "Project configuration database (required)")
+      ->type_name("FILE");
+  command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
+      ->expected(0, 1)
+      ->default_str("1")
+      ->check(CLI::Range(0, 3));
+}
+
+template <typename Options>
+CLI::App &catalogGroup(CLI::App &app, const char *name, const char *description,
+                       Options &options) {
+  auto &group = *app.add_subcommand(name, description);
+  group.require_subcommand(1, 1);
+  catalogOptions(group, options);
+  return group;
+}
+
 template <typename Options>
 CLI::App &catalogLeaf(CLI::App &group, const char *name,
                       const char *description, Options &options,
                       typename Options::Action action) {
   auto &leaf = *group.add_subcommand(name, description);
-  leaf.add_option("--conf", options.configuration,
-                  "Project configuration database")
-      ->required()
-      ->type_name("FILE");
-  leaf.add_option("-v,--verbose", options.verbosity, "Verbosity level")
-      ->expected(0, 1)
-      ->default_str("1")
-      ->check(CLI::Range(0, 3));
-  leaf.callback([&options, action] { options.action = action; });
+  catalogOptions(leaf, options);
+  leaf.callback([&options, action] {
+    if (options.configuration.empty()) {
+      throw CLI::RequiredError("--conf");
+    }
+    options.action = action;
+  });
   return leaf;
 }
 
