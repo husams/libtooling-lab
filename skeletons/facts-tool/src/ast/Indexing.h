@@ -8,12 +8,14 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_set>
 #include <utility>
 
 namespace facts {
 
 struct IndexingError {
   std::string message;
+  std::string category;
 };
 
 using IndexingResult = std::expected<void, IndexingError>;
@@ -54,8 +56,12 @@ public:
     }
 
     ++failureCount_;
-    llvm::errs() << "facts-tool: indexing incomplete: "
-                 << result.error().message << '\n';
+    const auto &error = result.error();
+    const auto &key = error.category.empty() ? error.message : error.category;
+    if (reported_.insert(key).second) {
+      llvm::errs() << "facts-tool: indexing incomplete: " << error.message
+                   << '\n';
+    }
   }
 
   [[nodiscard]] bool complete() const { return failureCount_ == 0; }
@@ -64,6 +70,7 @@ public:
 
 private:
   std::size_t failureCount_ = 0;
+  std::unordered_set<std::string> reported_;
 };
 
 } // namespace facts

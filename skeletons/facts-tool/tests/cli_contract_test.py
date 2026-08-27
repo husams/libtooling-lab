@@ -356,7 +356,7 @@ def main() -> None:
         )
         require_failure(
             empty_extract,
-            "project configuration contains no stored compile commands",
+            "project configuration is incomplete",
         )
 
         ignored_extra_argument = run(

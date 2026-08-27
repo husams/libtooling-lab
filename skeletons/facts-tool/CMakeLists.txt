@@ -194,6 +194,7 @@ add_library(facts-commands STATIC
   src/commands/DatabasePaths.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
+  src/commands/IncludedFiles.cpp
   src/commands/Import.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)

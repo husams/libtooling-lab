@@ -1,6 +1,7 @@
 #include "commands/Extract.h"
 
 #include "commands/DatabasePaths.h"
+#include "commands/IncludedFiles.h"
 
 #include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
@@ -12,6 +13,7 @@
 
 #include <clang/Tooling/Tooling.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <functional>
@@ -75,7 +77,8 @@ std::expected<CompilationDatabasePtr, std::string>
 requireStoredCommands(CompilationDatabasePtr database) {
   if (database->getAllCompileCommands().empty()) {
     return std::unexpected(
-        "project configuration contains no stored compile commands");
+        "project configuration is incomplete; run 'facts-tool import' to "
+        "rebuild it");
   }
   return database;
 }
@@ -90,16 +93,19 @@ selectSources(const CompilationDatabase &database,
 // needs must already have been registered by 'facts-tool import'.
 std::expected<void, std::string>
 requireRegisteredSources(FileManager &files,
+                         const CompilationDatabase &database,
                          const std::vector<std::string> &sources) {
-  for (const auto &source : sources) {
-    if (!files.getId(source)) {
-      return std::unexpected(
-          "source file has no identity in the project configuration; "
-          "run 'facts-tool import' first: " +
-          source);
-    }
-  }
-  return {};
+  return discoverIncludedFiles(database, sources)
+      .and_then([&](const std::vector<std::string> &included) {
+        const auto missing = std::ranges::find_if(
+            included, [&](const auto &source) { return !files.getId(source); });
+        return missing == included.end()
+                   ? std::expected<void, std::string>{}
+                   : std::expected<void, std::string>{std::unexpected(
+                         "project configuration is incomplete; run "
+                         "'facts-tool import' to rebuild it: " +
+                         *missing)};
+      });
 }
 
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
@@ -116,9 +122,11 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
   });
   cli::logVerbose(options.verbosity, 2,
                   "facts-tool: extract: selected_sources={}", sources.size());
-  return runExtractStage(
-             options, "resolve registered sources",
-             [&] { return requireRegisteredSources(files, sources); })
+  return runExtractStage(options, "resolve registered sources",
+                         [&] {
+                           return requireRegisteredSources(files, *database,
+                                                           sources);
+                         })
       .and_then([&] {
         auto configured = runExtractStage(options, "configure Clang tool", [&] {
           return configurePlatformCompilationDatabase(*database, sources);

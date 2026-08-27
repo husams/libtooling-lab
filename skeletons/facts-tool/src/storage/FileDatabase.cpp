@@ -603,6 +603,28 @@ std::expected<void, std::string> requireCurrentFileSchema(sqlite3 *database) {
   });
 }
 
+std::expected<void, std::string>
+requireImportedProjectConfiguration(sqlite3 *database) {
+  constexpr auto sql =
+      "SELECT EXISTS(SELECT 1 FROM file "
+      "WHERE driver IS NOT NULL AND compile_options IS NOT NULL)";
+  return legacyPrepare(database, sql)
+      .transform_error([](std::error_code error) {
+        return "cannot inspect the project configuration: " + error.message();
+      })
+      .and_then([&](Statement statement) -> std::expected<void, std::string> {
+        if (sqlite3_step(statement.get()) != SQLITE_ROW) {
+          return std::unexpected("cannot inspect the project configuration: " +
+                                 legacySqliteError(database).message());
+        }
+        return sqlite3_column_int(statement.get(), 0) != 0
+                   ? std::expected<void, std::string>{}
+                   : std::expected<void, std::string>{std::unexpected(
+                         "project configuration is incomplete; run "
+                         "'facts-tool import' to rebuild it")};
+      });
+}
+
 std::expected<storage::Database, std::string>
 openReadOnlyFileDatabase(const std::string &path) {
   constexpr int flags = storage::Database::readOnly | SQLITE_OPEN_FULLMUTEX;
@@ -658,6 +680,20 @@ FileDatabase::openReadOnly(const std::string &path) {
   return openReadOnlyFileDatabase(path).transform([](storage::Database opened) {
     return std::unique_ptr<FileDatabase>(new FileDatabase(std::move(opened)));
   });
+}
+
+std::expected<std::unique_ptr<FileDatabase>, std::string>
+FileDatabase::openImportedReadOnly(const std::string &path) {
+  return openReadOnlyFileDatabase(path)
+      .and_then([](storage::Database opened)
+                    -> std::expected<storage::Database, std::string> {
+        return requireImportedProjectConfiguration(opened.nativeHandle())
+            .transform([&] { return std::move(opened); });
+      })
+      .transform([](storage::Database opened) {
+        return std::unique_ptr<FileDatabase>(
+            new FileDatabase(std::move(opened)));
+      });
 }
 
 FileDatabase::~FileDatabase() = default;

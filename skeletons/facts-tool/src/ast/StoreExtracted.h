@@ -83,25 +83,25 @@ IndexingResult storeExtracted(Node &node, Result symbol,
                   "facts-tool: trace: node extraction kind='{}' name='{}' "
                   "result=success",
                   nodeKind, name);
-  return withContext(
-             resolveFile(context.getSourceManager(), node.getLocation(), files)
-                 .transform([&](FileId file) {
-                   cli::logVerbose(
-                       store.verbosity(), 3,
-                       "facts-tool: trace: node file resolution kind='{}' "
-                       "name='{}' result=found file_id={}",
-                       nodeKind, name, file);
-                   return file;
-                 })
-                 .transform_error([&](std::error_code error) {
-                   cli::logVerbose(
-                       store.verbosity(), 3,
-                       "facts-tool: trace: node file resolution kind='{}' "
-                       "name='{}' result=failure error='{}'",
-                       nodeKind, name, error.message());
-                   return error;
-                 }),
-             "cannot resolve source file for '" + name + "'")
+  return resolveFile(context.getSourceManager(), node.getLocation(), files)
+      .transform([&](FileId file) {
+        cli::logVerbose(store.verbosity(), 3,
+                        "facts-tool: trace: node file resolution kind='{}' "
+                        "name='{}' result=found file_id={}",
+                        nodeKind, name, file);
+        return file;
+      })
+      .transform_error([&](std::error_code error) {
+        cli::logVerbose(store.verbosity(), 3,
+                        "facts-tool: trace: node file resolution kind='{}' "
+                        "name='{}' result=failure error='{}'",
+                        nodeKind, name, error.message());
+        return IndexingError{"cannot resolve source file for '" + name +
+                                 "': " + error.message(),
+                             error == std::errc::no_such_file_or_directory
+                                 ? "missing-file-identity"
+                                 : std::string{}};
+      })
       .and_then([&store, &symbol, &name](FileId file) {
         return withContext(store.save(file, std::move(*symbol)),
                            "cannot persist symbol '" + name + "'");
