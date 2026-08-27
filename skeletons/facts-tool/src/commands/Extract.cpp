@@ -89,12 +89,43 @@ selectSources(const CompilationDatabase &database,
   return requested.empty() ? database.getAllFiles() : requested;
 }
 
+// The registry is a consumed input, and only an import that finished
+// registering says so. A database that was never marked is rejected here,
+// before a single translation unit is preprocessed, instead of failing on the
+// first identity it happens to be missing.
+std::expected<std::string, std::string>
+requireCompletedRegistry(FileManager &files) {
+  return files.registryStatus()
+      .transform_error([](std::error_code error) {
+        return "cannot read the file registry state: " + error.message();
+      })
+      .and_then([](const RegistryStatus &status)
+                    -> std::expected<std::string, std::string> {
+        if (!status.complete) {
+          return std::unexpected(
+              "project configuration is incomplete; run 'facts-tool import' "
+              "to rebuild it: no import has completed the file registry");
+        }
+        return status.fingerprint;
+      });
+}
+
+// A registry that was complete when it was written can still be missing a
+// header today, because the header search path is a property of this machine.
+// Saying which one moved turns an unexplained missing file into a fact.
+std::string toolchainDrift(const std::string &imported) {
+  const auto current = platformFingerprint();
+  return imported == current
+             ? std::string{}
+             : " (the toolchain moved since import: imported under " +
+                   imported + ", running under " + current + ")";
+}
+
 // The project configuration is a consumed input: every identity extraction
 // needs must already have been registered by 'facts-tool import'.
-std::expected<void, std::string>
-requireRegisteredSources(FileManager &files,
-                         const CompilationDatabase &database,
-                         const std::vector<std::string> &sources) {
+std::expected<void, std::string> requireRegisteredSources(
+    FileManager &files, const CompilationDatabase &database,
+    const std::vector<std::string> &sources, const std::string &fingerprint) {
   return discoverIncludedFiles(database, sources)
       .and_then([&](const std::vector<std::string> &included) {
         const auto missing = std::ranges::find_if(
@@ -104,7 +135,7 @@ requireRegisteredSources(FileManager &files,
                    : std::expected<void, std::string>{std::unexpected(
                          "project configuration is incomplete; run "
                          "'facts-tool import' to rebuild it: " +
-                         *missing)};
+                         *missing + toolchainDrift(fingerprint))};
       });
 }
 
@@ -117,6 +148,12 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
     return std::expected<int, std::string>{std::unexpected(opened.error())};
   }
   auto &files = **opened;
+  auto registry =
+      runExtractStage(options, "validate registry completeness",
+                      [&] { return requireCompletedRegistry(files); });
+  if (!registry) {
+    return std::expected<int, std::string>{std::unexpected(registry.error())};
+  }
   auto sources = runExtractStage(options, "select sources", [&] {
     return selectSources(*database, options.sources);
   });
@@ -125,7 +162,7 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
   return runExtractStage(options, "resolve registered sources",
                          [&] {
                            return requireRegisteredSources(files, *database,
-                                                           sources);
+                                                           sources, *registry);
                          })
       .and_then([&] {
         auto configured = runExtractStage(options, "configure Clang tool", [&] {

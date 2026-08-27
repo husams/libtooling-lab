@@ -3,12 +3,14 @@
 #include "platform/DriverIncludes.h"
 #include "platform/ResourceDirectory.h"
 
+#include <clang/Basic/Version.h>
 #include <clang/Tooling/CompilationDatabase.h>
 
 #include <cstdio>
 #include <filesystem>
 #include <optional>
 #include <ranges>
+#include <string>
 #include <utility>
 
 namespace facts {
@@ -122,6 +124,19 @@ configurePlatformCompilationDatabase(
                       std::move(commands)));
             });
       });
+}
+
+std::string platformFingerprint() {
+  auto resourceDirectory = platform::resolveLinkedResourceDirectory();
+  const auto sdkRoot = macosSdkRoot();
+  std::string fingerprint = "clang=";
+  fingerprint += CLANG_VERSION_STRING;
+  fingerprint += "; resource-dir=";
+  fingerprint += resourceDirectory ? resourceDirectory->string()
+                                   : "unresolved: " + resourceDirectory.error();
+  fingerprint += "; sdk=";
+  fingerprint += sdkRoot ? sdkRoot->string() : std::string{};
+  return fingerprint;
 }
 
 } // namespace facts

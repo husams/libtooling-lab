@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_STORAGE_PROJECT_CONFIGURATION_H
 #define FACTS_TOOL_STORAGE_PROJECT_CONFIGURATION_H
 
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -42,6 +43,16 @@ struct ProjectConfiguration {
   ProjectClone activeClone;
   std::vector<ProjectComponent> components;
   std::vector<ProjectFile> files;
+};
+
+// What 'facts-tool import' recorded about the registry it left behind: whether
+// it finished registering every identity extraction can need, the toolchain
+// that resolved those identities, and how many rows the registry held when it
+// said so.
+struct RegistryStatus {
+  bool complete = false;
+  std::string fingerprint;
+  std::size_t fileCount = 0;
 };
 
 struct StoredFile {

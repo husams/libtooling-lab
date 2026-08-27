@@ -51,6 +51,11 @@ public:
                                                 bool activate = false);
   std::expected<FileId, std::error_code> getId(std::string_view path);
 
+  // What import recorded about this registry, and how import records it.
+  std::expected<RegistryStatus, std::error_code> registryStatus();
+  std::expected<void, std::error_code>
+  markRegistryComplete(std::string_view fingerprint);
+
 private:
   FileManager(std::string databasePath, std::unique_ptr<FileDatabase> database,
               int verbosity);

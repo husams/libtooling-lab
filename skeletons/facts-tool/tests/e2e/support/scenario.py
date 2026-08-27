@@ -125,6 +125,11 @@ class FactsToolContext:
         with sqlite3.connect(self.files_database_path) as connection:
             connection.execute("ALTER TABLE file ADD COLUMN path TEXT")
 
+    def clear_registry_completion(self) -> None:
+        """Leave a registry that stores compile commands but claims nothing."""
+        with sqlite3.connect(self.files_database_path) as connection:
+            connection.execute("UPDATE project_registry SET complete=0")
+
     def remove_registered_header(self) -> None:
         """Remove one imported header while preserving its source command."""
         with sqlite3.connect(self.files_database_path) as connection:

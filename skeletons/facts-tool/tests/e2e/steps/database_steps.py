@@ -181,6 +181,37 @@ def then_extraction_commits_zero_symbols(context: FactsToolContext) -> None:
     require(symbols == 0, f"incomplete extraction committed {symbols} symbols")
 
 
+@given("a project configuration whose registry no import has completed")
+def given_uncompleted_registry(context: FactsToolContext) -> None:
+    context.import_isolated_configuration()
+    context.clear_registry_completion()
+
+
+@then("extraction preprocesses no translation unit")
+def then_extraction_preprocesses_nothing(context: FactsToolContext) -> None:
+    require(
+        "Processing file" not in context.last_output,
+        f"extraction parsed before refusing the registry:\n{context.last_output}",
+    )
+
+
+@then("the project configuration records a completed registry")
+def then_configuration_records_completed_registry(
+    context: FactsToolContext,
+) -> None:
+    complete, fingerprint, files = query(
+        context.files_database_path,
+        "SELECT complete,fingerprint,file_count FROM project_registry WHERE id=1",
+    )[0]
+    require(complete == 1, "import left the registry marked incomplete")
+    require(bool(fingerprint), "import recorded no toolchain fingerprint")
+    registered = scalar(context.files_database_path, "SELECT COUNT(*) FROM file")
+    require(
+        files == registered,
+        f"import recorded {files} files for a registry holding {registered}",
+    )
+
+
 @given("a compilation database whose translation unit includes a missing header")
 def given_unpreprocessable_translation_unit(context: FactsToolContext) -> None:
     context.prepare()

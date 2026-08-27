@@ -22,6 +22,7 @@ Feature: Facts and file storage boundaries
       | component         |
       | directory         |
       | file              |
+      | project_registry  |
       | repository        |
       | semantic_universe |
     And the facts and files databases use different paths
@@ -46,6 +47,17 @@ Feature: Facts and file storage boundaries
     Then extraction reports the incomplete project configuration once
     And extraction emits no per-symbol incomplete diagnostics
     And extraction commits zero symbols
+
+  Scenario: Extraction refuses a registry no import has completed
+    Given a project configuration whose registry no import has completed
+    When the real facts-tool extracts one translation unit for the registry check
+    Then extraction reports the incomplete project configuration once
+    And extraction preprocesses no translation unit
+    And extraction commits zero symbols
+
+  Scenario: Import records the registry it completed
+    Given a project configuration imported from a compilation database
+    Then the project configuration records a completed registry
 
   Scenario: Import refuses to report success when a translation unit cannot be preprocessed
     Given a compilation database whose translation unit includes a missing header

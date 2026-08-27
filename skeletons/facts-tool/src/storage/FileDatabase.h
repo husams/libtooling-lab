@@ -53,6 +53,13 @@ public:
                                                 bool activate);
   std::expected<FileId, std::error_code> getId(std::string_view identity);
 
+  // What import last recorded about the registry. A database written before
+  // the marker existed reads as incomplete, which is what it is.
+  std::expected<RegistryStatus, std::error_code> registryStatus();
+  // Import says here, and only here, that the registry is complete.
+  std::expected<void, std::error_code>
+  markRegistryComplete(std::string_view fingerprint);
+
 private:
   explicit FileDatabase(storage::Database database);
 

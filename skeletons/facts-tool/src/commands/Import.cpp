@@ -3,9 +3,11 @@
 #include "commands/IncludedFiles.h"
 
 #include "cli/Verbose.h"
+#include "platform/PlatformFlags.h"
 #include "storage/FileManager.h"
 #include "tooling/CompilationFiles.h"
 #include "tooling/ProjectImport.h"
+#include "tooling/StoredCompilationDatabase.h"
 
 #include <clang/Tooling/ArgumentsAdjusters.h>
 #include <clang/Tooling/CommonOptionsParser.h>
@@ -111,29 +113,69 @@ registeredFileCount(FileManager &files) {
   });
 }
 
-// Import owns the file registry: every path a later command can resolve is
-// discovered and stored here, so extraction only ever reads it.
-std::expected<std::size_t, std::string>
-registerFiles(FileManager &files, const CompilationDatabase &database,
-              const std::vector<std::string> &sources) {
-  return discoverCompilationFiles(database, sources)
+// Extraction discovers the files it needs through the compile commands this
+// import has just stored, not through the ones it was handed: storing a
+// command sanitizes its flags and rewrites its paths, and a set discovered
+// before that round trip is not the set discovered after it.
+std::expected<std::vector<std::string>, std::string>
+discoverRegistryFiles(const CompilationDatabase &stored) {
+  return discoverCompilationFiles(stored, {})
       .and_then([&](CompilationFiles discovered) {
         reportDiagnostics(discovered.diagnostics);
-        const auto selected =
-            sources.empty() ? database.getAllFiles() : sources;
-        return discoverIncludedFiles(database, selected)
-            .and_then([&, identities = std::move(discovered.files)](
-                          std::vector<std::string> included) mutable {
+        return discoverIncludedFiles(stored, stored.getAllFiles())
+            .transform([identities = std::move(discovered.files)](
+                           std::vector<std::string> included) mutable {
               std::ranges::move(included, std::back_inserter(identities));
               std::ranges::sort(identities);
               identities.erase(std::ranges::unique(identities).begin(),
                                identities.end());
-              return files.addBulk(identities)
-                  .transform_error([](std::error_code error) {
-                    return "cannot register compilation files: " +
-                           error.message();
-                  });
+              return std::move(identities);
             });
+      });
+}
+
+// Registration is only worth anything if the registry answers the question
+// extraction will ask, so import asks it here: every discovered identity is
+// resolved back through the same lookup, and an import that cannot satisfy it
+// fails instead of leaving a database extraction will reject later.
+std::expected<void, std::string>
+requireResolvableIdentities(FileManager &files,
+                            const std::vector<std::string> &identities) {
+  const auto missing = std::ranges::find_if(
+      identities, [&](const auto &identity) { return !files.getId(identity); });
+  return missing == identities.end()
+             ? std::expected<void, std::string>{}
+             : std::expected<void, std::string>{std::unexpected(
+                   "the file registry is incomplete after import; it cannot "
+                   "resolve " +
+                   *missing)};
+}
+
+// Import owns the file registry: every path a later command can resolve is
+// discovered and stored here, so extraction only ever reads it.
+std::expected<std::size_t, std::string>
+registerFiles(FileManager &files, const std::string &configuration) {
+  return loadStoredCompilationDatabase(configuration)
+      .and_then([&](CompilationDatabasePtr stored) {
+        return discoverRegistryFiles(*stored);
+      })
+      .and_then([&](std::vector<std::string> identities) {
+        return files.addBulk(identities)
+            .transform_error([](std::error_code error) {
+              return "cannot register compilation files: " + error.message();
+            })
+            .and_then([&](std::size_t added) {
+              return requireResolvableIdentities(files, identities)
+                  .transform([added] { return added; });
+            });
+      })
+      .and_then([&](std::size_t added) {
+        return files.markRegistryComplete(platformFingerprint())
+            .transform_error([](std::error_code error) {
+              return "cannot record the completed file registry: " +
+                     error.message();
+            })
+            .transform([added] { return added; });
       });
 }
 
@@ -162,15 +204,13 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
                    })
             .and_then([&](const ProjectImportResult &result) {
               reportDiagnostics(result.diagnostics);
-              return cli::runStage(options.verbosity, "import",
-                                   "register files",
-                                   [&] {
-                                     return registerFiles(files, *database,
-                                                          options.sources);
-                                   })
-                  .and_then([&](std::size_t) {
-                    return registeredFileCount(files);
-                  })
+              return cli::runStage(
+                         options.verbosity, "import", "register files",
+                         [&] {
+                           return registerFiles(files, options.configuration);
+                         })
+                  .and_then(
+                      [&](std::size_t) { return registeredFileCount(files); })
                   .transform([&](std::size_t after) {
                     std::cout << "Imported " << result.importedFiles
                               << " compile command(s)\n";

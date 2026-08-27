@@ -702,9 +702,10 @@ namespace {
 
 std::expected<std::int64_t, std::error_code>
 currentFileCount(storage::Database &database) {
-  auto counts = storage::detail::toItlibGenerator(database.query(
-      "SELECT COUNT(*) FROM file",
-      [](const storage::Row &row) { return row.get<std::int64_t>(0); }));
+  auto counts = storage::detail::toItlibGenerator(
+      database.query("SELECT COUNT(*) FROM file", [](const storage::Row &row) {
+        return row.get<std::int64_t>(0);
+      }));
   return storage::detail::collectOne(std::move(counts));
 }
 
@@ -807,6 +808,16 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
               return database_.execute(
                   "UPDATE file SET compile_options=NULL, driver=NULL, "
                   "working_directory=NULL");
+            })
+            .and_then([&] {
+              // Storing compile commands replaces the project; whatever a
+              // previous import registered no longer describes it. Only the
+              // import that registers the files again may say complete.
+              return database_.execute(
+                  "INSERT INTO project_registry(id,complete,fingerprint,"
+                  "file_count) VALUES(1,0,'',0) "
+                  "ON CONFLICT(id) DO UPDATE SET complete=0,fingerprint='',"
+                  "file_count=0");
             })
             .and_then([&] {
               return database_.execute(
@@ -944,6 +955,57 @@ FileDatabase::addClone(std::string_view repositoryName,
                                                       cloneId)
                               : std::expected<void, std::error_code>{};
             });
+      })
+      .and_then([&] { return transaction->commit(); });
+}
+
+std::expected<RegistryStatus, std::error_code> FileDatabase::registryStatus() {
+  auto present = hasTable(database_.nativeHandle(), "project_registry");
+  if (!present) {
+    return std::unexpected(present.error());
+  }
+  // A registry imported before the marker existed, or one whose row was
+  // removed, has nothing to say for itself: that reads as incomplete rather
+  // than as a storage failure.
+  if (!*present) {
+    return RegistryStatus{};
+  }
+  auto rows = storage::detail::toItlibGenerator(database_.query(
+      "SELECT complete,fingerprint,file_count FROM project_registry WHERE id=1",
+      [](const storage::Row &row) {
+        return RegistryStatus{
+            .complete = row.get<std::int64_t>(0) != 0,
+            .fingerprint = row.get<std::string>(1),
+            .fileCount = static_cast<std::size_t>(row.get<std::int64_t>(2))};
+      }));
+  return storage::detail::collectOptional(std::move(rows))
+      .transform([](std::optional<RegistryStatus> status) {
+        return status.value_or(RegistryStatus{});
+      });
+}
+
+std::expected<void, std::error_code>
+FileDatabase::markRegistryComplete(std::string_view fingerprint) {
+  auto transaction = database_.write();
+  if (!transaction) {
+    return std::unexpected(transaction.error());
+  }
+  return currentFileCount(database_)
+      .and_then([&](std::int64_t files) {
+        const std::array rows{std::string{fingerprint}};
+        return database_
+            .executeBulk(
+                "INSERT INTO project_registry(id,complete,fingerprint,"
+                "file_count) VALUES(1,1,?1,?2) "
+                "ON CONFLICT(id) DO UPDATE SET complete=1,"
+                "fingerprint=excluded.fingerprint,"
+                "file_count=excluded.file_count",
+                rows,
+                [files](sqlite3_stmt *statement, const std::string &value) {
+                  return storage::bindParameters(statement, value, files);
+                },
+                {.atomic = false})
+            .transform([](const storage::BulkResult &) {});
       })
       .and_then([&] { return transaction->commit(); });
 }

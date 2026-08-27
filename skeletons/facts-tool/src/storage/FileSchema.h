@@ -68,6 +68,19 @@ CREATE TABLE IF NOT EXISTS file (
   UNIQUE(directory_id, name)
 );
 
+-- Import writes the registry; extraction consumes it. This single row is how
+-- one says to the other that the registry holds every identity extraction can
+-- ask for, and under which toolchain that was established.
+CREATE TABLE IF NOT EXISTS project_registry (
+  id          INTEGER PRIMARY KEY CHECK(id = 1),
+  complete    INTEGER NOT NULL DEFAULT 0,
+  fingerprint TEXT NOT NULL DEFAULT '',
+  file_count  INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT OR IGNORE INTO project_registry(id, complete, fingerprint, file_count)
+VALUES(1, 0, '', 0);
+
 )sql";
 
 } // namespace facts

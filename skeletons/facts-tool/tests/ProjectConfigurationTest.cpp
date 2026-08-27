@@ -113,6 +113,21 @@ int main(int argc, char **argv) {
                     "WHERE component.repository_id IS NOT NULL") ==
          sourceRelative.filename().generic_string());
 
+  // Storing compile commands is not registering files. Only an import that
+  // finished registering may call the registry complete, and storing the
+  // configuration again withdraws the claim.
+  auto status = files.registryStatus();
+  assert(status && !status->complete);
+  assert(files.markRegistryComplete("toolchain-under-test"));
+  status = files.registryStatus();
+  assert(status && status->complete);
+  assert(status->fingerprint == "toolchain-under-test");
+  assert(status->fileCount == 1);
+  assert(facts::importProjectConfiguration(files, input, fallbackSources,
+                                           facts::ProjectImportOptions{}));
+  status = files.registryStatus();
+  assert(status && !status->complete && status->fingerprint.empty());
+
   auto stored = facts::loadStoredCompilationDatabase(databasePath.string());
   assert(stored);
   auto commands = (*stored)->getCompileCommands(source.string());
@@ -141,9 +156,8 @@ int main(int argc, char **argv) {
     configuration.repositoryName = "cpp-indexer";
     configuration.activeClone.path = cloneTwo.string();
     configuration.components.push_back({.name = "cpp-indexer", .path = "."});
-    configuration.files.push_back({.componentPath = ".",
-                                   .name = "good.cpp",
-                                   .compileOptions = "[]"});
+    configuration.files.push_back(
+        {.componentPath = ".", .name = "good.cpp", .compileOptions = "[]"});
     return configuration;
   };
   const auto refusal = [&](facts::ProjectConfiguration configuration) {

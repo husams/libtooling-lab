@@ -46,9 +46,8 @@ canonicalIdentity(std::string_view path) {
 // so that spelling has to be tried before the resolved one.
 std::expected<std::string, std::error_code>
 requestedIdentity(std::string_view path) {
-  return absoluteIdentityPath(path).transform([](auto absolute) {
-    return absolute.lexically_normal().string();
-  });
+  return absoluteIdentityPath(path).transform(
+      [](auto absolute) { return absolute.lexically_normal().string(); });
 }
 
 std::expected<std::vector<std::string>, std::error_code>
@@ -133,6 +132,15 @@ std::expected<void, std::error_code>
 FileManager::addClone(std::string_view repositoryName,
                       const ProjectClone &clone, bool activate) {
   return database_->addClone(repositoryName, clone, activate);
+}
+
+std::expected<RegistryStatus, std::error_code> FileManager::registryStatus() {
+  return database_->registryStatus();
+}
+
+std::expected<void, std::error_code>
+FileManager::markRegistryComplete(std::string_view fingerprint) {
+  return database_->markRegistryComplete(fingerprint);
 }
 
 std::expected<FileId, std::error_code>
