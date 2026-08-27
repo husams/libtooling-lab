@@ -68,6 +68,13 @@ def main() -> None:
         and "use --extra-arg arguments" in output(import_help),
         output(import_help),
     )
+    require(
+        "Compiler argument appended to fixed-command or"
+        in output(import_help)
+        and "compile_commands.json imports; repeatable"
+        in output(import_help),
+        output(import_help),
+    )
 
     dependency_help = run(tool, "analyses", "dependency", "--help")
     require(dependency_help.returncode == 0, output(dependency_help))
@@ -359,20 +366,6 @@ def main() -> None:
             "project configuration is incomplete",
         )
 
-        ignored_extra_argument = run(
-            tool,
-            "import",
-            "--conf",
-            str(configuration),
-            "--compilation-database",
-            str(root),
-            "--extra-arg=-DIGNORED=1",
-        )
-        require_failure(
-            ignored_extra_argument,
-            "--extra-arg cannot be used with --compilation-database",
-        )
-
         first = (root / "first.cpp").resolve()
         second = (root / "second.cpp").resolve()
         # import now discovers and registers files, so the sources must exist.
@@ -395,6 +388,95 @@ def main() -> None:
             ),
             encoding="utf-8",
         )
+
+        adjusted_root = (root / "adjusted-project").resolve()
+        adjusted_root.mkdir()
+        include_root = adjusted_root / "extra-include"
+        include_root.mkdir()
+        extra_header = (include_root / "extra.hpp").resolve()
+        extra_header.write_text("struct ExtraBase {};\n", encoding="utf-8")
+        adjusted_source = (adjusted_root / "adjusted.cpp").resolve()
+        adjusted_source.write_text(
+            '#include "extra.hpp"\nstruct ExtraDerived : ExtraBase {};\n',
+            encoding="utf-8",
+        )
+        original_arguments = [
+            "clang",
+            "-x",
+            "c++",
+            "-std=c++23",
+            str(adjusted_source),
+        ]
+        extra_arguments = [f"-I{include_root}", "-DEXTRA_IMPORT=1"]
+        adjusted_compilation_database = (
+            adjusted_root / "compile_commands.json"
+        )
+        adjusted_compilation_database.write_text(
+            json.dumps(
+                [
+                    {
+                        "directory": str(adjusted_root),
+                        "file": str(adjusted_source),
+                        "arguments": original_arguments,
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        adjusted_configuration = root / "adjusted.sqlite"
+        adjusted_import = run(
+            tool,
+            "import",
+            "--conf",
+            str(adjusted_configuration),
+            "--compilation-database",
+            str(adjusted_root),
+            "--component",
+            "adjusted=.",
+            *(f"--extra-arg={argument}" for argument in extra_arguments),
+        )
+        require(adjusted_import.returncode == 0, output(adjusted_import))
+        require(
+            "Imported 1 compile command(s)" in output(adjusted_import)
+            and "Registered 2 file(s)" in output(adjusted_import),
+            output(adjusted_import),
+        )
+
+        exported = run(
+            tool,
+            "component",
+            "compile-commands",
+            "adjusted",
+            "--conf",
+            str(adjusted_configuration),
+        )
+        require(exported.returncode == 0, output(exported))
+        stored_commands = json.loads(exported.stdout)
+        require(len(stored_commands) == 1, output(exported))
+        require(
+            stored_commands[0]["arguments"]
+            == original_arguments + extra_arguments,
+            output(exported),
+        )
+
+        adjusted_extract = run(
+            tool,
+            "extract",
+            "-v",
+            "3",
+            "--output",
+            str(root / "adjusted-facts.sqlite"),
+            "--conf",
+            str(adjusted_configuration),
+            str(adjusted_source),
+        )
+        require(adjusted_extract.returncode == 0, output(adjusted_extract))
+        require(
+            "name='ExtraBase'" in adjusted_extract.stderr
+            and "name='ExtraDerived'" in adjusted_extract.stderr,
+            output(adjusted_extract),
+        )
+
         filtered_import = run(
             tool,
             "import",

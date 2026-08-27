@@ -108,7 +108,8 @@ private:
             [this](const std::string &argument) {
               import_.extraArguments.push_back(argument);
             },
-            "Compiler argument for fixed-command imports; repeatable")
+            "Compiler argument appended to fixed-command or "
+            "compile_commands.json imports; repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
     command.add_option(

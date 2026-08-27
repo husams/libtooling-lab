@@ -26,6 +26,9 @@ using Statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
 using Commands = std::vector<clang::tooling::CompileCommand>;
 using Aliases = std::map<std::string, std::string>;
 
+constexpr std::string_view sourceArgumentMarker = "\x1f"
+                                                  "facts-tool-source-argument";
+
 struct Connection {
   sqlite3 *handle = nullptr;
 
@@ -494,6 +497,17 @@ std::string defaultDriver(const std::filesystem::path &source) {
   return source.extension() == ".c" ? "clang" : "clang++";
 }
 
+void restoreSourceArgument(std::vector<std::string> &arguments,
+                           const std::filesystem::path &source) {
+  const auto marker = std::ranges::find(arguments, sourceArgumentMarker);
+  if (marker == arguments.end()) {
+    arguments.push_back(source.string());
+    return;
+  }
+  std::ranges::replace(arguments, std::string(sourceArgumentMarker),
+                       source.string());
+}
+
 std::expected<clang::tooling::CompileCommand, std::string>
 toCompileCommand(const StoredCompileFile &file, const Aliases &aliases) {
   return decodeOptions(file.options).transform([&](auto options) {
@@ -501,10 +515,10 @@ toCompileCommand(const StoredCompileFile &file, const Aliases &aliases) {
     fileAliases.try_emplace(file.componentName, file.root.string());
     auto arguments =
         resolveIncludePaths(sanitize(std::move(options)), fileAliases);
+    restoreSourceArgument(arguments, file.path);
     arguments.insert(arguments.begin(), file.driver.empty()
                                             ? defaultDriver(file.path)
                                             : file.driver);
-    arguments.push_back(file.path.string());
     const auto directory = file.workingDirectory.empty()
                                ? file.root
                                : std::filesystem::path(resolvePath(
@@ -869,6 +883,33 @@ struct PreparedCommand {
   std::vector<std::string> options;
 };
 
+bool isSourceArgument(const ProjectRoot &root,
+                      const clang::tooling::CompileCommand &command,
+                      const std::filesystem::path &source,
+                      const std::string &argument) {
+  return argument == command.Filename || argument == source.string() ||
+         (!argument.starts_with('-') &&
+          projectPath(root, command, argument) == source);
+}
+
+std::vector<std::string> preserveSourcePosition(
+    const ProjectRoot &root, const clang::tooling::CompileCommand &command,
+    const std::filesystem::path &source, std::vector<std::string> arguments) {
+  std::vector<std::string> preserved;
+  preserved.reserve(arguments.size());
+  bool sourceRecorded = false;
+  for (auto &argument : arguments) {
+    if (isSourceArgument(root, command, source, argument)) {
+      if (!std::exchange(sourceRecorded, true)) {
+        preserved.emplace_back(sourceArgumentMarker);
+      }
+      continue;
+    }
+    preserved.push_back(std::move(argument));
+  }
+  return preserved;
+}
+
 std::expected<PreparedCommand, std::string>
 prepareCommand(const ProjectRoot &root,
                const clang::tooling::CompileCommand &command,
@@ -891,11 +932,7 @@ prepareCommand(const ProjectRoot &root,
   }
   std::vector<std::string> options(command.CommandLine.begin() + start + 1,
                                    command.CommandLine.end());
-  std::erase_if(options, [&](const std::string &option) {
-    return option == command.Filename || option == source.string() ||
-           (!option.starts_with('-') &&
-            projectPath(root, command, option) == source);
-  });
+  options = preserveSourcePosition(root, command, source, std::move(options));
   auto sanitized = sanitize(std::move(options));
   sanitized = normalizePathOptions(root, command, std::move(sanitized),
                                    components[*component], clone);
