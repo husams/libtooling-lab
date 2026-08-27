@@ -7,6 +7,8 @@
 #include "tooling/CompilationFiles.h"
 #include "tooling/ProjectImport.h"
 
+#include <clang/Tooling/ArgumentsAdjusters.h>
+#include <clang/Tooling/CommonOptionsParser.h>
 #include <clang/Tooling/CompilationDatabase.h>
 
 #include <algorithm>
@@ -26,6 +28,32 @@ namespace {
 
 using CompilationDatabase = clang::tooling::CompilationDatabase;
 using CompilationDatabasePtr = std::unique_ptr<CompilationDatabase>;
+
+CompilationDatabasePtr
+appendExtraArguments(CompilationDatabasePtr database,
+                     const std::vector<std::string> &extraArguments) {
+  if (extraArguments.empty()) {
+    return database;
+  }
+
+  auto adjusted =
+      std::make_unique<clang::tooling::ArgumentsAdjustingCompilations>(
+          std::move(database));
+  adjusted->appendArgumentsAdjuster(clang::tooling::getInsertArgumentAdjuster(
+      extraArguments, clang::tooling::ArgumentInsertPosition::END));
+  return adjusted;
+}
+
+std::expected<CompilationDatabasePtr, std::string>
+loadJsonCompilationDatabase(const std::string &directory) {
+  std::string error;
+  auto database = CompilationDatabase::loadFromDirectory(directory, error);
+  if (!database) {
+    return std::unexpected("cannot load compilation database from " +
+                           directory + ": " + error);
+  }
+  return database;
+}
 
 std::expected<ProjectComponent, std::string>
 parseComponent(const std::string &specification) {
@@ -63,19 +91,11 @@ loadCompilationDatabase(const cli::ImportOptions &options) {
     return std::make_unique<clang::tooling::FixedCompilationDatabase>(
         std::filesystem::current_path().string(), options.extraArguments);
   }
-  if (!options.extraArguments.empty()) {
-    return std::unexpected(
-        "--extra-arg cannot be used with --compilation-database");
-  }
-
-  std::string error;
-  auto database = CompilationDatabase::loadFromDirectory(
-      options.compilationDatabase, error);
-  if (!database) {
-    return std::unexpected("cannot load compilation database from " +
-                           options.compilationDatabase + ": " + error);
-  }
-  return database;
+  return loadJsonCompilationDatabase(options.compilationDatabase)
+      .transform([&](CompilationDatabasePtr database) {
+        return appendExtraArguments(std::move(database),
+                                    options.extraArguments);
+      });
 }
 
 void reportDiagnostics(const std::vector<std::string> &diagnostics) {
