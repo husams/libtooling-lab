@@ -96,7 +96,10 @@ add_library(facts-storage STATIC
   src/storage/catalog/Removal.cpp
   src/storage/DependencyDatabase.cpp
   src/storage/FileDatabase.cpp
+  src/storage/FileIdentity.cpp
   src/storage/FileManager.cpp
+  src/storage/FilePersistence.cpp
+  src/storage/FileSchemaMigration.cpp
   src/storage/Definition.cpp
   src/storage/Enumeration.cpp
   src/storage/Enumerator.cpp

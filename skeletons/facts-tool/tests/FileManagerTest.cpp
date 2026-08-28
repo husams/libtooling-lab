@@ -1,7 +1,9 @@
 #include "storage/FileManager.h"
+#include "storage/FileIdentity.h"
 
 #include <sqlite3.h>
 
+#include <array>
 #include <cassert>
 #include <filesystem>
 #include <future>
@@ -30,6 +32,42 @@ int main(int argc, char **argv) {
   std::filesystem::remove(databasePath);
 
   const std::vector<std::string> paths = {source.string(), header.string()};
+
+  const facts::ProjectClone clone{
+      .path = source.parent_path().parent_path().string()};
+  const std::array components{
+      facts::ProjectComponent{.id = 1, .path = ".", .repositoryId = 1},
+      facts::ProjectComponent{.id = 2, .path = "fixtures", .repositoryId = 1},
+  };
+  const auto nested = facts::identifyFile(components, clone, source);
+  assert(nested && nested->componentId == 2 && nested->directory.empty() &&
+         nested->name == source.filename());
+
+  const std::array versioned{
+      facts::ProjectComponent{
+          .id = 3, .path = ".", .version = "fixtures", .repositoryId = 1},
+  };
+  const auto versionedSource = facts::identifyFile(versioned, clone, source);
+  assert(versionedSource && versionedSource->componentId == 3 &&
+         versionedSource->directory.empty());
+
+  const std::array ungrouped{
+      facts::ProjectComponent{.id = 4, .path = source.parent_path().string()}};
+  const auto ungroupedHeader =
+      facts::identifyFile(ungrouped, facts::ProjectClone{}, header);
+  assert(ungroupedHeader && ungroupedHeader->componentId == 4 &&
+         ungroupedHeader->name == header.filename());
+
+  const auto root = facts::identifyFile(ungrouped, facts::ProjectClone{},
+                                        source.parent_path());
+  assert(!root && root.error() == std::make_error_code(
+                                      std::errc::no_such_file_or_directory));
+  const auto outside =
+      facts::identifyFile(components, clone, databasePath.parent_path());
+  assert(!outside &&
+         outside.error() ==
+             std::make_error_code(std::errc::no_such_file_or_directory));
+
   facts::FileManager first(databasePath.string());
   facts::FileManager second(databasePath.string());
   auto firstImport =
