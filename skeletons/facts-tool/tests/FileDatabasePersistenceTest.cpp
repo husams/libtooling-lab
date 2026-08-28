@@ -112,16 +112,26 @@ bool verifyFileDatabase(const std::string &path) {
   }
 
   const std::array saved{std::string{"/saved/item.cpp"}};
-  if (!require(files.addBulk(saved).has_value(), "failed to save file")) {
+  const auto firstAdd = files.addBulk(saved);
+  if (!require(firstAdd && *firstAdd == 1, "failed to save one file")) {
     return false;
   }
   const auto firstId = files.getId(saved.front());
   if (!require(firstId.has_value(), "failed to load saved file")) {
     return false;
   }
-  if (!require(files.addBulk(saved).has_value(), "failed to update file") ||
+  const auto repeatedAdd = files.addBulk(saved);
+  if (!require(repeatedAdd && *repeatedAdd == 0,
+               "repeated upsert reported a new file") ||
       !require(files.getId(saved.front()) == firstId,
                "file update changed identity")) {
+    return false;
+  }
+  const auto neverStored = files.getId("/saved/missing.cpp");
+  if (!require(!neverStored && neverStored.error() ==
+                                   std::make_error_code(
+                                       std::errc::no_such_file_or_directory),
+               "missing lookup did not return the expected error")) {
     return false;
   }
 

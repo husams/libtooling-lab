@@ -2,6 +2,7 @@
 #include "model/RecordInstance.h"
 #include "model/RecordTemplate.h"
 #include "model/Relation.h"
+#include "storage/FileDatabase.h"
 #include "storage/Storage.h"
 
 #include <sqlite3.h>
@@ -12,6 +13,7 @@
 #include <filesystem>
 #include <iostream>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -771,6 +773,50 @@ bool verifyMigration(const std::string &path) {
   return valid;
 }
 
+bool verifyFileSchemaRollback(const std::string &path) {
+  std::filesystem::remove(path);
+  sqlite3 *database = nullptr;
+  if (!require(sqlite3_open(path.c_str(), &database) == SQLITE_OK,
+               "failed to create rollback file database")) {
+    return false;
+  }
+  const auto created = execute(database, R"sql(
+CREATE TABLE file(id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE);
+INSERT INTO file(id,path) VALUES(0,'/invalid.cpp');
+)sql");
+  sqlite3_close(database);
+  if (!require(created, "failed to prepare rollback file database")) {
+    return false;
+  }
+
+  bool failed = false;
+  try {
+    facts::FileDatabase migrated{path};
+  } catch (const std::runtime_error &) {
+    failed = true;
+  }
+  if (!require(failed, "invalid legacy file schema unexpectedly migrated")) {
+    return false;
+  }
+
+  if (!require(sqlite3_open(path.c_str(), &database) == SQLITE_OK,
+               "failed to inspect rolled-back file database")) {
+    return false;
+  }
+  const auto rolledBack =
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info('file') "
+                               "WHERE name='path'") == 1,
+              "rollback did not restore the legacy file table") &&
+      require(scalar(database,
+                     "SELECT COUNT(*) FROM sqlite_master "
+                     "WHERE type='table' AND name='legacy_file'") == 0,
+              "rollback retained the renamed legacy file table") &&
+      require(scalar(database, "SELECT COUNT(*) FROM file WHERE id=0") == 1,
+              "rollback did not restore the legacy file row");
+  sqlite3_close(database);
+  return rolledBack;
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -781,7 +827,9 @@ int main(int argc, char **argv) {
   return verifyFreshSchema(argv[1]) && verifyMigration(argv[2]) &&
                  verifyVersionOneMigration(std::string{argv[2]} + ".v1") &&
                  verifyVersionTwoMigration(std::string{argv[2]} + ".v2") &&
-                 verifyVersionFiveMigration(std::string{argv[2]} + ".v5")
+                 verifyVersionFiveMigration(std::string{argv[2]} + ".v5") &&
+                 verifyFileSchemaRollback(std::string{argv[2]} +
+                                          ".file-rollback")
              ? 0
              : 1;
 }
