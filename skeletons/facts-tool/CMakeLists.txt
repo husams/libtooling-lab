@@ -295,7 +295,13 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_BINARY_DIR}/project-configuration.sqlite
             ${CMAKE_CURRENT_SOURCE_DIR}
   )
-  add_executable(storage-schema-test tests/StorageSchemaTest.cpp)
+  add_executable(
+    storage-schema-test
+    tests/storage/FreshSchemaTest.cpp
+    tests/storage/LegacySchemaMigrationTest.cpp
+    tests/storage/StorageSchemaTestMain.cpp
+    tests/storage/StorageSchemaTestSupport.cpp
+  )
   target_link_libraries(storage-schema-test PRIVATE facts-storage facts-model
                                                     facts-sqlite)
   add_test(
