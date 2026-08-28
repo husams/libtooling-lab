@@ -174,7 +174,7 @@ FileDatabase::addBulk(std::span<const std::string> identities) {
               return identifyFiles(context, identities);
             })
             .and_then([&](const std::vector<FileIdentity> &files) {
-              return persistFiles(database_.nativeHandle(), files);
+              return persistFiles(database_, files);
             })
             .and_then([&] { return fileRowCount(database_.nativeHandle()); })
             .and_then([&](std::int64_t after) {

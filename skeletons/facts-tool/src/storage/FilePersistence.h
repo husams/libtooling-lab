@@ -14,6 +14,9 @@
 struct sqlite3;
 
 namespace facts {
+namespace storage {
+class Database;
+}
 
 std::expected<std::int64_t, std::error_code> fileRowCount(sqlite3 *database);
 
@@ -25,7 +28,8 @@ std::expected<FileId, std::error_code>
 persistFile(sqlite3 *database, const FileIdentity &identity);
 
 std::expected<void, std::error_code>
-persistFiles(sqlite3 *database, std::span<const FileIdentity> identities);
+persistFiles(storage::Database &database,
+             std::span<const FileIdentity> identities);
 
 std::expected<FileId, std::error_code>
 selectFileId(sqlite3 *database, const FileIdentity &identity);

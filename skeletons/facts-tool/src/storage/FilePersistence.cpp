@@ -1,6 +1,7 @@
 #include "storage/FilePersistence.h"
 
 #include "storage/Sqlite.h"
+#include "storage/SqliteDatabase.h"
 
 #include <sqlite3.h>
 
@@ -113,13 +114,30 @@ persistFile(sqlite3 *database, const FileIdentity &identity) {
 }
 
 std::expected<void, std::error_code>
-persistFiles(sqlite3 *database, std::span<const FileIdentity> identities) {
-  for (const auto &identity : identities) {
-    if (auto persisted = persistFile(database, identity); !persisted) {
-      return std::unexpected(persisted.error());
-    }
-  }
-  return {};
+persistFiles(storage::Database &database,
+             std::span<const FileIdentity> identities) {
+  return database
+      .executeBulk("INSERT INTO directory(component_id,path) VALUES(?1,?2) "
+                   "ON CONFLICT(component_id,path) DO NOTHING",
+                   identities,
+                   [](sqlite3_stmt *statement, const FileIdentity &identity) {
+                     return storage::bindParameters(
+                         statement, identity.componentId, identity.directory);
+                   },
+                   {.atomic = false})
+      .and_then([&](const storage::BulkResult &) {
+        return database.executeBulk(
+            "INSERT INTO file(directory_id,name) "
+            "SELECT id,?3 FROM directory WHERE component_id=?1 AND path=?2 "
+            "ON CONFLICT(directory_id,name) DO UPDATE SET name=excluded.name",
+            identities,
+            [](sqlite3_stmt *statement, const FileIdentity &identity) {
+              return storage::bindParameters(statement, identity.componentId,
+                                             identity.directory, identity.name);
+            },
+            {.atomic = false});
+      })
+      .transform([](const storage::BulkResult &) {});
 }
 
 std::expected<FileId, std::error_code>
