@@ -1,11 +1,13 @@
 #include "StorageSchemaTestCases.h"
 #include "StorageSchemaTestSupport.h"
 
+#include "storage/FileDatabase.h"
 #include "storage/Storage.h"
 
 #include <sqlite3.h>
 
 #include <filesystem>
+#include <stdexcept>
 
 namespace storage_schema_test {
 
@@ -255,6 +257,50 @@ bool verifyMigration(const std::filesystem::path &path) {
               "migration version was not recorded");
   sqlite3_close(database);
   return valid;
+}
+
+bool verifyFileSchemaRollback(const std::filesystem::path &path) {
+  removeDatabase(path);
+  sqlite3 *database = nullptr;
+  if (!require(sqlite3_open(path.c_str(), &database) == SQLITE_OK,
+               "failed to create rollback file database")) {
+    return false;
+  }
+  const auto created = execute(database, R"sql(
+CREATE TABLE file(id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE);
+INSERT INTO file(id,path) VALUES(0,'/invalid.cpp');
+)sql");
+  sqlite3_close(database);
+  if (!require(created, "failed to prepare rollback file database")) {
+    return false;
+  }
+
+  bool failed = false;
+  try {
+    facts::FileDatabase migrated{path.string()};
+  } catch (const std::runtime_error &) {
+    failed = true;
+  }
+  if (!require(failed, "invalid legacy file schema unexpectedly migrated")) {
+    return false;
+  }
+
+  if (!require(sqlite3_open(path.c_str(), &database) == SQLITE_OK,
+               "failed to inspect rolled-back file database")) {
+    return false;
+  }
+  const auto rolledBack =
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info('file') "
+                               "WHERE name='path'") == 1,
+              "rollback did not restore the legacy file table") &&
+      require(scalar(database,
+                     "SELECT COUNT(*) FROM sqlite_master "
+                     "WHERE type='table' AND name='legacy_file'") == 0,
+              "rollback retained the renamed legacy file table") &&
+      require(scalar(database, "SELECT COUNT(*) FROM file WHERE id=0") == 1,
+              "rollback did not restore the legacy file row");
+  sqlite3_close(database);
+  return rolledBack;
 }
 
 } // namespace storage_schema_test

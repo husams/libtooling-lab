@@ -96,7 +96,10 @@ add_library(facts-storage STATIC
   src/storage/catalog/Removal.cpp
   src/storage/DependencyDatabase.cpp
   src/storage/FileDatabase.cpp
+  src/storage/FileIdentity.cpp
   src/storage/FileManager.cpp
+  src/storage/FilePersistence.cpp
+  src/storage/FileSchemaMigration.cpp
   src/storage/Definition.cpp
   src/storage/Enumeration.cpp
   src/storage/Enumerator.cpp
@@ -131,7 +134,10 @@ target_link_libraries(facts-storage
 
 add_library(facts-tooling STATIC
   src/tooling/CompilationFiles.cpp
+  src/tooling/CompilationCommandCodec.cpp
+  src/tooling/ProjectImport.cpp
   src/tooling/StoredCompilationDatabase.cpp
+  src/tooling/StoredCompilationReader.cpp
 )
 target_include_directories(facts-tooling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang

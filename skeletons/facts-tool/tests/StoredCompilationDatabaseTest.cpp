@@ -73,7 +73,20 @@ int main(int argc, char **argv) {
   assert(stored);
   const auto commands = (*stored)->getCompileCommands(source.string());
   assert(commands.size() == 1);
+  assert(commands.front().Directory == root.string());
+  assert(commands.front().Filename == source.string());
+  assert(commands.front().Output.empty());
   const auto &arguments = commands.front().CommandLine;
+  const std::vector<std::string> expectedArguments = {
+      "/opt/rh/gcc-toolset-15/root/usr/bin/g++-15",
+      "-I" + include.string(),
+      "-DVALUE=1",
+      "--target=x86_64-redhat-linux",
+      "--gcc-toolchain=/opt/rh/gcc-toolset-15/root/usr",
+      "--sysroot=/target-sysroot",
+      "-stdlib=libstdc++",
+      source.string()};
+  assert(arguments == expectedArguments);
   assert(arguments.front() == "/opt/rh/gcc-toolset-15/root/usr/bin/g++-15");
   assert(contains(arguments, "-I" + include.string()));
   assert(contains(arguments, "-DVALUE=1"));
@@ -95,4 +108,5 @@ int main(int argc, char **argv) {
   sqlite3_close(database);
   auto malformed = facts::loadStoredCompilationDatabase(databasePath.string());
   assert(!malformed);
+  assert(malformed.error() == "compile_options is not a JSON array");
 }

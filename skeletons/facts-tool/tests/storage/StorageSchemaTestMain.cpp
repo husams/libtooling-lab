@@ -19,7 +19,10 @@ int main(int argc, char **argv) {
                                                                 ".v1") &&
                  storage_schema_test::verifyVersionTwoMigration(legacy +
                                                                 ".v2") &&
-                 storage_schema_test::verifyVersionFiveMigration(legacy + ".v5")
+                 storage_schema_test::verifyVersionFiveMigration(legacy +
+                                                                 ".v5") &&
+                 storage_schema_test::verifyFileSchemaRollback(legacy +
+                                                               ".file-rollback")
              ? 0
              : 1;
 }

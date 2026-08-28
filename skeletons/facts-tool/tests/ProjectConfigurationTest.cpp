@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -36,11 +37,17 @@ public:
   explicit TestCompilationDatabase(clang::tooling::CompileCommand command)
       : commands_{std::move(command)} {}
 
+  explicit TestCompilationDatabase(
+      std::vector<clang::tooling::CompileCommand> commands)
+      : commands_(std::move(commands)) {}
+
   std::vector<clang::tooling::CompileCommand>
   getCompileCommands(llvm::StringRef filePath) const override {
-    return filePath == commands_.front().Filename
-               ? commands_
-               : std::vector<clang::tooling::CompileCommand>{};
+    auto matching = commands_ | std::views::filter([&](const auto &command) {
+                      return filePath == command.Filename;
+                    });
+    return matching |
+           std::ranges::to<std::vector<clang::tooling::CompileCommand>>();
   }
 
   std::vector<std::string> getAllFiles() const override {
@@ -79,16 +86,24 @@ int main(int argc, char **argv) {
 
   facts::FileManager files(databasePath.string());
   const auto source = cloneOne / sourceRelative;
-  TestCompilationDatabase input(clang::tooling::CompileCommand{
+  auto preferred = clang::tooling::CompileCommand{
       cloneOne.string(),
       source.string(),
-      {"clang++", "-std=c++23", "-Itests/fixtures", source.string()},
-      ""});
+      {"clang++", "-std=c++23", "-Itests/fixtures", "-DVALUE=1",
+       source.string()},
+      ""};
+  auto duplicate = preferred;
+  duplicate.CommandLine[3] = "-DVALUE=2";
+  TestCompilationDatabase input(
+      std::vector<clang::tooling::CompileCommand>{duplicate, preferred});
   const std::vector<std::string> fallbackSources{source.string()};
   auto imported = facts::importProjectConfiguration(
       files, input, fallbackSources,
       facts::ProjectImportOptions{.repositoryName = "facts-tool"});
   assert(imported && imported->importedFiles == 1);
+  assert(imported->duplicateCommands == 1);
+  assert(imported->diagnostics.size() == 1);
+  assert(imported->diagnostics.front().contains("duplicate compile command"));
   imported = facts::importProjectConfiguration(files, input, fallbackSources,
                                                facts::ProjectImportOptions{});
   assert(imported && imported->importedFiles == 1);
@@ -134,14 +149,30 @@ int main(int argc, char **argv) {
   assert(commands.size() == 1);
   assert(commands.front().Directory == cloneOne.string());
   assert(commands.front().Filename == source.string());
-  assert(std::ranges::find(commands.front().CommandLine,
-                           "-I" + (cloneOne / "tests/fixtures").string()) !=
-         commands.front().CommandLine.end());
+  const std::vector<std::string> expectedArguments = {
+      "clang++", "-std=c++23", "-I" + (cloneOne / "tests/fixtures").string(),
+      "-DVALUE=1", source.string()};
+  assert(commands.front().CommandLine == expectedArguments);
 
   assert(files.addClone(
       "cpp-indexer",
       facts::ProjectClone{.path = cloneTwo.string(), .label = "second"}));
   assert(files.switchActiveClone("cpp-indexer", "second"));
+  stored = facts::loadStoredCompilationDatabase(databasePath.string());
+  assert(stored);
+  commands = (*stored)->getAllCompileCommands();
+  assert(commands.size() == 1);
+  assert(commands.front().Directory == cloneTwo.string());
+  assert(commands.front().Filename == (cloneTwo / sourceRelative).string());
+
+  auto invalidOptions = facts::ProjectImportOptions{};
+  invalidOptions.components = {
+      facts::ProjectComponent{.name = "first", .path = "."},
+      facts::ProjectComponent{.name = "second", .path = "."}};
+  const auto rejected = facts::importProjectConfiguration(
+      files, input, fallbackSources, invalidOptions);
+  assert(!rejected);
+  assert(rejected.error().contains("is configured twice"));
   stored = facts::loadStoredCompilationDatabase(databasePath.string());
   assert(stored);
   commands = (*stored)->getAllCompileCommands();
