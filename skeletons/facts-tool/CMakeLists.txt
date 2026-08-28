@@ -131,7 +131,10 @@ target_link_libraries(facts-storage
 
 add_library(facts-tooling STATIC
   src/tooling/CompilationFiles.cpp
+  src/tooling/CompilationCommandCodec.cpp
+  src/tooling/ProjectImport.cpp
   src/tooling/StoredCompilationDatabase.cpp
+  src/tooling/StoredCompilationReader.cpp
 )
 target_include_directories(facts-tooling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang
