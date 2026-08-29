@@ -12,6 +12,7 @@ from support.scenario import FactsToolContext
 SPECIALIZES = 4
 INSTANTIATES = 5
 FIELD_OF = 8
+METHOD_OF = 9
 TEMPLATE_ARGUMENT_TYPE = 23
 
 PRIMARY_USR = "c:@N@b0xx@ST>1#T@Holder"
@@ -23,9 +24,35 @@ UNDECLARED_USRS = {
 }
 INSTANTIATED_USR = "c:@N@b0xx@S@Holder>#$@N@b0xx@S@Policy"
 
+# The owners relation_resolution.hpp declares are filtered out of the store, so
+# each of these relations has to persist its destination on demand. Exact USR
+# pairs, because a LIKE match cannot tell a correctly wired owner from a swapped
+# one.
+RESOLVED_OWNER_RELATIONS = [
+    (
+        FIELD_OF,
+        "c:@N@regression@S@Box@value",
+        "c:@N@regression@S@Box",
+        1,
+    ),
+    (
+        FIELD_OF,
+        "c:@N@regression@S@BoxedPair@value",
+        "c:@N@regression@S@BoxedPair",
+        1,
+    ),
+    (
+        METHOD_OF,
+        "c:@N@std@S@hash>#$@N@regression@S@Hashable@F@operator()#&1S0_#1",
+        "c:@N@std@S@hash>#$@N@regression@S@Hashable",
+        1,
+    ),
+]
+
 FIXTURES = {
     "undeclared-template": ("undeclared_template_instances.cpp", "b019a"),
     "invalid-usr": ("invalid_usr_declarations.cpp", "b019b"),
+    "relation-resolution": ("relation_resolution.cpp", "b019c"),
 }
 
 
@@ -352,6 +379,49 @@ def then_named_siblings_survive(context: FactsToolContext) -> None:
         "probe::canary",
     }
     require(expected <= symbols, f"named siblings were lost: {expected - symbols}")
+
+
+@then(
+    "the relation-resolution extraction exits successfully without incomplete diagnostics"
+)
+def then_relation_resolution_succeeds(context: FactsToolContext) -> None:
+    require(
+        context.last_returncode == 0,
+        f"expected extract exit code 0, got {context.last_returncode}:\n"
+        + context.last_output,
+    )
+    require(
+        "indexing incomplete" not in context.last_output,
+        f"unexpected incomplete diagnostic:\n{context.last_output}",
+    )
+    require(
+        "target symbol is not persisted" not in context.last_output,
+        f"owner relation still failed to resolve its target:\n{context.last_output}",
+    )
+    require(
+        "invalid USR" not in context.last_output,
+        f"unexpected invalid-USR diagnostic:\n{context.last_output}",
+    )
+
+
+@then("the specialization owner relation is committed")
+def then_specialization_owner_relation_is_committed(
+    context: FactsToolContext,
+) -> None:
+    rows = query(
+        context.facts_database_path,
+        "SELECT relation.kind,source.usr,destination.usr,destination.is_external "
+        "FROM relation "
+        "JOIN symbol source ON source.id=relation.source_id "
+        "JOIN symbol destination ON destination.id=relation.destination_id "
+        "WHERE relation.kind IN (?,?) AND destination.is_external=1 "
+        "ORDER BY relation.kind,source.usr",
+        (FIELD_OF, METHOD_OF),
+    )
+    require(
+        rows == RESOLVED_OWNER_RELATIONS,
+        f"unexpected on-demand owner relations: {rows}",
+    )
 
 
 @then("the template relation insertion exits unsuccessfully")

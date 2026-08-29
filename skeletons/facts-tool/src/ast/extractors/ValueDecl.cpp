@@ -1,6 +1,7 @@
 #include "ast/extractors/ValueDecl.h"
 
 #include "ast/extractors/NamedDecl.h"
+#include "ast/extractors/TargetResolution.h"
 #include "ast/extractors/Type.h"
 #include "model/Relation.h"
 #include "storage/FactStore.h"
@@ -15,8 +16,10 @@
 namespace facts {
 namespace {
 
-IndexingResult storeFieldOwnerRelation(const clang::ValueDecl &node,
-                                       SymbolId value, FactStore &store) {
+IndexingResult
+storeFieldOwnerRelation(const clang::ValueDecl &node, SymbolId value,
+                        const clang::SourceManager &sourceManager,
+                        FileManager &files, FactStore &store) {
   const auto *owner =
       llvm::dyn_cast<clang::CXXRecordDecl>(node.getDeclContext());
   if (owner == nullptr) {
@@ -34,18 +37,14 @@ IndexingResult storeFieldOwnerRelation(const clang::ValueDecl &node,
         return failure("<unavailable>", "owner USR is unavailable");
       })
       .and_then([&](std::string usr) -> IndexingResult {
-        return store.findId(usr)
+        return findOrStoreSymbolTarget(*owner, sourceManager, files, store, usr)
             .transform_error([&](std::error_code error) {
               return failure(usr, error.message());
             })
-            .and_then([&](std::optional<SymbolId> ownerId) -> IndexingResult {
-              if (!ownerId) {
-                return std::unexpected(
-                    failure(usr, "target symbol is not persisted"));
-              }
+            .and_then([&](SymbolId ownerId) -> IndexingResult {
               const std::array relations{Relation{
                   .source = value,
-                  .destination = *ownerId,
+                  .destination = ownerId,
                   .kind = RelationKind::FieldOf,
               }};
               return store.addRelations(relations).transform_error(
@@ -90,9 +89,10 @@ IndexingResult storeTypeRelation(const clang::ValueDecl &node, SymbolId value,
 IndexingResult storeValueRelations(const clang::ValueDecl &node, SymbolId value,
                                    const clang::SourceManager &sourceManager,
                                    FileManager &files, FactStore &store) {
-  return storeFieldOwnerRelation(node, value, store).and_then([&] {
-    return storeTypeRelation(node, value, sourceManager, files, store);
-  });
+  return storeFieldOwnerRelation(node, value, sourceManager, files, store)
+      .and_then([&] {
+        return storeTypeRelation(node, value, sourceManager, files, store);
+      });
 }
 
 } // namespace facts

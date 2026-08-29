@@ -24,6 +24,8 @@ Feature: Canonical source file registry
       | references.hpp |
       | references_one.cpp |
       | references_two.cpp |
+      | relation_resolution.cpp |
+      | relation_resolution.hpp |
       | shared.hpp |
       | system/external_base.hpp |
       | system/external_string |
