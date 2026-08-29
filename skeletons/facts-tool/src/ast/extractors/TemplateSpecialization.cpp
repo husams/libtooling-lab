@@ -71,17 +71,22 @@ DetailedExtractionResult<SymbolId> resolveType(clang::QualType type,
 }
 
 DetailedExtractionResult<SymbolId>
-resolveDeclaration(const clang::NamedDecl &declaration, FactStore &store) {
+resolveDeclaration(const clang::NamedDecl &declaration,
+                   const clang::SourceManager &sourceManager,
+                   FileManager &files, FactStore &store) {
   return extractUsr(declaration)
       .transform_error(
           [](ExtractionError error) { return DetailedExtractionError{error}; })
       .and_then([&](std::string usr) -> DetailedExtractionResult<SymbolId> {
-        auto id = store.findId(usr);
-        if (!id || !*id) {
-          return std::unexpected(
-              DetailedExtractionError{ExtractionError::InvalidType});
-        }
-        return **id;
+        return findOrStoreSymbolTarget(declaration, sourceManager, files, store,
+                                       usr)
+            .transform_error([&](std::error_code error) {
+              return DetailedExtractionError{TypeResolutionError{
+                  .target = declaration.getQualifiedNameAsString(),
+                  .usr = usr,
+                  .detail = error.message(),
+              }};
+            });
       });
 }
 
@@ -137,13 +142,16 @@ extractLeafParameter(const clang::TemplateArgument &argument,
       return std::unexpected(
           DetailedExtractionError{ExtractionError::InvalidType});
     }
-    return resolveDeclaration(*declaration, store).transform([&](SymbolId id) {
-      return TemplateParameter{
-          .type = id,
-          .flags = flagWhen(ParameterBit::PackBit, argument.isPackExpansion()),
-          .kind = TemplateParameterKind::Template,
-      };
-    });
+    return resolveDeclaration(*declaration, context.getSourceManager(), files,
+                              store)
+        .transform([&](SymbolId id) {
+          return TemplateParameter{
+              .type = id,
+              .flags =
+                  flagWhen(ParameterBit::PackBit, argument.isPackExpansion()),
+              .kind = TemplateParameterKind::Template,
+          };
+        });
   }
   case clang::TemplateArgument::Null:
   case clang::TemplateArgument::Pack:

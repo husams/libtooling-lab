@@ -47,6 +47,12 @@ Feature: Extraction completeness for undeclared instances and un-USR-able declar
     Then the relation-resolution extraction exits successfully without incomplete diagnostics
     And the specialization owner relation is committed
 
+  Scenario: Template-template arguments resolve before their primary definition
+    Given a compile database for the forward-template-target fixture
+    When the real extraction command indexes the forward-template-target fixture
+    Then the forward-template-target extraction exits successfully without incomplete diagnostics
+    And the forward template target and argument relation are committed
+
   Scenario: Template relation persistence failures identify the exact edge
     Given a compile database for the undeclared-template fixture
     When template argument relation persistence is forced to fail on a rerun
@@ -60,6 +66,7 @@ Feature: Extraction completeness for undeclared instances and un-USR-able declar
     And the output database passes PRAGMA foreign_key_check
 
     Examples:
-      | fixture             |
-      | undeclared-template |
-      | invalid-usr         |
+      | fixture                 |
+      | undeclared-template     |
+      | invalid-usr             |
+      | forward-template-target |

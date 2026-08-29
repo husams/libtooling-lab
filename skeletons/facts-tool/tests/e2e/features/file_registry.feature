@@ -12,6 +12,8 @@ Feature: Canonical source file registry
       | dependent_template_types.cpp |
       | external_targets.cpp |
       | external_template_specialization.cpp |
+      | forward_template_target.cpp |
+      | forward_template_target_system.hpp |
       | initializer_dependent_alignment.cpp |
       | invalid_usr_declarations.cpp |
       | modern/iface.cppm |

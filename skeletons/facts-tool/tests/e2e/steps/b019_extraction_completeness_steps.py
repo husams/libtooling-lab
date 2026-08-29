@@ -23,6 +23,10 @@ UNDECLARED_USRS = {
     "Holder<char>": "c:@N@b0xx@S@Holder>#C",
 }
 INSTANTIATED_USR = "c:@N@b0xx@S@Holder>#$@N@b0xx@S@Policy"
+FORWARD_TEMPLATE_USR = "c:@N@forward_target@ST>1#T@Late"
+FORWARD_INSTANCE_USR = (
+    "c:@N@forward_target@S@Envelope>#@N@forward_target@ST>1#T@Late"
+)
 
 # The owners relation_resolution.hpp declares are filtered out of the store, so
 # each of these relations has to persist its destination on demand. Exact USR
@@ -53,6 +57,7 @@ FIXTURES = {
     "undeclared-template": ("undeclared_template_instances.cpp", "b019a"),
     "invalid-usr": ("invalid_usr_declarations.cpp", "b019b"),
     "relation-resolution": ("relation_resolution.cpp", "b019c"),
+    "forward-template-target": ("forward_template_target.cpp", "b019d"),
 }
 
 
@@ -299,6 +304,28 @@ def then_instantiation_keeps_argument_edge(context: FactsToolContext) -> None:
         (sid, TEMPLATE_ARGUMENT_TYPE),
     )
     require(rows == [(policy, 0)], f"Holder<Policy> argument edge: {rows}")
+
+
+@then("the forward template target and argument relation are committed")
+def then_forward_template_target_is_committed(context: FactsToolContext) -> None:
+    rows = query(
+        context.facts_database_path,
+        "SELECT relation.kind,destination.is_external "
+        "FROM relation "
+        "JOIN symbol AS source ON source.id=relation.source_id "
+        "JOIN symbol AS destination ON destination.id=relation.destination_id "
+        "WHERE source.usr=? AND destination.usr=? AND relation.kind=?",
+        (FORWARD_INSTANCE_USR, FORWARD_TEMPLATE_USR, TEMPLATE_ARGUMENT_TYPE),
+    )
+    require(
+        rows == [(TEMPLATE_ARGUMENT_TYPE, 0)],
+        f"forward template argument relation: {rows}",
+    )
+    canary = query(
+        context.facts_database_path,
+        "SELECT usr FROM symbol WHERE qualified_name='forward_target::Canary'",
+    )
+    require(len(canary) == 1, f"forward-template transaction was not committed: {canary}")
 
 
 @then("no symbol row exists for the un-USR-able declaration")
