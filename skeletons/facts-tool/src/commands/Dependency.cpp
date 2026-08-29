@@ -3,6 +3,7 @@
 #include "ast/visitors/IncludeVisitor.h"
 #include "cli/Options.h"
 #include "cli/Verbose.h"
+#include "commands/CompilationDatabase.h"
 #include "commands/DatabasePaths.h"
 #include "model/Dependency.h"
 #include "platform/PlatformFlags.h"
@@ -245,6 +246,10 @@ runDependency(const cli::DependencyOptions &options) {
         return runDependencyStage(options, "load compilation database", [&] {
           return loadStoredCompilationDatabase(options.configuration);
         });
+      })
+      .transform([&](CompilationDatabasePtr database) {
+        return appendExtraArguments(std::move(database),
+                                    options.extraArguments);
       })
       .and_then([&](CompilationDatabasePtr database) {
         return runDependencyStage(options, "validate stored commands", [&] {

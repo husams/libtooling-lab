@@ -1,5 +1,6 @@
 #include "commands/Import.h"
 
+#include "commands/CompilationDatabase.h"
 #include "commands/IncludedFiles.h"
 
 #include "cli/Verbose.h"
@@ -9,7 +10,6 @@
 #include "tooling/ProjectImport.h"
 #include "tooling/StoredCompilationDatabase.h"
 
-#include <clang/Tooling/ArgumentsAdjusters.h>
 #include <clang/Tooling/CommonOptionsParser.h>
 #include <clang/Tooling/CompilationDatabase.h>
 
@@ -30,21 +30,6 @@ namespace {
 
 using CompilationDatabase = clang::tooling::CompilationDatabase;
 using CompilationDatabasePtr = std::unique_ptr<CompilationDatabase>;
-
-CompilationDatabasePtr
-appendExtraArguments(CompilationDatabasePtr database,
-                     const std::vector<std::string> &extraArguments) {
-  if (extraArguments.empty()) {
-    return database;
-  }
-
-  auto adjusted =
-      std::make_unique<clang::tooling::ArgumentsAdjustingCompilations>(
-          std::move(database));
-  adjusted->appendArgumentsAdjuster(clang::tooling::getInsertArgumentAdjuster(
-      extraArguments, clang::tooling::ArgumentInsertPosition::END));
-  return adjusted;
-}
 
 std::expected<CompilationDatabasePtr, std::string>
 loadJsonCompilationDatabase(const std::string &directory) {

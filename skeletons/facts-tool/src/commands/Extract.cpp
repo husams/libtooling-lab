@@ -1,5 +1,6 @@
 #include "commands/Extract.h"
 
+#include "commands/CompilationDatabase.h"
 #include "commands/DatabasePaths.h"
 #include "commands/IncludedFiles.h"
 
@@ -221,6 +222,10 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
         return runExtractStage(options, "load compilation database", [&] {
           return loadStoredCompilationDatabase(options.configuration);
         });
+      })
+      .transform([&](CompilationDatabasePtr database) {
+        return appendExtraArguments(std::move(database),
+                                    options.extraArguments);
       })
       .and_then([&](CompilationDatabasePtr database) {
         return runExtractStage(options, "validate stored commands", [&] {

@@ -75,6 +75,15 @@ private:
                     "Full path to the stored project configuration")
         ->required()
         ->type_name("FILE");
+    command
+        .add_option_function<std::string>(
+            "--extra-arg",
+            [this](const std::string &argument) {
+              extract_.extraArguments.push_back(argument);
+            },
+            "Compiler argument appended to stored commands; repeatable")
+        ->trigger_on_parse()
+        ->type_name("ARG");
     command.add_option(
         "sources", extract_.sources,
         "Source files to extract; defaults to all imported files");
@@ -131,6 +140,15 @@ private:
                     "Full path to the stored project configuration")
         ->required()
         ->type_name("FILE");
+    command
+        .add_option_function<std::string>(
+            "--extra-arg",
+            [this](const std::string &argument) {
+              dependency_.extraArguments.push_back(argument);
+            },
+            "Compiler argument appended to stored commands; repeatable")
+        ->trigger_on_parse()
+        ->type_name("ARG");
     command
         .add_option("sources", dependency_.sources,
                     "Translation-unit roots to analyse")
