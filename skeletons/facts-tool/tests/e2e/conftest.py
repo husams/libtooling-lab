@@ -19,6 +19,7 @@ pytest_plugins = (
     "steps.file_registry_steps",
     "steps.header_defined_type_steps",
     "steps.inheritance_steps",
+    "steps.initializer_dependent_alignment_steps",
     "steps.method_steps",
     "steps.parameter_default_steps",
     "steps.parameter_steps",

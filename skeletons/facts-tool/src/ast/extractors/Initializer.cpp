@@ -38,6 +38,12 @@ std::optional<EvaluatedValue>
 evaluatedValue(const clang::Expr &expression,
                const clang::QualType &declaredType,
                const clang::ASTContext &context) {
+  if (expression.isValueDependent() || expression.isTypeDependent() ||
+      expression.isInstantiationDependent() ||
+      expression.containsUnexpandedParameterPack()) {
+    return std::nullopt;
+  }
+
   const auto *valueExpression = expression.IgnoreParenImpCasts();
   if (const auto *literal =
           llvm::dyn_cast<clang::StringLiteral>(valueExpression)) {
