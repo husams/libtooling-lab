@@ -328,7 +328,11 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_BINARY_DIR}/reference-extraction-artifacts
   )
   add_executable(type-resolution-error-test tests/TypeResolutionErrorTest.cpp)
-  target_link_libraries(type-resolution-error-test PRIVATE facts-ast)
+  # StoreExtracted.h pulls in storage/FactStore.h, so this target needs the
+  # SQLite include path and link line too; facts-ast links facts-storage
+  # PRIVATE and does not propagate them.
+  target_link_libraries(type-resolution-error-test PRIVATE
+    facts-ast facts-storage facts-model facts-clang facts-sqlite)
   add_test(NAME type-resolution-error COMMAND type-resolution-error-test)
   add_executable(file-database-persistence-test
                  tests/FileDatabasePersistenceTest.cpp)
