@@ -12,6 +12,7 @@ Feature: Canonical source file registry
       | dependent_template_types.cpp |
       | external_targets.cpp |
       | external_template_specialization.cpp |
+      | invalid_usr_declarations.cpp |
       | modern/iface.cppm |
       | modern/interface.ccm |
       | modern/kernel.cu |
@@ -26,6 +27,7 @@ Feature: Canonical source file registry
       | system/external_base.hpp |
       | system/external_string |
       | toolchain_targets.cpp |
+      | undeclared_template_instances.cpp |
       | one.cpp    |
       | two.cpp    |
     And every registered FileId is greater than zero

@@ -28,6 +28,7 @@ class FactsToolContext:
     files_database: Optional[Path] = None
     initial_files: list[tuple] = field(default_factory=list)
     initial_symbols: list[tuple] = field(default_factory=list)
+    first_identities: list[tuple] = field(default_factory=list)
     configuration_bytes: Optional[bytes] = None
     last_returncode: Optional[int] = None
     last_output: str = ""

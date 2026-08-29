@@ -41,6 +41,18 @@ relationFailure(std::string_view relation, std::string_view sourceLabel,
                        std::string{usr} + "': " + std::string{detail}};
 }
 
+inline IndexingError relationFailure(std::string_view relation,
+                                     std::string_view sourceSymbolId,
+                                     std::string_view destinationSymbolId,
+                                     std::size_t position,
+                                     std::string_view detail) {
+  return IndexingError{
+      "cannot persist relation=" + std::string{relation} +
+      " source_symbol_id='" + std::string{sourceSymbolId} +
+      "' destination_symbol_id='" + std::string{destinationSymbolId} +
+      "' position=" + std::to_string(position) + ": " + std::string{detail}};
+}
+
 template <typename Value, typename Error>
 std::expected<Value, IndexingError>
 withContext(std::expected<Value, Error> result, std::string_view context) {

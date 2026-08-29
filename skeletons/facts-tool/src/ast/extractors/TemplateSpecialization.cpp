@@ -16,7 +16,9 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include <cstddef>
+#include <optional>
 #include <ranges>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -185,13 +187,17 @@ ParametersResult extractParameter(const clang::TemplateArgument &argument,
       ParametersResult{std::vector<TemplateParameter>{}}, append);
 }
 
-std::expected<RelationKind, std::error_code>
+std::expected<std::optional<RelationKind>, std::error_code>
 relationKind(clang::TemplateSpecializationKind specializationKind) {
-  if (specializationKind == clang::TSK_ExplicitSpecialization) {
-    return RelationKind::Specializes;
-  }
-  if (clang::isTemplateInstantiation(specializationKind)) {
-    return RelationKind::Instantiates;
+  switch (specializationKind) {
+  case clang::TSK_Undeclared:
+    return std::optional<RelationKind>{};
+  case clang::TSK_ExplicitSpecialization:
+    return std::optional{RelationKind::Specializes};
+  case clang::TSK_ImplicitInstantiation:
+  case clang::TSK_ExplicitInstantiationDeclaration:
+  case clang::TSK_ExplicitInstantiationDefinition:
+    return std::optional{RelationKind::Instantiates};
   }
   return std::unexpected(std::make_error_code(std::errc::invalid_argument));
 }
@@ -202,7 +208,16 @@ struct PatternTarget {
 };
 
 std::string_view relationName(RelationKind kind) {
-  return kind == RelationKind::Specializes ? "specializes" : "instantiates";
+  switch (kind) {
+  case RelationKind::Specializes:
+    return "specializes";
+  case RelationKind::Instantiates:
+    return "instantiates";
+  case RelationKind::TemplateArgumentType:
+    return "template_argument_type";
+  default:
+    return "unknown";
+  }
 }
 
 std::expected<PatternTarget, IndexingError>
@@ -230,6 +245,53 @@ findPattern(std::string_view source, const clang::NamedDecl &pattern,
                   return PatternTarget{.id = id, .usr = std::move(usr)};
                 });
           });
+}
+
+using ProvenanceRelation = std::pair<Relation, std::string>;
+
+std::expected<std::optional<ProvenanceRelation>, IndexingError>
+extractProvenanceRelation(std::string_view source,
+                          const clang::NamedDecl &pattern,
+                          clang::TemplateSpecializationKind specializationKind,
+                          const clang::SourceManager &sourceManager,
+                          FileManager &files, FactStore &store) {
+  const auto target = pattern.getQualifiedNameAsString();
+  return relationKind(specializationKind)
+      .transform_error([&](std::error_code error) {
+        return relationFailure("template_instance", "source", source, "target",
+                               target, "<unavailable>", error.message());
+      })
+      .and_then([&](std::optional<RelationKind> kind)
+                    -> std::expected<std::optional<ProvenanceRelation>,
+                                     IndexingError> {
+        if (!kind) {
+          return std::optional<ProvenanceRelation>{};
+        }
+        return findPattern(source, pattern, *kind, sourceManager, files, store)
+            .transform([kind = *kind](PatternTarget destination) {
+              return std::optional<ProvenanceRelation>{ProvenanceRelation{
+                  Relation{.destination = destination.id, .kind = kind},
+                  std::move(destination.usr)}};
+            });
+      });
+}
+
+IndexingResult storeRelations(std::span<const Relation> relations,
+                              FactStore &store) {
+  const auto save = [&](IndexingResult result, const Relation &relation) {
+    return std::move(result).and_then([&]() -> IndexingResult {
+      return store
+          .addRelations(std::span<const Relation>{&relation, std::size_t{1}})
+          .transform_error([&](std::error_code error) {
+            return relationFailure(
+                relationName(relation.kind),
+                std::to_string(relation.source.packed()),
+                std::to_string(relation.destination.packed()),
+                relation.position, error.message());
+          });
+    });
+  };
+  return std::ranges::fold_left(relations, IndexingResult{}, save);
 }
 
 } // namespace
@@ -262,32 +324,18 @@ IndexingResult storeTemplateInstanceRelations(
     llvm::ArrayRef<clang::TemplateArgument> arguments,
     const clang::ASTContext &context, FileManager &files, FactStore &store) {
   const auto target = pattern.getQualifiedNameAsString();
-  return relationKind(specializationKind)
-      .transform_error([&](std::error_code error) {
-        return relationFailure("template_instance", "source", instanceName,
-                               "target", target, "<unavailable>",
-                               error.message());
-      })
-      .and_then([&](RelationKind kind) {
-        return findPattern(instanceName, pattern, kind,
-                           context.getSourceManager(), files, store)
-            .transform([kind](PatternTarget destination) {
-              return std::pair{
-                  Relation{.destination = destination.id, .kind = kind},
-                  std::move(destination.usr)};
-            });
-      })
-      .and_then([&](auto pattern) {
-        auto [patternRelation, usr] = std::move(pattern);
+  return extractProvenanceRelation(instanceName, pattern, specializationKind,
+                                   context.getSourceManager(), files, store)
+      .and_then([&](std::optional<ProvenanceRelation> provenance) {
         return extractTemplateParameters(arguments, context, files, store)
             .transform_error([&](DetailedExtractionError error) {
-              return relationFailure(relationName(patternRelation.kind),
-                                     "source", instanceName, "target", target,
-                                     usr, extractionErrorName(error));
+              return relationFailure(
+                  "template_argument_type", "source", instanceName, "target",
+                  target, provenance ? provenance->second : "<unavailable>",
+                  extractionErrorName(error));
             })
-            .transform([&, usr = std::move(usr)](
+            .transform([instance, provenance = std::move(provenance)](
                            std::vector<TemplateParameter> parameters) mutable {
-              patternRelation.source = instance;
               auto relations =
                   std::views::zip(std::views::iota(std::size_t{0}),
                                   parameters) |
@@ -305,18 +353,16 @@ IndexingResult storeTemplateInstanceRelations(
                     };
                   }) |
                   std::ranges::to<std::vector>();
-              relations.insert(relations.begin(), patternRelation);
-              return std::pair{std::move(relations), std::move(usr)};
+              if (provenance) {
+                provenance->first.source = instance;
+                relations.insert(relations.begin(),
+                                 std::move(provenance->first));
+              }
+              return relations;
             });
       })
-      .and_then([&](auto result) {
-        auto [relations, usr] = std::move(result);
-        return store.addRelations(relations).transform_error(
-            [&](std::error_code error) {
-              return relationFailure(relationName(relations.front().kind),
-                                     "source", instanceName, "target", target,
-                                     usr, error.message());
-            });
+      .and_then([&](std::vector<Relation> relations) {
+        return storeRelations(relations, store);
       });
 }
 
