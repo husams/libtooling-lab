@@ -132,7 +132,8 @@ std::string lambdaDiscriminator(const clang::NamedDecl &node,
     if (closure == nullptr) {
       continue;
     }
-    const auto location = extractLocation(sourceManager, closure->getLocation());
+    const auto location =
+        extractLocation(sourceManager, closure->getLocation());
     if (!location) {
       continue;
     }
@@ -199,7 +200,7 @@ TypeResult extractAliasTarget(const clang::TypedefNameDecl &node,
   return extractType(node.getUnderlyingType(), sourceManager, files, store);
 }
 
-ExtractionResult<std::vector<TemplateArgument>>
+DetailedExtractionResult<std::vector<TemplateArgument>>
 extractAliasTemplateArguments(const clang::TypedefNameDecl &node,
                               const clang::SourceManager &sourceManager,
                               FileManager &files, FactStore &store) {

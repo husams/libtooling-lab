@@ -85,27 +85,25 @@ extractDefaultValue(const clang::ParmVarDecl &node,
 
 } // namespace
 
-DetailedExtractionResult<std::optional<Parameter>>
+DetailedExtractionResult<Parameter>
 extractParameter(const clang::ParmVarDecl &node,
                  const clang::SourceManager &sourceManager, FileManager &files,
                  FactStore &store) {
   const auto toParameter = [&](Location location) {
-    const auto withRegion = [&, location](Region region)
-        -> DetailedExtractionResult<std::optional<Parameter>> {
+    const auto withRegion =
+        [&, location](Region region) -> DetailedExtractionResult<Parameter> {
       return extractType(node.getType(), sourceManager, files, store)
           .transform_error(typeExtractionFailure)
           .transform([&](std::optional<SymbolId> type) {
-            return type.transform([&](SymbolId resolvedType) {
-              return Parameter{
-                  .name = node.getNameAsString(),
-                  .type = resolvedType,
-                  .loc = location,
-                  .region = region,
-                  .flags = extractParameterFlags(node),
-                  .hasDefault = node.hasDefaultArg(),
-                  .defaultValue = extractDefaultValue(node, sourceManager),
-              };
-            });
+            return Parameter{
+                .name = node.getNameAsString(),
+                .type = type.value_or(SymbolId{}),
+                .loc = location,
+                .region = region,
+                .flags = extractParameterFlags(node),
+                .hasDefault = node.hasDefaultArg(),
+                .defaultValue = extractDefaultValue(node, sourceManager),
+            };
           });
     };
 

@@ -114,23 +114,31 @@ struct DependentOwners {
   static typename T::type dependentNameRoundTrip(typename T::type value);
   static typename T::template rebind<Concrete>
   dependentTemplateRoundTrip(typename T::template rebind<Concrete> value);
+  static void mixedParameters(typename T::type dependentFirst, int plainSecond,
+                              Concrete plainThird);
 };
 
 using MemberPointerAlias = Concrete Owner::*;
 using MemberPointerFunction = Concrete Owner::*(*)(Concrete Owner::*);
 using ComplexAlias = _Complex double;
+using AtomicAlias = _Atomic(Concrete);
+using BlockPointerAlias = Concrete (^)(Concrete);
 using TypeOfExprAlias = __typeof__(concreteValue);
 using VectorAlias = int __attribute__((vector_size(16)));
 
 struct WrapperFields {
   Concrete Owner::*memberPointerField;
   _Complex double complexField;
+  _Atomic(Concrete) atomicField;
+  Concrete (^blockPointerField)(Concrete);
   __typeof__(concreteValue) typeOfExprField;
   int vectorField __attribute__((vector_size(16)));
 };
 
 Concrete Owner::*memberPointerRoundTrip(Concrete Owner::*value);
 _Complex double complexRoundTrip(_Complex double value);
+_Atomic(Concrete) atomicRoundTrip(_Atomic(Concrete) value);
+Concrete (^blockPointerRoundTrip(Concrete (^value)(Concrete)))(Concrete);
 __typeof__(concreteValue) typeOfExprRoundTrip(__typeof__(concreteValue) value);
 VectorAlias vectorRoundTrip(VectorAlias value);
 

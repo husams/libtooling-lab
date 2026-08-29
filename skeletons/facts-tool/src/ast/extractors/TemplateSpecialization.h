@@ -3,6 +3,7 @@
 
 #include "ast/Indexing.h"
 #include "ast/extractors/Extraction.h"
+#include "ast/extractors/Type.h"
 #include "model/SymbolId.h"
 #include "model/TemplateParameter.h"
 
@@ -24,7 +25,7 @@ namespace facts {
 class FactStore;
 class FileManager;
 
-ExtractionResult<std::vector<TemplateParameter>>
+DetailedExtractionResult<std::vector<TemplateParameter>>
 extractTemplateParameters(llvm::ArrayRef<clang::TemplateArgument> arguments,
                           const clang::ASTContext &context, FileManager &files,
                           FactStore &store);

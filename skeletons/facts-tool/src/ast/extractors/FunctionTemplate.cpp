@@ -12,7 +12,7 @@
 
 namespace facts {
 
-ExtractionResult<FunctionTemplate>
+DetailedExtractionResult<FunctionTemplate>
 toFunctionTemplate(Function function,
                    const clang::TemplateParameterList &parameters,
                    const clang::SourceManager &sourceManager,
@@ -27,12 +27,13 @@ toFunctionTemplate(Function function,
       });
 }
 
-ExtractionResult<FunctionInstance>
+DetailedExtractionResult<FunctionInstance>
 toFunctionInstance(Function function, const clang::FunctionDecl &node,
                    FileManager &files, FactStore &store) {
   const auto *arguments = node.getTemplateSpecializationArgs();
   if (arguments == nullptr) {
-    return std::unexpected(ExtractionError::InvalidType);
+    return std::unexpected(
+        DetailedExtractionError{ExtractionError::InvalidType});
   }
 
   return extractTemplateParameters(arguments->asArray(), node.getASTContext(),

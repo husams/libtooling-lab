@@ -16,7 +16,7 @@ std::uint32_t flagWhen(TemplateArgumentBit flag, bool condition) {
   return condition ? bit(static_cast<std::size_t>(flag)) : 0;
 }
 
-ExtractionResult<TemplateArgument>
+DetailedExtractionResult<TemplateArgument>
 extractTemplateArgument(const clang::NamedDecl &node,
                         const clang::SourceManager &sourceManager,
                         FileManager &files, FactStore &store) {
@@ -31,8 +31,7 @@ extractTemplateArgument(const clang::NamedDecl &node,
   if (const auto *parameter =
           llvm::dyn_cast<clang::NonTypeTemplateParmDecl>(&node)) {
     return extractType(parameter->getType(), sourceManager, files, store)
-        .transform_error(
-            [](TypeResolutionError) { return ExtractionError::InvalidType; })
+        .transform_error(typeExtractionFailure)
         .transform([&](std::optional<SymbolId> type) {
           return TemplateArgument{
               .name = parameter->getNameAsString(),
@@ -53,17 +52,17 @@ extractTemplateArgument(const clang::NamedDecl &node,
     };
   }
 
-  return std::unexpected(ExtractionError::InvalidType);
+  return std::unexpected(DetailedExtractionError{ExtractionError::InvalidType});
 }
 
 } // namespace
 
-ExtractionResult<std::vector<TemplateArgument>>
+DetailedExtractionResult<std::vector<TemplateArgument>>
 extractTemplateArguments(const clang::TemplateParameterList &parameters,
                          const clang::SourceManager &sourceManager,
                          FileManager &files, FactStore &store) {
   const auto append =
-      [&](ExtractionResult<std::vector<TemplateArgument>> result,
+      [&](DetailedExtractionResult<std::vector<TemplateArgument>> result,
           const clang::NamedDecl *parameter) {
         return std::move(result).and_then(
             [&](std::vector<TemplateArgument> arguments) {
@@ -77,10 +76,11 @@ extractTemplateArguments(const clang::TemplateParameterList &parameters,
             });
       };
 
-  return std::ranges::fold_left(parameters,
-                                ExtractionResult<std::vector<TemplateArgument>>{
-                                    std::vector<TemplateArgument>{}},
-                                append);
+  return std::ranges::fold_left(
+      parameters,
+      DetailedExtractionResult<std::vector<TemplateArgument>>{
+          std::vector<TemplateArgument>{}},
+      append);
 }
 
 } // namespace facts

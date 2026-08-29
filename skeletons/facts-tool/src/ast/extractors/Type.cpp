@@ -50,12 +50,20 @@ public:
     return Visit(type->getPointeeType().getTypePtr());
   }
 
+  TypeResult VisitBlockPointerType(const clang::BlockPointerType *type) {
+    return Visit(type->getPointeeType().getTypePtr());
+  }
+
   TypeResult VisitArrayType(const clang::ArrayType *type) {
     return Visit(type->getElementType().getTypePtr());
   }
 
   TypeResult VisitComplexType(const clang::ComplexType *type) {
     return Visit(type->getElementType().getTypePtr());
+  }
+
+  TypeResult VisitAtomicType(const clang::AtomicType *type) {
+    return Visit(type->getValueType().getTypePtr());
   }
 
   TypeResult VisitVectorType(const clang::VectorType *type) {

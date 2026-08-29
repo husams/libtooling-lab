@@ -3,6 +3,7 @@
 
 #include "ast/Indexing.h"
 #include "ast/extractors/Extraction.h"
+#include "ast/extractors/Type.h"
 #include "model/Function.h"
 #include "model/FunctionInstance.h"
 #include "model/FunctionTemplate.h"
@@ -20,13 +21,13 @@ namespace facts {
 class FactStore;
 class FileManager;
 
-ExtractionResult<FunctionTemplate>
+DetailedExtractionResult<FunctionTemplate>
 toFunctionTemplate(Function function,
                    const clang::TemplateParameterList &parameters,
                    const clang::SourceManager &sourceManager,
                    FileManager &files, FactStore &store);
 
-ExtractionResult<FunctionInstance>
+DetailedExtractionResult<FunctionInstance>
 toFunctionInstance(Function function, const clang::FunctionDecl &node,
                    FileManager &files, FactStore &store);
 

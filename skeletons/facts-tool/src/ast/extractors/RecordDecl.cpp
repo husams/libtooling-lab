@@ -208,9 +208,13 @@ IndexingResult collectSymbol(clang::CXXRecordDecl &node,
           });
     };
 
-    return storeExtracted(
-        node, extractRecord(node, context.getSourceManager()) | toTemplate,
-        context, files, store, storeRelations);
+    return storeExtracted(node,
+                          extractRecord(node, context.getSourceManager())
+                                  .transform_error([](ExtractionError error) {
+                                    return DetailedExtractionError{error};
+                                  }) |
+                              toTemplate,
+                          context, files, store, storeRelations);
   }
 
   return storeExtracted(node, extractRecord(node, context.getSourceManager()),

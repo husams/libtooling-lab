@@ -13,7 +13,7 @@
 namespace facts {
 namespace {
 
-ExtractionResult<SymbolId>
+DetailedExtractionResult<SymbolId>
 extractUnderlyingType(const clang::EnumDecl &node,
                       const clang::SourceManager &sourceManager,
                       FileManager &files, FactStore &store) {
@@ -22,14 +22,13 @@ extractUnderlyingType(const clang::EnumDecl &node,
     return SymbolId{};
   }
   return extractType(type, sourceManager, files, store)
-      .transform_error(
-          [](TypeResolutionError) { return ExtractionError::InvalidType; })
+      .transform_error(typeExtractionFailure)
       .transform([](std::optional<SymbolId> resolved) {
         return resolved.value_or(SymbolId{});
       });
 }
 
-ExtractionResult<Enumeration>
+DetailedExtractionResult<Enumeration>
 addEnumerationDetails(Enumeration enumeration, const clang::EnumDecl &node,
                       const clang::SourceManager &sourceManager,
                       FileManager &files, FactStore &store) {
@@ -45,7 +44,7 @@ addEnumerationDetails(Enumeration enumeration, const clang::EnumDecl &node,
 
 } // namespace
 
-ExtractionResult<Enumeration>
+DetailedExtractionResult<Enumeration>
 extractEnumeration(const clang::EnumDecl &node,
                    const clang::SourceManager &sourceManager,
                    FileManager &files, FactStore &store) {
@@ -64,8 +63,15 @@ extractEnumeration(const clang::EnumDecl &node,
 
   return extractSymbol<Symbol, clang::NamedDecl>(node, sourceManager)
       .and_then(toEnumeration)
+      .transform_error(
+          [](ExtractionError error) { return DetailedExtractionError{error}; })
       .and_then(addDetails)
-      .and_then(addDefinition);
+      .and_then([&](Enumeration enumeration) {
+        return addDefinition(std::move(enumeration))
+            .transform_error([](ExtractionError error) {
+              return DetailedExtractionError{error};
+            });
+      });
 }
 
 IndexingResult collectSymbol(clang::EnumDecl &node, clang::ASTContext &context,

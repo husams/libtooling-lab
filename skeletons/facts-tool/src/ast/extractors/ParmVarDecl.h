@@ -5,8 +5,6 @@
 #include "ast/extractors/Type.h"
 #include "model/Parameter.h"
 
-#include <optional>
-
 namespace clang {
 class ParmVarDecl;
 class SourceManager;
@@ -16,7 +14,7 @@ namespace facts {
 class FactStore;
 class FileManager;
 
-DetailedExtractionResult<std::optional<Parameter>>
+DetailedExtractionResult<Parameter>
 extractParameter(const clang::ParmVarDecl &node,
                  const clang::SourceManager &sourceManager, FileManager &files,
                  FactStore &store);

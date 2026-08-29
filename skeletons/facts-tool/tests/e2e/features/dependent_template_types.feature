@@ -31,3 +31,4 @@ Feature: Dependent function-template parameter types
     And unsupported type-class owners and the canary are committed
     And unresolved dependent type relations are omitted
     And structural wrapper types resolve to their concrete targets
+    And dependent and wrapper parameters retain every source position

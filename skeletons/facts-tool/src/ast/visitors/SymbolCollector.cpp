@@ -61,7 +61,7 @@ extractAliasFacts(clang::TypedefNameDecl &node,
             .transform([targetId](std::vector<TemplateArgument> arguments) {
               return AliasFacts{targetId, std::move(arguments)};
             })
-            .transform_error([&](ExtractionError error) {
+            .transform_error([&](DetailedExtractionError error) {
               return relationFailure("alias_of", "source", source, "target",
                                      target, "<unavailable>",
                                      extractionErrorName(error));

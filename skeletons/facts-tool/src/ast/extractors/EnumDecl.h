@@ -3,6 +3,7 @@
 
 #include "ast/Indexing.h"
 #include "ast/extractors/Extraction.h"
+#include "ast/extractors/Type.h"
 #include "model/Enumeration.h"
 
 namespace clang {
@@ -15,7 +16,7 @@ namespace facts {
 class FactStore;
 class FileManager;
 
-ExtractionResult<Enumeration>
+DetailedExtractionResult<Enumeration>
 extractEnumeration(const clang::EnumDecl &node,
                    const clang::SourceManager &sourceManager,
                    FileManager &files, FactStore &store);

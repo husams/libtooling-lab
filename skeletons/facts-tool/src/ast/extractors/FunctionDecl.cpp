@@ -75,10 +75,7 @@ IndexingResult collectSymbol(clang::FunctionDecl &node,
 
   if (node.getTemplateSpecializationInfo() != nullptr) {
     const auto toInstance = [&](Function function) {
-      return toFunctionInstance(std::move(function), node, files, store)
-          .transform_error([](ExtractionError error) {
-            return DetailedExtractionError{error};
-          });
+      return toFunctionInstance(std::move(function), node, files, store);
     };
     const auto storeInstanceRelations = [&](SymbolId function) {
       return storeMethodRelation(node, function, store).and_then([&] {
@@ -97,10 +94,7 @@ IndexingResult collectSymbol(clang::FunctionDecl &node,
     const auto toTemplate = [&](Function function) {
       return toFunctionTemplate(std::move(function),
                                 *templateDeclaration->getTemplateParameters(),
-                                context.getSourceManager(), files, store)
-          .transform_error([](ExtractionError error) {
-            return DetailedExtractionError{error};
-          });
+                                context.getSourceManager(), files, store);
     };
 
     return storeExtracted(
