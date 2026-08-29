@@ -42,6 +42,13 @@ std::vector<RelationSite> relationSites(const std::vector<UseFact> &facts) {
 void BodyVisitor::capture(ExtractionResult<std::optional<UseFact>> fact,
                           const clang::NamedDecl &referenced) {
   if (!fact) {
+    // An unnamed declaration -- an anonymous union/struct member, an unnamed
+    // parameter -- has no stable USR to key a relation on. Skipping it is
+    // correct; escalating it aborts the whole translation unit.
+    if (fact.error() == ExtractionError::InvalidUsr &&
+        !referenced.getDeclName()) {
+      return;
+    }
     status_.record(std::unexpected(
         IndexingError{"cannot extract reference to '" +
                       referenced.getQualifiedNameAsString() +

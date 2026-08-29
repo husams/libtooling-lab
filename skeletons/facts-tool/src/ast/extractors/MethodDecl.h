@@ -10,16 +10,20 @@
 
 namespace clang {
 class FunctionDecl;
+class SourceManager;
 } // namespace clang
 
 namespace facts {
 class FactStore;
+class FileManager;
 
 ExtractionResult<Function> addMethodFlags(Function function,
                                           const clang::FunctionDecl &node);
 
 IndexingResult storeMethodRelation(const clang::FunctionDecl &node,
-                                   SymbolId function, FactStore &store);
+                                   SymbolId function,
+                                   const clang::SourceManager &sourceManager,
+                                   FileManager &files, FactStore &store);
 
 } // namespace facts
 

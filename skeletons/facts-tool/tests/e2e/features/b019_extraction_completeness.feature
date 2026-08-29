@@ -41,6 +41,12 @@ Feature: Extraction completeness for undeclared instances and un-USR-able declar
     Then the trace records the skipped declaration with reason invalid USR
     And every named sibling declaration in the same record is committed
 
+  Scenario: Template owner relations survive an external specialization
+    Given a compile database for the relation-resolution fixture
+    When the real extraction command indexes the relation-resolution fixture
+    Then the relation-resolution extraction exits successfully without incomplete diagnostics
+    And the specialization owner relation is committed
+
   Scenario: Template relation persistence failures identify the exact edge
     Given a compile database for the undeclared-template fixture
     When template argument relation persistence is forced to fail on a rerun

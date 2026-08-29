@@ -12,6 +12,7 @@ from support.scenario import FactsToolContext
 SPECIALIZES = 4
 INSTANTIATES = 5
 FIELD_OF = 8
+METHOD_OF = 9
 TEMPLATE_ARGUMENT_TYPE = 23
 
 PRIMARY_USR = "c:@N@b0xx@ST>1#T@Holder"
@@ -26,6 +27,7 @@ INSTANTIATED_USR = "c:@N@b0xx@S@Holder>#$@N@b0xx@S@Policy"
 FIXTURES = {
     "undeclared-template": ("undeclared_template_instances.cpp", "b019a"),
     "invalid-usr": ("invalid_usr_declarations.cpp", "b019b"),
+    "relation-resolution": ("relation_resolution.cpp", "b019c"),
 }
 
 
@@ -352,6 +354,66 @@ def then_named_siblings_survive(context: FactsToolContext) -> None:
         "probe::canary",
     }
     require(expected <= symbols, f"named siblings were lost: {expected - symbols}")
+
+
+@then(
+    "the relation-resolution extraction exits successfully without incomplete diagnostics"
+)
+def then_relation_resolution_succeeds(context: FactsToolContext) -> None:
+    require(
+        context.last_returncode == 0,
+        f"expected extract exit code 0, got {context.last_returncode}:\n"
+        + context.last_output,
+    )
+    require(
+        "indexing incomplete" not in context.last_output,
+        f"unexpected incomplete diagnostic:\n{context.last_output}",
+    )
+    require(
+        "target symbol is not persisted" not in context.last_output,
+        f"owner relation still failed to resolve its target:\n{context.last_output}",
+    )
+    require(
+        "invalid USR" not in context.last_output,
+        f"unexpected invalid-USR diagnostic:\n{context.last_output}",
+    )
+
+
+@then("the specialization owner relation is committed")
+def then_specialization_owner_relation_is_committed(
+    context: FactsToolContext,
+) -> None:
+    relation_rows = query(
+        context.facts_database_path,
+        "SELECT COUNT(*) "
+        "FROM relation "
+        "JOIN symbol source ON source.id=relation.source_id "
+        "JOIN symbol destination ON destination.id=relation.destination_id "
+        "WHERE relation.kind=? "
+        "AND source.qualified_name LIKE 'std::hash<regression::Hashable>::operator()%' "
+        "AND destination.qualified_name LIKE 'std::hash%';",
+        (METHOD_OF,),
+    )
+    require(
+        relation_rows == [(1,)],
+        f"missing specialization owner relation: {relation_rows}",
+    )
+
+    field_rows = query(
+        context.facts_database_path,
+        "SELECT COUNT(*) "
+        "FROM relation "
+        "JOIN symbol source ON source.id=relation.source_id "
+        "JOIN symbol destination ON destination.id=relation.destination_id "
+        "WHERE relation.kind=? "
+        "AND source.qualified_name LIKE 'regression::Box%::value%' "
+        "AND destination.qualified_name LIKE 'regression::Box%';",
+        (FIELD_OF,),
+    )
+    require(
+        field_rows == [(2,)],
+        f"the template field relation was not committed: {field_rows}",
+    )
 
 
 @then("the template relation insertion exits unsuccessfully")

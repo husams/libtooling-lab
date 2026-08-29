@@ -4,6 +4,7 @@
 #include "ast/extractors/Definition.h"
 #include "ast/extractors/Initializer.h"
 #include "ast/extractors/NamedDecl.h"
+#include "ast/extractors/TargetResolution.h"
 #include "model/Relation.h"
 
 #include <clang/AST/ASTContext.h>
@@ -52,7 +53,9 @@ addEnumeratorDetails(Enumerator enumerator, const clang::EnumConstantDecl &node,
 }
 
 std::expected<SymbolId, IndexingError>
-enumerationId(const clang::EnumConstantDecl &node, FactStore &store) {
+enumerationId(const clang::EnumConstantDecl &node,
+              const clang::SourceManager &sourceManager, FileManager &files,
+              FactStore &store) {
   const auto *enumeration =
       llvm::dyn_cast<clang::EnumDecl>(node.getDeclContext());
   if (enumeration == nullptr) {
@@ -72,38 +75,37 @@ enumerationId(const clang::EnumConstantDecl &node, FactStore &store) {
         return failure("<unavailable>", "enumeration USR is unavailable");
       })
       .and_then([&](std::string usr) -> std::expected<SymbolId, IndexingError> {
-        return store.findId(usr)
+        return findOrStoreSymbolTarget(*enumeration, sourceManager, files,
+                                       store, usr)
             .transform_error([&](std::error_code error) {
               return failure(usr, error.message());
-            })
-            .and_then([&](std::optional<SymbolId> id)
-                          -> std::expected<SymbolId, IndexingError> {
-              return id ? std::expected<SymbolId, IndexingError>{*id}
-                        : std::unexpected(
-                              failure(usr, "target symbol is not persisted"));
             });
       });
 }
 
-IndexingResult storeEnumerationRelation(const clang::EnumConstantDecl &node,
-                                        SymbolId enumerator, FactStore &store) {
+IndexingResult
+storeEnumerationRelation(const clang::EnumConstantDecl &node,
+                         SymbolId enumerator,
+                         const clang::SourceManager &sourceManager,
+                         FileManager &files, FactStore &store) {
   const auto *parent = llvm::dyn_cast<clang::EnumDecl>(node.getDeclContext());
   const auto source =
       parent ? parent->getQualifiedNameAsString() : "<unavailable>";
   const auto target = node.getQualifiedNameAsString();
-  return enumerationId(node, store).and_then([&](SymbolId enumeration) {
-    const std::array relations{Relation{
-        .source = enumeration,
-        .destination = enumerator,
-        .kind = RelationKind::Contains,
-        .flags = static_cast<std::uint16_t>(bit(LexicalBit)),
-    }};
-    return store.addRelations(relations).transform_error(
-        [&](std::error_code error) {
-          return relationFailure("contains", "source", source, "target", target,
-                                 "<unavailable>", error.message());
-        });
-  });
+  return enumerationId(node, sourceManager, files, store)
+      .and_then([&](SymbolId enumeration) {
+        const std::array relations{Relation{
+            .source = enumeration,
+            .destination = enumerator,
+            .kind = RelationKind::Contains,
+            .flags = static_cast<std::uint16_t>(bit(LexicalBit)),
+        }};
+        return store.addRelations(relations).transform_error(
+            [&](std::error_code error) {
+              return relationFailure("contains", "source", source, "target",
+                                     target, "<unavailable>", error.message());
+            });
+      });
 }
 
 } // namespace
@@ -132,7 +134,8 @@ IndexingResult collectSymbol(clang::EnumConstantDecl &node,
                              clang::ASTContext &context, FileManager &files,
                              FactStore &store) {
   const auto storeRelation = [&](SymbolId enumerator) {
-    return storeEnumerationRelation(node, enumerator, store);
+    return storeEnumerationRelation(node, enumerator,
+                                    context.getSourceManager(), files, store);
   };
   return storeExtracted(node,
                         extractEnumerator(node, context.getSourceManager()),

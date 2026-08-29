@@ -70,7 +70,8 @@ IndexingResult collectSymbol(clang::FunctionDecl &node,
                              clang::ASTContext &context, FileManager &files,
                              FactStore &store) {
   const auto storeRelations = [&](SymbolId function) {
-    return storeMethodRelation(node, function, store);
+    return storeMethodRelation(node, function, context.getSourceManager(),
+                               files, store);
   };
 
   if (node.getTemplateSpecializationInfo() != nullptr) {
@@ -78,9 +79,11 @@ IndexingResult collectSymbol(clang::FunctionDecl &node,
       return toFunctionInstance(std::move(function), node, files, store);
     };
     const auto storeInstanceRelations = [&](SymbolId function) {
-      return storeMethodRelation(node, function, store).and_then([&] {
-        return storeFunctionInstanceRelations(node, function, files, store);
-      });
+      return storeMethodRelation(node, function, context.getSourceManager(),
+                                 files, store)
+          .and_then([&] {
+            return storeFunctionInstanceRelations(node, function, files, store);
+          });
     };
 
     return storeExtracted(

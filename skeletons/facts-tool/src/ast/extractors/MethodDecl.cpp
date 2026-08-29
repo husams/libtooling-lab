@@ -1,6 +1,7 @@
 #include "ast/extractors/MethodDecl.h"
 
 #include "ast/extractors/NamedDecl.h"
+#include "ast/extractors/TargetResolution.h"
 #include "model/Relation.h"
 #include "storage/FactStore.h"
 
@@ -49,7 +50,9 @@ ExtractionResult<Function> addMethodFlags(Function function,
 }
 
 IndexingResult storeMethodRelation(const clang::FunctionDecl &node,
-                                   SymbolId function, FactStore &store) {
+                                   SymbolId function,
+                                   const clang::SourceManager &sourceManager,
+                                   FileManager &files, FactStore &store) {
   const auto *method = supportedMethod(node);
   if (!method) {
     return {};
@@ -65,19 +68,15 @@ IndexingResult storeMethodRelation(const clang::FunctionDecl &node,
     return failure("<unavailable>", "owner USR is unavailable");
   };
   const auto findAndStore = [&](std::string usr) -> IndexingResult {
-    return store.findId(usr)
+    return findOrStoreSymbolTarget(*method->getParent(), sourceManager, files,
+                                   store, usr)
         .transform_error([&](std::error_code error) {
           return failure(usr, error.message());
         })
-        .and_then([&](std::optional<SymbolId> owner) -> IndexingResult {
-          if (!owner) {
-            return std::unexpected(
-                failure(usr, "target symbol is not persisted"));
-          }
-
+        .and_then([&](SymbolId owner) -> IndexingResult {
           const std::array relations{Relation{
               .source = function,
-              .destination = *owner,
+              .destination = owner,
               .kind = RelationKind::MethodOf,
           }};
           return store.addRelations(relations).transform_error(
