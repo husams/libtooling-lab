@@ -1,0 +1,17 @@
+[
+  {
+    "directory": "/tmp/gcc-facts-build/x86_64-pc-linux-gnu/libstdc++-v3/src/c++11",
+    "command": "xgcc -std=gnu++11 -c assert_fail.cc -o assert_fail.o",
+    "file": "/tmp/gcc-facts-corpus/libstdc++-v3/src/c++11/assert_fail.cc"
+  },
+  {
+    "directory": "/tmp/gcc-facts-build/x86_64-pc-linux-gnu/libstdc++-v3/src/c++11",
+    "arguments": ["xgcc", "-std=gnu++11", "-c", "random.cc", "-o", "random.o"],
+    "file": "/tmp/gcc-facts-corpus/libstdc++-v3/src/c++11/random.cc"
+  },
+  {
+    "directory": "/tmp/gcc-facts-build/gcc",
+    "command": "xgcc -c regular.cc -o regular.o",
+    "file": "/tmp/gcc-facts-corpus/gcc/regular.cc"
+  }
+]

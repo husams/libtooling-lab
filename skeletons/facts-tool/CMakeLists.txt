@@ -451,6 +451,12 @@ if(BUILD_TESTING)
             $<TARGET_FILE:facts-tool>
   )
 
+  add_test(
+    NAME gcc-clang-ast-shim
+    COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/gcc_clang_ast_shim_test.py
+  )
+
   # A precompiled header is only readable by the exact Clang that wrote it, so
   # the prefix-header scenarios need the clang++ that ships beside the libClang
   # this tool links -- CMAKE_CXX_COMPILER may be GCC, whose PCH Clang rejects.
