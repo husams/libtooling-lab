@@ -23,8 +23,8 @@ Feature: Dependent initializer alignment extraction
       | qualified_name                       | expression                             | evaluated_kind | evaluated_value |
       | b020::concreteSize                    | sizeof(AlignFixture)                   | integer        | 8               |
       | b020::concreteAlignment               | alignof(AlignFixture)                  | integer        | 8               |
+      | b020::DependentMember<b020::AlignFixture>::value | alignof(T)             | integer        | 8               |
       | b020::instantiatedMember              | DependentMember<AlignFixture>::value   | integer        | 8               |
-    And the instantiated dependent-member value symbol is present
 
   Scenario: Dependent alignment extraction is deterministic and referentially intact
     Given a compile database for the dependent-alignment fixture

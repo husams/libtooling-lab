@@ -23,11 +23,11 @@ the constant evaluator is entered. `extractInitializer()` still records the
 written expression, and the existing string-literal and general
 `EvaluateAsRValue()` paths remain unchanged for non-dependent expressions.
 
-The field extractor delegates in-class initializers to this shared path. The
-parameter extractor records default-argument presence and source regions but
-does not evaluate default expressions. Enumerator extraction reads Clang's
-already-computed `EnumConstantDecl::getInitVal()` and does not invoke the
-constant evaluator, so neither site needs a parallel guard.
+Field, parameter-default, enumerator, and variable extraction all funnel
+initializer expressions through `extractInitializer()` and its guarded
+`evaluatedValue()` helper. The extractor sources contain only one direct
+Clang constant-evaluator call, in `Initializer.cpp`, so the guard at that
+shared choke point covers every site without parallel checks.
 
 ## Regression coverage
 

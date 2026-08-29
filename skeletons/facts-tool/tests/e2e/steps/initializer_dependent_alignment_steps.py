@@ -79,16 +79,3 @@ def then_dependent_alignment_extraction_succeeds(
         "indexing incomplete" not in context.last_output,
         f"unexpected incomplete diagnostic:\n{context.last_output}",
     )
-
-
-@then("the instantiated dependent-member value symbol is present")
-def then_instantiated_dependent_member_is_present(
-    context: FactsToolContext,
-) -> None:
-    rows = query(
-        context.facts_database_path,
-        "SELECT qualified_name FROM symbol "
-        "WHERE qualified_name="
-        "'b020::DependentMember<b020::AlignFixture>::value'",
-    )
-    require(rows, "missing instantiated DependentMember value symbol")
