@@ -18,9 +18,16 @@ cannot persist relation=method_of source='std::hash<regression::Hashable>::opera
 ```
 
 The owner is genuinely absent whenever the member is defined in the main file
-but its record is declared somewhere extraction filters out — a system header,
-or a generated header missing from the registry. `BroadcastOptimizations.cpp`
-reaches that shape through its generated include graph.
+but its record is declared in a file extraction filters out — a system header.
+`BroadcastOptimizations.cpp` reaches that shape through its generated include
+graph.
+
+A header *missing from the registry* is a different failure and out of scope
+here: the completeness gate rejects the run before any relation is written.
+Deleting `relation_resolution.hpp` from the fixture's project database yields
+`project configuration is incomplete; run 'facts-tool import' to rebuild it`,
+never a relation diagnostic. The owners this fix resolves are registered but
+filtered.
 
 `RecordDecl.cpp:81-97` already resolved base-class targets on demand through
 `findOrStoreSymbolTarget`, which persists an `ExternalBit` stub keyed by USR.

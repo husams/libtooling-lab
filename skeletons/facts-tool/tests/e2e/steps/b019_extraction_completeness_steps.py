@@ -24,6 +24,31 @@ UNDECLARED_USRS = {
 }
 INSTANTIATED_USR = "c:@N@b0xx@S@Holder>#$@N@b0xx@S@Policy"
 
+# The owners relation_resolution.hpp declares are filtered out of the store, so
+# each of these relations has to persist its destination on demand. Exact USR
+# pairs, because a LIKE match cannot tell a correctly wired owner from a swapped
+# one.
+RESOLVED_OWNER_RELATIONS = [
+    (
+        FIELD_OF,
+        "c:@N@regression@S@Box@value",
+        "c:@N@regression@S@Box",
+        1,
+    ),
+    (
+        FIELD_OF,
+        "c:@N@regression@S@BoxedPair@value",
+        "c:@N@regression@S@BoxedPair",
+        1,
+    ),
+    (
+        METHOD_OF,
+        "c:@N@std@S@hash>#$@N@regression@S@Hashable@F@operator()#&1S0_#1",
+        "c:@N@std@S@hash>#$@N@regression@S@Hashable",
+        1,
+    ),
+]
+
 FIXTURES = {
     "undeclared-template": ("undeclared_template_instances.cpp", "b019a"),
     "invalid-usr": ("invalid_usr_declarations.cpp", "b019b"),
@@ -383,36 +408,19 @@ def then_relation_resolution_succeeds(context: FactsToolContext) -> None:
 def then_specialization_owner_relation_is_committed(
     context: FactsToolContext,
 ) -> None:
-    relation_rows = query(
+    rows = query(
         context.facts_database_path,
-        "SELECT COUNT(*) "
+        "SELECT relation.kind,source.usr,destination.usr,destination.is_external "
         "FROM relation "
         "JOIN symbol source ON source.id=relation.source_id "
         "JOIN symbol destination ON destination.id=relation.destination_id "
-        "WHERE relation.kind=? "
-        "AND source.qualified_name LIKE 'std::hash<regression::Hashable>::operator()%' "
-        "AND destination.qualified_name LIKE 'std::hash%';",
-        (METHOD_OF,),
+        "WHERE relation.kind IN (?,?) AND destination.is_external=1 "
+        "ORDER BY relation.kind,source.usr",
+        (FIELD_OF, METHOD_OF),
     )
     require(
-        relation_rows == [(1,)],
-        f"missing specialization owner relation: {relation_rows}",
-    )
-
-    field_rows = query(
-        context.facts_database_path,
-        "SELECT COUNT(*) "
-        "FROM relation "
-        "JOIN symbol source ON source.id=relation.source_id "
-        "JOIN symbol destination ON destination.id=relation.destination_id "
-        "WHERE relation.kind=? "
-        "AND source.qualified_name LIKE 'regression::Box%::value%' "
-        "AND destination.qualified_name LIKE 'regression::Box%';",
-        (FIELD_OF,),
-    )
-    require(
-        field_rows == [(2,)],
-        f"the template field relation was not committed: {field_rows}",
+        rows == RESOLVED_OWNER_RELATIONS,
+        f"unexpected on-demand owner relations: {rows}",
     )
 
 
