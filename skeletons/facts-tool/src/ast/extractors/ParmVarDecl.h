@@ -2,7 +2,10 @@
 #define FACTS_TOOL_AST_EXTRACTORS_PARMVARDECL_H
 
 #include "ast/extractors/Extraction.h"
+#include "ast/extractors/Type.h"
 #include "model/Parameter.h"
+
+#include <optional>
 
 namespace clang {
 class ParmVarDecl;
@@ -13,7 +16,7 @@ namespace facts {
 class FactStore;
 class FileManager;
 
-ExtractionResult<Parameter>
+DetailedExtractionResult<std::optional<Parameter>>
 extractParameter(const clang::ParmVarDecl &node,
                  const clang::SourceManager &sourceManager, FileManager &files,
                  FactStore &store);

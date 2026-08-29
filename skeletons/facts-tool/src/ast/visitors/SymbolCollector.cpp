@@ -42,7 +42,8 @@ bool hasSpecializedExtractor(const clang::NamedDecl &decl) {
                    clang::TemplateTemplateParmDecl>(decl);
 }
 
-using AliasFacts = std::pair<SymbolId, std::vector<TemplateArgument>>;
+using AliasFacts =
+    std::pair<std::optional<SymbolId>, std::vector<TemplateArgument>>;
 
 std::expected<AliasFacts, IndexingError>
 extractAliasFacts(clang::TypedefNameDecl &node,
@@ -55,7 +56,7 @@ extractAliasFacts(clang::TypedefNameDecl &node,
         return relationFailure("alias_of", "source", source, "target",
                                error.target, error.usr, error.detail);
       })
-      .and_then([&](SymbolId targetId) {
+      .and_then([&](std::optional<SymbolId> targetId) {
         return extractAliasTemplateArguments(node, sourceManager, files, store)
             .transform([targetId](std::vector<TemplateArgument> arguments) {
               return AliasFacts{targetId, std::move(arguments)};
@@ -82,26 +83,31 @@ IndexingResult collectAlias(clang::TypedefNameDecl &node,
         const auto stored = [&store, target, sourceName, targetName,
                              arguments =
                                  std::move(arguments)](SymbolId source) {
-          if (target.file == builtinFileId) {
+          if (target && target->file == builtinFileId) {
             return IndexingResult{};
           }
-          const std::array relations{Relation{
-              .source = source,
-              .destination = target,
-              .kind = RelationKind::AliasOf,
-          }};
-          return store.addRelations(relations)
-              .transform_error([&](std::error_code error) {
-                return relationFailure("alias_of", "source", sourceName,
-                                       "target", targetName, "<unavailable>",
-                                       error.message());
-              })
-              .and_then([&]() {
-                return withContext(
-                    store.addTemplateArguments(source, arguments),
-                    "cannot persist alias template arguments for '" +
-                        sourceName + "'");
-              });
+          const auto storeRelation = [&]() -> IndexingResult {
+            if (!target) {
+              return {};
+            }
+            const std::array relations{Relation{
+                .source = source,
+                .destination = *target,
+                .kind = RelationKind::AliasOf,
+            }};
+            return store.addRelations(relations).transform_error(
+                [&](std::error_code error) {
+                  return relationFailure("alias_of", "source", sourceName,
+                                         "target", targetName, "<unavailable>",
+                                         error.message());
+                });
+          };
+
+          return storeRelation().and_then([&]() {
+            return withContext(store.addTemplateArguments(source, arguments),
+                               "cannot persist alias template arguments for '" +
+                                   sourceName + "'");
+          });
         };
 
         return storeExtracted(

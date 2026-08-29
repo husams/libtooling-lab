@@ -12,15 +12,17 @@
 namespace facts {
 namespace {
 
-ExtractionResult<std::vector<Parameter>>
+DetailedExtractionResult<std::vector<Parameter>>
 appendParameter(std::vector<Parameter> parameters,
                 const clang::ParmVarDecl &node,
                 const clang::SourceManager &sourceManager, FileManager &files,
                 FactStore &store) {
-  auto append = [parameters =
-                     std::move(parameters)](Parameter parameter) mutable
-      -> ExtractionResult<std::vector<Parameter>> {
-    parameters.push_back(std::move(parameter));
+  auto append = [parameters = std::move(parameters)](
+                    std::optional<Parameter> parameter) mutable
+      -> DetailedExtractionResult<std::vector<Parameter>> {
+    if (parameter) {
+      parameters.push_back(std::move(*parameter));
+    }
     return std::move(parameters);
   };
 
@@ -32,7 +34,7 @@ appendParameter(std::vector<Parameter> parameters,
 
 // FunctionDecl and its subclasses expose the source-ordered parameter
 // sequence. Keeping list extraction here lets functions and methods reuse it.
-ExtractionResult<std::vector<Parameter>>
+DetailedExtractionResult<std::vector<Parameter>>
 extractParameters(const clang::FunctionDecl &node,
                   const clang::SourceManager &sourceManager, FileManager &files,
                   FactStore &store) {
@@ -55,7 +57,8 @@ extractParameters(const clang::FunctionDecl &node,
 
   return std::ranges::fold_left(
       parameterStages,
-      ExtractionResult<std::vector<Parameter>>{std::vector<Parameter>{}},
+      DetailedExtractionResult<std::vector<Parameter>>{
+          std::vector<Parameter>{}},
       applyStage);
 }
 

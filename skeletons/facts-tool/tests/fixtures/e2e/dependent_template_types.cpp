@@ -91,3 +91,47 @@ Widget instantiate(Widget value) {
 }
 
 } // namespace b004
+
+namespace b018 {
+
+struct Concrete {};
+
+struct Owner {
+  Concrete value;
+};
+
+inline Concrete concreteValue;
+inline constexpr int committedCanary = 18;
+
+template <typename T>
+struct DependentOwners {
+  using DependentNameAlias = typename T::type;
+  using DependentTemplateAlias = typename T::template rebind<Concrete>;
+
+  typename T::type dependentNameField;
+  typename T::template rebind<Concrete> dependentTemplateField;
+
+  static typename T::type dependentNameRoundTrip(typename T::type value);
+  static typename T::template rebind<Concrete>
+  dependentTemplateRoundTrip(typename T::template rebind<Concrete> value);
+};
+
+using MemberPointerAlias = Concrete Owner::*;
+using MemberPointerFunction = Concrete Owner::*(*)(Concrete Owner::*);
+using ComplexAlias = _Complex double;
+using TypeOfExprAlias = __typeof__(concreteValue);
+using VectorAlias = int __attribute__((vector_size(16)));
+
+struct WrapperFields {
+  Concrete Owner::*memberPointerField;
+  _Complex double complexField;
+  __typeof__(concreteValue) typeOfExprField;
+  int vectorField __attribute__((vector_size(16)));
+};
+
+Concrete Owner::*memberPointerRoundTrip(Concrete Owner::*value);
+_Complex double complexRoundTrip(_Complex double value);
+__typeof__(concreteValue) typeOfExprRoundTrip(__typeof__(concreteValue) value);
+VectorAlias vectorRoundTrip(VectorAlias value);
+
+} // namespace b018

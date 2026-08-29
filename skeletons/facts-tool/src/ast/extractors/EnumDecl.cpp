@@ -23,7 +23,10 @@ extractUnderlyingType(const clang::EnumDecl &node,
   }
   return extractType(type, sourceManager, files, store)
       .transform_error(
-          [](TypeResolutionError) { return ExtractionError::InvalidType; });
+          [](TypeResolutionError) { return ExtractionError::InvalidType; })
+      .transform([](std::optional<SymbolId> resolved) {
+        return resolved.value_or(SymbolId{});
+      });
 }
 
 ExtractionResult<Enumeration>

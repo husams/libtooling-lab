@@ -3,6 +3,7 @@
 #include "ast/Indexing.h"
 #include "ast/extractors/Extraction.h"
 #include "ast/extractors/File.h"
+#include "ast/extractors/Type.h"
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
 
@@ -40,8 +41,22 @@ inline std::string_view extractionErrorName(ExtractionError error) {
   return "unknown extraction error";
 }
 
-template <typename Node>
-IndexingResult extractionFailure(const Node &node, ExtractionError error) {
+inline bool isFilteredExtraction(const DetailedExtractionError &error) {
+  const auto *extraction = std::get_if<ExtractionError>(&error);
+  return extraction != nullptr && isFilteredExtraction(*extraction);
+}
+
+inline std::string extractionErrorName(const DetailedExtractionError &error) {
+  if (const auto *extraction = std::get_if<ExtractionError>(&error)) {
+    return std::string{extractionErrorName(*extraction)};
+  }
+  const auto &type = std::get<TypeResolutionError>(error);
+  return "type target='" + type.target + "' usr='" + type.usr +
+         "': " + type.detail;
+}
+
+template <typename Node, typename Error>
+IndexingResult extractionFailure(const Node &node, const Error &error) {
   if (isFilteredExtraction(error)) {
     return {};
   }

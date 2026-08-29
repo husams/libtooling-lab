@@ -33,10 +33,10 @@ extractTemplateArgument(const clang::NamedDecl &node,
     return extractType(parameter->getType(), sourceManager, files, store)
         .transform_error(
             [](TypeResolutionError) { return ExtractionError::InvalidType; })
-        .transform([&](SymbolId type) {
+        .transform([&](std::optional<SymbolId> type) {
           return TemplateArgument{
               .name = parameter->getNameAsString(),
-              .type = type,
+              .type = type.value_or(SymbolId{}),
               .flags =
                   flagWhen(ParameterPackBit, parameter->isParameterPack()) |
                   bit(static_cast<std::size_t>(NonTypeBit)),

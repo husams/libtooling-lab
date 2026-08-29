@@ -23,3 +23,11 @@ Feature: Dependent function-template parameter types
     And deduced auto variables and aliases are captured
     And parenthesized function-pointer template arguments are resolved
     And using directives are ignored as non-symbol declarations
+
+  Scenario: Unsupported Clang type classes do not roll back extraction
+    Given a reproducing compile database for dependent template parameter types
+    When the real extraction command indexes the dependent-template fixture
+    Then the dependent-template extraction exits successfully without incomplete diagnostics
+    And unsupported type-class owners and the canary are committed
+    And unresolved dependent type relations are omitted
+    And structural wrapper types resolve to their concrete targets

@@ -92,6 +92,11 @@ def then_dependent_template_extraction_succeeds(context: FactsToolContext) -> No
         "indexing incomplete" not in context.last_output,
         f"unexpected incomplete diagnostic:\n{context.last_output}",
     )
+    require(
+        "type is not supported" not in context.last_output
+        and ": invalid type" not in context.last_output,
+        f"unexpected type diagnostic:\n{context.last_output}",
+    )
 
 
 @then("dependent template parameters retain resolvable types and modifiers")
@@ -251,4 +256,94 @@ def then_dependent_instances_point_to_primary(context: FactsToolContext) -> None
     require(
         expected <= relations,
         f"missing dependent template relations: {expected - relations}",
+    )
+
+
+@then("unsupported type-class owners and the canary are committed")
+def then_unsupported_type_class_owners_are_committed(
+    context: FactsToolContext,
+) -> None:
+    symbols = {
+        row[0]
+        for row in query(
+            context.facts_database_path,
+            "SELECT qualified_name FROM symbol WHERE qualified_name LIKE 'b018::%'",
+        )
+    }
+    expected = {
+        "b018::committedCanary",
+        "b018::DependentOwners::DependentNameAlias",
+        "b018::DependentOwners::DependentTemplateAlias",
+        "b018::DependentOwners::dependentNameField",
+        "b018::DependentOwners::dependentTemplateField",
+        "b018::DependentOwners::dependentNameRoundTrip",
+        "b018::DependentOwners::dependentTemplateRoundTrip",
+        "b018::MemberPointerAlias",
+        "b018::MemberPointerFunction",
+        "b018::ComplexAlias",
+        "b018::TypeOfExprAlias",
+        "b018::VectorAlias",
+        "b018::WrapperFields::memberPointerField",
+        "b018::WrapperFields::complexField",
+        "b018::WrapperFields::typeOfExprField",
+        "b018::WrapperFields::vectorField",
+        "b018::memberPointerRoundTrip",
+        "b018::complexRoundTrip",
+        "b018::typeOfExprRoundTrip",
+        "b018::vectorRoundTrip",
+    }
+    require(
+        expected <= symbols,
+        f"missing committed type-class owners: {expected - symbols}",
+    )
+
+
+@then("unresolved dependent type relations are omitted")
+def then_unresolved_dependent_relations_are_omitted(
+    context: FactsToolContext,
+) -> None:
+    relations = query(
+        context.facts_database_path,
+        "SELECT source.qualified_name,destination.qualified_name "
+        "FROM relation "
+        "JOIN symbol source ON source.id=relation.source_id "
+        "JOIN symbol destination ON destination.id=relation.destination_id "
+        "WHERE source.qualified_name LIKE 'b018::DependentOwners::dependent%' "
+        "OR source.qualified_name LIKE 'b018::DependentOwners::Dependent%'",
+    )
+    type_relations = [
+        relation
+        for relation in relations
+        if relation[1] != "b018::DependentOwners"
+    ]
+    require(
+        type_relations == [],
+        f"dependent types produced fabricated relations: {type_relations}",
+    )
+
+
+@then("structural wrapper types resolve to their concrete targets")
+def then_structural_wrapper_types_resolve_to_concrete_targets(
+    context: FactsToolContext,
+) -> None:
+    relations = set(
+        query(
+            context.facts_database_path,
+            "SELECT source.qualified_name,destination.qualified_name "
+            "FROM relation "
+            "JOIN symbol source ON source.id=relation.source_id "
+            "JOIN symbol destination ON destination.id=relation.destination_id "
+            "WHERE source.qualified_name LIKE 'b018::%'",
+        )
+    )
+    expected = {
+        ("b018::MemberPointerAlias", "b018::Concrete"),
+        ("b018::MemberPointerFunction", "b018::Concrete"),
+        ("b018::TypeOfExprAlias", "b018::Concrete"),
+        ("b018::WrapperFields::memberPointerField", "b018::Concrete"),
+        ("b018::WrapperFields::typeOfExprField", "b018::Concrete"),
+    }
+    require(
+        expected <= relations,
+        f"missing normalized wrapper relations: {expected - relations}",
     )
