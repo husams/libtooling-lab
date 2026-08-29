@@ -13,15 +13,15 @@
 namespace facts {
 namespace {
 
-ExtractionResult<std::vector<TemplateArgument>>
+DetailedExtractionResult<std::vector<TemplateArgument>>
 extractOpenArguments(const clang::ClassTemplateSpecializationDecl &node,
                      const clang::SourceManager &sourceManager,
                      FileManager &files, FactStore &store) {
   const auto *partial =
       llvm::dyn_cast<clang::ClassTemplatePartialSpecializationDecl>(&node);
   return partial == nullptr
-             ? ExtractionResult<std::vector<TemplateArgument>>{std::vector<
-                   TemplateArgument>{}}
+             ? DetailedExtractionResult<std::vector<
+                   TemplateArgument>>{std::vector<TemplateArgument>{}}
              : extractTemplateArguments(*partial->getTemplateParameters(),
                                         sourceManager, files, store);
 }
@@ -39,11 +39,13 @@ specializedPattern(const clang::ClassTemplateSpecializationDecl &node) {
 
 } // namespace
 
-ExtractionResult<RecordInstance>
+DetailedExtractionResult<RecordInstance>
 extractRecordInstance(const clang::ClassTemplateSpecializationDecl &node,
                       const clang::SourceManager &sourceManager,
                       FileManager &files, FactStore &store) {
   return extractRecord(node, sourceManager)
+      .transform_error(
+          [](ExtractionError error) { return DetailedExtractionError{error}; })
       .and_then([&](Record record) {
         return extractOpenArguments(node, sourceManager, files, store)
             .transform([record = std::move(record)](

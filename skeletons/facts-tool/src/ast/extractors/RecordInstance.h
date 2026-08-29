@@ -3,6 +3,7 @@
 
 #include "ast/Indexing.h"
 #include "ast/extractors/Extraction.h"
+#include "ast/extractors/Type.h"
 #include "model/RecordInstance.h"
 
 #include <expected>
@@ -17,7 +18,7 @@ namespace facts {
 class FactStore;
 class FileManager;
 
-ExtractionResult<RecordInstance>
+DetailedExtractionResult<RecordInstance>
 extractRecordInstance(const clang::ClassTemplateSpecializationDecl &node,
                       const clang::SourceManager &sourceManager,
                       FileManager &files, FactStore &store);

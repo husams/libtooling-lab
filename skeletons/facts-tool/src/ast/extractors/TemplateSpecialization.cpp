@@ -23,7 +23,8 @@
 namespace facts {
 namespace {
 
-using ParametersResult = ExtractionResult<std::vector<TemplateParameter>>;
+using ParametersResult =
+    DetailedExtractionResult<std::vector<TemplateParameter>>;
 
 std::uint32_t flagWhen(ParameterBit flag, bool condition) {
   return condition ? bit(flag) : 0;
@@ -49,27 +50,34 @@ std::uint32_t typeFlags(clang::QualType type, bool isPack) {
          flagWhen(ParameterBit::PackBit, isPack);
 }
 
-ExtractionResult<SymbolId> resolveType(clang::QualType type,
-                                       const clang::ASTContext &context,
-                                       FileManager &files, FactStore &store) {
+DetailedExtractionResult<SymbolId> resolveType(clang::QualType type,
+                                               const clang::ASTContext &context,
+                                               FileManager &files,
+                                               FactStore &store) {
   if (type.isNull()) {
-    return std::unexpected(ExtractionError::InvalidType);
+    return std::unexpected(
+        DetailedExtractionError{ExtractionError::InvalidType});
   }
   if (type->isDependentType()) {
     return SymbolId{};
   }
   return extractType(type, context.getSourceManager(), files, store)
-      .transform_error(
-          [](TypeResolutionError) { return ExtractionError::InvalidType; });
+      .transform_error(typeExtractionFailure)
+      .transform([](std::optional<SymbolId> resolved) {
+        return resolved.value_or(SymbolId{});
+      });
 }
 
-ExtractionResult<SymbolId>
+DetailedExtractionResult<SymbolId>
 resolveDeclaration(const clang::NamedDecl &declaration, FactStore &store) {
   return extractUsr(declaration)
-      .and_then([&](std::string usr) -> ExtractionResult<SymbolId> {
+      .transform_error(
+          [](ExtractionError error) { return DetailedExtractionError{error}; })
+      .and_then([&](std::string usr) -> DetailedExtractionResult<SymbolId> {
         auto id = store.findId(usr);
         if (!id || !*id) {
-          return std::unexpected(ExtractionError::InvalidType);
+          return std::unexpected(
+              DetailedExtractionError{ExtractionError::InvalidType});
         }
         return **id;
       });
@@ -83,7 +91,7 @@ std::string printArgument(const clang::TemplateArgument &argument,
   return text;
 }
 
-ExtractionResult<TemplateParameter>
+DetailedExtractionResult<TemplateParameter>
 extractLeafParameter(const clang::TemplateArgument &argument,
                      const clang::ASTContext &context, FileManager &files,
                      FactStore &store) {
@@ -124,7 +132,8 @@ extractLeafParameter(const clang::TemplateArgument &argument,
     const auto name = argument.getAsTemplateOrTemplatePattern();
     const auto *declaration = name.getAsTemplateDecl();
     if (declaration == nullptr) {
-      return std::unexpected(ExtractionError::InvalidType);
+      return std::unexpected(
+          DetailedExtractionError{ExtractionError::InvalidType});
     }
     return resolveDeclaration(*declaration, store).transform([&](SymbolId id) {
       return TemplateParameter{
@@ -136,9 +145,10 @@ extractLeafParameter(const clang::TemplateArgument &argument,
   }
   case clang::TemplateArgument::Null:
   case clang::TemplateArgument::Pack:
-    return std::unexpected(ExtractionError::InvalidType);
+    return std::unexpected(
+        DetailedExtractionError{ExtractionError::InvalidType});
   }
-  return std::unexpected(ExtractionError::InvalidType);
+  return std::unexpected(DetailedExtractionError{ExtractionError::InvalidType});
 }
 
 ParametersResult extractParameter(const clang::TemplateArgument &argument,
@@ -270,7 +280,7 @@ IndexingResult storeTemplateInstanceRelations(
       .and_then([&](auto pattern) {
         auto [patternRelation, usr] = std::move(pattern);
         return extractTemplateParameters(arguments, context, files, store)
-            .transform_error([&](ExtractionError error) {
+            .transform_error([&](DetailedExtractionError error) {
               return relationFailure(relationName(patternRelation.kind),
                                      "source", instanceName, "target", target,
                                      usr, extractionErrorName(error));

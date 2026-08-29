@@ -19,13 +19,13 @@
 namespace facts {
 namespace {
 
-ExtractionResult<Function>
+DetailedExtractionResult<Function>
 addParameters(Function function, const clang::FunctionDecl &node,
               const clang::SourceManager &sourceManager, FileManager &files,
               FactStore &store) {
   auto toFunction = [function = std::move(function)](
                         std::vector<Parameter> parameters) mutable
-      -> ExtractionResult<Function> {
+      -> DetailedExtractionResult<Function> {
     function.parameters = std::move(parameters);
     return std::move(function);
   };
@@ -36,7 +36,7 @@ addParameters(Function function, const clang::FunctionDecl &node,
 
 } // namespace
 
-ExtractionResult<Function>
+DetailedExtractionResult<Function>
 extractFunction(const clang::FunctionDecl &node,
                 const clang::SourceManager &sourceManager, FileManager &files,
                 FactStore &store) {
@@ -61,6 +61,8 @@ extractFunction(const clang::FunctionDecl &node,
       .and_then(toFunction)
       .and_then(addFlags)
       .and_then(addDefinition)
+      .transform_error(
+          [](ExtractionError error) { return DetailedExtractionError{error}; })
       .and_then(addParameterList);
 }
 

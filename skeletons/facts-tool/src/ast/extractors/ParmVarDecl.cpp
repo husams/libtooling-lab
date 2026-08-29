@@ -85,20 +85,19 @@ extractDefaultValue(const clang::ParmVarDecl &node,
 
 } // namespace
 
-ExtractionResult<Parameter>
+DetailedExtractionResult<Parameter>
 extractParameter(const clang::ParmVarDecl &node,
                  const clang::SourceManager &sourceManager, FileManager &files,
                  FactStore &store) {
   const auto toParameter = [&](Location location) {
     const auto withRegion =
-        [&, location](Region region) -> ExtractionResult<Parameter> {
+        [&, location](Region region) -> DetailedExtractionResult<Parameter> {
       return extractType(node.getType(), sourceManager, files, store)
-          .transform_error(
-              [](TypeResolutionError) { return ExtractionError::InvalidType; })
-          .transform([&](SymbolId type) {
+          .transform_error(typeExtractionFailure)
+          .transform([&](std::optional<SymbolId> type) {
             return Parameter{
                 .name = node.getNameAsString(),
-                .type = type,
+                .type = type.value_or(SymbolId{}),
                 .loc = location,
                 .region = region,
                 .flags = extractParameterFlags(node),
@@ -109,11 +108,18 @@ extractParameter(const clang::ParmVarDecl &node,
     };
 
     return extractRegion(sourceManager, node.getASTContext().getLangOpts(),
-                         node.getSourceRange()) |
+                         node.getSourceRange())
+               .transform_error([](ExtractionError error) {
+                 return DetailedExtractionError{error};
+               }) |
            withRegion;
   };
 
-  return extractLocation(sourceManager, node.getLocation()) | toParameter;
+  return extractLocation(sourceManager, node.getLocation())
+             .transform_error([](ExtractionError error) {
+               return DetailedExtractionError{error};
+             }) |
+         toParameter;
 }
 
 } // namespace facts

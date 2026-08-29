@@ -70,13 +70,14 @@ IndexingResult storeTypeRelation(const clang::ValueDecl &node, SymbolId value,
         return relationFailure("of_type", "source", source, "target",
                                error.target, error.usr, error.detail);
       })
-      .and_then([value, &store, &failure](SymbolId type) -> IndexingResult {
-        if (type.file == builtinFileId) {
+      .and_then([value, &store,
+                 &failure](std::optional<SymbolId> type) -> IndexingResult {
+        if (!type || type->file == builtinFileId) {
           return {};
         }
         const std::array relations{Relation{
             .source = value,
-            .destination = type,
+            .destination = *type,
             .kind = RelationKind::OfType,
         }};
         return store.addRelations(relations).transform_error(

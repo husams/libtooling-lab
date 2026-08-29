@@ -36,7 +36,7 @@ TypeResult extractAliasTarget(const clang::TypedefNameDecl &node,
                               const clang::SourceManager &sourceManager,
                               FileManager &files, FactStore &store);
 
-ExtractionResult<std::vector<TemplateArgument>>
+DetailedExtractionResult<std::vector<TemplateArgument>>
 extractAliasTemplateArguments(const clang::TypedefNameDecl &node,
                               const clang::SourceManager &sourceManager,
                               FileManager &files, FactStore &store);

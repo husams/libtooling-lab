@@ -28,7 +28,13 @@ def given_dependent_template_compile_database(context: FactsToolContext) -> Path
         {
             "directory": str(context.fixture_root),
             "file": str(source),
-            "arguments": [str(context.compiler), "-std=c++23", "-c", str(source)],
+            "arguments": [
+                str(context.compiler),
+                "-std=c++23",
+                "-fblocks",
+                "-c",
+                str(source),
+            ],
         }
     ]
     (context.run_root_path / "compile_commands.json").write_text(
@@ -91,6 +97,11 @@ def then_dependent_template_extraction_succeeds(context: FactsToolContext) -> No
     require(
         "indexing incomplete" not in context.last_output,
         f"unexpected incomplete diagnostic:\n{context.last_output}",
+    )
+    require(
+        "type is not supported" not in context.last_output
+        and ": invalid type" not in context.last_output,
+        f"unexpected type diagnostic:\n{context.last_output}",
     )
 
 
@@ -252,3 +263,165 @@ def then_dependent_instances_point_to_primary(context: FactsToolContext) -> None
         expected <= relations,
         f"missing dependent template relations: {expected - relations}",
     )
+
+
+@then("unsupported type-class owners and the canary are committed")
+def then_unsupported_type_class_owners_are_committed(
+    context: FactsToolContext,
+) -> None:
+    symbols = {
+        row[0]
+        for row in query(
+            context.facts_database_path,
+            "SELECT qualified_name FROM symbol WHERE qualified_name LIKE 'b018::%'",
+        )
+    }
+    expected = {
+        "b018::committedCanary",
+        "b018::DependentOwners::DependentNameAlias",
+        "b018::DependentOwners::DependentTemplateAlias",
+        "b018::DependentOwners::dependentNameField",
+        "b018::DependentOwners::dependentTemplateField",
+        "b018::DependentOwners::dependentNameRoundTrip",
+        "b018::DependentOwners::dependentTemplateRoundTrip",
+        "b018::DependentOwners::mixedParameters",
+        "b018::MemberPointerAlias",
+        "b018::MemberPointerFunction",
+        "b018::ComplexAlias",
+        "b018::AtomicAlias",
+        "b018::BlockPointerAlias",
+        "b018::TypeOfExprAlias",
+        "b018::VectorAlias",
+        "b018::WrapperFields::memberPointerField",
+        "b018::WrapperFields::complexField",
+        "b018::WrapperFields::atomicField",
+        "b018::WrapperFields::blockPointerField",
+        "b018::WrapperFields::typeOfExprField",
+        "b018::WrapperFields::vectorField",
+        "b018::memberPointerRoundTrip",
+        "b018::complexRoundTrip",
+        "b018::atomicRoundTrip",
+        "b018::blockPointerRoundTrip",
+        "b018::typeOfExprRoundTrip",
+        "b018::vectorRoundTrip",
+    }
+    require(
+        expected <= symbols,
+        f"missing committed type-class owners: {expected - symbols}",
+    )
+
+
+@then("unresolved dependent type relations are omitted")
+def then_unresolved_dependent_relations_are_omitted(
+    context: FactsToolContext,
+) -> None:
+    relations = query(
+        context.facts_database_path,
+        "SELECT source.qualified_name,destination.qualified_name "
+        "FROM relation "
+        "JOIN symbol source ON source.id=relation.source_id "
+        "JOIN symbol destination ON destination.id=relation.destination_id "
+        "WHERE source.qualified_name LIKE 'b018::DependentOwners::dependent%' "
+        "OR source.qualified_name LIKE 'b018::DependentOwners::Dependent%'",
+    )
+    type_relations = [
+        relation
+        for relation in relations
+        if relation[1] != "b018::DependentOwners"
+    ]
+    require(
+        type_relations == [],
+        f"dependent types produced fabricated relations: {type_relations}",
+    )
+
+
+@then("structural wrapper types resolve to their concrete targets")
+def then_structural_wrapper_types_resolve_to_concrete_targets(
+    context: FactsToolContext,
+) -> None:
+    relations = set(
+        query(
+            context.facts_database_path,
+            "SELECT source.qualified_name,destination.qualified_name "
+            "FROM relation "
+            "JOIN symbol source ON source.id=relation.source_id "
+            "JOIN symbol destination ON destination.id=relation.destination_id "
+            "WHERE source.qualified_name LIKE 'b018::%'",
+        )
+    )
+    expected = {
+        ("b018::MemberPointerAlias", "b018::Concrete"),
+        ("b018::MemberPointerFunction", "b018::Concrete"),
+        ("b018::AtomicAlias", "b018::Concrete"),
+        ("b018::BlockPointerAlias", "b018::Concrete"),
+        ("b018::TypeOfExprAlias", "b018::Concrete"),
+        ("b018::WrapperFields::memberPointerField", "b018::Concrete"),
+        ("b018::WrapperFields::atomicField", "b018::Concrete"),
+        ("b018::WrapperFields::blockPointerField", "b018::Concrete"),
+        ("b018::WrapperFields::typeOfExprField", "b018::Concrete"),
+    }
+    require(
+        expected <= relations,
+        f"missing normalized wrapper relations: {expected - relations}",
+    )
+
+
+@then("dependent and wrapper parameters retain every source position")
+def then_dependent_and_wrapper_parameters_retain_positions(
+    context: FactsToolContext,
+) -> None:
+    parameters = query(
+        context.facts_database_path,
+        "SELECT source.qualified_name,p.position,p.name,p.type,"
+        "target.qualified_name FROM parameter p "
+        "JOIN symbol source ON source.id=p.symbol_id "
+        "LEFT JOIN symbol target ON target.id=p.type "
+        "WHERE source.qualified_name IN ("
+        "'b018::DependentOwners::dependentNameRoundTrip',"
+        "'b018::DependentOwners::dependentTemplateRoundTrip',"
+        "'b018::DependentOwners::mixedParameters',"
+        "'b018::memberPointerRoundTrip',"
+        "'b018::atomicRoundTrip',"
+        "'b018::blockPointerRoundTrip') "
+        "ORDER BY source.qualified_name,p.position",
+    )
+    by_owner = {}
+    for owner, position, name, type_id, target in parameters:
+        by_owner.setdefault(owner, []).append((position, name, type_id, target))
+
+    mixed = by_owner.get("b018::DependentOwners::mixedParameters", [])
+    require(
+        [(position, name) for position, name, _, _ in mixed]
+        == [(0, "dependentFirst"), (1, "plainSecond"), (2, "plainThird")],
+        f"dependent parameter positions were not preserved: {mixed}",
+    )
+    require(
+        mixed[0][2] == 0
+        and mixed[1][2] != 0
+        and mixed[2][3] == "b018::Concrete",
+        f"unexpected mixed parameter targets: {mixed}",
+    )
+
+    for owner in (
+        "b018::DependentOwners::dependentNameRoundTrip",
+        "b018::DependentOwners::dependentTemplateRoundTrip",
+    ):
+        require(
+            by_owner.get(owner) == [(0, "value", 0, None)],
+            f"dependent parameter row was not preserved for {owner}: "
+            f"{by_owner.get(owner)}",
+        )
+
+    for owner in (
+        "b018::memberPointerRoundTrip",
+        "b018::atomicRoundTrip",
+        "b018::blockPointerRoundTrip",
+    ):
+        rows = by_owner.get(owner, [])
+        require(
+            len(rows) == 1
+            and rows[0][0:2] == (0, "value")
+            and rows[0][2] != 0
+            and rows[0][3] == "b018::Concrete",
+            f"wrapper parameter position or target was lost for {owner}: {rows}",
+        )

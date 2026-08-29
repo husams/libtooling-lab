@@ -2,6 +2,7 @@
 #define FACTS_TOOL_AST_EXTRACTORS_FUNCTIONDECL_H
 
 #include "ast/extractors/Extraction.h"
+#include "ast/extractors/Type.h"
 #include "model/Function.h"
 
 namespace clang {
@@ -12,7 +13,7 @@ namespace facts {
 class FactStore;
 class FileManager;
 
-ExtractionResult<Function>
+DetailedExtractionResult<Function>
 extractFunction(const clang::FunctionDecl &node,
                 const clang::SourceManager &sourceManager, FileManager &files,
                 FactStore &store);

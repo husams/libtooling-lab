@@ -327,6 +327,9 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/e2e
             ${CMAKE_CURRENT_BINARY_DIR}/reference-extraction-artifacts
   )
+  add_executable(type-resolution-error-test tests/TypeResolutionErrorTest.cpp)
+  target_link_libraries(type-resolution-error-test PRIVATE facts-ast)
+  add_test(NAME type-resolution-error COMMAND type-resolution-error-test)
   add_executable(file-database-persistence-test
                  tests/FileDatabasePersistenceTest.cpp)
   target_link_libraries(file-database-persistence-test

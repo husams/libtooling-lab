@@ -24,6 +24,8 @@ TypeResolutionError typeFailure(std::string target, std::string usr,
                              .detail = std::move(detail)};
 }
 
+TypeResult resolved(SymbolId id) { return std::optional<SymbolId>{id}; }
+
 class TypeSymbolVisitor final
     : public clang::TypeVisitor<TypeSymbolVisitor, TypeResult> {
 public:
@@ -32,8 +34,8 @@ public:
       : sourceManager_(sourceManager), files_(files), store_(store) {}
 
   TypeResult VisitBuiltinType(const clang::BuiltinType *type) {
-    return SymbolId{builtinFileId,
-                    static_cast<std::uint32_t>(type->getKind()) + 1};
+    return resolved(SymbolId{builtinFileId,
+                             static_cast<std::uint32_t>(type->getKind()) + 1});
   }
 
   TypeResult VisitPointerType(const clang::PointerType *type) {
@@ -44,7 +46,27 @@ public:
     return Visit(type->getPointeeType().getTypePtr());
   }
 
+  TypeResult VisitMemberPointerType(const clang::MemberPointerType *type) {
+    return Visit(type->getPointeeType().getTypePtr());
+  }
+
+  TypeResult VisitBlockPointerType(const clang::BlockPointerType *type) {
+    return Visit(type->getPointeeType().getTypePtr());
+  }
+
   TypeResult VisitArrayType(const clang::ArrayType *type) {
+    return Visit(type->getElementType().getTypePtr());
+  }
+
+  TypeResult VisitComplexType(const clang::ComplexType *type) {
+    return Visit(type->getElementType().getTypePtr());
+  }
+
+  TypeResult VisitAtomicType(const clang::AtomicType *type) {
+    return Visit(type->getValueType().getTypePtr());
+  }
+
+  TypeResult VisitVectorType(const clang::VectorType *type) {
     return Visit(type->getElementType().getTypePtr());
   }
 
@@ -114,7 +136,10 @@ public:
 
   TypeResult VisitTemplateSpecializationType(
       const clang::TemplateSpecializationType *type) {
-    return declarationId(type->getTemplateName().getAsTemplateDecl());
+    const auto *declaration = type->getTemplateName().getAsTemplateDecl();
+    return declaration == nullptr && type->isDependentType()
+               ? TypeResult{std::optional<SymbolId>{}}
+               : declarationId(declaration);
   }
 
   TypeResult VisitPackExpansionType(const clang::PackExpansionType *type) {
@@ -125,10 +150,31 @@ public:
     return Visit(type->getUnderlyingType().getTypePtr());
   }
 
+  TypeResult VisitTypeOfExprType(const clang::TypeOfExprType *type) {
+    return type->isDependentType()
+               ? TypeResult{std::optional<SymbolId>{}}
+               : Visit(type->getUnderlyingExpr()->getType().getTypePtr());
+  }
+
+  TypeResult VisitDependentNameType(const clang::DependentNameType *) {
+    return std::optional<SymbolId>{};
+  }
+
+#if CLANG_VERSION_MAJOR < 22
+  TypeResult VisitDependentTemplateSpecializationType(
+      const clang::DependentTemplateSpecializationType *) {
+    return std::optional<SymbolId>{};
+  }
+#endif
+
   TypeResult VisitType(const clang::Type *type) {
-    return std::unexpected(typeFailure(
-        "<unsupported type>", "<unavailable>",
-        "type is not supported: " + std::string{type->getTypeClassName()}));
+    if (type->isDependentType()) {
+      return std::optional<SymbolId>{};
+    }
+    const auto canonical = type->getCanonicalTypeInternal();
+    return canonical.getTypePtr() == type
+               ? TypeResult{std::optional<SymbolId>{}}
+               : Visit(canonical.getTypePtr());
   }
 
 private:
@@ -154,10 +200,12 @@ private:
         })
         .and_then([&](std::optional<SymbolId> id) -> TypeResult {
           if (id) {
-            return *id;
+            return resolved(*id);
           }
           return findOrStoreSymbolTarget(*declaration, sourceManager_, files_,
                                          store_, usrText)
+              .transform(
+                  [](SymbolId id) { return std::optional<SymbolId>{id}; })
               .transform_error([&](std::error_code error) {
                 return typeFailure(target, usrText, error.message());
               });
