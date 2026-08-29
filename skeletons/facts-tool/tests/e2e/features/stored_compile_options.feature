@@ -30,6 +30,11 @@ Feature: Stored compilation options
     Then the facts-tool run fails
     And the diagnostic mentions malformed compile options
 
+  Scenario: Malformed unrelated stored options do not block selected extraction
+    Given realistic shared-header declarations, definitions, parameters, and relations
+    When the real facts-tool extracts one.cpp while two.cpp has malformed stored options
+    Then the facts-tool run succeeds
+
   Scenario: Every requested source needs a stored command
     Given realistic shared-header declarations, definitions, parameters, and relations
     When the real facts-tool runs without a stored command for two.cpp

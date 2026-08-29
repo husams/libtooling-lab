@@ -325,10 +325,14 @@ std::string jsonQuote(std::string_view value) {
 
 } // namespace
 
+std::filesystem::path logicalCompilationPath(std::filesystem::path path) {
+  return (path.is_absolute() ? std::move(path)
+                             : std::filesystem::absolute(path))
+      .lexically_normal();
+}
+
 std::filesystem::path normalizeCompilationPath(std::filesystem::path path) {
-  auto absolute =
-      (path.is_absolute() ? std::move(path) : std::filesystem::absolute(path))
-          .lexically_normal();
+  auto absolute = logicalCompilationPath(std::move(path));
   std::error_code error;
   auto canonical = std::filesystem::weakly_canonical(absolute, error);
   return error ? absolute : canonical;

@@ -46,20 +46,12 @@ resolveCommandPath(const clang::tooling::CompileCommand &command,
                          : std::filesystem::path(command.Directory) / path);
 }
 
-// Compilation databases may deliberately use a logical path through a
-// symlink. Keep that spelling while finding the owning project.
-std::filesystem::path logicalPath(std::filesystem::path path) {
-  return (path.is_absolute() ? std::move(path)
-                             : std::filesystem::absolute(path))
-      .lexically_normal();
-}
-
 std::filesystem::path
 logicalCommandPath(const clang::tooling::CompileCommand &command,
                    std::string_view value) {
   const std::filesystem::path path(value);
-  return logicalPath(path.is_absolute()
-                         ? path
+  return logicalCompilationPath(
+      path.is_absolute() ? path
                          : std::filesystem::path(command.Directory) / path);
 }
 
@@ -193,7 +185,7 @@ std::size_t depth(const std::filesystem::path &path) {
 }
 
 std::optional<std::filesystem::path> gitRoot(std::filesystem::path directory) {
-  auto current = logicalPath(std::move(directory));
+  auto current = logicalCompilationPath(std::move(directory));
   while (true) {
     std::error_code error;
     const auto dotGit = current / ".git";

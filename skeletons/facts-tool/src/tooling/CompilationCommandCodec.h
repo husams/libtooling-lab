@@ -21,6 +21,8 @@ inline constexpr std::string_view storedSourceArgumentMarker =
 
 std::filesystem::path normalizeCompilationPath(std::filesystem::path path);
 
+std::filesystem::path logicalCompilationPath(std::filesystem::path path);
+
 std::size_t commandStart(const std::vector<std::string> &arguments);
 
 std::vector<std::string>

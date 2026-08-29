@@ -20,6 +20,13 @@ def when_stored_options_are_malformed(context: FactsToolContext) -> None:
     context.run_with_malformed_stored_options()
 
 
+@when("the real facts-tool extracts one.cpp while two.cpp has malformed stored options")
+def when_unrelated_stored_options_are_malformed(
+    context: FactsToolContext,
+) -> None:
+    context.run_with_malformed_unrelated_stored_options()
+
+
 @when("the real facts-tool runs without a stored command for two.cpp")
 def when_a_stored_command_is_missing(context: FactsToolContext) -> None:
     context.run_with_missing_stored_command("two.cpp")
