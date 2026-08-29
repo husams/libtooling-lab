@@ -12,6 +12,7 @@ struct ExtractOptions {
   int verbosity = 0;
   std::string output;
   std::string configuration;
+  std::vector<std::string> extraArguments;
   std::vector<std::string> sources;
 };
 
@@ -28,6 +29,7 @@ struct DependencyOptions {
   int verbosity = 0;
   std::string output;
   std::string configuration;
+  std::vector<std::string> extraArguments;
   std::vector<std::string> sources;
 };
 

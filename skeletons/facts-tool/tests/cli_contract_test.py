@@ -9,13 +9,17 @@ from pathlib import Path
 
 
 def run(
-    tool: Path, *arguments: str, environment: dict[str, str] | None = None
+    tool: Path,
+    *arguments: str,
+    environment: dict[str, str] | None = None,
+    working_directory: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [str(tool), *arguments],
         capture_output=True,
         text=True,
         check=False,
+        cwd=working_directory,
         env=os.environ | (environment or {}),
     )
 
@@ -51,6 +55,8 @@ def main() -> None:
     require(
         "--output" in output(extract_help)
         and "--conf" in output(extract_help)
+        and "--extra-arg" in output(extract_help)
+        and "repeatable" in output(extract_help)
         and "--verbose" in output(extract_help),
         output(extract_help),
     )
@@ -81,6 +87,8 @@ def main() -> None:
     require(
         "--output" in output(dependency_help)
         and "--conf" in output(dependency_help)
+        and "--extra-arg" in output(dependency_help)
+        and "repeatable" in output(dependency_help)
         and "--verbose" in output(dependency_help),
         output(dependency_help),
     )
@@ -475,6 +483,109 @@ def main() -> None:
             "name='ExtraBase'" in adjusted_extract.stderr
             and "name='ExtraDerived'" in adjusted_extract.stderr,
             output(adjusted_extract),
+        )
+
+        runtime_root = (root / "runtime-extra-arguments").resolve()
+        runtime_root.mkdir()
+        runtime_source = (runtime_root / "runtime.cpp").resolve()
+        runtime_source.write_text(
+            "#ifndef B021_VALUE\n"
+            "#define B021_VALUE 0\n"
+            "#endif\n"
+            "static_assert(B021_VALUE == 2);\n"
+            "struct RuntimeExtraArgument {};\n",
+            encoding="utf-8",
+        )
+        runtime_compilation_database = runtime_root / "compile_commands.json"
+        runtime_compilation_database.write_text(
+            json.dumps(
+                [
+                    {
+                        "directory": str(runtime_root),
+                        "file": str(runtime_source),
+                        "arguments": [
+                            "clang",
+                            "-x",
+                            "c++",
+                            "-std=c++23",
+                            "-DB021_VALUE=0",
+                            "-c",
+                            str(runtime_source),
+                        ],
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        runtime_configuration = root / "runtime-extra-arguments.sqlite"
+        runtime_import = run(
+            tool,
+            "import",
+            "--conf",
+            str(runtime_configuration),
+            "--compilation-database",
+            str(runtime_root),
+            "--component",
+            "runtime=.",
+        )
+        require(runtime_import.returncode == 0, output(runtime_import))
+
+        runtime_extra_arguments = ["-DB021_VALUE=1", "-DB021_VALUE=2"]
+        runtime_extract = run(
+            tool,
+            "extract",
+            "-v",
+            "3",
+            "--output",
+            str(root / "runtime-extra-arguments-facts.sqlite"),
+            "--conf",
+            str(runtime_configuration),
+            *(f"--extra-arg={argument}" for argument in runtime_extra_arguments),
+            str(runtime_source),
+        )
+        require(runtime_extract.returncode == 0, output(runtime_extract))
+        require(
+            "name='RuntimeExtraArgument'" in runtime_extract.stderr,
+            output(runtime_extract),
+        )
+
+        runtime_dependency = run(
+            tool,
+            "analyses",
+            "dependency",
+            "--output",
+            str(root / "runtime-extra-arguments-dependencies.sqlite"),
+            "--conf",
+            str(runtime_configuration),
+            *(f"--extra-arg={argument}" for argument in runtime_extra_arguments),
+            str(runtime_source),
+        )
+        require(runtime_dependency.returncode == 0, output(runtime_dependency))
+
+        runtime_fixed_configuration = root / "runtime-extra-arguments-fixed.sqlite"
+        runtime_fixed_import = run(
+            tool,
+            "import",
+            "--conf",
+            str(runtime_fixed_configuration),
+            "--component",
+            "runtime-fixed=.",
+            *(f"--extra-arg={argument}" for argument in runtime_extra_arguments),
+            str(runtime_source),
+            working_directory=runtime_root,
+        )
+        require(runtime_fixed_import.returncode == 0, output(runtime_fixed_import))
+        runtime_fixed_extract = run(
+            tool,
+            "extract",
+            "--output",
+            str(root / "runtime-extra-arguments-fixed-facts.sqlite"),
+            "--conf",
+            str(runtime_fixed_configuration),
+            str(runtime_source),
+        )
+        require(
+            runtime_fixed_extract.returncode == 0, output(runtime_fixed_extract)
         )
 
         filtered_import = run(
