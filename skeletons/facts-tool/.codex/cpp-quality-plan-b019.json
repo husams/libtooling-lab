@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "name": "build-facts-tool",
+      "kind": "build",
+      "argv": ["cmake", "--build", "build", "--target", "facts-tool", "-j", "8"],
+      "timeout_seconds": 1200
+    },
+    {
+      "name": "all-tests",
+      "kind": "test",
+      "argv": ["ctest", "--test-dir", "build", "--output-on-failure"],
+      "timeout_seconds": 1800
+    },
+    {
+      "name": "changed-cpp-format",
+      "kind": "format",
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/clang-format",
+        "--dry-run",
+        "--Werror",
+        "src/ast/Indexing.h",
+        "src/ast/StoreExtracted.h",
+        "src/ast/extractors/TemplateSpecialization.cpp",
+        "tests/fixtures/e2e/undeclared_template_instances.cpp",
+        "tests/fixtures/e2e/invalid_usr_declarations.cpp"
+      ],
+      "timeout_seconds": 120
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "dry_run": false,
+  "finished_at": "2026-08-29T07:46:27+00:00",
+  "passed": true,
+  "plan": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/.codex/cpp-quality-plan-b019.json",
+  "project_root": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+  "results": [
+    {
+      "argv": [
+        "cmake",
+        "--build",
+        "build",
+        "--target",
+        "facts-tool",
+        "-j",
+        "8"
+      ],
+      "cwd": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.017,
+      "kind": "build",
+      "name": "build-facts-tool",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "",
+      "stdout": "ninja: no work to do.\n"
+    },
+    {
+      "argv": [
+        "ctest",
+        "--test-dir",
+        "build",
+        "--output-on-failure"
+      ],
+      "cwd": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 24.03,
+      "kind": "test",
+      "name": "all-tests",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "",
+      "stdout": "Test project /Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool/build\n      Start  1: fact-store\n 1/23 Test  #1: fact-store .......................   Passed    0.03 sec\n      Start  2: file-manager\n 2/23 Test  #2: file-manager .....................   Passed    0.02 sec\n      Start  3: compilation-files\n 3/23 Test  #3: compilation-files ................   Passed    0.03 sec\n      Start  4: stored-compilation-database\n 4/23 Test  #4: stored-compilation-database ......   Passed    0.02 sec\n      Start  5: platform-flags\n 5/23 Test  #5: platform-flags ...................   Passed    0.20 sec\n      Start  6: project-configuration\n 6/23 Test  #6: project-configuration ............   Passed    0.03 sec\n      Start  7: storage-schema\n 7/23 Test  #7: storage-schema ...................   Passed    0.05 sec\n      Start  8: reference-extraction\n 8/23 Test  #8: reference-extraction .............   Passed    0.03 sec\n      Start  9: type-resolution-error\n 9/23 Test  #9: type-resolution-error ............   Passed    0.02 sec\n      Start 10: file-database-persistence\n10/23 Test #10: file-database-persistence ........   Passed    0.08 sec\n      Start 11: sqlite-query\n11/23 Test #11: sqlite-query .....................   Passed    0.02 sec\n      Start 12: sqlite-command\n12/23 Test #12: sqlite-command ...................   Passed    0.02 sec\n      Start 13: sqlite-generator-demo\n13/23 Test #13: sqlite-generator-demo ............   Passed    0.02 sec\n      Start 14: dependency-analysis-import\n14/23 Test #14: dependency-analysis-import .......   Passed    0.29 sec\n      Start 15: dependency-analysis-first\n15/23 Test #15: dependency-analysis-first ........   Passed    0.03 sec\n      Start 16: dependency-analysis-second\n16/23 Test #16: dependency-analysis-second .......   Passed    0.03 sec\n      Start 17: dependency-analysis-extract\n17/23 Test #17: dependency-analysis-extract ......   Passed    0.04 sec\n      Start 18: dependency-analysis-verify\n18/23 Test #18: dependency-analysis-verify .......   Passed    0.02 sec\n      Start 19: multi-tu-project-import\n19/23 Test #19: multi-tu-project-import ..........   Passed    0.04 sec\n      Start 20: multi-tu-file-registry\n20/23 Test #20: multi-tu-file-registry ...........   Passed    0.04 sec\n      Start 21: multi-tu-project-cleanup\n21/23 Test #21: multi-tu-project-cleanup .........   Passed    0.00 sec\n      Start 22: facts-tool-cli-contract\n22/23 Test #22: facts-tool-cli-contract ..........   Passed    0.61 sec\n      Start 23: facts-tool-e2e\n23/23 Test #23: facts-tool-e2e ...................   Passed   22.33 sec\n\n100% tests passed out of 23\n\nTotal Test time (real) =  24.01 sec\n"
+    },
+    {
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/clang-format",
+        "--dry-run",
+        "--Werror",
+        "src/ast/Indexing.h",
+        "src/ast/StoreExtracted.h",
+        "src/ast/extractors/TemplateSpecialization.cpp",
+        "tests/fixtures/e2e/undeclared_template_instances.cpp",
+        "tests/fixtures/e2e/invalid_usr_declarations.cpp"
+      ],
+      "cwd": "/Users/husam/workspace/qemu-vms/libtooling-lab/skeletons/facts-tool",
+      "duration_seconds": 0.031,
+      "kind": "format",
+      "name": "changed-cpp-format",
+      "required": true,
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "",
+      "stdout": ""
+    }
+  ],
+  "started_at": "2026-08-29T07:46:03+00:00",
+  "summary": {
+    "failed": 0,
+    "not_found": 0,
+    "passed": 3,
+    "planned": 0,
+    "timeout": 0
+  }
+}

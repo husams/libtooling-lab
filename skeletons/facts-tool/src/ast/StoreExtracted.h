@@ -18,7 +18,8 @@ namespace facts {
 
 inline bool isFilteredExtraction(ExtractionError error) {
   return error == ExtractionError::OutsideMainFile ||
-         error == ExtractionError::SystemHeader;
+         error == ExtractionError::SystemHeader ||
+         error == ExtractionError::InvalidUsr;
 }
 
 inline std::string_view extractionErrorName(ExtractionError error) {
