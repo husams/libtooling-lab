@@ -5,6 +5,7 @@
 #include <array>
 #include <format>
 #include <iostream>
+#include <optional>
 
 namespace facts::commands {
 namespace {
@@ -14,8 +15,8 @@ struct SymbolFact {
   std::array<std::string, 32> details;
 };
 
-catalog::Result<std::vector<SymbolFact>> symbols(storage::Database &database,
-                                                 const std::string &name) {
+catalog::Result<std::vector<SymbolFact>>
+symbols(storage::Database &database, const std::optional<std::string> &name) {
   return catalog::query(
       database,
       "SELECT id,node,kind,sub_kind,lang,properties,usr,qualified_name,line,"
@@ -24,7 +25,7 @@ catalog::Result<std::vector<SymbolFact>> symbols(storage::Database &database,
       "has_internal_linkage,is_external,is_variadic,is_deleted,is_defaulted,"
       "is_explicit,is_final,is_abstract,is_polymorphic,has_extern_storage,"
       "constant_evaluation,is_noexcept FROM symbol "
-      "WHERE (?='' OR qualified_name=?) ORDER BY id",
+      "WHERE (? IS NULL OR qualified_name=?) ORDER BY id",
       [](const storage::Row &row) {
         SymbolFact value;
         value.id = row.get<SymbolId>(0);
@@ -100,9 +101,10 @@ catalog::Result<storage::Database> openFacts(const std::string &path) {
 
 catalog::Result<std::string> operate(storage::Database &database,
                                      const cli::SymbolOptions &options) {
-  return symbols(database, options.action == cli::SymbolOptions::Action::show
-                               ? options.qualifiedName
-                               : std::string{})
+  const auto name = options.action == cli::SymbolOptions::Action::show
+                        ? std::optional{options.qualifiedName}
+                        : std::nullopt;
+  return symbols(database, name)
       .and_then([&](const auto &values) -> catalog::Result<std::string> {
         if (options.action == cli::SymbolOptions::Action::list)
           return displaySymbols(values);

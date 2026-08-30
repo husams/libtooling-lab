@@ -20,6 +20,7 @@ bool contains(const std::filesystem::path &root,
 struct OwnedDirectory {
   Directory value;
   std::filesystem::path root;
+  std::filesystem::path componentRoot;
 };
 
 Result<std::filesystem::path> regularFile(const std::string &path,
@@ -53,8 +54,8 @@ Result<OwnedDirectory> owningDirectory(Database &database,
               const auto depth = static_cast<std::size_t>(
                   std::ranges::distance(candidate.begin(), candidate.end()));
               if (!selected || depth > selected->first)
-                selected =
-                    std::pair{depth, OwnedDirectory{directory, candidate}};
+                selected = std::pair{
+                    depth, OwnedDirectory{directory, candidate, *root}};
             }
           }
           return selected ? Result<OwnedDirectory>{std::move(selected->second)}
@@ -63,6 +64,38 @@ Result<OwnedDirectory> owningDirectory(Database &database,
                                 "directory")};
         });
   });
+}
+
+Result<OwnedDirectory>
+registerFileDirectory(Database &database, const OwnedDirectory &owner,
+                      const std::filesystem::path &fileParent) {
+  const auto relative = fileParent.lexically_relative(owner.componentRoot)
+                            .lexically_normal()
+                            .generic_string();
+  return execute(database,
+                 "INSERT INTO directory(component_id,path) VALUES(?,?) "
+                 "ON CONFLICT(component_id,path) DO NOTHING",
+                 owner.value.componentId, relative)
+      .and_then([&] {
+        return query(
+            database,
+            "SELECT id,component_id,path,(SELECT count(*) FROM file "
+            "WHERE directory_id=directory.id) FROM directory "
+            "WHERE component_id=?1 AND path=?2",
+            [&](const storage::Row &row) {
+              return Directory{row.integer(0), row.integer(1),
+                               owner.value.component, row.string(2),
+                               row.integer(3)};
+            },
+            owner.value.componentId, relative);
+      })
+      .and_then([&](auto values) -> Result<OwnedDirectory> {
+        return requireOne(std::move(values), "file directory")
+            .transform([&](Directory directory) {
+              return OwnedDirectory{std::move(directory), fileParent,
+                                    owner.componentRoot};
+            });
+      });
 }
 
 } // namespace
@@ -145,6 +178,10 @@ Result<void> addFile(Database &database, const std::string &path,
     return regularFile(driver, "compiler driver")
         .and_then([&](const auto &canonicalDriver) {
           return owningDirectory(database, canonical)
+              .and_then([&](const OwnedDirectory &owner) {
+                return registerFileDirectory(database, owner,
+                                             canonical.parent_path());
+              })
               .and_then([&](const OwnedDirectory &directory) {
                 auto working =
                     workingDirectory.empty()

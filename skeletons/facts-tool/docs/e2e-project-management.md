@@ -21,8 +21,10 @@ including the only clone, must be switched away before it can be removed.
 
 `file add` canonicalizes the source, compiler driver, and optional working
 directory. With no working directory it stores the effective root of the
-deepest registered indexed directory containing the file. Arguments are stored
-as exact tokens and marked as manually overridden. Removal affects only the
+deepest registered indexed directory containing the file. If the file is below
+that directory, its actual parent is registered so the stored path round-trips
+without dropping intermediate segments. Arguments are stored as exact tokens
+and marked as manually overridden. Removal affects only the
 catalog row. Empty file lists print `No files registered`.
 
 File option matching is case-sensitive ECMAScript `regex_search` over the

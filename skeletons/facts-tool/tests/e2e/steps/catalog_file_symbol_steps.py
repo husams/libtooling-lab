@@ -14,6 +14,10 @@ def manual_path(catalog: Catalog) -> Path:
     return catalog.checkout / "core/src/deep/manual.cpp"
 
 
+def nested_path(catalog: Catalog) -> Path:
+    return catalog.checkout / "core/src/newdir/one.cpp"
+
+
 @given("a manual source inside the deepest indexed directory")
 def manual_source(catalog: Catalog) -> None:
     path = manual_path(catalog)
@@ -28,6 +32,34 @@ def outside_source(catalog: Catalog) -> None:
     content = b"int outside_value() { return 7; }\n"
     path.write_bytes(content)
     catalog.sources[path] = content
+
+
+@given("a source beneath an unregistered child directory with an existing basename")
+def nested_source(catalog: Catalog) -> None:
+    path = nested_path(catalog)
+    path.parent.mkdir()
+    content = b"int nested_value() { return 21; }\n"
+    path.write_bytes(content)
+    catalog.sources[path] = content
+
+
+@then("the nested file has its own registered directory and round-trips exactly")
+def nested_file_round_trips(catalog: Catalog) -> None:
+    rows = catalog.rows(
+        "SELECT d.path,f.name,f.working_directory FROM file f "
+        "JOIN directory d ON d.id=f.directory_id WHERE f.name='one.cpp' "
+        "ORDER BY d.path")
+    require(("src/newdir", "one.cpp", str(nested_path(catalog).parent)) in rows,
+            f"nested file path was collapsed: {rows}")
+    require(any(path == "src" and name == "one.cpp"
+                for path, name, _ in rows),
+            f"existing basename was displaced: {rows}")
+
+
+@then("the nested file appears at its exact path")
+def nested_file_output(catalog: Catalog) -> None:
+    require(str(nested_path(catalog)) in catalog.stdout,
+            f"exact nested path is absent: {catalog.stdout}")
 
 
 @given("a registered manual source")

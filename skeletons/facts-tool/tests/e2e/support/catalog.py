@@ -51,6 +51,7 @@ class Catalog:
             "{core-id}": str(self.core_id),
             "{deep-id}": str(self.deep_id),
             "{manual-file}": str(self.checkout / "core/src/deep/manual.cpp"),
+            "{nested-file}": str(self.checkout / "core/src/newdir/one.cpp"),
             "{outside-file}": str(self.external / "outside.cpp"),
             "{compiler}": str(self.context.compiler),
             "{working-directory}": str(self.checkout / "core/src"),

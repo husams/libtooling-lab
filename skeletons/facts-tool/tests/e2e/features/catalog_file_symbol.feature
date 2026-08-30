@@ -22,6 +22,18 @@ Feature: Manage files, clones, and extracted symbols
     Then the catalog command succeeds
     And the manual file uses the explicit working directory
 
+  Scenario: Add a file beneath an unregistered child directory without collapsing its path
+    Given a source beneath an unregistered child directory with an existing basename
+    When I run the catalog command "file add {nested-file} --driver {compiler}"
+    Then the catalog command succeeds
+    And the nested file has its own registered directory and round-trips exactly
+    When I run the catalog command "file show {nested-file}"
+    Then the catalog command succeeds
+    And the nested file appears at its exact path
+    When I run the catalog command "file list"
+    Then the catalog command succeeds
+    And the nested file appears at its exact path
+
   Scenario Outline: Invalid file additions are atomic
     Given a manual source inside the deepest indexed directory
     And an existing source outside every indexed directory
@@ -135,6 +147,10 @@ Feature: Manage files, clones, and extracted symbols
 
   Scenario: Symbol show rejects an unknown qualified name
     When I run the symbol command "show definitely::missing"
+    Then the symbol command fails with "not found"
+
+  Scenario: Symbol show rejects an empty qualified name
+    When I run the symbol command "show ''"
     Then the symbol command fails with "not found"
 
   Scenario: Symbol list documents an empty facts database
