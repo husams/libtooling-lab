@@ -35,6 +35,7 @@ struct DependencyOptions {
 
 using Command =
     std::variant<ExtractOptions, ImportOptions, DependencyOptions,
-                 RepositoryOptions, ComponentOptions, DirectoryOptions>;
+                 RepositoryOptions, ComponentOptions, DirectoryOptions,
+                 FileOptions, SymbolOptions>;
 
 } // namespace facts::cli

@@ -11,4 +11,6 @@ std::expected<int, std::string>
 runComponent(const cli::ComponentOptions &options);
 std::expected<int, std::string>
 runDirectory(const cli::DirectoryOptions &options);
+std::expected<int, std::string> runFile(const cli::FileOptions &options);
+std::expected<int, std::string> runSymbol(const cli::SymbolOptions &options);
 } // namespace facts::commands

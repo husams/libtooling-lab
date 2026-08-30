@@ -385,12 +385,17 @@ std::string encodeCompileOptions(const std::vector<std::string> &options) {
   return result;
 }
 
+std::expected<std::vector<std::string>, std::string>
+decodeCompileOptions(std::string_view text) {
+  return decodeOptions(text);
+}
+
 std::expected<clang::tooling::CompileCommand, std::string>
 decodeStoredCommand(const StoredCompileFile &file,
                     const StoredCommandAliases &aliases) {
   auto fileAliases = aliases;
   fileAliases.try_emplace(file.componentName, file.root.string());
-  return decodeOptions(file.options)
+  return decodeCompileOptions(file.options)
       .transform(sanitizeCommandArguments)
       .transform([&](auto arguments) {
         return resolveIncludePaths(std::move(arguments), fileAliases);

@@ -50,6 +50,10 @@ class Catalog:
             "{missing-path}": str(self.checkout / "missing"),
             "{core-id}": str(self.core_id),
             "{deep-id}": str(self.deep_id),
+            "{manual-file}": str(self.checkout / "core/src/deep/manual.cpp"),
+            "{outside-file}": str(self.external / "outside.cpp"),
+            "{compiler}": str(self.context.compiler),
+            "{working-directory}": str(self.checkout / "core/src"),
         }
         # Split before substitution so a path containing spaces stays one argv.
         arguments = [replacements.get(token, token) for token in shlex.split(command)]
@@ -66,6 +70,19 @@ class Catalog:
         for source, content in self.sources.items():
             require(source.is_file() and source.read_bytes() == content,
                     f"a catalog command changed or deleted checkout source {source}")
+
+    def run_symbol(self, command: str) -> None:
+        arguments = shlex.split(command)
+        result = self.context._run(
+            [str(self.context.facts_tool), "symbol", *arguments,
+             "--facts", str(self.context.facts_database_path)]
+        )
+        self.stdout = result.stdout
+        require(self.context.files_database_path.read_bytes() ==
+                self.configuration_before,
+                "a symbol command modified the project configuration")
+        require(self.context.facts_database_path.read_bytes() == self.facts_before,
+                "a symbol command modified the facts database")
 
     @property
     def core_id(self) -> int:

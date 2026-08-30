@@ -48,6 +48,9 @@ catalog::Result<std::string> operate(catalog::Database &database,
         case Action::switchClone:
           return catalog::switchClone(database, repo, options.path)
               .transform([] { return std::string{"Active clone switched\n"}; });
+        case Action::removeClone:
+          return catalog::removeClone(database, repo, options.path)
+              .transform([] { return std::string{"Clone removed\n"}; });
         case Action::remove:
           if (options.dryRun)
             return "Would remove repository '" + repo.name + "'\n";

@@ -1,7 +1,7 @@
 # Project catalog commands and E2E tests
 
-The real `facts-tool` executable now manages repositories, components, and
-indexed directories in a project configuration database.
+The real `facts-tool` executable manages repositories, components, indexed
+directories, files, and extracted symbol inspection.
 
 ## Commands
 
@@ -9,9 +9,35 @@ Append `--conf /path/to/project.sqlite` to each command.
 
 | Group | Subcommands |
 | --- | --- |
-| `repo` | `list` / `ls`, `show NAME`, `add-clone NAME PATH [--label LABEL]`, `switch NAME LABEL_OR_PATH`, `rm NAME [--delete-components] [--dry-run]` |
+| `repo` | `list` / `ls`, `show NAME`, `add-clone NAME PATH [--label LABEL]`, `switch NAME LABEL_OR_PATH`, `rm-clone` / `remove-clone NAME LABEL_OR_PATH`, `rm NAME [--delete-components] [--dry-run]` |
 | `component` | `list` / `ls`, `show NAME`, `add --path PATH [--name NAME] [--repo REPO] [--kind repo\|external] [--version VERSION] [--no-git]`, `set-version NAME [VERSION]`, `compile-commands NAME`, `rm SELECTOR [--dry-run]` |
 | `dir` | `list` / `ls` `[--component COMPONENT]`, `rm SELECTOR [--component COMPONENT] [--dry-run]` |
+| `file` | `list` / `ls`, `show PATH`, `add PATH --driver DRIVER [--working-directory DIR] [--arg TOKEN]...`, `rm` / `remove PATH`, `set-option --match REGEX --arg TOKEN...`, `clear-option --match REGEX --arg TOKEN...` |
+| `symbol` | `list` / `ls --facts FACTS.sqlite`, `show QUALIFIED_NAME --facts FACTS.sqlite` |
+
+`repo rm-clone NAME LABEL_OR_PATH` (alias `remove-clone`) removes only a
+non-active clone registration and never deletes a checkout. The active clone,
+including the only clone, must be switched away before it can be removed.
+
+`file add` canonicalizes the source, compiler driver, and optional working
+directory. With no working directory it stores the effective root of the
+deepest registered indexed directory containing the file. Arguments are stored
+as exact tokens and marked as manually overridden. Removal affects only the
+catalog row. Empty file lists print `No files registered`.
+
+File option matching is case-sensitive ECMAScript `regex_search` over the
+normalized forward-slash file path relative to its effective component root;
+patterns are unanchored unless they use `^` or `$`. `set-option` removes every
+exact contiguous occurrence of the supplied token sequence and appends it once;
+`clear-option` removes every occurrence. Nonmatching files are unchanged and an
+invalid or unmatched expression rolls back the operation. A later import
+preserves manually overridden files it omits, while a command containing the
+same file replaces its fields and resets the override.
+
+Symbol commands open only the database supplied by `--facts` and never require
+or use `--conf`. Listing includes packed, file, and per-file symbol identifiers;
+show uses an exact qualified-name match and reports all stored symbol details.
+Empty lists print `No symbols`. Both operations are read-only.
 
 Component removal requires exactly one of `--id`, `--name`, or `--path`.
 Directory removal requires exactly one of `--id` or `--path`. Directory paths
@@ -53,7 +79,7 @@ silently migrate them.
   and transaction helpers.
 - `src/cli/Dispatch.cpp`: dispatch separated from the existing parser.
 
-No new implementation file exceeds 105 lines.
+Command behavior remains separated from CLI parsing and catalog persistence.
 
 ## Real executable BDD coverage
 

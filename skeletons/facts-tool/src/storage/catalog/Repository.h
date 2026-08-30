@@ -10,6 +10,8 @@ Result<void> addClone(Database &database, const Repository &repository,
                       const std::string &path, const std::string &label);
 Result<void> switchClone(Database &database, const Repository &repository,
                          const std::string &target);
+Result<void> removeClone(Database &database, const Repository &repository,
+                         const std::string &target);
 Result<void> removeRepository(Database &database, const Repository &repository,
                               bool deleteComponents);
 } // namespace facts::catalog
