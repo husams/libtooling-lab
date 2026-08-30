@@ -102,4 +102,25 @@ Result<void> switchClone(Database &database, const Repository &repo,
             });
       });
 }
+
+Result<void> removeClone(Database &database, const Repository &repo,
+                         const std::string &target) {
+  return clones(database, repo.id)
+      .and_then([&](auto values) {
+        std::error_code error;
+        const auto path = std::filesystem::canonical(target, error).string();
+        std::erase_if(values, [&](const auto &clone) {
+          return clone.label != target && clone.path != target &&
+                 (error || clone.path != path);
+        });
+        return requireOne(std::move(values), "clone '" + target + "'");
+      })
+      .and_then([&](const ProjectClone &clone) -> Result<void> {
+        if (repo.activeCloneId == clone.id) {
+          return std::unexpected(
+              "cannot remove active clone; switch to another clone first");
+        }
+        return execute(database, "DELETE FROM clone WHERE id=?", clone.id);
+      });
+}
 } // namespace facts::catalog

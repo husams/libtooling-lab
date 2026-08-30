@@ -46,9 +46,46 @@ def main() -> None:
     root_help = run(tool, "--help")
     require(root_help.returncode == 0, output(root_help))
     require(
-        "extract" in output(root_help) and "import" in output(root_help),
+        all(command in output(root_help) for command in
+            ("extract", "import", "file", "symbol")),
         output(root_help),
     )
+
+    file_help = run(tool, "file", "--help")
+    require(file_help.returncode == 0, output(file_help))
+    require(all(command in output(file_help) for command in
+                ("add", "rm", "remove", "list", "ls", "show",
+                 "set-option", "clear-option")), output(file_help))
+
+    file_add_help = run(tool, "file", "add", "--help")
+    require(file_add_help.returncode == 0 and
+            all(option in output(file_add_help) for option in
+                ("--driver", "--working-directory", "--arg")),
+            output(file_add_help))
+
+    file_set_help = run(tool, "file", "set-option", "--help")
+    require(file_set_help.returncode == 0 and
+            "--match" in output(file_set_help) and "--arg" in output(file_set_help),
+            output(file_set_help))
+
+    clone_help = run(tool, "repo", "rm-clone", "--help")
+    require(clone_help.returncode == 0 and "remove-clone" in output(
+        run(tool, "repo", "--help")), output(clone_help))
+
+    symbol_help = run(tool, "symbol", "--help")
+    require(symbol_help.returncode == 0 and "--facts" in output(symbol_help) and
+            "--conf" not in output(symbol_help) and
+            all(command in output(symbol_help) for command in
+                ("list", "ls", "show")), output(symbol_help))
+
+    missing_symbol_facts = run(tool, "symbol", "list")
+    require(missing_symbol_facts.returncode != 0 and
+            "--facts" in output(missing_symbol_facts),
+            output(missing_symbol_facts))
+
+    missing_file_conf = run(tool, "file", "list")
+    require(missing_file_conf.returncode != 0 and
+            "--conf" in output(missing_file_conf), output(missing_file_conf))
 
     extract_help = run(tool, "extract", "--help")
     require(extract_help.returncode == 0, output(extract_help))

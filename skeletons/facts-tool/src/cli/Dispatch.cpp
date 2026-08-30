@@ -23,6 +23,10 @@ std::string_view commandName(const ComponentOptions &) { return "component"; }
 
 std::string_view commandName(const DirectoryOptions &) { return "dir"; }
 
+std::string_view commandName(const FileOptions &) { return "file"; }
+
+std::string_view commandName(const SymbolOptions &) { return "symbol"; }
+
 template <typename Options>
 std::string commandDetails(const Options &options) {
   return std::format("configuration='{}'", options.configuration);
@@ -50,6 +54,10 @@ std::string commandDetails(const DependencyOptions &options) {
                      options.sources.size());
 }
 
+std::string commandDetails(const SymbolOptions &options) {
+  return std::format("facts='{}'", options.facts);
+}
+
 std::expected<int, std::string> execute(const ExtractOptions &options) {
   return commands::runExtract(options);
 }
@@ -72,6 +80,14 @@ std::expected<int, std::string> execute(const ComponentOptions &options) {
 
 std::expected<int, std::string> execute(const DirectoryOptions &options) {
   return commands::runDirectory(options);
+}
+
+std::expected<int, std::string> execute(const FileOptions &options) {
+  return commands::runFile(options);
+}
+
+std::expected<int, std::string> execute(const SymbolOptions &options) {
+  return commands::runSymbol(options);
 }
 
 int report(std::expected<int, std::string> result) {

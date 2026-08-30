@@ -31,5 +31,22 @@ struct Directory {
   std::int64_t files = 0;
 };
 
+struct File {
+  std::int64_t id = 0;
+  std::int64_t directoryId = 0;
+  ProjectComponent component;
+  std::optional<ProjectClone> clone;
+  std::string componentName;
+  std::string directory;
+  std::string name;
+  std::string compileOptions;
+  std::string driver;
+  std::string workingDirectory;
+  bool argsOverridden = false;
+  bool indexed = false;
+};
+
 Result<std::filesystem::path> componentRoot(const Component &component);
+Result<std::filesystem::path> filePath(const File &file);
+std::string relativeFilePath(const File &file);
 } // namespace facts::catalog

@@ -32,6 +32,9 @@ std::string defaultCompilerDriver(const std::filesystem::path &source);
 
 std::string encodeCompileOptions(const std::vector<std::string> &options);
 
+std::expected<std::vector<std::string>, std::string>
+decodeCompileOptions(std::string_view text);
+
 std::expected<clang::tooling::CompileCommand, std::string>
 decodeStoredCommand(const StoredCompileFile &file,
                     const StoredCommandAliases &aliases);

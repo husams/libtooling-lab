@@ -28,6 +28,8 @@ public:
     repositoryCommand_ = configureRepository(app_, repository_);
     componentCommand_ = configureComponent(app_, component_);
     directoryCommand_ = configureDirectory(app_, directory_);
+    fileCommand_ = configureFile(app_, file_);
+    symbolCommand_ = configureSymbol(app_, symbol_);
   }
 
   std::expected<Command, int> parse(int argc, char **argv) {
@@ -46,6 +48,10 @@ public:
       return Command{std::move(component_)};
     if (directoryCommand_->parsed())
       return Command{std::move(directory_)};
+    if (fileCommand_->parsed())
+      return Command{std::move(file_)};
+    if (symbolCommand_->parsed())
+      return Command{std::move(symbol_)};
     return importCommand_->parsed() ? Command{std::move(import_)}
                                     : Command{std::move(dependency_)};
   }
@@ -166,9 +172,13 @@ private:
   CLI::App *repositoryCommand_ = nullptr;
   CLI::App *componentCommand_ = nullptr;
   CLI::App *directoryCommand_ = nullptr;
+  CLI::App *fileCommand_ = nullptr;
+  CLI::App *symbolCommand_ = nullptr;
   RepositoryOptions repository_;
   ComponentOptions component_;
   DirectoryOptions directory_;
+  FileOptions file_;
+  SymbolOptions symbol_;
 };
 
 } // namespace

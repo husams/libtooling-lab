@@ -211,7 +211,7 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
             .and_then([&] {
               return database_.execute(
                   "UPDATE file SET compile_options=NULL,driver=NULL,"
-                  "working_directory=NULL");
+                  "working_directory=NULL WHERE args_overridden=0");
             })
             .and_then([&] {
               return database_.execute(
@@ -280,7 +280,8 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
                   "ON CONFLICT(directory_id,name) DO UPDATE SET "
                   "driver=excluded.driver,"
                   "working_directory=excluded.working_directory,"
-                  "compile_options=excluded.compile_options",
+                  "compile_options=excluded.compile_options,"
+                  "args_overridden=0",
                   configuration.files,
                   [repositoryId](sqlite3_stmt *statement,
                                  const ProjectFile &file) {

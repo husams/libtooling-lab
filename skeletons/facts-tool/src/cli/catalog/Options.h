@@ -2,13 +2,14 @@
 
 #include "storage/catalog/Requests.h"
 #include <string>
+#include <vector>
 
 namespace facts::cli {
 
 using CatalogSelector = catalog::Selector;
 
 struct RepositoryOptions {
-  enum class Action { list, show, addClone, switchClone, remove };
+  enum class Action { list, show, addClone, switchClone, removeClone, remove };
   int verbosity = 0;
   std::string configuration;
   Action action = Action::list;
@@ -17,6 +18,26 @@ struct RepositoryOptions {
   std::string label;
   bool deleteComponents = false;
   bool dryRun = false;
+};
+
+struct FileOptions {
+  enum class Action { add, remove, list, show, setOption, clearOption };
+  int verbosity = 0;
+  std::string configuration;
+  Action action = Action::list;
+  std::string path;
+  std::string driver;
+  std::string workingDirectory;
+  std::string match;
+  std::vector<std::string> arguments;
+};
+
+struct SymbolOptions {
+  enum class Action { list, show };
+  int verbosity = 0;
+  std::string facts;
+  Action action = Action::list;
+  std::string qualifiedName;
 };
 
 struct ComponentOptions {

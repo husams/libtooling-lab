@@ -30,6 +30,7 @@ pytest_plugins = (
     "steps.catalog_failure_steps",
     "steps.catalog_validation_steps",
     "steps.catalog_registration_steps",
+    "steps.catalog_file_symbol_steps",
     "steps.project_import_steps",
     "steps.record_steps",
     "steps.references_steps",

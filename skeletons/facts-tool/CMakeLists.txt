@@ -94,6 +94,7 @@ add_library(facts-storage STATIC
   src/storage/catalog/Clone.cpp
   src/storage/catalog/Registration.cpp
   src/storage/catalog/Removal.cpp
+  src/storage/catalog/File.cpp
   src/storage/DependencyDatabase.cpp
   src/storage/FileDatabase.cpp
   src/storage/FileIdentity.cpp
@@ -197,6 +198,8 @@ add_library(facts-commands STATIC
   src/commands/catalog/Directory.cpp
   src/commands/catalog/Display.cpp
   src/commands/catalog/Export.cpp
+  src/commands/catalog/File.cpp
+  src/commands/catalog/Symbol.cpp
   src/commands/DatabasePaths.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
@@ -219,6 +222,8 @@ add_library(facts-cli STATIC
   src/cli/catalog/Repository.cpp
   src/cli/catalog/Component.cpp
   src/cli/catalog/Directory.cpp
+  src/cli/catalog/File.cpp
+  src/cli/catalog/Symbol.cpp
 )
 target_include_directories(facts-cli PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-cli PRIVATE facts-commands CLI11::CLI11)
