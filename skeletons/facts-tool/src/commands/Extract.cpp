@@ -220,7 +220,8 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
                          })
       .and_then([&] {
         return runExtractStage(options, "load compilation database", [&] {
-          return loadStoredCompilationDatabase(options.configuration);
+          return loadStoredCompilationDatabase(options.configuration,
+                                               options.sources);
         });
       })
       .transform([&](CompilationDatabasePtr database) {

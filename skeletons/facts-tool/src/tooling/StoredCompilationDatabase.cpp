@@ -49,10 +49,11 @@ makeStoredCompilationDatabase(CompileCommands commands) {
 } // namespace
 
 std::expected<std::unique_ptr<clang::tooling::CompilationDatabase>, std::string>
-loadStoredCompilationDatabase(std::string databasePath) {
+loadStoredCompilationDatabase(std::string databasePath,
+                              std::span<const std::string> requestedSources) {
   return openStoredDatabase(normalizeCompilationPath(std::move(databasePath)))
-      .and_then([](StoredDatabase database) {
-        return readStoredCompilation(database.get());
+      .and_then([requestedSources](StoredDatabase database) {
+        return readStoredCompilation(database.get(), requestedSources);
       })
       .and_then(decodeCompileCommands)
       .transform(makeStoredCompilationDatabase);

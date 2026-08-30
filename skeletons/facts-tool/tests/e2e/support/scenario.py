@@ -387,6 +387,17 @@ class FactsToolContext:
         self._select_facts_database("malformed-stored-facts.sqlite")
         self._run(self.stored_tool_command())
 
+    def run_with_malformed_unrelated_stored_options(self) -> None:
+        self.extract()
+        with sqlite3.connect(self.files_database_path) as connection:
+            connection.execute(
+                "UPDATE file SET compile_options=? WHERE name='two.cpp'",
+                ('{"invalid":true}',),
+            )
+        self._remove_compilation_database()
+        self._select_facts_database("malformed-unrelated-stored-facts.sqlite")
+        self._run(self._tool_command((self.sources[0],)))
+
     def run_with_missing_stored_command(self, filename: str) -> None:
         self.extract()
         self._store_compile_options(self._compile_options())

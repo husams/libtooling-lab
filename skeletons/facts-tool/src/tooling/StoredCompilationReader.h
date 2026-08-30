@@ -4,6 +4,7 @@
 #include <expected>
 #include <filesystem>
 #include <map>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,7 @@ std::expected<StoredDatabase, std::string>
 openStoredDatabase(const std::filesystem::path &path);
 
 std::expected<StoredCompilationSnapshot, std::string>
-readStoredCompilation(sqlite3 *database);
+readStoredCompilation(sqlite3 *database,
+                      std::span<const std::string> requestedSources = {});
 
 } // namespace facts

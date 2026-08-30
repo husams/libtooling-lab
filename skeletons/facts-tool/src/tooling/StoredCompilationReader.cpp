@@ -2,10 +2,12 @@
 
 #include "storage/ProjectConfiguration.h"
 #include "storage/Sqlite.h"
+#include "tooling/CompilationCommandCodec.h"
 
 #include <sqlite3.h>
 
 #include <optional>
+#include <set>
 #include <string_view>
 #include <utility>
 
@@ -41,6 +43,18 @@ std::filesystem::path componentRoot(sqlite3_stmt *statement) {
           ? std::optional<ProjectClone>{}
           : std::optional<ProjectClone>{ProjectClone{.path = clonePath}};
   return effectiveComponentRoot(component, clone);
+}
+
+StoredCompileFile storedCompileFile(sqlite3_stmt *statement) {
+  auto root = componentRoot(statement);
+  return {root,
+          (root / storage::columnText(statement, 6) /
+           storage::columnText(statement, 7))
+              .lexically_normal(),
+          storage::columnText(statement, 1),
+          storage::columnText(statement, 8),
+          storage::columnText(statement, 9),
+          storage::columnText(statement, 10)};
 }
 
 std::expected<std::vector<StoredCompilationComponent>, std::string>
@@ -89,15 +103,7 @@ readStoredFiles(sqlite3 *database) {
         std::vector<StoredCompileFile> files;
         auto status = sqlite3_step(statement.get());
         while (status == SQLITE_ROW) {
-          auto root = componentRoot(statement.get());
-          files.push_back({root,
-                           (root / storage::columnText(statement.get(), 6) /
-                            storage::columnText(statement.get(), 7))
-                               .lexically_normal(),
-                           storage::columnText(statement.get(), 1),
-                           storage::columnText(statement.get(), 8),
-                           storage::columnText(statement.get(), 9),
-                           storage::columnText(statement.get(), 10)});
+          files.push_back(storedCompileFile(statement.get()));
           status = sqlite3_step(statement.get());
         }
         if (status != SQLITE_DONE) {
@@ -107,6 +113,197 @@ readStoredFiles(sqlite3 *database) {
         return std::expected<std::vector<StoredCompileFile>, std::string>{
             std::move(files)};
       });
+}
+
+struct RequestedFileIdentity {
+  std::int64_t componentId;
+  std::filesystem::path path;
+  std::string directory;
+  std::string name;
+};
+
+struct OwningComponent {
+  const StoredCompilationComponent *component;
+  std::filesystem::path identity;
+};
+
+bool ownsPath(const std::filesystem::path &root,
+              const std::filesystem::path &path) {
+  const auto relative = path.lexically_relative(root);
+  return !relative.empty() && !relative.is_absolute() &&
+         *relative.begin() != "..";
+}
+
+std::expected<OwningComponent, std::string>
+selectOwningComponent(const std::vector<StoredCompilationComponent> &components,
+                      const std::filesystem::path &logicalPath,
+                      const std::filesystem::path &canonicalPath) {
+  const StoredCompilationComponent *selected = nullptr;
+  std::filesystem::path selectedIdentity;
+  std::size_t selectedRootSize = 0;
+  bool ambiguous = false;
+  bool selectedLogicalOwner = false;
+  for (const auto &component : components) {
+    const auto root = logicalCompilationPath(component.root);
+    const auto logicalOwner = ownsPath(root, logicalPath);
+    const auto identity = logicalOwner                    ? &logicalPath
+                          : ownsPath(root, canonicalPath) ? &canonicalPath
+                                                          : nullptr;
+    if (!identity) {
+      continue;
+    }
+    if (logicalOwner && !selectedLogicalOwner) {
+      selected = nullptr;
+      selectedRootSize = 0;
+      ambiguous = false;
+      selectedLogicalOwner = true;
+    } else if (!logicalOwner && selectedLogicalOwner) {
+      continue;
+    }
+    const auto rootSize = root.native().size();
+    if (!selected || rootSize > selectedRootSize) {
+      selected = &component;
+      selectedIdentity = *identity;
+      selectedRootSize = rootSize;
+      ambiguous = false;
+    } else if (rootSize == selectedRootSize) {
+      ambiguous = true;
+    }
+  }
+  if (!selected) {
+    return std::unexpected("no stored compile command for requested source '" +
+                           logicalPath.string() + "'");
+  }
+  if (ambiguous) {
+    return std::unexpected(
+        "ambiguous stored compile commands for requested source '" +
+        logicalPath.string() + "'");
+  }
+  return OwningComponent{selected, std::move(selectedIdentity)};
+}
+
+std::expected<RequestedFileIdentity, std::string>
+identifyRequestedFile(const std::vector<StoredCompilationComponent> &components,
+                      const std::string &requestedSource) {
+  const auto logicalPath = logicalCompilationPath(requestedSource);
+  const auto owner = selectOwningComponent(
+      components, logicalPath, normalizeCompilationPath(logicalPath));
+  if (!owner) {
+    return std::unexpected(owner.error());
+  }
+  const auto relative = owner->identity.lexically_relative(
+      logicalCompilationPath(owner->component->root));
+  return RequestedFileIdentity{owner->component->id, logicalPath,
+                               relative.parent_path().generic_string(),
+                               relative.filename().generic_string()};
+}
+
+std::expected<std::vector<RequestedFileIdentity>, std::string>
+identifyRequestedFiles(
+    const std::vector<StoredCompilationComponent> &components,
+    std::span<const std::string> requestedSources) {
+  std::vector<RequestedFileIdentity> identities;
+  std::set<std::string> seen;
+  for (const auto &source : requestedSources) {
+    auto identity = identifyRequestedFile(components, source);
+    if (!identity) {
+      return std::unexpected(identity.error());
+    }
+    if (seen.insert(identity->path.string()).second) {
+      identities.push_back(std::move(*identity));
+    }
+  }
+  return identities;
+}
+
+std::expected<void, std::string>
+bindRequestedFile(storage::Statement &statement,
+                  const RequestedFileIdentity &identity, sqlite3 *database) {
+  const auto directory = identity.directory;
+  const auto name = identity.name;
+  if (sqlite3_reset(statement.get()) != SQLITE_OK ||
+      sqlite3_clear_bindings(statement.get()) != SQLITE_OK ||
+      sqlite3_bind_int64(statement.get(), 1, identity.componentId) !=
+          SQLITE_OK ||
+      sqlite3_bind_text(statement.get(), 2, directory.c_str(), -1,
+                        SQLITE_TRANSIENT) != SQLITE_OK ||
+      sqlite3_bind_text(statement.get(), 3, name.c_str(), -1,
+                        SQLITE_TRANSIENT) != SQLITE_OK) {
+    return std::unexpected(sqliteMessage(database));
+  }
+  return {};
+}
+
+std::expected<StoredCompileFile, std::string>
+readRequestedFile(storage::Statement &statement,
+                  const RequestedFileIdentity &identity, sqlite3 *database) {
+  return bindRequestedFile(statement, identity, database).and_then([&] {
+    auto status = sqlite3_step(statement.get());
+    if (status == SQLITE_DONE) {
+      return std::expected<StoredCompileFile, std::string>{
+          std::unexpected("no stored compile command for requested source '" +
+                          identity.path.string() + "'")};
+    }
+    if (status != SQLITE_ROW) {
+      return std::expected<StoredCompileFile, std::string>{
+          std::unexpected(sqliteMessage(database))};
+    }
+    auto file = storedCompileFile(statement.get());
+    status = sqlite3_step(statement.get());
+    if (status == SQLITE_ROW) {
+      return std::expected<StoredCompileFile, std::string>{std::unexpected(
+          "ambiguous stored compile commands for requested source '" +
+          identity.path.string() + "'")};
+    }
+    if (status != SQLITE_DONE) {
+      return std::expected<StoredCompileFile, std::string>{
+          std::unexpected(sqliteMessage(database))};
+    }
+    return std::expected<StoredCompileFile, std::string>{std::move(file)};
+  });
+}
+
+std::expected<std::vector<StoredCompileFile>, std::string>
+readRequestedFiles(sqlite3 *database,
+                   const std::vector<RequestedFileIdentity> &identities) {
+  constexpr auto sql =
+      "SELECT component.id, component.name, component.path, "
+      "component.version, component.repository_id, clone.path, "
+      "directory.path, file.name, file.driver, file.working_directory, "
+      "file.compile_options "
+      "FROM file JOIN directory ON directory.id=file.directory_id "
+      "JOIN component ON component.id=directory.component_id "
+      "LEFT JOIN repository ON repository.id=component.repository_id "
+      "LEFT JOIN clone ON clone.id=repository.active_clone_id "
+      "WHERE file.compile_options IS NOT NULL AND component.id=?1 "
+      "AND directory.path=?2 AND file.name=?3 ORDER BY file.id";
+  return prepareStatement(database, sql)
+      .and_then([database, &identities](storage::Statement statement) {
+        std::vector<StoredCompileFile> files;
+        files.reserve(identities.size());
+        for (const auto &identity : identities) {
+          auto file = readRequestedFile(statement, identity, database);
+          if (!file) {
+            return std::expected<std::vector<StoredCompileFile>, std::string>{
+                std::unexpected(file.error())};
+          }
+          files.push_back(std::move(*file));
+        }
+        return std::expected<std::vector<StoredCompileFile>, std::string>{
+            std::move(files)};
+      });
+}
+
+std::expected<std::vector<StoredCompileFile>, std::string>
+readSelectedFiles(sqlite3 *database,
+                  const std::vector<StoredCompilationComponent> &components,
+                  std::span<const std::string> requestedSources) {
+  return requestedSources.empty()
+             ? readStoredFiles(database)
+             : identifyRequestedFiles(components, requestedSources)
+                   .and_then([database](const auto &identities) {
+                     return readRequestedFiles(database, identities);
+                   });
 }
 
 bool hasTable(sqlite3 *database, std::string_view name) {
@@ -188,16 +385,18 @@ openStoredDatabase(const std::filesystem::path &path) {
 }
 
 std::expected<StoredCompilationSnapshot, std::string>
-readStoredCompilation(sqlite3 *database) {
+readStoredCompilation(sqlite3 *database,
+                      std::span<const std::string> requestedSources) {
   return readComponents(database).and_then(
-      [database](std::vector<StoredCompilationComponent> components) {
+      [database,
+       requestedSources](std::vector<StoredCompilationComponent> components) {
         return readLabels(database).and_then(
-            [database, components = std::move(components)](
+            [database, requestedSources, components = std::move(components)](
                 StoredCommandAliases labels) mutable {
-              return readStoredFiles(database).transform(
-                  [components = std::move(components),
-                   labels = std::move(labels)](
-                      std::vector<StoredCompileFile> files) mutable {
+              return readSelectedFiles(database, components, requestedSources)
+                  .transform([components = std::move(components),
+                              labels = std::move(labels)](
+                                 std::vector<StoredCompileFile> files) mutable {
                     return StoredCompilationSnapshot{
                         .components = std::move(components),
                         .files = std::move(files),
