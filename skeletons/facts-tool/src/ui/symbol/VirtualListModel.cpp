@@ -78,13 +78,13 @@ ColumnWidths columnWidths(int terminalWidth) {
     column += amount;
     remaining -= amount;
   };
-  distribute(result.identity, 12);
-  distribute(result.kind, 14);
-  distribute(result.flags, 18);
-  const auto locationGrowth = std::min(remaining / 2, 22);
+  distribute(result.identity, 8);
+  distribute(result.kind, 10);
+  distribute(result.flags, 12);
+  const auto locationGrowth = std::min(remaining / 3, 14);
   result.location += locationGrowth;
   remaining -= locationGrowth;
-  result.symbol += remaining;
+  distribute(result.symbol, 36);
   return result;
 }
 

@@ -33,11 +33,16 @@ int main() {
   require(state.selected == 0 && state.offset == 0,
           "home did not reset selection and scroll offset");
 
-  const auto columns = columnWidths(100);
-  require(columns.total() == 100,
+  const auto columns = columnWidths(80);
+  require(columns.total() == 80,
           "fixed column widths do not fill the terminal viewport");
   require(columnWidths(38).total() == 38,
           "narrow terminal columns do not match the available viewport");
+  const auto wideColumns = columnWidths(200);
+  require(wideColumns.total() == 90 && wideColumns.identity == 8 &&
+              wideColumns.symbol == 36 && wideColumns.kind == 10 &&
+              wideColumns.flags == 12 && wideColumns.location == 20,
+          "wide terminals did not cap compact browser columns");
   const auto truncated = truncateCell("/a/very/long/path/to/source.cpp", 14);
   require(cellWidth(truncated) == 14 && truncated.ends_with("..."),
           "long cells were not truncated to their terminal width");
