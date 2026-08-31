@@ -133,7 +133,7 @@ Feature: Manage files, clones, and extracted symbols
   Scenario Outline: Symbol list aliases read only the facts database
     When I run the symbol command "<verb>"
     Then the symbol command succeeds
-    And symbol output lists the extracted catalog function with aligned columns
+    And symbol output lists only qualified names and kinds
 
     Examples:
       | verb |

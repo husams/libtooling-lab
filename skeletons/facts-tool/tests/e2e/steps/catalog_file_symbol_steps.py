@@ -258,18 +258,18 @@ def symbol_fails(catalog: Catalog, diagnostic: str) -> None:
             catalog.context.last_output)
 
 
-@then("symbol output lists the extracted catalog function with aligned columns")
+@then("symbol output lists only qualified names and kinds")
 def symbol_list_output(catalog: Catalog) -> None:
     lines = catalog.stdout.splitlines()
-    header = next((line for line in lines if line.startswith("id ")), "")
+    header = next((line for line in lines if line.startswith("qualified name")), "")
     symbol = next((line for line in lines if "catalog_value_0" in line), "")
-    require(header and symbol and "catalog_value_0(int amount = 0)" in symbol and
-            "function" in symbol and "definition" in symbol and
-            "one.cpp:1" in symbol and
+    require(header and symbol and "catalog_value_0" in symbol and
+            "function" in symbol and "definition" not in symbol and
+            "one.cpp" not in symbol and "id" not in header and
+            "flags" not in header and "location" not in header and
             symbol.index("function") == header.index("kind") and
-            symbol.index("one.cpp:1") == header.index("location") and
             all("/core/src/one.cpp" not in line for line in lines),
-            f"incomplete or unaligned symbol list: {catalog.stdout}")
+            f"unexpected symbol list columns: {catalog.stdout}")
 
 
 @then("symbol output contains human-readable function metadata")

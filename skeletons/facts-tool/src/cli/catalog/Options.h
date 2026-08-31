@@ -33,7 +33,7 @@ struct FileOptions {
 };
 
 struct SymbolOptions {
-  enum class Action { list, show, view };
+  enum class Action { list, show, browser };
   int verbosity = 0;
   std::string facts;
   std::string configuration;

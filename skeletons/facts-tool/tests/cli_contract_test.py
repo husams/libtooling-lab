@@ -76,7 +76,10 @@ def main() -> None:
     require(symbol_help.returncode == 0 and "--facts" in output(symbol_help) and
             "--conf" in output(symbol_help) and
             all(command in output(symbol_help) for command in
-                ("list", "ls", "show", "view")), output(symbol_help))
+                ("list", "ls", "show", "browser")), output(symbol_help))
+
+    removed_symbol_view = run(tool, "symbol", "view")
+    require(removed_symbol_view.returncode != 0, output(removed_symbol_view))
 
     missing_symbol_facts = run(tool, "symbol", "list")
     require(missing_symbol_facts.returncode != 0 and

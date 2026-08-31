@@ -31,7 +31,7 @@ catalog::Result<int> runSymbol(const cli::SymbolOptions &options) {
                         : std::nullopt;
   return loadSymbols(options.facts, options.configuration, name)
       .and_then([&](auto values) -> catalog::Result<int> {
-        if (options.action == cli::SymbolOptions::Action::view)
+        if (options.action == cli::SymbolOptions::Action::browser)
           return ui::symbol::runBrowser(std::move(values));
         return renderScriptOutput(options, values);
       });

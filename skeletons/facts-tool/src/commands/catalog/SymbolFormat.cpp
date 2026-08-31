@@ -12,17 +12,25 @@
 namespace facts::commands {
 
 std::vector<std::string> trueFlags(const storage::Row &row) {
-  static constexpr std::array flagColumns{
-      std::pair{12, "definition"}, std::pair{13, "implicit"},
-      std::pair{14, "static"}, std::pair{15, "virtual"},
-      std::pair{16, "const"}, std::pair{17, "inline"},
-      std::pair{18, "pure"}, std::pair{20, "override"},
-      std::pair{21, "internal-linkage"}, std::pair{22, "external"},
-      std::pair{23, "variadic"}, std::pair{24, "deleted"},
-      std::pair{25, "defaulted"}, std::pair{26, "explicit"},
-      std::pair{27, "final"}, std::pair{28, "abstract"},
-      std::pair{29, "polymorphic"}, std::pair{30, "extern-storage"},
-      std::pair{32, "noexcept"}};
+  static constexpr std::array flagColumns{std::pair{12, "definition"},
+                                          std::pair{13, "implicit"},
+                                          std::pair{14, "static"},
+                                          std::pair{15, "virtual"},
+                                          std::pair{16, "const"},
+                                          std::pair{17, "inline"},
+                                          std::pair{18, "pure"},
+                                          std::pair{20, "override"},
+                                          std::pair{21, "internal-linkage"},
+                                          std::pair{22, "external"},
+                                          std::pair{23, "variadic"},
+                                          std::pair{24, "deleted"},
+                                          std::pair{25, "defaulted"},
+                                          std::pair{26, "explicit"},
+                                          std::pair{27, "final"},
+                                          std::pair{28, "abstract"},
+                                          std::pair{29, "polymorphic"},
+                                          std::pair{30, "extern-storage"},
+                                          std::pair{32, "noexcept"}};
   std::vector<std::string> flags;
   for (const auto &[column, name] : flagColumns)
     if (row.integer(column))
@@ -32,8 +40,8 @@ std::vector<std::string> trueFlags(const storage::Row &row) {
 
 namespace {
 
-constexpr std::string_view symbolPropertyName(
-    clang::index::SymbolProperty property) noexcept {
+constexpr std::string_view
+symbolPropertyName(clang::index::SymbolProperty property) noexcept {
   switch (property) {
   case clang::index::SymbolProperty::Generic:
     return "Generic";
@@ -130,11 +138,9 @@ std::string declaration(const SymbolFact &value) {
   return result;
 }
 
-std::string formatListRow(const std::array<std::string, 5> &row,
-                          const std::array<std::size_t, 5> &widths) {
-  return std::format("{:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}\n", row[0],
-                      widths[0], row[1], widths[1], row[2], widths[2], row[3],
-                      widths[3], row[4], widths[4]);
+std::string formatListRow(const std::array<std::string, 2> &row,
+                          const std::array<std::size_t, 2> &widths) {
+  return std::format("{:<{}}  {:<{}}\n", row[0], widths[0], row[1], widths[1]);
 }
 
 } // namespace
@@ -146,15 +152,12 @@ std::string symbolDeclaration(const SymbolFact &value) {
 std::string displaySymbols(const std::vector<SymbolFact> &values) {
   if (values.empty())
     return "No symbols\n";
-  const std::array<std::string, 5> headers{"id", "symbol", "kind", "flags",
-                                            "location"};
-  std::vector<std::array<std::string, 5>> rows;
+  const std::array<std::string, 2> headers{"qualified name", "kind"};
+  std::vector<std::array<std::string, 2>> rows;
   rows.reserve(values.size());
   for (const auto &value : values)
-    rows.push_back({symbolId(value.id), symbolDeclaration(value), value.kind,
-                    value.flags.empty() ? "-" : join(value.flags),
-                    std::format("{}:{}", value.sourceName, value.line)});
-  std::array<std::size_t, 5> widths{};
+    rows.push_back({value.qualifiedName, value.kind});
+  std::array<std::size_t, 2> widths{};
   for (std::size_t column = 0; column < widths.size(); ++column) {
     widths[column] = headers[column].size();
     for (const auto &row : rows)
@@ -176,8 +179,8 @@ std::string displaySymbol(const SymbolFact &value) {
     output += std::format("  language   {}\n", value.language);
   if (value.access != "none")
     output += std::format("  access     {}\n", value.access);
-  output += std::format("  source     {}:{}:{}\n", value.sourceName,
-                        value.line, value.column);
+  output += std::format("  source     {}:{}:{}\n", value.sourceName, value.line,
+                        value.column);
   if (!value.sourcePath.empty())
     output += std::format("             {}\n", value.sourcePath.string());
   output += std::format("  usr        {}\n  properties {}\n", value.usr,
