@@ -20,10 +20,10 @@ public:
         "extract", "Extract facts using a stored project configuration"));
     configureImport(*app_.add_subcommand(
         "import", "Import compile commands into a project configuration"));
-    analysesCommand_ =
-        app_.add_subcommand("analyses", "Run explicitly requested analyses");
-    analysesCommand_->require_subcommand(1, 1);
-    configureDependency(*analysesCommand_->add_subcommand(
+    analyseCommand_ =
+        app_.add_subcommand("analyse", "Run explicitly requested analyses");
+    analyseCommand_->require_subcommand(1, 1);
+    configureDependency(*analyseCommand_->add_subcommand(
         "dependency", "Build the direct include dependency graph"));
     repositoryCommand_ = configureRepository(app_, repository_);
     componentCommand_ = configureComponent(app_, component_);
@@ -164,7 +164,7 @@ private:
   CLI::App app_;
   CLI::App *extractCommand_ = nullptr;
   CLI::App *importCommand_ = nullptr;
-  CLI::App *analysesCommand_ = nullptr;
+  CLI::App *analyseCommand_ = nullptr;
   CLI::App *dependencyCommand_ = nullptr;
   ExtractOptions extract_;
   ImportOptions import_;

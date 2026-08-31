@@ -119,7 +119,7 @@ def main() -> None:
         output(import_help),
     )
 
-    dependency_help = run(tool, "analyses", "dependency", "--help")
+    dependency_help = run(tool, "analyse", "dependency", "--help")
     require(dependency_help.returncode == 0, output(dependency_help))
     require(
         "--output" in output(dependency_help)
@@ -251,7 +251,7 @@ def main() -> None:
 
         invalid_dependency_verbosity = run(
             tool,
-            "analyses",
+            "analyse",
             "dependency",
             "--verbose",
             "4",
@@ -325,7 +325,7 @@ def main() -> None:
 
         identical_dependency_databases = run(
             tool,
-            "analyses",
+            "analyse",
             "dependency",
             "--output",
             str(same_database),
@@ -340,7 +340,7 @@ def main() -> None:
 
         detailed_dependency = run(
             tool,
-            "analyses",
+            "analyse",
             "dependency",
             "--verbose",
             "2",
@@ -365,7 +365,7 @@ def main() -> None:
 
         short_dependency = run(
             tool,
-            "analyses",
+            "analyse",
             "dependency",
             "-v",
             "--output",
@@ -588,7 +588,7 @@ def main() -> None:
 
         runtime_dependency = run(
             tool,
-            "analyses",
+            "analyse",
             "dependency",
             "--output",
             str(root / "runtime-extra-arguments-dependencies.sqlite"),

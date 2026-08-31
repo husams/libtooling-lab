@@ -377,7 +377,7 @@ if(BUILD_TESTING)
   )
   add_test(
     NAME dependency-analysis-first
-    COMMAND facts-tool analyses dependency
+    COMMAND facts-tool analyse dependency
             --output ${dependency_output}
             --conf ${dependency_config}
             ${dependency_fixture}/root.cpp
@@ -386,7 +386,7 @@ if(BUILD_TESTING)
     DEPENDS dependency-analysis-import)
   add_test(
     NAME dependency-analysis-second
-    COMMAND facts-tool analyses dependency
+    COMMAND facts-tool analyse dependency
             --output ${dependency_output}
             --conf ${dependency_config}
             ${dependency_fixture}/root.cpp
