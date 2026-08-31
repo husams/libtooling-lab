@@ -73,12 +73,18 @@ class Catalog:
                     f"a catalog command changed or deleted checkout source {source}")
 
     def run_symbol(self, command: str) -> None:
+        self._run_symbol(command, include_configuration=True)
+
+    def run_symbol_without_configuration(self, command: str) -> None:
+        self._run_symbol(command, include_configuration=False)
+
+    def _run_symbol(self, command: str, include_configuration: bool) -> None:
         arguments = shlex.split(command)
-        result = self.context._run(
-            [str(self.context.facts_tool), "symbol", *arguments,
-             "--facts", str(self.context.facts_database_path), "--conf",
-             str(self.context.files_database_path)]
-        )
+        command_line = [str(self.context.facts_tool), "symbol", *arguments,
+                        "--facts", str(self.context.facts_database_path)]
+        if include_configuration:
+            command_line.extend(("--conf", str(self.context.files_database_path)))
+        result = self.context._run(command_line)
         self.stdout = result.stdout
         require(self.context.files_database_path.read_bytes() ==
                 self.configuration_before,

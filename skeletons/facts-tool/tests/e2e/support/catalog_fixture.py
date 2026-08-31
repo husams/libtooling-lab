@@ -19,7 +19,8 @@ def prepare_catalog(context: FactsToolContext) -> Catalog:
     for number, relative in enumerate(paths):
         source = checkout / relative
         source.parent.mkdir(parents=True, exist_ok=True)
-        content = f"int catalog_value_{number}() {{ return {number}; }}\n".encode()
+        content = (f"int catalog_value_{number}() {{ return {number}; }}\n"
+                   + ("struct catalog_record {};\n" if number == 0 else "")).encode()
         source.write_bytes(content)
         catalog.sources[source] = content
     commands = [

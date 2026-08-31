@@ -140,10 +140,16 @@ Feature: Manage files, clones, and extracted symbols
       | list |
       | ls   |
 
-  Scenario: Symbol show returns full stored details by exact qualified name
+  Scenario: Symbol show renders human-readable function metadata
     When I show the extracted catalog function
     Then the symbol command succeeds
     And symbol output contains the full stored symbol details
+    And symbol output contains human-readable function metadata
+
+  Scenario: Symbol show renders human-readable record metadata without catalog configuration
+    When I show the extracted catalog record without catalog configuration
+    Then the symbol command succeeds
+    And symbol output contains human-readable record metadata
 
   Scenario: Symbol show rejects an unknown qualified name
     When I run the symbol command "show definitely::missing"

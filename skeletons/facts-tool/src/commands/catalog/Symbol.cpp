@@ -32,6 +32,79 @@ struct SourceFile {
   std::filesystem::path path;
 };
 
+constexpr std::string_view symbolPropertyName(
+    clang::index::SymbolProperty property) noexcept {
+  switch (property) {
+  case clang::index::SymbolProperty::Generic:
+    return "Generic";
+  case clang::index::SymbolProperty::TemplatePartialSpecialization:
+    return "TemplatePartialSpecialization";
+  case clang::index::SymbolProperty::TemplateSpecialization:
+    return "TemplateSpecialization";
+  case clang::index::SymbolProperty::UnitTest:
+    return "UnitTest";
+  case clang::index::SymbolProperty::IBAnnotated:
+    return "IBAnnotated";
+  case clang::index::SymbolProperty::IBOutletCollection:
+    return "IBOutletCollection";
+  case clang::index::SymbolProperty::GKInspectable:
+    return "GKInspectable";
+  case clang::index::SymbolProperty::Local:
+    return "Local";
+  case clang::index::SymbolProperty::ProtocolInterface:
+    return "ProtocolInterface";
+  }
+  return "Unknown";
+}
+
+std::string symbolProperties(std::int64_t properties) {
+  std::string result;
+  clang::index::applyForEachSymbolProperty(
+      static_cast<clang::index::SymbolPropertySet>(properties),
+      [&result](const auto property) {
+        if (!result.empty())
+          result += ", ";
+        result += symbolPropertyName(property);
+      });
+  return result.empty() ? "none" : result;
+}
+
+bool isBooleanColumn(int column) {
+  switch (column) {
+  case 12:
+  case 13:
+  case 14:
+  case 15:
+  case 16:
+  case 17:
+  case 18:
+  case 20:
+  case 21:
+  case 22:
+  case 23:
+  case 24:
+  case 25:
+  case 26:
+  case 27:
+  case 28:
+  case 29:
+  case 30:
+  case 32:
+    return true;
+  default:
+    return false;
+  }
+}
+
+std::string symbolDetail(const storage::Row &row, int column) {
+  if (column == 6 || column == 7 || column == 11 || column == 19 ||
+      column == 31)
+    return row.string(column);
+  if (isBooleanColumn(column))
+    return row.integer(column) ? "yes" : "no";
+  return std::to_string(row.integer(column));
+}
+
 std::string sourceLocation(const std::vector<SourceFile> &files, SymbolId id,
                            std::int64_t line) {
   const auto file = std::ranges::find(files, id.file, &SourceFile::id);
@@ -79,12 +152,10 @@ symbols(storage::Database &database, const std::vector<SourceFile> &files,
         value.kind = clang::index::getSymbolKindString(
                          row.get<clang::index::SymbolKind>(2))
                          .str();
-        for (int column = 5; column <= 32; ++column)
+        value.details[4] = symbolProperties(row.integer(5));
+        for (int column = 6; column <= 32; ++column)
           value.details[static_cast<std::size_t>(column - 1)] =
-              column == 6 || column == 7 || column == 11 || column == 19 ||
-                      column == 31
-                  ? row.string(column)
-                  : std::to_string(row.integer(column));
+              symbolDetail(row, column);
         value.details[2] = clang::index::getSymbolSubKindString(
                                row.get<clang::index::SymbolSubKind>(3))
                                .str();

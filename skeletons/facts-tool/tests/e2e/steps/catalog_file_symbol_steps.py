@@ -236,6 +236,16 @@ def show_known_symbol(catalog: Catalog) -> None:
     catalog.run_symbol(f"show {name}")
 
 
+@when("I show the extracted catalog record without catalog configuration")
+def show_known_record_without_configuration(catalog: Catalog) -> None:
+    with sqlite3.connect(catalog.context.facts_database_path) as connection:
+        name = connection.execute(
+            "SELECT qualified_name FROM symbol "
+            "WHERE qualified_name='catalog_record'"
+        ).fetchone()[0]
+    catalog.run_symbol_without_configuration(f"show {name}")
+
+
 @then("the symbol command succeeds")
 def symbol_succeeds(catalog: Catalog) -> None:
     require(catalog.context.last_returncode == 0, catalog.context.last_output)
@@ -268,6 +278,28 @@ def symbol_show_output(catalog: Catalog) -> None:
                   if line.startswith("KIND:")]
     require(len(kind_lines) == 1 and "NODE:" not in catalog.stdout,
             f"symbol header fields were duplicated: {catalog.stdout}")
+
+
+@then("symbol output contains human-readable function metadata")
+def human_readable_function_metadata(catalog: Catalog) -> None:
+    expected_source = str(catalog.checkout / "core/src/one.cpp")
+    for label in (f"SOURCE: one.cpp@{expected_source}:1", "KIND: function",
+                  "TYPE: Function", "PROPERTIES: none", "DEFINITION: yes",
+                  "IMPLICIT: no", "NOEXCEPT: no"):
+        require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")
+
+
+@then("symbol output contains human-readable record metadata")
+def human_readable_record_metadata(catalog: Catalog) -> None:
+    file_id = next(line.removeprefix("FILE ID: ")
+                   for line in catalog.stdout.splitlines()
+                   if line.startswith("FILE ID:"))
+    for label in (f"SOURCE: <file {file_id}>@<unknown>:2", "KIND: struct",
+                  "TYPE: Record", "PROPERTIES: none", "DEFINITION: yes"):
+        require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")
+    require("PROPERTIES: 0" not in catalog.stdout and
+            all(value in catalog.stdout for value in ("IMPLICIT: no", "STATIC: no")),
+            f"record metadata was not decoded: {catalog.stdout}")
 
 
 @given("the facts database contains no symbols")
