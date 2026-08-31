@@ -1,5 +1,6 @@
 #include "ast/visitors/Traversal.h"
 
+#include "ast/visitors/CallGraphVisitor.h"
 #include "ast/visitors/SymbolVisitor.h"
 
 #include <clang/AST/ASTContext.h>
@@ -14,7 +15,12 @@ void traverse(clang::ASTContext &context, FileManager &files, FactStore &store,
         IndexingError{"cannot traverse translation unit declarations"}));
     return;
   }
-  status.record(visitor.flushBodies());
+  auto bodies = visitor.flushBodies();
+  if (!bodies) {
+    status.record(std::move(bodies));
+    return;
+  }
+  status.record(CallGraphVisitor(context, files, store).run());
 }
 
 } // namespace facts

@@ -228,6 +228,8 @@ CREATE TABLE IF NOT EXISTS relation_site (
   line           INTEGER NOT NULL,
   col            INTEGER NOT NULL,
   offset         INTEGER NOT NULL,
+  receiver_type_id INTEGER REFERENCES symbol(id),
+  certainty      INTEGER,
   PRIMARY KEY (source_id, destination_id, kind, position, file_id, offset),
   FOREIGN KEY (source_id, destination_id, kind, position)
     REFERENCES relation(source_id, destination_id, kind, position)
@@ -239,7 +241,7 @@ CREATE TABLE IF NOT EXISTS relation_site (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=7;
+PRAGMA user_version=8;
 
 )sql";
 

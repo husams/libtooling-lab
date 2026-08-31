@@ -1,5 +1,6 @@
 #include "storage/Storage.h"
 
+#include "analysis/callgraph/RelationSiteContextStore.h"
 #include "storage/StorageQuery.h"
 
 #include <algorithm>
@@ -29,6 +30,17 @@ bool validUseSite(const RelationSite &site) {
          site.location.line != 0 && site.location.column != 0;
 }
 
+bool validRelationSite(const RelationSite &site) {
+  const auto siteBacked = site.kind == RelationKind::Uses ||
+                          site.kind == RelationKind::Calls ||
+                          site.kind == RelationKind::DispatchCalls ||
+                          site.kind == RelationKind::Overrides;
+  return siteBacked && site.source != SymbolId{} &&
+         site.destination != SymbolId{} && site.file != builtinFileId &&
+         site.location.line != 0 && site.location.column != 0 &&
+         callgraph::validContext(site);
+}
+
 bool sitesBelongToRelations(std::span<const Relation> relations,
                             std::span<const RelationSite> sites) {
   return std::ranges::all_of(sites, [&](const RelationSite &site) {
@@ -53,26 +65,14 @@ validateUseFacts(std::span<const Relation> relations,
 
 std::expected<void, std::error_code>
 Storage::addRelationSites(std::span<const RelationSite> sites) {
-  if (!std::ranges::all_of(sites, validUseSite)) {
+  if (!std::ranges::all_of(sites, validRelationSite)) {
     return std::unexpected(std::make_error_code(std::errc::invalid_argument));
   }
-
-  return database_
-      .executeBulk(
-          "INSERT INTO relation_site(source_id,destination_id,kind,position,"
-          "file_id,line,col,offset) VALUES(?1,?2,?3,?4,?5,?6,?7,?8) "
-          "ON CONFLICT DO NOTHING",
-          sites,
-          storage::detail::typedBinder([](auto bind, const RelationSite &site) {
-            return bind(site.source, site.destination, site.kind, site.position,
-                        site.file, site.location.line, site.location.column,
-                        site.location.offset);
-          }))
-      .transform([](const storage::BulkResult &) {});
+  return callgraph::insertRelationSites(database_, sites);
 }
 
 std::expected<void, std::error_code>
-Storage::recomputeUseCounts(std::span<const Relation> relations) {
+Storage::recomputeRelationCounts(std::span<const Relation> relations) {
   return database_
       .executeBulk(
           "UPDATE relation SET count=(SELECT COUNT(*) FROM relation_site site "
@@ -80,11 +80,11 @@ Storage::recomputeUseCounts(std::span<const Relation> relations) {
           "site.destination_id=relation.destination_id AND "
           "site.kind=relation.kind AND site.position=relation.position) "
           "WHERE source_id=?1 AND destination_id=?2 AND kind=?3 AND "
-          "position=?4 AND kind=?5",
+          "position=?4",
           relations,
           storage::detail::typedBinder([](auto bind, const Relation &relation) {
             return bind(relation.source, relation.destination, relation.kind,
-                        relation.position, RelationKind::Uses);
+                        relation.position);
           }))
       .transform([](const storage::BulkResult &) {});
 }
@@ -92,15 +92,26 @@ Storage::recomputeUseCounts(std::span<const Relation> relations) {
 std::expected<void, std::error_code>
 Storage::addUseFacts(std::span<const Relation> relations,
                      std::span<const RelationSite> sites) {
+  return validateUseFacts(relations, sites).and_then([&] {
+    return addRelationFacts(relations, sites);
+  });
+}
+
+std::expected<void, std::error_code>
+Storage::addRelationFacts(std::span<const Relation> relations,
+                          std::span<const RelationSite> sites) {
   auto transaction = writeTransaction();
   if (!transaction) {
     return std::unexpected(transaction.error());
   }
 
-  return validateUseFacts(relations, sites)
-      .and_then([&] { return addRelations(relations); })
+  if (!std::ranges::all_of(sites, validRelationSite) ||
+      !sitesBelongToRelations(relations, sites)) {
+    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+  }
+  return addRelations(relations)
       .and_then([&] { return addRelationSites(sites); })
-      .and_then([&] { return recomputeUseCounts(relations); })
+      .and_then([&] { return recomputeRelationCounts(relations); })
       .and_then([&] { return commit(*transaction); });
 }
 

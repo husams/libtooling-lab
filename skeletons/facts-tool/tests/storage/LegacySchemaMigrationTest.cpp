@@ -68,6 +68,7 @@ DROP INDEX IF EXISTS idx_parameter_default_evaluated;
 DROP TABLE parameter_default;
 DROP INDEX IF EXISTS idx_variable_initializer_evaluated;
 DROP TABLE variable_initializer;
+DROP TABLE relation_site;
 ALTER TABLE symbol DROP COLUMN has_extern_storage;
 PRAGMA user_version=1;
 )sql");
@@ -100,7 +101,7 @@ bool verifyVersionOneMigration(const std::filesystem::path &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version one") &&
-      require(scalar(database, "PRAGMA user_version") == 7,
+      require(scalar(database, "PRAGMA user_version") == 8,
               "version-one migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -119,6 +120,7 @@ bool createVersionTwoDatabase(const std::filesystem::path &path) {
   const auto created = execute(database, R"sql(
 DROP INDEX IF EXISTS idx_parameter_default_evaluated;
 DROP TABLE parameter_default;
+DROP TABLE relation_site;
 PRAGMA user_version=2;
 )sql");
   sqlite3_close(database);
@@ -143,7 +145,7 @@ bool verifyVersionTwoMigration(const std::filesystem::path &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'parameter_default')") == 5,
               "parameter default table was not migrated from version two") &&
-      require(scalar(database, "PRAGMA user_version") == 7,
+      require(scalar(database, "PRAGMA user_version") == 8,
               "version-two migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -166,6 +168,7 @@ ALTER TABLE symbol ADD COLUMN identity TEXT NOT NULL DEFAULT '';
 CREATE UNIQUE INDEX idx_symbol_file_identity
   ON symbol(((id >> 32) & 4294967295), identity);
 CREATE UNIQUE INDEX idx_symbol_unique_usr ON symbol(usr) WHERE usr <> '';
+DROP TABLE relation_site;
 PRAGMA user_version=5;
 )sql");
   sqlite3_close(database);
@@ -183,7 +186,7 @@ PRAGMA user_version=5;
   const auto valid =
       require(usrIsOnlySymbolIdentity(database),
               "version-five migration retained a separate symbol identity") &&
-      require(scalar(database, "PRAGMA user_version") == 7,
+      require(scalar(database, "PRAGMA user_version") == 8,
               "version-five migration was not recorded");
   sqlite3_close(database);
   return valid;
@@ -251,9 +254,9 @@ bool verifyMigration(const std::filesystem::path &path) {
                                "'enumerator')") == 3,
               "enumerator schema was not migrated") &&
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
-                               "'relation_site')") == 8,
+                               "'relation_site')") == 10,
               "relation-site schema was not migrated") &&
-      require(scalar(database, "PRAGMA user_version") == 7,
+      require(scalar(database, "PRAGMA user_version") == 8,
               "migration version was not recorded");
   sqlite3_close(database);
   return valid;
