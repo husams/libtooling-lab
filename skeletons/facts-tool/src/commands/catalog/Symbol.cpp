@@ -4,6 +4,7 @@
 #include "storage/SqliteDatabase.h"
 #include "storage/catalog/Database.h"
 #include "storage/catalog/File.h"
+#include "clang/AST/Type.h"
 #include "clang/Index/IndexSymbol.h"
 #include <algorithm>
 #include <array>
@@ -18,6 +19,8 @@
 
 namespace facts::commands {
 namespace {
+
+struct ParameterFact;
 
 struct SymbolFact {
   SymbolId id;
@@ -37,6 +40,21 @@ struct SymbolFact {
   std::vector<std::string> flags;
   std::string sourceName;
   std::filesystem::path sourcePath;
+  std::vector<ParameterFact> parameters;
+};
+
+struct ParameterFact {
+  SymbolId symbol;
+  SymbolId typeId;
+  std::string name;
+  std::string type;
+  bool pointer = false;
+  bool lvalueReference = false;
+  bool rvalueReference = false;
+  bool constant = false;
+  bool pack = false;
+  bool hasDefault = false;
+  std::string defaultValue;
 };
 
 struct SourceFile {
@@ -119,6 +137,96 @@ std::string symbolId(SymbolId id) {
   return std::format("{}:{}", id.file, id.index);
 }
 
+std::string builtinTypeName(SymbolId id) {
+  if (id.file != builtinFileId)
+    return "";
+  using BuiltinType = clang::BuiltinType;
+  switch (id.index) {
+  case static_cast<std::uint32_t>(BuiltinType::Void) + 1:
+    return "void";
+  case static_cast<std::uint32_t>(BuiltinType::Bool) + 1:
+    return "bool";
+  case static_cast<std::uint32_t>(BuiltinType::Char_U) + 1:
+  case static_cast<std::uint32_t>(BuiltinType::Char_S) + 1:
+    return "char";
+  case static_cast<std::uint32_t>(BuiltinType::SChar) + 1:
+    return "signed char";
+  case static_cast<std::uint32_t>(BuiltinType::UChar) + 1:
+    return "unsigned char";
+  case static_cast<std::uint32_t>(BuiltinType::Short) + 1:
+    return "short";
+  case static_cast<std::uint32_t>(BuiltinType::UShort) + 1:
+    return "unsigned short";
+  case static_cast<std::uint32_t>(BuiltinType::Int) + 1:
+    return "int";
+  case static_cast<std::uint32_t>(BuiltinType::UInt) + 1:
+    return "unsigned int";
+  case static_cast<std::uint32_t>(BuiltinType::Long) + 1:
+    return "long";
+  case static_cast<std::uint32_t>(BuiltinType::ULong) + 1:
+    return "unsigned long";
+  case static_cast<std::uint32_t>(BuiltinType::LongLong) + 1:
+    return "long long";
+  case static_cast<std::uint32_t>(BuiltinType::ULongLong) + 1:
+    return "unsigned long long";
+  case static_cast<std::uint32_t>(BuiltinType::Float) + 1:
+    return "float";
+  case static_cast<std::uint32_t>(BuiltinType::Double) + 1:
+    return "double";
+  case static_cast<std::uint32_t>(BuiltinType::LongDouble) + 1:
+    return "long double";
+  default:
+    return "";
+  }
+}
+
+std::string renderParameter(const ParameterFact &parameter) {
+  auto result = parameter.type.empty()
+                    ? std::format("<symbol {}>", symbolId(parameter.typeId))
+                    : parameter.type;
+  if (parameter.constant)
+    result = "const " + result;
+  if (parameter.pointer)
+    result += "*";
+  if (parameter.lvalueReference)
+    result += "&";
+  if (parameter.rvalueReference)
+    result += "&&";
+  if (parameter.pack)
+    result += "...";
+  if (!parameter.name.empty())
+    result += " " + parameter.name;
+  if (parameter.hasDefault)
+    result += " = " + parameter.defaultValue;
+  return result;
+}
+
+bool hasFlag(const SymbolFact &value, std::string_view flag) {
+  return std::ranges::find(value.flags, flag) != value.flags.end();
+}
+
+std::string declaration(const SymbolFact &value) {
+  auto result = value.qualifiedName;
+  if (value.type == "Function") {
+    std::vector<std::string> parameters;
+    parameters.reserve(value.parameters.size());
+    for (const auto &parameter : value.parameters)
+      parameters.push_back(renderParameter(parameter));
+    result += "(" + join(parameters) + ")";
+    if (hasFlag(value, "const"))
+      result += " const";
+    if (value.refQualifier == "lvalue" || value.refQualifier == "&")
+      result += " &";
+    if (value.refQualifier == "rvalue" || value.refQualifier == "&&")
+      result += " &&";
+    if (hasFlag(value, "noexcept"))
+      result += " noexcept";
+  }
+  if (!value.returnType.empty())
+    result += " -> " + value.returnType;
+  return result;
+}
+
 catalog::Result<std::vector<SourceFile>> sourceFiles(const std::string &path) {
   if (path.empty())
     return std::vector<SourceFile>{};
@@ -137,6 +245,44 @@ catalog::Result<std::vector<SourceFile>> sourceFiles(const std::string &path) {
   });
 }
 
+catalog::Result<std::vector<ParameterFact>>
+loadParameters(storage::Database &database) {
+  return catalog::query(
+      database,
+      "SELECT p.symbol_id,p.name,p.type,type.qualified_name,"
+      "p.is_pointer,p.is_lvalue_reference,p.is_rvalue_reference,"
+      "p.is_const,p.is_pack,p.has_default,d.expression "
+      "FROM parameter p LEFT JOIN symbol type ON type.id=p.type "
+      "LEFT JOIN parameter_default d ON d.symbol_id=p.symbol_id "
+      "AND d.position=p.position ORDER BY p.symbol_id,p.position",
+      [](const storage::Row &row) {
+        ParameterFact value;
+        value.symbol = row.get<SymbolId>(0);
+        value.typeId = row.get<SymbolId>(2);
+        value.name = row.string(1);
+        value.type = row.isNull(3) ? builtinTypeName(value.typeId)
+                                   : row.string(3);
+        value.pointer = row.integer(4);
+        value.lvalueReference = row.integer(5);
+        value.rvalueReference = row.integer(6);
+        value.constant = row.integer(7);
+        value.pack = row.integer(8);
+        value.hasDefault = row.integer(9);
+        value.defaultValue = row.isNull(10) ? "" : row.string(10);
+        return value;
+      });
+}
+
+std::vector<SymbolFact>
+attachParameters(std::vector<SymbolFact> values,
+                 const std::vector<ParameterFact> &parameters) {
+  for (auto &value : values)
+    for (const auto &parameter : parameters)
+      if (parameter.symbol == value.id)
+        value.parameters.push_back(parameter);
+  return values;
+}
+
 catalog::Result<std::vector<SymbolFact>>
 symbols(storage::Database &database, const std::vector<SourceFile> &files,
         const std::optional<std::string> &name) {
@@ -150,8 +296,8 @@ symbols(storage::Database &database, const std::vector<SourceFile> &files,
       "constant_evaluation,is_noexcept,"
       "(SELECT destination.qualified_name FROM relation "
       "JOIN symbol destination ON destination.id=relation.destination_id "
-      "WHERE relation.source_id=symbol.id AND relation.kind=? LIMIT 1) "
-      "FROM symbol WHERE (? IS NULL OR qualified_name=?) ORDER BY id",
+      "WHERE relation.source_id=s.id AND relation.kind=? LIMIT 1) "
+      "FROM symbol s WHERE (? IS NULL OR qualified_name=?) ORDER BY id",
       [&files](const storage::Row &row) {
         SymbolFact value;
         value.id = row.get<SymbolId>(0);
@@ -188,25 +334,47 @@ symbols(storage::Database &database, const std::vector<SourceFile> &files,
         }
         return value;
       },
-      static_cast<int>(RelationKind::ReturnType), name, name);
+      static_cast<int>(RelationKind::ReturnType), name, name)
+      .and_then([&database](auto values) {
+        return loadParameters(database).transform(
+            [&values](const auto &parameters) mutable {
+              return attachParameters(std::move(values), parameters);
+            });
+      });
+}
+
+std::string formatListRow(const std::array<std::string, 5> &row,
+                          const std::array<std::size_t, 5> &widths) {
+  return std::format("{:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}\n", row[0],
+                      widths[0], row[1], widths[1], row[2], widths[2], row[3],
+                      widths[3], row[4], widths[4]);
 }
 
 std::string displaySymbols(const std::vector<SymbolFact> &values) {
   if (values.empty())
     return "No symbols\n";
-  std::string output = "id\tsymbol\tkind\tflags\tlocation\n";
+  const std::array<std::string, 5> headers{"id", "symbol", "kind", "flags",
+                                            "location"};
+  std::vector<std::array<std::string, 5>> rows;
+  rows.reserve(values.size());
   for (const auto &value : values)
-    output += std::format("{}\t{}\t{}\t{}\t{}:{}\n", symbolId(value.id),
-                          value.qualifiedName, value.kind,
-                          value.flags.empty() ? "-" : join(value.flags),
-                          value.sourceName, value.line);
+    rows.push_back({symbolId(value.id), declaration(value), value.kind,
+                    value.flags.empty() ? "-" : join(value.flags),
+                    std::format("{}:{}", value.sourceName, value.line)});
+  std::array<std::size_t, 5> widths{};
+  for (std::size_t column = 0; column < widths.size(); ++column) {
+    widths[column] = headers[column].size();
+    for (const auto &row : rows)
+      widths[column] = std::max(widths[column], row[column].size());
+  }
+  std::string output = formatListRow(headers, widths);
+  for (const auto &row : rows)
+    output += formatListRow(row, widths);
   return output;
 }
 
 std::string displaySymbol(const SymbolFact &value) {
-  std::string output = value.qualifiedName;
-  if (!value.returnType.empty())
-    output += std::format(" -> {}", value.returnType);
+  std::string output = declaration(value);
   output += std::format("\n  identity   {}\n  kind       {}\n  type       {}\n",
                         symbolId(value.id), value.kind, value.type);
   if (value.subKind != "none")

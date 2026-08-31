@@ -258,22 +258,24 @@ def symbol_fails(catalog: Catalog, diagnostic: str) -> None:
             catalog.context.last_output)
 
 
-@then("symbol output lists the extracted catalog function with source identifiers")
+@then("symbol output lists the extracted catalog function with aligned columns")
 def symbol_list_output(catalog: Catalog) -> None:
     lines = catalog.stdout.splitlines()
-    require(any(line.startswith("id\tsymbol\tkind\tflags\tlocation")
-                for line in lines) and
-            any("catalog_value_0" in line and "function" in line and
-                "definition" in line and "one.cpp:1" in line
-                for line in lines) and
+    header = next((line for line in lines if line.startswith("id ")), "")
+    symbol = next((line for line in lines if "catalog_value_0" in line), "")
+    require(header and symbol and "catalog_value_0(int amount = 0)" in symbol and
+            "function" in symbol and "definition" in symbol and
+            "one.cpp:1" in symbol and
+            symbol.index("function") == header.index("kind") and
+            symbol.index("one.cpp:1") == header.index("location") and
             all("/core/src/one.cpp" not in line for line in lines),
-            f"incomplete symbol list: {catalog.stdout}")
+            f"incomplete or unaligned symbol list: {catalog.stdout}")
 
 
 @then("symbol output contains human-readable function metadata")
 def human_readable_function_metadata(catalog: Catalog) -> None:
     expected_source = str(catalog.checkout / "core/src/one.cpp")
-    for label in ("catalog_value_0", "kind       function",
+    for label in ("catalog_value_0(int amount = 0)", "kind       function",
                   "type       Function", f"source     one.cpp:1:5",
                   expected_source, "properties none", "flags      definition"):
         require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")

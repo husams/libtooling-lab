@@ -37,13 +37,15 @@ preserves manually overridden files it omits, while a command containing the
 same file replaces its fields and resets the override.
 
 Symbol commands open the facts database supplied by `--facts`; listing emits
-one compact row per symbol with a readable `file:index` identity, qualified
-name, kind, true flags, and basename/line location. Show uses an exact
-qualified-name match and presents a declaration-style heading followed by
-grouped lower-case identity, kind, type, source, USR, properties, and true
-flags. With `--conf`, the source includes the full path on a secondary line;
-without it, source uses the `<file N>:<line>:<column>` fallback. Empty lists
-print `No symbols`. Both operations are read-only.
+aligned columns for a readable `file:index` identity, declaration, kind, true
+flags, and basename/line location. Function declarations include stored
+parameter types, names, defaults, and qualifiers; a return arrow is shown only
+when a return-type relation was persisted. Show uses an exact qualified-name
+match and presents the same declaration-style heading followed by grouped
+lower-case identity, kind, type, source, USR, properties, and true flags. With
+`--conf`, the source includes the full path on a secondary line; without it,
+source uses the `<file N>:<line>:<column>` fallback. Empty lists print `No symbols`.
+Both operations are read-only.
 
 Component removal requires exactly one of `--id`, `--name`, or `--path`.
 Directory removal requires exactly one of `--id` or `--path`. Directory paths
