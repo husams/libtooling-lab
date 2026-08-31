@@ -26,6 +26,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(itlib)
 
+FetchContent_Declare(
+  ftxui
+  GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git
+  GIT_TAG v7.0.1
+)
+FetchContent_MakeAvailable(ftxui)
+
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
@@ -191,6 +198,25 @@ target_compile_definitions(
 )
 target_link_libraries(facts-platform PRIVATE facts-clang)
 
+add_library(facts-symbols STATIC
+  src/commands/catalog/SymbolFormat.cpp
+  src/commands/catalog/SymbolQuery.cpp
+)
+target_include_directories(facts-symbols PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(facts-symbols PRIVATE facts-storage facts-clang)
+
+add_library(facts-symbol-ui STATIC
+  src/ui/symbol/SymbolBrowser.cpp
+  src/ui/symbol/SymbolDetail.cpp
+  src/ui/symbol/VirtualList.cpp
+  src/ui/symbol/VirtualListModel.cpp
+)
+target_include_directories(facts-symbol-ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(facts-symbol-ui
+  PUBLIC facts-symbols
+  PRIVATE ftxui::component ftxui::dom ftxui::screen
+)
+
 # Commands own application behavior and remain independent of CLI11.
 add_library(facts-commands STATIC
   src/commands/catalog/Repository.cpp
@@ -200,7 +226,6 @@ add_library(facts-commands STATIC
   src/commands/catalog/Export.cpp
   src/commands/catalog/File.cpp
   src/commands/catalog/Symbol.cpp
-  src/commands/catalog/SymbolFormat.cpp
   src/commands/DatabasePaths.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
@@ -212,6 +237,8 @@ target_link_libraries(facts-commands PRIVATE
   facts-ast
   facts-storage
   facts-platform
+  facts-symbols
+  facts-symbol-ui
   facts-tooling
   facts-clang
 )
@@ -358,6 +385,9 @@ if(BUILD_TESTING)
   target_link_libraries(sqlite-command-test PRIVATE facts-storage
                                                     facts-sqlite)
   add_test(NAME sqlite-command COMMAND sqlite-command-test)
+  add_executable(symbol-browser-test tests/SymbolBrowserTest.cpp)
+  target_link_libraries(symbol-browser-test PRIVATE facts-symbol-ui)
+  add_test(NAME symbol-browser COMMAND symbol-browser-test)
   add_executable(dependency-database-test tests/DependencyDatabaseTest.cpp)
   target_link_libraries(dependency-database-test PRIVATE facts-storage
                                                          facts-sqlite)

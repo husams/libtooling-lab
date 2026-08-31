@@ -42,6 +42,8 @@ CLI::App *configureSymbol(CLI::App &app, SymbolOptions &options) {
              SymbolOptions::Action::show)
       .add_option("qualified-name", options.qualifiedName)
       ->required();
+  symbolLeaf(*group, "view", "Browse extracted symbols interactively", options,
+             SymbolOptions::Action::view);
   return group;
 }
 

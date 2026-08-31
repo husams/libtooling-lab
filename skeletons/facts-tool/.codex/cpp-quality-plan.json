@@ -4,37 +4,90 @@
     {
       "name": "configure",
       "kind": "configure",
-      "argv": ["cmake", "-S", ".", "-B", "build", "-DBUILD_TESTING=ON", "-DLLVM_DIR=/opt/homebrew/opt/llvm/lib/cmake/llvm"],
+      "argv": [
+        "cmake",
+        "-G",
+        "Ninja",
+        "-B",
+        "build",
+        "-DCMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm",
+        "-DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++",
+        "-DPython3_EXECUTABLE=/Users/husam/.codex/worktrees/18b5/libtooling-lab/skeletons/facts-tool/build/test-venv/bin/python",
+        "-DBUILD_TESTING=ON",
+        "."
+      ],
       "timeout_seconds": 600
     },
     {
       "name": "build",
       "kind": "build",
-      "argv": ["cmake", "--build", "build", "--parallel", "4"],
+      "argv": ["cmake", "--build", "build", "-j", "4"],
       "timeout_seconds": 1200
     },
     {
       "name": "focused-tests",
       "kind": "test",
-      "argv": ["ctest", "--test-dir", "build", "--output-on-failure", "-R", "^(storage-schema|file-database-persistence)$"],
-      "timeout_seconds": 600
+      "argv": [
+        "ctest",
+        "--test-dir",
+        "build",
+        "-R",
+        "^(symbol-browser|facts-tool-cli-contract)$",
+        "--output-on-failure"
+      ],
+      "timeout_seconds": 300
     },
     {
-      "name": "all-tests",
+      "name": "full-tests",
       "kind": "test",
-      "argv": ["ctest", "--test-dir", "build", "--output-on-failure"],
+      "argv": [
+        "ctest",
+        "--test-dir",
+        "build",
+        "--output-on-failure"
+      ],
       "timeout_seconds": 1200
     },
     {
-      "name": "format-check",
+      "name": "format",
       "kind": "format",
-      "argv": ["/opt/homebrew/opt/llvm/bin/clang-format", "--dry-run", "--Werror", "src/storage/StorageQuery.h", "src/storage/Definition.cpp", "src/storage/Enumeration.cpp", "src/storage/Enumerator.cpp", "src/storage/Parameter.cpp", "src/storage/RecordInstance.cpp", "src/storage/RecordTemplate.cpp", "src/storage/Relation.cpp", "src/storage/Variable.cpp", "src/storage/Symbol.cpp", "src/storage/Storage.cpp", "src/storage/FileDatabase.cpp", "tests/StorageSchemaTest.cpp", "tests/FileDatabasePersistenceTest.cpp"],
-      "timeout_seconds": 300
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/clang-format",
+        "--dry-run",
+        "--Werror",
+        "src/cli/catalog/Options.h",
+        "src/commands/catalog/Symbol.cpp",
+        "src/commands/catalog/SymbolData.h",
+        "src/commands/catalog/SymbolFormat.h",
+        "src/commands/catalog/SymbolQuery.cpp",
+        "src/ui/symbol/SymbolBrowser.cpp",
+        "src/ui/symbol/SymbolBrowser.h",
+        "src/ui/symbol/SymbolDetail.cpp",
+        "src/ui/symbol/SymbolDetail.h",
+        "src/ui/symbol/VirtualList.cpp",
+        "src/ui/symbol/VirtualList.h",
+        "src/ui/symbol/VirtualListModel.cpp",
+        "src/ui/symbol/VirtualListModel.h",
+        "tests/SymbolBrowserTest.cpp"
+      ],
+      "timeout_seconds": 120
     },
     {
       "name": "static-analysis",
       "kind": "static-analysis",
-      "argv": ["/opt/homebrew/opt/llvm/bin/clang-tidy", "-p", "build", "src/storage/Definition.cpp", "src/storage/Enumeration.cpp", "src/storage/Enumerator.cpp", "src/storage/Parameter.cpp", "src/storage/RecordInstance.cpp", "src/storage/RecordTemplate.cpp", "src/storage/Relation.cpp", "src/storage/Variable.cpp", "src/storage/Symbol.cpp", "src/storage/Storage.cpp", "src/storage/FileDatabase.cpp", "tests/StorageSchemaTest.cpp", "tests/FileDatabasePersistenceTest.cpp"],
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/clang-tidy",
+        "--quiet",
+        "-p",
+        "build",
+        "src/commands/catalog/Symbol.cpp",
+        "src/commands/catalog/SymbolQuery.cpp",
+        "src/ui/symbol/SymbolBrowser.cpp",
+        "src/ui/symbol/SymbolDetail.cpp",
+        "src/ui/symbol/VirtualList.cpp",
+        "src/ui/symbol/VirtualListModel.cpp",
+        "tests/SymbolBrowserTest.cpp"
+      ],
       "timeout_seconds": 1200
     }
   ]
