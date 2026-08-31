@@ -76,7 +76,8 @@ class Catalog:
         arguments = shlex.split(command)
         result = self.context._run(
             [str(self.context.facts_tool), "symbol", *arguments,
-             "--facts", str(self.context.facts_database_path)]
+             "--facts", str(self.context.facts_database_path), "--conf",
+             str(self.context.files_database_path)]
         )
         self.stdout = result.stdout
         require(self.context.files_database_path.read_bytes() ==

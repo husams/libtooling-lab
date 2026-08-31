@@ -250,14 +250,18 @@ def symbol_fails(catalog: Catalog, diagnostic: str) -> None:
 
 @then("symbol output lists the extracted catalog function with source identifiers")
 def symbol_list_output(catalog: Catalog) -> None:
-    require("catalog_value_0" in catalog.stdout and "FILE" in catalog.stdout and
-            "INDEX" in catalog.stdout and "USR" in catalog.stdout,
+    require("catalog_value_0" in catalog.stdout and "SOURCE" in catalog.stdout and
+            "one.cpp@" in catalog.stdout and str(catalog.checkout /
+            "core/src/one.cpp") + ":1" in catalog.stdout and
+            "KIND" in catalog.stdout and "TYPE" in catalog.stdout and
+            "USR" in catalog.stdout,
             f"incomplete symbol list: {catalog.stdout}")
 
 
 @then("symbol output contains the full stored symbol details")
 def symbol_show_output(catalog: Catalog) -> None:
-    for label in ("ID:", "FILE ID:", "SYMBOL INDEX:", "NODE:", "USR:",
+    for label in ("ID:", "FILE ID:", "SYMBOL INDEX:", "SOURCE:",
+                  "KIND: function", "TYPE: Function", "NODE: Function", "USR:",
                   "QUALIFIED NAME:", "LINE:", "COLUMN:", "NOEXCEPT:"):
         require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")
 

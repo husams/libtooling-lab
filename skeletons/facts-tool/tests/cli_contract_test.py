@@ -74,7 +74,7 @@ def main() -> None:
 
     symbol_help = run(tool, "symbol", "--help")
     require(symbol_help.returncode == 0 and "--facts" in output(symbol_help) and
-            "--conf" not in output(symbol_help) and
+            "--conf" in output(symbol_help) and
             all(command in output(symbol_help) for command in
                 ("list", "ls", "show")), output(symbol_help))
 

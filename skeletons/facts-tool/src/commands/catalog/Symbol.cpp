@@ -2,10 +2,16 @@
 #include "storage/Sqlite.h"
 #include "storage/SqliteDatabase.h"
 #include "storage/catalog/Database.h"
+#include "storage/catalog/File.h"
+#include "clang/Index/IndexSymbol.h"
+#include <algorithm>
 #include <array>
+#include <filesystem>
 #include <format>
 #include <iostream>
 #include <optional>
+#include <string_view>
+#include <vector>
 
 namespace facts::commands {
 namespace {
@@ -13,10 +19,65 @@ namespace {
 struct SymbolFact {
   SymbolId id;
   std::array<std::string, 32> details;
+  std::string type;
+  std::string kind;
+  std::string source;
 };
 
+struct SourceFile {
+  FileId id;
+  std::string name;
+  std::filesystem::path path;
+};
+
+std::string symbolType(std::int64_t node) {
+  switch (node) {
+  case 1:
+    return "Function";
+  case 2:
+    return "Record";
+  case 3:
+    return "Enumeration";
+  case 4:
+    return "Variable";
+  case 5:
+    return "Symbol";
+  case 6:
+    return "Enumerator";
+  default:
+    return "Unknown";
+  }
+}
+
+std::string sourceLocation(const std::vector<SourceFile> &files, SymbolId id,
+                           std::string_view line) {
+  const auto file = std::ranges::find(files, id.file, &SourceFile::id);
+  if (file == files.end())
+    return std::format("<file {}>@<unknown>:{}", id.file, line);
+  return std::format("{}@{}:{}", file->name, file->path.string(), line);
+}
+
+catalog::Result<std::vector<SourceFile>> sourceFiles(const std::string &path) {
+  if (path.empty())
+    return std::vector<SourceFile>{};
+  return catalog::open(path, false).and_then([](auto configuration) {
+    return catalog::files(configuration);
+  }).and_then([](auto files) -> catalog::Result<std::vector<SourceFile>> {
+    std::vector<SourceFile> sources;
+    for (auto &file : files) {
+      auto path = catalog::filePath(file);
+      if (!path)
+        return std::unexpected(path.error());
+      sources.push_back(
+          {static_cast<FileId>(file.id), std::move(file.name), *path});
+    }
+    return sources;
+  });
+}
+
 catalog::Result<std::vector<SymbolFact>>
-symbols(storage::Database &database, const std::optional<std::string> &name) {
+symbols(storage::Database &database, const std::vector<SourceFile> &files,
+        const std::optional<std::string> &name) {
   return catalog::query(
       database,
       "SELECT id,node,kind,sub_kind,lang,properties,usr,qualified_name,line,"
@@ -26,15 +87,28 @@ symbols(storage::Database &database, const std::optional<std::string> &name) {
       "is_explicit,is_final,is_abstract,is_polymorphic,has_extern_storage,"
       "constant_evaluation,is_noexcept FROM symbol "
       "WHERE (? IS NULL OR qualified_name=?) ORDER BY id",
-      [](const storage::Row &row) {
+      [&files](const storage::Row &row) {
         SymbolFact value;
         value.id = row.get<SymbolId>(0);
+        value.type = symbolType(row.integer(1));
+        value.kind = clang::index::getSymbolKindString(
+                         row.get<clang::index::SymbolKind>(2))
+                         .str();
         for (int column = 1; column <= 32; ++column)
           value.details[static_cast<std::size_t>(column - 1)] =
               column == 6 || column == 7 || column == 11 || column == 19 ||
                       column == 31
                   ? row.string(column)
                   : std::to_string(row.integer(column));
+        value.details[0] = value.type;
+        value.details[1] = value.kind;
+        value.details[2] = clang::index::getSymbolSubKindString(
+                               row.get<clang::index::SymbolSubKind>(3))
+                               .str();
+        value.details[3] = clang::index::getSymbolLanguageString(
+                               row.get<clang::index::SymbolLanguage>(4))
+                               .str();
+        value.source = sourceLocation(files, value.id, value.details[7]);
         return value;
       },
       name, name);
@@ -43,11 +117,12 @@ symbols(storage::Database &database, const std::optional<std::string> &name) {
 std::string displaySymbols(const std::vector<SymbolFact> &values) {
   if (values.empty())
     return "No symbols\n";
-  std::string output = "ID\tFILE\tINDEX\tQUALIFIED NAME\tUSR\n";
+  std::string output = "ID\tSOURCE\tKIND\tTYPE\tQUALIFIED NAME\tUSR\n";
   for (const auto &value : values)
     output +=
-        std::format("{}\t{}\t{}\t{}\t{}\n", value.id.packed(), value.id.file,
-                    value.id.index, value.details[6], value.details[5]);
+        std::format("{}\t{}\t{}\t{}\t{}\t{}\n", value.id.packed(),
+                    value.source, value.kind, value.type, value.details[6],
+                    value.details[5]);
   return output;
 }
 
@@ -85,8 +160,10 @@ std::string displaySymbol(const SymbolFact &value) {
                                         "CONSTANT EVALUATION",
                                         "NOEXCEPT"};
   std::string output =
-      std::format("ID: {}\nFILE ID: {}\nSYMBOL INDEX: {}\n", value.id.packed(),
-                  value.id.file, value.id.index);
+      std::format("ID: {}\nFILE ID: {}\nSYMBOL INDEX: {}\nSOURCE: {}\n"
+                  "KIND: {}\nTYPE: {}\n",
+                  value.id.packed(), value.id.file, value.id.index,
+                  value.source, value.kind, value.type);
   for (std::size_t index = 0; index < labels.size(); ++index)
     output += std::format("{}: {}\n", labels[index], value.details[index]);
   return output;
@@ -104,7 +181,8 @@ catalog::Result<std::string> operate(storage::Database &database,
   const auto name = options.action == cli::SymbolOptions::Action::show
                         ? std::optional{options.qualifiedName}
                         : std::nullopt;
-  return symbols(database, name)
+  return sourceFiles(options.configuration).and_then(
+      [&](const auto &files) { return symbols(database, files, name); })
       .and_then([&](const auto &values) -> catalog::Result<std::string> {
         if (options.action == cli::SymbolOptions::Action::list)
           return displaySymbols(values);
