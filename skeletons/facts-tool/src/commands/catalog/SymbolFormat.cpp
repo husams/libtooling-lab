@@ -139,6 +139,10 @@ std::string formatListRow(const std::array<std::string, 5> &row,
 
 } // namespace
 
+std::string symbolDeclaration(const SymbolFact &value) {
+  return declaration(value);
+}
+
 std::string displaySymbols(const std::vector<SymbolFact> &values) {
   if (values.empty())
     return "No symbols\n";
@@ -147,7 +151,7 @@ std::string displaySymbols(const std::vector<SymbolFact> &values) {
   std::vector<std::array<std::string, 5>> rows;
   rows.reserve(values.size());
   for (const auto &value : values)
-    rows.push_back({symbolId(value.id), declaration(value), value.kind,
+    rows.push_back({symbolId(value.id), symbolDeclaration(value), value.kind,
                     value.flags.empty() ? "-" : join(value.flags),
                     std::format("{}:{}", value.sourceName, value.line)});
   std::array<std::size_t, 5> widths{};
@@ -163,7 +167,7 @@ std::string displaySymbols(const std::vector<SymbolFact> &values) {
 }
 
 std::string displaySymbol(const SymbolFact &value) {
-  std::string output = declaration(value);
+  std::string output = symbolDeclaration(value);
   output += std::format("\n  identity   {}\n  kind       {}\n  type       {}\n",
                         symbolId(value.id), value.kind, value.type);
   if (value.subKind != "none")
