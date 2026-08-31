@@ -82,16 +82,16 @@ public:
         std::move(object));
   }
 
-private:
   enum class SymbolNode : std::uint8_t {
     Function = 1,
-    Record,
-    Enumeration,
-    Variable,
-    Symbol,
-    Enumerator,
+    Record = 2,
+    Enumeration = 3,
+    Variable = 4,
+    Symbol = 5,
+    Enumerator = 6,
   };
 
+private:
   struct SymbolFacts {
     bool definition = false;
     bool parameters = false;
@@ -189,6 +189,24 @@ private:
   storage::Database database_;
   OptionalTransaction transaction_;
 };
+
+constexpr std::string_view symbolNodeName(Storage::SymbolNode node) noexcept {
+  switch (node) {
+  case Storage::SymbolNode::Function:
+    return "Function";
+  case Storage::SymbolNode::Record:
+    return "Record";
+  case Storage::SymbolNode::Enumeration:
+    return "Enumeration";
+  case Storage::SymbolNode::Variable:
+    return "Variable";
+  case Storage::SymbolNode::Symbol:
+    return "Symbol";
+  case Storage::SymbolNode::Enumerator:
+    return "Enumerator";
+  }
+  return "Unknown";
+}
 
 } // namespace facts
 

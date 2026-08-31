@@ -261,9 +261,13 @@ def symbol_list_output(catalog: Catalog) -> None:
 @then("symbol output contains the full stored symbol details")
 def symbol_show_output(catalog: Catalog) -> None:
     for label in ("ID:", "FILE ID:", "SYMBOL INDEX:", "SOURCE:",
-                  "KIND: function", "TYPE: Function", "NODE: Function", "USR:",
+                  "KIND: function", "TYPE: Function", "USR:",
                   "QUALIFIED NAME:", "LINE:", "COLUMN:", "NOEXCEPT:"):
         require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")
+    kind_lines = [line for line in catalog.stdout.splitlines()
+                  if line.startswith("KIND:")]
+    require(len(kind_lines) == 1 and "NODE:" not in catalog.stdout,
+            f"symbol header fields were duplicated: {catalog.stdout}")
 
 
 @given("the facts database contains no symbols")

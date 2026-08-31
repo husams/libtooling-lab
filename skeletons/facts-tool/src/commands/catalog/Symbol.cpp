@@ -1,4 +1,5 @@
 #include "commands/catalog/Commands.h"
+#include "storage/Storage.h"
 #include "storage/Sqlite.h"
 #include "storage/SqliteDatabase.h"
 #include "storage/catalog/Database.h"
@@ -19,6 +20,7 @@ namespace {
 struct SymbolFact {
   SymbolId id;
   std::array<std::string, 32> details;
+  std::int64_t line;
   std::string type;
   std::string kind;
   std::string source;
@@ -30,27 +32,8 @@ struct SourceFile {
   std::filesystem::path path;
 };
 
-std::string symbolType(std::int64_t node) {
-  switch (node) {
-  case 1:
-    return "Function";
-  case 2:
-    return "Record";
-  case 3:
-    return "Enumeration";
-  case 4:
-    return "Variable";
-  case 5:
-    return "Symbol";
-  case 6:
-    return "Enumerator";
-  default:
-    return "Unknown";
-  }
-}
-
 std::string sourceLocation(const std::vector<SourceFile> &files, SymbolId id,
-                           std::string_view line) {
+                           std::int64_t line) {
   const auto file = std::ranges::find(files, id.file, &SourceFile::id);
   if (file == files.end())
     return std::format("<file {}>@<unknown>:{}", id.file, line);
@@ -65,11 +48,11 @@ catalog::Result<std::vector<SourceFile>> sourceFiles(const std::string &path) {
   }).and_then([](auto files) -> catalog::Result<std::vector<SourceFile>> {
     std::vector<SourceFile> sources;
     for (auto &file : files) {
-      auto path = catalog::filePath(file);
-      if (!path)
-        return std::unexpected(path.error());
+      auto resolvedPath = catalog::filePath(file);
+      if (!resolvedPath)
+        return std::unexpected(resolvedPath.error());
       sources.push_back(
-          {static_cast<FileId>(file.id), std::move(file.name), *path});
+          {static_cast<FileId>(file.id), std::move(file.name), *resolvedPath});
     }
     return sources;
   });
@@ -90,25 +73,25 @@ symbols(storage::Database &database, const std::vector<SourceFile> &files,
       [&files](const storage::Row &row) {
         SymbolFact value;
         value.id = row.get<SymbolId>(0);
-        value.type = symbolType(row.integer(1));
+        value.line = row.integer(8);
+        value.type = std::string(symbolNodeName(
+            static_cast<Storage::SymbolNode>(row.integer(1))));
         value.kind = clang::index::getSymbolKindString(
                          row.get<clang::index::SymbolKind>(2))
                          .str();
-        for (int column = 1; column <= 32; ++column)
+        for (int column = 5; column <= 32; ++column)
           value.details[static_cast<std::size_t>(column - 1)] =
               column == 6 || column == 7 || column == 11 || column == 19 ||
                       column == 31
                   ? row.string(column)
                   : std::to_string(row.integer(column));
-        value.details[0] = value.type;
-        value.details[1] = value.kind;
         value.details[2] = clang::index::getSymbolSubKindString(
                                row.get<clang::index::SymbolSubKind>(3))
                                .str();
         value.details[3] = clang::index::getSymbolLanguageString(
                                row.get<clang::index::SymbolLanguage>(4))
                                .str();
-        value.source = sourceLocation(files, value.id, value.details[7]);
+        value.source = sourceLocation(files, value.id, value.line);
         return value;
       },
       name, name);
@@ -164,7 +147,7 @@ std::string displaySymbol(const SymbolFact &value) {
                   "KIND: {}\nTYPE: {}\n",
                   value.id.packed(), value.id.file, value.id.index,
                   value.source, value.kind, value.type);
-  for (std::size_t index = 0; index < labels.size(); ++index)
+  for (std::size_t index = 2; index < labels.size(); ++index)
     output += std::format("{}: {}\n", labels[index], value.details[index]);
   return output;
 }
