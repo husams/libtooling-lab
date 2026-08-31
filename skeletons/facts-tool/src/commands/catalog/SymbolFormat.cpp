@@ -139,8 +139,8 @@ std::string declaration(const SymbolFact &value) {
 }
 
 std::string formatListRow(const std::array<std::string, 2> &row,
-                          const std::array<std::size_t, 2> &widths) {
-  return std::format("{:<{}}  {:<{}}\n", row[0], widths[0], row[1], widths[1]);
+                          std::size_t kindWidth) {
+  return std::format("{:<{}} {}\n", row[0], kindWidth, row[1]);
 }
 
 } // namespace
@@ -152,20 +152,17 @@ std::string symbolDeclaration(const SymbolFact &value) {
 std::string displaySymbols(const std::vector<SymbolFact> &values) {
   if (values.empty())
     return "No symbols\n";
-  const std::array<std::string, 2> headers{"qualified name", "kind"};
+  const std::array<std::string, 2> headers{"kind", "qualified name"};
   std::vector<std::array<std::string, 2>> rows;
   rows.reserve(values.size());
   for (const auto &value : values)
-    rows.push_back({value.qualifiedName, value.kind});
-  std::array<std::size_t, 2> widths{};
-  for (std::size_t column = 0; column < widths.size(); ++column) {
-    widths[column] = headers[column].size();
-    for (const auto &row : rows)
-      widths[column] = std::max(widths[column], row[column].size());
-  }
-  std::string output = formatListRow(headers, widths);
+    rows.push_back({value.kind, value.qualifiedName});
+  auto kindWidth = headers[0].size();
   for (const auto &row : rows)
-    output += formatListRow(row, widths);
+    kindWidth = std::max(kindWidth, row[0].size());
+  std::string output = formatListRow(headers, kindWidth);
+  for (const auto &row : rows)
+    output += formatListRow(row, kindWidth);
   return output;
 }
 

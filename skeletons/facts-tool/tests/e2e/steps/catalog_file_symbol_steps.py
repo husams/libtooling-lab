@@ -261,13 +261,15 @@ def symbol_fails(catalog: Catalog, diagnostic: str) -> None:
 @then("symbol output lists only qualified names and kinds")
 def symbol_list_output(catalog: Catalog) -> None:
     lines = catalog.stdout.splitlines()
-    header = next((line for line in lines if line.startswith("qualified name")), "")
+    header = next((line for line in lines if line.startswith("kind")), "")
     symbol = next((line for line in lines if "catalog_value_0" in line), "")
     require(header and symbol and "catalog_value_0" in symbol and
             "function" in symbol and "definition" not in symbol and
             "one.cpp" not in symbol and "id" not in header and
             "flags" not in header and "location" not in header and
-            symbol.index("function") == header.index("kind") and
+            symbol.index("function") == header.index("kind") == 0 and
+            symbol.index("catalog_value_0") == header.index("qualified name") and
+            all(lines) and
             all("/core/src/one.cpp" not in line for line in lines),
             f"unexpected symbol list columns: {catalog.stdout}")
 
