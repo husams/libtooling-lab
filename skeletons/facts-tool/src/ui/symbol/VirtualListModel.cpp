@@ -7,7 +7,7 @@
 namespace facts::ui::symbol {
 namespace {
 
-constexpr int columnGaps = 4;
+constexpr int columnGaps = 1;
 
 std::size_t pageSize(std::size_t viewportHeight) {
   return std::max<std::size_t>(1, viewportHeight);
@@ -15,9 +15,7 @@ std::size_t pageSize(std::size_t viewportHeight) {
 
 } // namespace
 
-int ColumnWidths::total() const {
-  return identity + symbol + kind + flags + location + columnGaps;
-}
+int ColumnWidths::total() const { return kind + path + columnGaps; }
 
 void fitViewport(ListState &state, std::size_t itemCount,
                  std::size_t viewportHeight) {
@@ -71,21 +69,9 @@ VisibleRange visibleRange(ListState state, std::size_t itemCount,
 }
 
 ColumnWidths columnWidths(int terminalWidth) {
-  auto remaining = std::max(32, terminalWidth) - 32;
-  ColumnWidths result{6, 6, 5, 5, 6};
-  const auto distribute = [&remaining](int &column, int maximum) {
-    const auto amount = std::min(remaining, maximum - column);
-    column += amount;
-    remaining -= amount;
-  };
-  distribute(result.identity, 8);
-  distribute(result.kind, 10);
-  distribute(result.flags, 12);
-  const auto locationGrowth = std::min(remaining / 3, 14);
-  result.location += locationGrowth;
-  remaining -= locationGrowth;
-  distribute(result.symbol, 36);
-  return result;
+  const auto width = std::max(3, terminalWidth);
+  const auto kind = std::min(12, width - 2);
+  return {kind, width - kind - columnGaps};
 }
 
 int cellWidth(std::string_view value) { return ftxui::string_width(value); }

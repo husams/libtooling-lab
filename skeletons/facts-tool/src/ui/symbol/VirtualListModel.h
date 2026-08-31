@@ -19,11 +19,8 @@ struct VisibleRange {
 enum class Navigation { up, down, pageUp, pageDown, home, end };
 
 struct ColumnWidths {
-  int identity;
-  int symbol;
   int kind;
-  int flags;
-  int location;
+  int path;
 
   [[nodiscard]] int total() const;
 };

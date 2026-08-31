@@ -1,15 +1,12 @@
 #include "ui/symbol/VirtualList.h"
 
-#include "commands/catalog/SymbolFormat.h"
-
 #include <algorithm>
 #include <array>
-#include <format>
 
 namespace facts::ui::symbol {
 namespace {
 
-using Row = std::array<std::string, 5>;
+using Row = std::array<std::string, 2>;
 
 ftxui::Element cell(const std::string &value, int width) {
   return ftxui::text(truncateCell(value, width)) |
@@ -18,25 +15,13 @@ ftxui::Element cell(const std::string &value, int width) {
 
 ftxui::Element renderRow(const Row &row, const ColumnWidths &widths,
                          bool selected) {
-  auto element = ftxui::hbox({cell(row[0], widths.identity), ftxui::text(" "),
-                              cell(row[1], widths.symbol), ftxui::text(" "),
-                              cell(row[2], widths.kind), ftxui::text(" "),
-                              cell(row[3], widths.flags), ftxui::text(" "),
-                              cell(row[4], widths.location)});
+  auto element = ftxui::hbox(
+      {cell(row[0], widths.kind), ftxui::text(" "), cell(row[1], widths.path)});
   return selected ? element | ftxui::inverted : element;
 }
 
 Row rowFor(const commands::SymbolFact &value) {
-  std::string flags;
-  for (const auto &flag : value.flags) {
-    if (!flags.empty())
-      flags += ",";
-    flags += flag;
-  }
-  return {std::format("{}:{}", value.id.file, value.id.index),
-          commands::symbolDeclaration(value), value.kind,
-          flags.empty() ? "-" : std::move(flags),
-          std::format("{}:{}", value.sourceName, value.line)};
+  return {value.kind, value.qualifiedName};
 }
 
 } // namespace
@@ -45,7 +30,7 @@ ftxui::Element
 renderVirtualList(const std::vector<commands::SymbolFact> &values,
                   const ListState &state, int width, int height) {
   const auto widths = columnWidths(width);
-  const Row headers{"id", "symbol", "kind", "flags", "location"};
+  const Row headers{"Kind", "Path"};
   ftxui::Elements rows{renderRow(headers, widths, false) | ftxui::bold};
   const auto range = visibleRange(
       state, values.size(), static_cast<std::size_t>(std::max(1, height)));
