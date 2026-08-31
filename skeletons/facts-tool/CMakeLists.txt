@@ -200,6 +200,7 @@ add_library(facts-commands STATIC
   src/commands/catalog/Export.cpp
   src/commands/catalog/File.cpp
   src/commands/catalog/Symbol.cpp
+  src/commands/catalog/SymbolFormat.cpp
   src/commands/DatabasePaths.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
