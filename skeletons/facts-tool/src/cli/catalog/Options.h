@@ -36,6 +36,7 @@ struct SymbolOptions {
   enum class Action { list, show };
   int verbosity = 0;
   std::string facts;
+  std::string configuration;
   Action action = Action::list;
   std::string qualifiedName;
 };

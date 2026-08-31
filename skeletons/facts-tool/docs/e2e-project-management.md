@@ -13,7 +13,7 @@ Append `--conf /path/to/project.sqlite` to each command.
 | `component` | `list` / `ls`, `show NAME`, `add --path PATH [--name NAME] [--repo REPO] [--kind repo\|external] [--version VERSION] [--no-git]`, `set-version NAME [VERSION]`, `compile-commands NAME`, `rm SELECTOR [--dry-run]` |
 | `dir` | `list` / `ls` `[--component COMPONENT]`, `rm SELECTOR [--component COMPONENT] [--dry-run]` |
 | `file` | `list` / `ls`, `show PATH`, `add PATH --driver DRIVER [--working-directory DIR] [--arg TOKEN]...`, `rm` / `remove PATH`, `set-option --match REGEX --arg TOKEN...`, `clear-option --match REGEX --arg TOKEN...` |
-| `symbol` | `list` / `ls --facts FACTS.sqlite`, `show QUALIFIED_NAME --facts FACTS.sqlite` |
+| `symbol` | `list` / `ls --facts FACTS.sqlite [--conf PROJECT.sqlite]`, `show QUALIFIED_NAME --facts FACTS.sqlite [--conf PROJECT.sqlite]` |
 
 `repo rm-clone NAME LABEL_OR_PATH` (alias `remove-clone`) removes only a
 non-active clone registration and never deletes a checkout. The active clone,
@@ -36,10 +36,16 @@ invalid or unmatched expression rolls back the operation. A later import
 preserves manually overridden files it omits, while a command containing the
 same file replaces its fields and resets the override.
 
-Symbol commands open only the database supplied by `--facts` and never require
-or use `--conf`. Listing includes packed, file, and per-file symbol identifiers;
-show uses an exact qualified-name match and reports all stored symbol details.
-Empty lists print `No symbols`. Both operations are read-only.
+Symbol commands open the facts database supplied by `--facts`; listing emits
+aligned columns for a readable `file:index` identity, declaration, kind, true
+flags, and basename/line location. Function declarations include stored
+parameter types, names, defaults, and qualifiers; a return arrow is shown only
+when a return-type relation was persisted. Show uses an exact qualified-name
+match and presents the same declaration-style heading followed by grouped
+lower-case identity, kind, type, source, USR, properties, and true flags. With
+`--conf`, the source includes the full path on a secondary line; without it,
+source uses the `<file N>:<line>:<column>` fallback. Empty lists print `No symbols`.
+Both operations are read-only.
 
 Component removal requires exactly one of `--id`, `--name`, or `--path`.
 Directory removal requires exactly one of `--id` or `--path`. Directory paths

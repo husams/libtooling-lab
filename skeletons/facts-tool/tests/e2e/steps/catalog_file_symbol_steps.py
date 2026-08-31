@@ -236,6 +236,16 @@ def show_known_symbol(catalog: Catalog) -> None:
     catalog.run_symbol(f"show {name}")
 
 
+@when("I show the extracted catalog record without catalog configuration")
+def show_known_record_without_configuration(catalog: Catalog) -> None:
+    with sqlite3.connect(catalog.context.facts_database_path) as connection:
+        name = connection.execute(
+            "SELECT qualified_name FROM symbol "
+            "WHERE qualified_name='catalog_record'"
+        ).fetchone()[0]
+    catalog.run_symbol_without_configuration(f"show {name}")
+
+
 @then("the symbol command succeeds")
 def symbol_succeeds(catalog: Catalog) -> None:
     require(catalog.context.last_returncode == 0, catalog.context.last_output)
@@ -248,18 +258,42 @@ def symbol_fails(catalog: Catalog, diagnostic: str) -> None:
             catalog.context.last_output)
 
 
-@then("symbol output lists the extracted catalog function with source identifiers")
+@then("symbol output lists the extracted catalog function with aligned columns")
 def symbol_list_output(catalog: Catalog) -> None:
-    require("catalog_value_0" in catalog.stdout and "FILE" in catalog.stdout and
-            "INDEX" in catalog.stdout and "USR" in catalog.stdout,
-            f"incomplete symbol list: {catalog.stdout}")
+    lines = catalog.stdout.splitlines()
+    header = next((line for line in lines if line.startswith("id ")), "")
+    symbol = next((line for line in lines if "catalog_value_0" in line), "")
+    require(header and symbol and "catalog_value_0(int amount = 0)" in symbol and
+            "function" in symbol and "definition" in symbol and
+            "one.cpp:1" in symbol and
+            symbol.index("function") == header.index("kind") and
+            symbol.index("one.cpp:1") == header.index("location") and
+            all("/core/src/one.cpp" not in line for line in lines),
+            f"incomplete or unaligned symbol list: {catalog.stdout}")
 
 
-@then("symbol output contains the full stored symbol details")
-def symbol_show_output(catalog: Catalog) -> None:
-    for label in ("ID:", "FILE ID:", "SYMBOL INDEX:", "NODE:", "USR:",
-                  "QUALIFIED NAME:", "LINE:", "COLUMN:", "NOEXCEPT:"):
+@then("symbol output contains human-readable function metadata")
+def human_readable_function_metadata(catalog: Catalog) -> None:
+    expected_source = str(catalog.checkout / "core/src/one.cpp")
+    for label in ("catalog_value_0(int amount = 0)", "kind       function",
+                  "type       Function", f"source     one.cpp:1:5",
+                  expected_source, "properties none", "flags      definition"):
         require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")
+
+
+@then("symbol output contains human-readable record metadata")
+def human_readable_record_metadata(catalog: Catalog) -> None:
+    identity = next(line.split()[-1]
+                   for line in catalog.stdout.splitlines()
+                   if line.startswith("  identity"))
+    file_id = identity.split(":", 1)[0]
+    for label in ("catalog_record", "kind       struct", "type       Record",
+                  f"source     <file {file_id}>:2:8", "properties none",
+                  "flags      definition"):
+        require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")
+    require("properties 0" not in catalog.stdout and
+            "implicit" not in catalog.stdout and "static" not in catalog.stdout,
+            f"record metadata was not decoded: {catalog.stdout}")
 
 
 @given("the facts database contains no symbols")
