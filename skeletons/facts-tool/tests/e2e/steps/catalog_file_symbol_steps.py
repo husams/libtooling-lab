@@ -260,45 +260,37 @@ def symbol_fails(catalog: Catalog, diagnostic: str) -> None:
 
 @then("symbol output lists the extracted catalog function with source identifiers")
 def symbol_list_output(catalog: Catalog) -> None:
-    require("catalog_value_0" in catalog.stdout and "SOURCE" in catalog.stdout and
-            "one.cpp@" in catalog.stdout and str(catalog.checkout /
-            "core/src/one.cpp") + ":1" in catalog.stdout and
-            "KIND" in catalog.stdout and "TYPE" in catalog.stdout and
-            "USR" in catalog.stdout,
+    lines = catalog.stdout.splitlines()
+    require(any(line.startswith("id\tsymbol\tkind\tflags\tlocation")
+                for line in lines) and
+            any("catalog_value_0" in line and "function" in line and
+                "definition" in line and "one.cpp:1" in line
+                for line in lines) and
+            all("/core/src/one.cpp" not in line for line in lines),
             f"incomplete symbol list: {catalog.stdout}")
-
-
-@then("symbol output contains the full stored symbol details")
-def symbol_show_output(catalog: Catalog) -> None:
-    for label in ("ID:", "FILE ID:", "SYMBOL INDEX:", "SOURCE:",
-                  "KIND: function", "TYPE: Function", "USR:",
-                  "QUALIFIED NAME:", "LINE:", "COLUMN:", "NOEXCEPT:"):
-        require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")
-    kind_lines = [line for line in catalog.stdout.splitlines()
-                  if line.startswith("KIND:")]
-    require(len(kind_lines) == 1 and "NODE:" not in catalog.stdout,
-            f"symbol header fields were duplicated: {catalog.stdout}")
 
 
 @then("symbol output contains human-readable function metadata")
 def human_readable_function_metadata(catalog: Catalog) -> None:
     expected_source = str(catalog.checkout / "core/src/one.cpp")
-    for label in (f"SOURCE: one.cpp@{expected_source}:1", "KIND: function",
-                  "TYPE: Function", "PROPERTIES: none", "DEFINITION: yes",
-                  "IMPLICIT: no", "NOEXCEPT: no"):
+    for label in ("catalog_value_0", "kind       function",
+                  "type       Function", f"source     one.cpp:1:5",
+                  expected_source, "properties none", "flags      definition"):
         require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")
 
 
 @then("symbol output contains human-readable record metadata")
 def human_readable_record_metadata(catalog: Catalog) -> None:
-    file_id = next(line.removeprefix("FILE ID: ")
+    identity = next(line.split()[-1]
                    for line in catalog.stdout.splitlines()
-                   if line.startswith("FILE ID:"))
-    for label in (f"SOURCE: <file {file_id}>@<unknown>:2", "KIND: struct",
-                  "TYPE: Record", "PROPERTIES: none", "DEFINITION: yes"):
+                   if line.startswith("  identity"))
+    file_id = identity.split(":", 1)[0]
+    for label in ("catalog_record", "kind       struct", "type       Record",
+                  f"source     <file {file_id}>:2:8", "properties none",
+                  "flags      definition"):
         require(label in catalog.stdout, f"missing {label}: {catalog.stdout}")
-    require("PROPERTIES: 0" not in catalog.stdout and
-            all(value in catalog.stdout for value in ("IMPLICIT: no", "STATIC: no")),
+    require("properties 0" not in catalog.stdout and
+            "implicit" not in catalog.stdout and "static" not in catalog.stdout,
             f"record metadata was not decoded: {catalog.stdout}")
 
 

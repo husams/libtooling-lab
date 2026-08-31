@@ -143,7 +143,6 @@ Feature: Manage files, clones, and extracted symbols
   Scenario: Symbol show renders human-readable function metadata
     When I show the extracted catalog function
     Then the symbol command succeeds
-    And symbol output contains the full stored symbol details
     And symbol output contains human-readable function metadata
 
   Scenario: Symbol show renders human-readable record metadata without catalog configuration

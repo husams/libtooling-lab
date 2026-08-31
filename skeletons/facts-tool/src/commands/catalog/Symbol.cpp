@@ -11,7 +11,9 @@
 #include <format>
 #include <iostream>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace facts::commands {
@@ -19,11 +21,22 @@ namespace {
 
 struct SymbolFact {
   SymbolId id;
-  std::array<std::string, 32> details;
   std::int64_t line;
+  std::int64_t column;
+  std::string qualifiedName;
+  std::string usr;
   std::string type;
   std::string kind;
-  std::string source;
+  std::string subKind;
+  std::string language;
+  std::string access;
+  std::string properties;
+  std::string refQualifier;
+  std::string constantEvaluation;
+  std::string returnType;
+  std::vector<std::string> flags;
+  std::string sourceName;
+  std::filesystem::path sourcePath;
 };
 
 struct SourceFile {
@@ -69,48 +82,41 @@ std::string symbolProperties(std::int64_t properties) {
   return result.empty() ? "none" : result;
 }
 
-bool isBooleanColumn(int column) {
-  switch (column) {
-  case 12:
-  case 13:
-  case 14:
-  case 15:
-  case 16:
-  case 17:
-  case 18:
-  case 20:
-  case 21:
-  case 22:
-  case 23:
-  case 24:
-  case 25:
-  case 26:
-  case 27:
-  case 28:
-  case 29:
-  case 30:
-  case 32:
-    return true;
-  default:
-    return false;
+std::string normalizeNone(std::string value) {
+  return value == "<none>" ? "none" : value;
+}
+
+std::vector<std::string> trueFlags(const storage::Row &row) {
+  static constexpr std::array flagColumns{
+      std::pair{12, "definition"}, std::pair{13, "implicit"},
+      std::pair{14, "static"}, std::pair{15, "virtual"},
+      std::pair{16, "const"}, std::pair{17, "inline"},
+      std::pair{18, "pure"}, std::pair{20, "override"},
+      std::pair{21, "internal-linkage"}, std::pair{22, "external"},
+      std::pair{23, "variadic"}, std::pair{24, "deleted"},
+      std::pair{25, "defaulted"}, std::pair{26, "explicit"},
+      std::pair{27, "final"}, std::pair{28, "abstract"},
+      std::pair{29, "polymorphic"}, std::pair{30, "extern-storage"},
+      std::pair{32, "noexcept"}};
+  std::vector<std::string> flags;
+  for (const auto &[column, name] : flagColumns)
+    if (row.integer(column))
+      flags.emplace_back(name);
+  return flags;
+}
+
+std::string join(const std::vector<std::string> &values) {
+  std::string result;
+  for (const auto &value : values) {
+    if (!result.empty())
+      result += ", ";
+    result += value;
   }
+  return result;
 }
 
-std::string symbolDetail(const storage::Row &row, int column) {
-  if (column == 6 || column == 7 || column == 11 || column == 19 ||
-      column == 31)
-    return row.string(column);
-  if (isBooleanColumn(column))
-    return row.integer(column) ? "yes" : "no";
-  return std::to_string(row.integer(column));
-}
-
-std::string sourceLocation(const std::vector<SourceFile> &files, SymbolId id,
-                           std::int64_t line) {
-  const auto file = std::ranges::find(files, id.file, &SourceFile::id);
-  if (file == files.end())
-    return std::format("<file {}>@<unknown>:{}", id.file, line);
-  return std::format("{}@{}:{}", file->name, file->path.string(), line);
+std::string symbolId(SymbolId id) {
+  return std::format("{}:{}", id.file, id.index);
 }
 
 catalog::Result<std::vector<SourceFile>> sourceFiles(const std::string &path) {
@@ -141,85 +147,86 @@ symbols(storage::Database &database, const std::vector<SourceFile> &files,
       "is_const,is_inline,is_pure,ref_qualifier,is_override,"
       "has_internal_linkage,is_external,is_variadic,is_deleted,is_defaulted,"
       "is_explicit,is_final,is_abstract,is_polymorphic,has_extern_storage,"
-      "constant_evaluation,is_noexcept FROM symbol "
-      "WHERE (? IS NULL OR qualified_name=?) ORDER BY id",
+      "constant_evaluation,is_noexcept,"
+      "(SELECT destination.qualified_name FROM relation "
+      "JOIN symbol destination ON destination.id=relation.destination_id "
+      "WHERE relation.source_id=symbol.id AND relation.kind=? LIMIT 1) "
+      "FROM symbol WHERE (? IS NULL OR qualified_name=?) ORDER BY id",
       [&files](const storage::Row &row) {
         SymbolFact value;
         value.id = row.get<SymbolId>(0);
         value.line = row.integer(8);
+        value.column = row.integer(9);
+        value.qualifiedName = row.string(7);
+        value.usr = row.string(6);
         value.type = std::string(symbolNodeName(
             static_cast<Storage::SymbolNode>(row.integer(1))));
         value.kind = clang::index::getSymbolKindString(
                          row.get<clang::index::SymbolKind>(2))
                          .str();
-        value.details[4] = symbolProperties(row.integer(5));
-        for (int column = 6; column <= 32; ++column)
-          value.details[static_cast<std::size_t>(column - 1)] =
-              symbolDetail(row, column);
-        value.details[2] = clang::index::getSymbolSubKindString(
-                               row.get<clang::index::SymbolSubKind>(3))
-                               .str();
-        value.details[3] = clang::index::getSymbolLanguageString(
-                               row.get<clang::index::SymbolLanguage>(4))
-                               .str();
-        value.source = sourceLocation(files, value.id, value.line);
+        value.subKind = normalizeNone(
+            clang::index::getSymbolSubKindString(
+                row.get<clang::index::SymbolSubKind>(3))
+                .str());
+        value.language = normalizeNone(
+            clang::index::getSymbolLanguageString(
+                row.get<clang::index::SymbolLanguage>(4))
+                .str());
+        value.access = row.string(11);
+        value.properties = symbolProperties(row.integer(5));
+        value.refQualifier = row.string(19);
+        value.constantEvaluation = row.string(31);
+        value.returnType = row.isNull(33) ? "" : row.string(33);
+        value.flags = trueFlags(row);
+        const auto file = std::ranges::find(files, value.id.file,
+                                            &SourceFile::id);
+        if (file == files.end())
+          value.sourceName = std::format("<file {}>", value.id.file);
+        else {
+          value.sourceName = file->name;
+          value.sourcePath = file->path;
+        }
         return value;
       },
-      name, name);
+      static_cast<int>(RelationKind::ReturnType), name, name);
 }
 
 std::string displaySymbols(const std::vector<SymbolFact> &values) {
   if (values.empty())
     return "No symbols\n";
-  std::string output = "ID\tSOURCE\tKIND\tTYPE\tQUALIFIED NAME\tUSR\n";
+  std::string output = "id\tsymbol\tkind\tflags\tlocation\n";
   for (const auto &value : values)
-    output +=
-        std::format("{}\t{}\t{}\t{}\t{}\t{}\n", value.id.packed(),
-                    value.source, value.kind, value.type, value.details[6],
-                    value.details[5]);
+    output += std::format("{}\t{}\t{}\t{}\t{}:{}\n", symbolId(value.id),
+                          value.qualifiedName, value.kind,
+                          value.flags.empty() ? "-" : join(value.flags),
+                          value.sourceName, value.line);
   return output;
 }
 
 std::string displaySymbol(const SymbolFact &value) {
-  static constexpr std::array labels = {"NODE",
-                                        "KIND",
-                                        "SUB KIND",
-                                        "LANG",
-                                        "PROPERTIES",
-                                        "USR",
-                                        "QUALIFIED NAME",
-                                        "LINE",
-                                        "COLUMN",
-                                        "OFFSET",
-                                        "ACCESS",
-                                        "DEFINITION",
-                                        "IMPLICIT",
-                                        "STATIC",
-                                        "VIRTUAL",
-                                        "CONST",
-                                        "INLINE",
-                                        "PURE",
-                                        "REF QUALIFIER",
-                                        "OVERRIDE",
-                                        "INTERNAL LINKAGE",
-                                        "EXTERNAL",
-                                        "VARIADIC",
-                                        "DELETED",
-                                        "DEFAULTED",
-                                        "EXPLICIT",
-                                        "FINAL",
-                                        "ABSTRACT",
-                                        "POLYMORPHIC",
-                                        "EXTERN STORAGE",
-                                        "CONSTANT EVALUATION",
-                                        "NOEXCEPT"};
-  std::string output =
-      std::format("ID: {}\nFILE ID: {}\nSYMBOL INDEX: {}\nSOURCE: {}\n"
-                  "KIND: {}\nTYPE: {}\n",
-                  value.id.packed(), value.id.file, value.id.index,
-                  value.source, value.kind, value.type);
-  for (std::size_t index = 2; index < labels.size(); ++index)
-    output += std::format("{}: {}\n", labels[index], value.details[index]);
+  std::string output = value.qualifiedName;
+  if (!value.returnType.empty())
+    output += std::format(" -> {}", value.returnType);
+  output += std::format("\n  identity   {}\n  kind       {}\n  type       {}\n",
+                        symbolId(value.id), value.kind, value.type);
+  if (value.subKind != "none")
+    output += std::format("  sub-kind   {}\n", value.subKind);
+  if (value.language != "none")
+    output += std::format("  language   {}\n", value.language);
+  if (value.access != "none")
+    output += std::format("  access     {}\n", value.access);
+  output += std::format("  source     {}:{}:{}\n", value.sourceName,
+                        value.line, value.column);
+  if (!value.sourcePath.empty())
+    output += std::format("             {}\n", value.sourcePath.string());
+  output += std::format("  usr        {}\n  properties {}\n", value.usr,
+                        value.properties);
+  if (!value.flags.empty())
+    output += std::format("  flags      {}\n", join(value.flags));
+  if (value.refQualifier != "none")
+    output += std::format("  ref        {}\n", value.refQualifier);
+  if (value.constantEvaluation != "none")
+    output += std::format("  constant   {}\n", value.constantEvaluation);
   return output;
 }
 
