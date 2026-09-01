@@ -57,7 +57,8 @@ OverrideIndex::targets(const clang::CXXMethodDecl &base,
       [&](const auto *fact) { return appliesTo(*fact, receiver, certainty); });
   std::vector<DispatchTarget> targets;
   for (const auto *fact : applicable)
-    if (!isOverridden(*fact, applicable))
+    if (certainty == ReceiverCertainty::Possible ||
+        !isOverridden(*fact, applicable))
       targets.push_back({fact->relation.source, fact->source});
   if (targets.empty())
     targets.push_back({baseSymbol, &base});

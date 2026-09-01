@@ -149,14 +149,19 @@ def possible_dispatch(context: FactsToolContext) -> None:
         "FROM relation_site site JOIN symbol s ON s.id=site.source_id JOIN symbol d "
         "ON d.id=site.destination_id WHERE site.kind=18 AND s.qualified_name IN "
         "('call_graph_fixture::PossibleRoot::call','call_graph_fixture::ExactRoot::call',"
-        "'call_graph_fixture::FallbackRoot::call') ORDER BY s.qualified_name")
+        "'call_graph_fixture::FallbackRoot::call') ORDER BY s.qualified_name,d.qualified_name")
     require(transitive == [
         ("call_graph_fixture::ExactRoot::call", "call_graph_fixture::ExactLeaf::value", 1),
         ("call_graph_fixture::FallbackRoot::call", "call_graph_fixture::FallbackRoot::value", 1),
         ("call_graph_fixture::PossibleRoot::call", "call_graph_fixture::PossibleLeaf::value", 2),
+        ("call_graph_fixture::PossibleRoot::call", "call_graph_fixture::PossibleMid::value", 2),
     ], str(transitive))
     output = cli(context, "--function", "call_graph_fixture::possibleCall")
     require("receiver=* certainty=possible" in output.stdout, output.stdout)
+    transitive_output = cli(context, "--function", "call_graph_fixture::transitivePossible")
+    for target in ("PossibleMid::value", "PossibleLeaf::value"):
+        require(f"target=call_graph_fixture::{target}" in transitive_output.stdout,
+                transitive_output.stdout + transitive_output.stderr)
 
 
 @then("instantiated callers normalize to the written pattern")
