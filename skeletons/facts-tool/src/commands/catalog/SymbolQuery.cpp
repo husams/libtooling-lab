@@ -1,5 +1,6 @@
 #include "commands/catalog/SymbolData.h"
 #include "commands/catalog/SymbolFormat.h"
+#include "storage/SemanticProperties.h"
 #include "storage/Sqlite.h"
 #include "storage/SqliteDatabase.h"
 #include "storage/Storage.h"
@@ -154,8 +155,10 @@ querySymbols(storage::Database &database, const std::vector<SourceFile> &files,
                value.usr = row.string(6);
                value.type = std::string(symbolNodeName(
                    static_cast<Storage::SymbolNode>(row.integer(1))));
+               // The column holds the storage numbering, not this build's
+               // enum: decode it the same way Storage does.
                value.kind = clang::index::getSymbolKindString(
-                                row.get<clang::index::SymbolKind>(2))
+                                storage::symbolKindFromStored(row.integer(2)))
                                 .str();
                value.subKind =
                    normalizeNone(clang::index::getSymbolSubKindString(
