@@ -297,6 +297,14 @@ CREATE TABLE IF NOT EXISTS relation_site (
 PRAGMA user_version=7;
 )sql";
 
+inline constexpr auto relationSiteContextMigrationSql = R"sql(
+ALTER TABLE relation_site
+ADD COLUMN receiver_type_id INTEGER REFERENCES symbol(id);
+ALTER TABLE relation_site
+ADD COLUMN certainty INTEGER;
+PRAGMA user_version=8;
+)sql";
+
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
@@ -346,6 +354,13 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
               return schemaVersion(database).and_then([database](int version) {
                 return version < 7 ? execute(database, relationSiteMigrationSql)
                                    : std::expected<void, std::error_code>{};
+              });
+            })
+            .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 8
+                           ? execute(database, relationSiteContextMigrationSql)
+                           : std::expected<void, std::error_code>{};
               });
             });
       });

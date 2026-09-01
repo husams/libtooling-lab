@@ -3,6 +3,7 @@
 #include "commands/Dependency.h"
 #include "commands/Extract.h"
 #include "commands/Import.h"
+#include "commands/analyse/CallGraphCommand.h"
 #include "commands/catalog/Commands.h"
 #include <format>
 #include <iostream>
@@ -16,6 +17,8 @@ std::string_view commandName(const ExtractOptions &) { return "extract"; }
 std::string_view commandName(const ImportOptions &) { return "import"; }
 
 std::string_view commandName(const DependencyOptions &) { return "dependency"; }
+
+std::string_view commandName(const CallGraphOptions &) { return "call-graph"; }
 
 std::string_view commandName(const RepositoryOptions &) { return "repo"; }
 
@@ -54,6 +57,11 @@ std::string commandDetails(const DependencyOptions &options) {
                      options.sources.size());
 }
 
+std::string commandDetails(const CallGraphOptions &options) {
+  return std::format("facts='{}', scope='{}'", options.facts,
+                     options.all ? "all" : *options.function);
+}
+
 std::string commandDetails(const SymbolOptions &options) {
   return std::format("facts='{}'", options.facts);
 }
@@ -68,6 +76,10 @@ std::expected<int, std::string> execute(const ImportOptions &options) {
 
 std::expected<int, std::string> execute(const DependencyOptions &options) {
   return commands::runDependency(options);
+}
+
+std::expected<int, std::string> execute(const CallGraphOptions &options) {
+  return commands::runCallGraph(options);
 }
 
 std::expected<int, std::string> execute(const RepositoryOptions &options) {

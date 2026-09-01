@@ -21,6 +21,8 @@ int main(int argc, char **argv) {
                                                                 ".v2") &&
                  storage_schema_test::verifyVersionFiveMigration(legacy +
                                                                  ".v5") &&
+                 storage_schema_test::verifyVersionSevenMigration(legacy +
+                                                                  ".v7") &&
                  storage_schema_test::verifyFileSchemaRollback(legacy +
                                                                ".file-rollback")
              ? 0

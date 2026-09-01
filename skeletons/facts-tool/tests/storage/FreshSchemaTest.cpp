@@ -437,13 +437,13 @@ SELECT group_concat(record, char(10)) FROM (
                          "is_implicit=1 AND is_lexical=1") == 1,
               "relation semantic columns are incorrect") &&
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
-                               "'relation_site')") == 8,
+                               "'relation_site')") == 10,
               "fresh relation-site schema is incomplete") &&
       require(scalar(database, "SELECT COUNT(*) FROM pragma_foreign_key_list("
                                "'relation_site') WHERE [table]='relation' "
                                "AND on_delete='CASCADE'") == 4,
               "relation-site cascade key is incorrect") &&
-      require(scalar(database, "PRAGMA user_version") == 7,
+      require(scalar(database, "PRAGMA user_version") == 8,
               "fresh schema version was not recorded");
   sqlite3_close(database);
   return valid;

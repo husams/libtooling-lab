@@ -32,9 +32,8 @@ storage::Database openDatabase(const std::string &path) {
             return database.executeScript("PRAGMA foreign_keys=ON;");
           });
   if (!initialized) {
-    throw std::runtime_error(
-        "cannot initialize SQLite database: " +
-        std::string{sqlite3_errmsg(database.nativeHandle())});
+    throw std::runtime_error("cannot initialize SQLite database '" + path +
+                             "': " + initialized.error().message());
   }
   return database;
 }

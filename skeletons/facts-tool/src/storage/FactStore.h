@@ -118,6 +118,16 @@ public:
   }
 
   std::expected<void, std::error_code>
+  addRelationFacts(std::span<const Relation> relations,
+                   std::span<const RelationSite> sites) {
+    cli::traceRelations(verbosity_, "add-relation-facts", relations);
+    cli::traceRelationSites(verbosity_, sites);
+    auto result = storage_.addRelationFacts(relations, sites);
+    cli::tracePersistenceResult(verbosity_, "add-relation-facts", result);
+    return result;
+  }
+
+  std::expected<void, std::error_code>
   addTemplateArguments(SymbolId id,
                        std::span<const TemplateArgument> arguments) {
     cli::logVerbose(

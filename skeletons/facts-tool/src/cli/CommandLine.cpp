@@ -7,6 +7,7 @@
 #include <CLI/CLI.hpp>
 
 #include <expected>
+#include <limits>
 #include <utility>
 
 namespace facts::cli {
@@ -25,6 +26,8 @@ public:
     analyseCommand_->require_subcommand(1, 1);
     configureDependency(*analyseCommand_->add_subcommand(
         "dependency", "Build the direct include dependency graph"));
+    configureCallGraph(*analyseCommand_->add_subcommand(
+        "call-graph", "Query contextual function call graphs"));
     repositoryCommand_ = configureRepository(app_, repository_);
     componentCommand_ = configureComponent(app_, component_);
     directoryCommand_ = configureDirectory(app_, directory_);
@@ -52,6 +55,8 @@ public:
       return Command{std::move(file_)};
     if (symbolCommand_->parsed())
       return Command{std::move(symbol_)};
+    if (callGraphCommand_->parsed())
+      return Command{std::move(callGraph_)};
     return importCommand_->parsed() ? Command{std::move(import_)}
                                     : Command{std::move(dependency_)};
   }
@@ -161,14 +166,37 @@ private:
         ->required();
   }
 
+  void configureCallGraph(CLI::App &command) {
+    callGraphCommand_ = &command;
+    configureVerbosity(command, callGraph_.verbosity);
+    command.add_option("-f,--facts", callGraph_.facts, "SQLite facts database")
+        ->required()
+        ->type_name("FILE");
+    auto *scope = command.add_option_group("scope", "Select graph roots");
+    scope
+        ->add_option("--function", callGraph_.function,
+                     "Qualified function name or USR")
+        ->type_name("SELECTOR");
+    scope->add_flag("--all", callGraph_.all,
+                    "All definition-backed functions with calls");
+    scope->require_option(1, 1);
+    command
+        .add_option("--max-depth", callGraph_.maxDepth,
+                    "Maximum traversal depth")
+        ->check(CLI::Range(1, std::numeric_limits<int>::max()))
+        ->type_name("N");
+  }
+
   CLI::App app_;
   CLI::App *extractCommand_ = nullptr;
   CLI::App *importCommand_ = nullptr;
   CLI::App *analyseCommand_ = nullptr;
   CLI::App *dependencyCommand_ = nullptr;
+  CLI::App *callGraphCommand_ = nullptr;
   ExtractOptions extract_;
   ImportOptions import_;
   DependencyOptions dependency_;
+  CallGraphOptions callGraph_;
   CLI::App *repositoryCommand_ = nullptr;
   CLI::App *componentCommand_ = nullptr;
   CLI::App *directoryCommand_ = nullptr;

@@ -123,6 +123,7 @@ add_library(facts-storage STATIC
   src/storage/RecordTemplate.cpp
   src/storage/Relation.cpp
   src/storage/RelationSite.cpp
+  src/analysis/callgraph/RelationSiteContextStore.cpp
   src/storage/SchemaMigration.cpp
   src/storage/Sqlite.cpp
   src/storage/Storage.cpp
@@ -169,6 +170,9 @@ add_library(facts-ast STATIC
   src/ast/extractors/RecordDecl.cpp
   src/ast/extractors/RecordInstance.cpp
   src/ast/extractors/Reference.cpp
+  src/ast/extractors/CallSite.cpp
+  src/ast/extractors/ReceiverContext.cpp
+  src/ast/extractors/OverrideRelation.cpp
   src/ast/extractors/TargetResolution.cpp
   src/ast/extractors/TemplatePattern.cpp
   src/ast/extractors/TemplateSpecialization.cpp
@@ -178,8 +182,17 @@ add_library(facts-ast STATIC
   src/ast/visitors/SymbolCollector.cpp
   src/ast/visitors/IncludeVisitor.cpp
   src/ast/visitors/BodyVisitor.cpp
+  src/ast/visitors/CallGraphVisitor.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
+  src/analysis/callgraph/CallGraphTypes.cpp
+  src/analysis/callgraph/CallGraphLinker.cpp
+  src/analysis/callgraph/OverrideIndex.cpp
+  src/analysis/callgraph/ReceiverPropagation.cpp
+  src/analysis/callgraph/DispatchResolver.cpp
+  src/analysis/callgraph/CallGraphContext.cpp
+  src/analysis/callgraph/CallGraphQuery.cpp
+  src/analysis/callgraph/CallGraphTraversal.cpp
 )
 target_include_directories(facts-ast PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-ast
@@ -231,6 +244,7 @@ add_library(facts-commands STATIC
   src/commands/Extract.cpp
   src/commands/IncludedFiles.cpp
   src/commands/Import.cpp
+  src/commands/analyse/CallGraphCommand.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-commands PRIVATE
@@ -287,6 +301,9 @@ if(BUILD_TESTING)
     NAME fact-store
     COMMAND fact-store-test ${CMAKE_CURRENT_BINARY_DIR}/fact-store-test.sqlite
   )
+  add_executable(call-graph-test tests/CallGraphTest.cpp)
+  target_link_libraries(call-graph-test PRIVATE facts-ast facts-storage)
+  add_test(NAME call-graph COMMAND call-graph-test)
   add_executable(file-manager-test tests/FileManagerTest.cpp)
   target_link_libraries(file-manager-test PRIVATE facts-storage facts-model
                                                 facts-clang facts-sqlite)
@@ -337,6 +354,7 @@ if(BUILD_TESTING)
   add_executable(
     storage-schema-test
     tests/storage/FreshSchemaTest.cpp
+    tests/storage/CallGraphMigrationTest.cpp
     tests/storage/LegacySchemaMigrationTest.cpp
     tests/storage/StorageSchemaTestMain.cpp
     tests/storage/StorageSchemaTestSupport.cpp
@@ -485,6 +503,13 @@ if(BUILD_TESTING)
     COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_contract_test.py
             $<TARGET_FILE:facts-tool>
+  )
+
+  add_test(
+    NAME call-graph-architecture
+    COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/call_graph_architecture_test.py
+            ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
   add_test(
