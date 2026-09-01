@@ -190,6 +190,7 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/OverrideIndex.cpp
   src/analysis/callgraph/ReceiverPropagation.cpp
   src/analysis/callgraph/DispatchResolver.cpp
+  src/analysis/callgraph/CallGraphContext.cpp
   src/analysis/callgraph/CallGraphQuery.cpp
   src/analysis/callgraph/CallGraphTraversal.cpp
 )

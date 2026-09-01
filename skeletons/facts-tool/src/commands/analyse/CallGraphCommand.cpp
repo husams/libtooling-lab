@@ -11,10 +11,14 @@ std::expected<int, std::string>
 runCallGraph(const cli::CallGraphOptions &options) {
   return callgraph::loadCallGraph(options.facts)
       .and_then([&](const auto &graph) {
+        if (graph.edges.empty())
+          return std::expected<int, std::string>{
+              std::unexpected("facts database contains no call facts")};
         return callgraph::selectRoots(graph, options.function, options.all)
             .transform([&](const auto &roots) {
-              std::cout << callgraph::renderCallGraph(
-                               graph, roots, options.maxDepth).text;
+              std::cout << callgraph::renderCallGraph(graph, roots,
+                                                      options.maxDepth)
+                               .text;
               return 0;
             });
       });

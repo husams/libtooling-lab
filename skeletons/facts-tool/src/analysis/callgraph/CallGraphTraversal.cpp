@@ -1,5 +1,7 @@
 #include "analysis/callgraph/CallGraphTraversal.h"
 
+#include "analysis/callgraph/CallGraphContext.h"
+
 #include <algorithm>
 #include <format>
 #include <ranges>
@@ -18,11 +20,12 @@ std::string_view kindName(RelationKind kind) {
 }
 
 std::string context(const QueryEdge &edge) {
-  if (!edge.certainty) return "receiver=- certainty=-";
-  const auto certainty = *edge.certainty == ReceiverCertainty::Exact
-                             ? "exact" : "possible";
-  return std::format("receiver={} certainty={}",
-                     edge.receiver.value_or("*"), certainty);
+  if (!edge.certainty)
+    return "receiver=- certainty=-";
+  const auto certainty =
+      *edge.certainty == ReceiverCertainty::Exact ? "exact" : "possible";
+  return std::format("receiver={} certainty={}", edge.receiver.value_or("*"),
+                     certainty);
 }
 
 class Traversal {
@@ -33,7 +36,7 @@ public:
   RenderedGraph run(const std::vector<const QueryNode *> &roots) {
     for (const auto *root : roots) {
       text_ += std::format("root={} usr={}\n", root->name, root->usr);
-      walk(*root, 0, {});
+      walk(*root, {root->id, {}, {}}, 0, {});
     }
     text_ += std::format("complete={} truncated={}\n",
                          truncated_ == 0 ? "true" : "false", truncated_);
@@ -41,20 +44,26 @@ public:
   }
 
 private:
-  void walk(const QueryNode &source, int depth, std::set<SymbolId> path) {
-    path.insert(source.id);
-    expanded_.insert(source.id);
+  void walk(const QueryNode &source, const QueryContext &current, int depth,
+            std::set<QueryContext> path) {
+    path.insert(current);
+    expanded_.insert(current);
     for (const auto &edge : graph_.edges) {
-      if (edge.source != source.id) continue;
+      if (edge.source != source.id || !matchesContext(edge, current))
+        continue;
       const auto *target = findNode(graph_, edge.destination);
-      if (!target) continue;
-      const bool cycle = path.contains(target->id);
-      const bool reused = !cycle && expanded_.contains(target->id);
-      const bool capped = maxDepth_ && depth + 1 >= *maxDepth_ &&
+      if (!target)
+        continue;
+      const auto child = descendContext(edge, current);
+      const bool cycle = path.contains(child);
+      const bool reused = !cycle && expanded_.contains(child);
+      const bool capped =
+          maxDepth_ && depth + 1 >= *maxDepth_ &&
           std::ranges::any_of(graph_.edges, [&](const auto &next) {
-            return next.source == target->id;
+            return next.source == target->id && matchesContext(next, child);
           });
-      if (capped) ++truncated_;
+      if (capped)
+        ++truncated_;
       text_ += std::format(
           "  depth={} relation={} source={} target={} {} location=<file {}>:"
           "{}:{} cycle={} reused={} external-boundary={} depth-truncated={}\n",
@@ -63,13 +72,13 @@ private:
           cycle ? "true" : "false", reused ? "true" : "false",
           target->external ? "true" : "false", capped ? "true" : "false");
       if (!cycle && !reused && !target->external && !capped)
-        walk(*target, depth + 1, path);
+        walk(*target, child, depth + 1, path);
     }
   }
 
   const QueryGraph &graph_;
   std::optional<int> maxDepth_;
-  std::set<SymbolId> expanded_;
+  std::set<QueryContext> expanded_;
   std::string text_;
   unsigned truncated_ = 0;
 };

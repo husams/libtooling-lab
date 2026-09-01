@@ -27,7 +27,7 @@ int directMethodLambdaAndConstructor() {
 int exactCalls() {
   X x;
   Y y;
-  return x.log() + x.log() + y.log() + declarationOnly(3);
+  return x.log() + y.log() + declarationOnly(3);
 }
 
 int recurse(int value) { return value ? recurse(value - 1) : exactCalls(); }

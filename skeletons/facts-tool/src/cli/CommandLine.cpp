@@ -7,6 +7,7 @@
 #include <CLI/CLI.hpp>
 
 #include <expected>
+#include <limits>
 #include <utility>
 
 namespace facts::cli {
@@ -182,7 +183,7 @@ private:
     command
         .add_option("--max-depth", callGraph_.maxDepth,
                     "Maximum traversal depth")
-        ->check(CLI::PositiveNumber)
+        ->check(CLI::Range(1, std::numeric_limits<int>::max()))
         ->type_name("N");
   }
 

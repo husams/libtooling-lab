@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import subprocess
+import shutil
 from pathlib import Path
 
 import pytest
@@ -90,6 +91,22 @@ def ownership(context: FactsToolContext) -> None:
             f"missing inherited call owner: {found}")
     require(("call_graph_fixture::X::toString", "call_graph_fixture::Base::toString", 6) in found,
             f"missing override: {found}")
+    counts = rows(context, "SELECT r.count,COUNT(site.offset) FROM relation r "
+        "JOIN symbol s ON s.id=r.source_id JOIN symbol d ON d.id=r.destination_id "
+        "LEFT JOIN relation_site site ON site.source_id=r.source_id AND "
+        "site.destination_id=r.destination_id AND site.kind=r.kind AND "
+        "site.position=r.position WHERE r.kind=1 AND ((s.qualified_name="
+        "'call_graph_fixture::exactCalls' AND d.qualified_name="
+        "'call_graph_fixture::Base::log') OR (s.qualified_name="
+        "'call_graph_fixture::Base::log' AND d.qualified_name="
+        "'call_graph_fixture::Base::toString')) GROUP BY r.source_id,r.destination_id "
+        "ORDER BY s.qualified_name")
+    require(counts == [(1, 1), (2, 2)], f"unexpected Calls site counts: {counts}")
+    overrides = rows(context, "SELECT s.qualified_name FROM relation r JOIN symbol s "
+        "ON s.id=r.source_id WHERE r.kind=6 AND s.qualified_name LIKE "
+        "'%::toString' ORDER BY s.qualified_name")
+    require(overrides == [("call_graph_fixture::X::toString",),
+                          ("call_graph_fixture::Y::toString",)], str(overrides))
     synthetic = rows(context, "SELECT qualified_name FROM symbol WHERE qualified_name IN "
         "('call_graph_fixture::X::log','call_graph_fixture::Y::log')")
     require(not synthetic, f"synthetic methods were created: {synthetic}")
@@ -104,6 +121,10 @@ def assert_exact_dispatch(context: FactsToolContext, receiver: str, target: str)
     output = cli(context, "--function", "call_graph_fixture::exactCalls")
     require(output.returncode == 0 and f"target=call_graph_fixture::{target}::toString" in output.stdout,
             output.stdout + output.stderr)
+    other = "Y" if target == "X" else "X"
+    section = output.stdout.split(f"receiver=call_graph_fixture::{receiver} certainty=exact", 1)[1]
+    section = section.split("depth=1 relation=Calls", 1)[0]
+    require(f"target=call_graph_fixture::{other}::toString" not in section, output.stdout)
 
 
 @then("MessageX dispatch is exact in storage and text")
@@ -119,10 +140,21 @@ def exact_y(context: FactsToolContext) -> None:
 @then("unproven receiver dispatch is possible and conservative")
 def possible_dispatch(context: FactsToolContext) -> None:
     found = rows(context, "SELECT d.qualified_name,site.receiver_type_id,site.certainty "
-        "FROM relation_site site JOIN symbol d ON d.id=site.destination_id "
-        "WHERE site.kind=18 ORDER BY d.qualified_name")
+        "FROM relation_site site JOIN symbol s ON s.id=site.source_id JOIN symbol d "
+        "ON d.id=site.destination_id WHERE site.kind=18 AND s.qualified_name="
+        "'call_graph_fixture::Base::log' ORDER BY d.qualified_name")
     require(found == [("call_graph_fixture::X::toString", None, 2),
                       ("call_graph_fixture::Y::toString", None, 2)], str(found))
+    transitive = rows(context, "SELECT s.qualified_name,d.qualified_name,site.certainty "
+        "FROM relation_site site JOIN symbol s ON s.id=site.source_id JOIN symbol d "
+        "ON d.id=site.destination_id WHERE site.kind=18 AND s.qualified_name IN "
+        "('call_graph_fixture::PossibleRoot::call','call_graph_fixture::ExactRoot::call',"
+        "'call_graph_fixture::FallbackRoot::call') ORDER BY s.qualified_name")
+    require(transitive == [
+        ("call_graph_fixture::ExactRoot::call", "call_graph_fixture::ExactLeaf::value", 1),
+        ("call_graph_fixture::FallbackRoot::call", "call_graph_fixture::FallbackRoot::value", 1),
+        ("call_graph_fixture::PossibleRoot::call", "call_graph_fixture::PossibleLeaf::value", 2),
+    ], str(transitive))
     output = cli(context, "--function", "call_graph_fixture::possibleCall")
     require("receiver=* certainty=possible" in output.stdout, output.stdout)
 
@@ -168,11 +200,34 @@ def all_mode(context: FactsToolContext) -> None:
     roots = [line for line in first.stdout.splitlines() if line.startswith("root=")]
     require(first.returncode == second.returncode == 0 and first.stdout == second.stdout,
             first.stdout + second.stdout)
-    require(roots == sorted(roots) and "virtual root" not in first.stdout.lower(), str(roots))
+    expected = [f"root={name} usr={usr}" for name, usr in rows(
+        context, "SELECT qualified_name,usr FROM symbol WHERE node=1 AND is_definition=1 "
+                 "ORDER BY qualified_name,usr,id")]
+    require(roots == expected and "virtual root" not in first.stdout.lower(), str(roots))
 
 
 @then("invalid graph state database and depth requests are diagnosed")
 def invalid_requests(context: FactsToolContext) -> None:
+    no_calls = context.run_root_path / "no-call-facts.sqlite"
+    shutil.copy2(context.facts_database_path, no_calls)
+    with sqlite3.connect(no_calls) as database:
+        database.execute("DELETE FROM relation_site WHERE kind IN (1,18)")
+    absent = run([str(context.facts_tool), "analyse", "call-graph", "-v", "0",
+                  "-f", str(no_calls), "--all"])
+    require(absent.returncode == 1 and "no call facts" in absent.stderr,
+            absent.stdout + absent.stderr)
+    broken = context.run_root_path / "broken.cpp"
+    broken.write_text("int broken( {\n", encoding="utf-8")
+    broken_conf = context.run_root_path / "broken-files.sqlite"
+    broken_facts = context.run_root_path / "broken-facts.sqlite"
+    imported = run([str(context.facts_tool), "import", "-v", "0", "-c",
+                    str(broken_conf), "--extra-arg=-std=c++23", str(broken)])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+    incomplete = run([str(context.facts_tool), "extract", "-v", "0", "-o",
+                      str(broken_facts), "-c", str(broken_conf), str(broken)])
+    require(incomplete.returncode == 1 and
+            ("error:" in incomplete.stderr or "incomplete" in incomplete.stderr),
+            incomplete.stdout + incomplete.stderr)
     with sqlite3.connect(context.facts_database_path) as database:
         database.execute("UPDATE relation_site SET receiver_type_id=NULL,certainty=1 "
                          "WHERE kind=18 AND destination_id=(SELECT id FROM symbol "
@@ -184,8 +239,10 @@ def invalid_requests(context: FactsToolContext) -> None:
                    str(context.run_root_path / "missing.sqlite"), "--all"])
     require(missing.returncode == 1 and "cannot open facts database" in missing.stderr,
             missing.stdout + missing.stderr)
-    depth = cli(context, "--all", "--max-depth", "0")
-    require(depth.returncode != 0 and "--max-depth" in depth.stderr, depth.stdout + depth.stderr)
+    for value in ("0", "-1", "abc"):
+        depth = cli(context, "--all", "--max-depth", value)
+        require(depth.returncode != 0 and "--max-depth" in depth.stderr,
+                depth.stdout + depth.stderr)
 
 
 @given("the call graph architecture regression is run", target_fixture="architecture_result")

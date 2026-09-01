@@ -3,24 +3,23 @@
 #include "analysis/callgraph/OverrideIndex.h"
 #include "analysis/callgraph/ReceiverPropagation.h"
 
-#include <clang/AST/DeclCXX.h>
 #include <algorithm>
+#include <clang/AST/DeclCXX.h>
 
 namespace facts::callgraph {
 namespace {
 
 void emitDispatches(const CallFact &call,
                     const ReceiverFunctionContext &context,
-                    const OverrideIndex &index,
-                    std::vector<CallFact> &output) {
-  const auto *method =
-      llvm::dyn_cast<clang::CXXMethodDecl>(call.callee);
+                    const OverrideIndex &index, std::vector<CallFact> &output) {
+  const auto *method = llvm::dyn_cast<clang::CXXMethodDecl>(call.callee);
   if (!call.virtualCall || !method || !context.receiver)
     return;
-  for (const auto *target :
-       index.targets(*method, *context.receiver, context.certainty)) {
+  for (const auto &target :
+       index.targets(*method, *context.receiver, context.certainty,
+                     call.relation.destination)) {
     const Relation relation{.source = call.relation.source,
-                            .destination = target->relation.source,
+                            .destination = target.symbol,
                             .kind = RelationKind::DispatchCalls};
     auto site = call.site;
     site.destination = relation.destination;
@@ -29,8 +28,8 @@ void emitDispatches(const CallFact &call,
                             ? context.receiverId
                             : std::nullopt;
     site.certainty = context.certainty;
-    output.push_back({relation, site, call.caller, target->source,
-                      context.receiver, false});
+    output.push_back(
+        {relation, site, call.caller, target.method, context.receiver, false});
   }
 }
 
@@ -45,8 +44,9 @@ resolveDispatchCalls(std::span<const CallFact> calls,
   std::vector<CallFact> output;
   for (const auto &call : calls)
     if (call.receiver && call.site.certainty && !isImplicitSelfReceiver(call))
-      emitDispatches(call, {call.caller, call.receiver,
-                            call.site.receiverType, *call.site.certainty},
+      emitDispatches(call,
+                     {call.caller, call.receiver, call.site.receiverType,
+                      *call.site.certainty},
                      index, output);
   while (!work.empty()) {
     auto context = work.back();
@@ -61,8 +61,7 @@ resolveDispatchCalls(std::span<const CallFact> calls,
           context.function->getCanonicalDecl())
         continue;
       emitDispatches(call, context, index, output);
-      if (!call.virtualCall &&
-          llvm::isa<clang::CXXMethodDecl>(call.callee))
+      if (!call.virtualCall && llvm::isa<clang::CXXMethodDecl>(call.callee))
         work.push_back({call.callee, context.receiver, context.receiverId,
                         context.certainty});
     }
