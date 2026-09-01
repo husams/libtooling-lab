@@ -46,30 +46,67 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
-find_package(SQLite3 REQUIRED)
+# SQLite is compiled from the official amalgamation and linked statically, so
+# every platform gets the same version regardless of what the system ships.
+# RHEL 9's 3.34 predates RETURNING, which the storage layer uses; macOS's SDK
+# copy is a dynamic library outside our control. Set FACTS_SYSTEM_SQLITE=ON to
+# link the system library instead (it must be >= 3.35).
+option(FACTS_SYSTEM_SQLITE "Link the system SQLite instead of the bundled amalgamation" OFF)
 
-# One target for SQLite, whatever find_package produced. CMake >= 4.3 names the
-# imported target SQLite3::SQLite3; older CMake (RHEL 9 ships 3.31) only defines
-# the now-deprecated SQLite::SQLite3, and a hand-pointed SQLite3_LIBRARY may
-# yield no imported target at all.
-add_library(facts-sqlite INTERFACE)
-if(TARGET SQLite3::SQLite3)
-  target_link_libraries(facts-sqlite INTERFACE SQLite3::SQLite3)
-elseif(TARGET SQLite::SQLite3)
-  target_link_libraries(facts-sqlite INTERFACE SQLite::SQLite3)
+if(FACTS_SYSTEM_SQLITE)
+  find_package(SQLite3 3.35 REQUIRED)
+  # One target for SQLite, whatever find_package produced. CMake >= 4.3 names
+  # the imported target SQLite3::SQLite3; older CMake (RHEL 9 ships 3.31) only
+  # defines the now-deprecated SQLite::SQLite3, and a hand-pointed
+  # SQLite3_LIBRARY may yield no imported target at all.
+  add_library(facts-sqlite INTERFACE)
+  if(TARGET SQLite3::SQLite3)
+    target_link_libraries(facts-sqlite INTERFACE SQLite3::SQLite3)
+  elseif(TARGET SQLite::SQLite3)
+    target_link_libraries(facts-sqlite INTERFACE SQLite::SQLite3)
+  else()
+    target_include_directories(facts-sqlite SYSTEM INTERFACE
+                               ${SQLite3_INCLUDE_DIRS})
+    target_link_libraries(facts-sqlite INTERFACE ${SQLite3_LIBRARIES})
+  endif()
+  # A hand-built libsqlite3.a carries no dependencies of its own; the threading,
+  # dlopen and math symbols it references have to come from the link line.
+  get_filename_component(FACTS_SQLITE_SUFFIX "${SQLite3_LIBRARY}" LAST_EXT)
+  if(FACTS_SQLITE_SUFFIX STREQUAL "${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    find_package(Threads REQUIRED)
+    target_link_libraries(facts-sqlite INTERFACE Threads::Threads
+                                                 ${CMAKE_DL_LIBS} m)
+  endif()
 else()
-  target_include_directories(facts-sqlite SYSTEM INTERFACE
-                             ${SQLite3_INCLUDE_DIRS})
-  target_link_libraries(facts-sqlite INTERFACE ${SQLite3_LIBRARIES})
-endif()
-# A static libsqlite3.a (what scripts/build-rhel9.sh builds, because RHEL 9's
-# 3.34 has no RETURNING) carries no dependencies of its own; the threading,
-# dlopen and math symbols it references have to come from the link line.
-get_filename_component(FACTS_SQLITE_SUFFIX "${SQLite3_LIBRARY}" LAST_EXT)
-if(FACTS_SQLITE_SUFFIX STREQUAL "${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  # The zip carries no CMakeLists.txt, so MakeAvailable only unpacks it. Point
+  # FETCHCONTENT_SOURCE_DIR_SQLITE3 at an unpacked amalgamation to build offline.
+  FetchContent_Declare(
+    sqlite3
+    URL https://www.sqlite.org/2026/sqlite-amalgamation-3530400.zip
+    URL_HASH SHA256=1e71ddf93849c6a6ecf58b827c0692073d2dd7ee40196158068f7b29f422e87d
+  )
+  FetchContent_MakeAvailable(sqlite3)
+
+  add_library(facts-sqlite STATIC ${sqlite3_SOURCE_DIR}/sqlite3.c)
+  # SYSTEM so sqlite3.h never draws warnings from our own flags, PUBLIC because
+  # the storage headers include <sqlite3.h>.
+  target_include_directories(facts-sqlite SYSTEM PUBLIC ${sqlite3_SOURCE_DIR})
+  # SQLITE_USE_URI keeps URI filenames working the way macOS's system SQLite
+  # does, so a database path is interpreted identically on both platforms.
+  target_compile_definitions(facts-sqlite PRIVATE
+    SQLITE_ENABLE_FTS5
+    SQLITE_ENABLE_JSON1
+    SQLITE_ENABLE_RTREE
+    SQLITE_USE_URI=1
+    SQLITE_OMIT_LOAD_EXTENSION=1
+    SQLITE_THREADSAFE=1
+  )
+  set_target_properties(facts-sqlite PROPERTIES POSITION_INDEPENDENT_CODE ON)
   find_package(Threads REQUIRED)
-  target_link_libraries(facts-sqlite INTERFACE Threads::Threads
-                                               ${CMAKE_DL_LIBS} m)
+  target_link_libraries(facts-sqlite PUBLIC Threads::Threads)
+  if(UNIX)
+    target_link_libraries(facts-sqlite PUBLIC m)
+  endif()
 endif()
 message(STATUS "Building against LLVM ${LLVM_PACKAGE_VERSION} at ${LLVM_DIR}")
 
@@ -216,7 +253,9 @@ add_library(facts-symbols STATIC
   src/commands/catalog/SymbolQuery.cpp
 )
 target_include_directories(facts-symbols PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(facts-symbols PRIVATE facts-storage facts-clang)
+# PUBLIC storage: SymbolData.h includes storage/catalog/Database.h, which pulls
+# in <sqlite3.h>, so consumers (facts-symbol-ui) need the SQLite include path.
+target_link_libraries(facts-symbols PUBLIC facts-storage PRIVATE facts-clang)
 
 add_library(facts-symbol-ui STATIC
   src/ui/symbol/SymbolBrowser.cpp

@@ -15,10 +15,13 @@
 #     compiler and libstdc++ headers. The toolset links the new libstdc++
 #     symbols statically and keeps libstdc++.so.6 dynamic, so the ABI stays
 #     compatible with libLLVM.
-#   * SQLite. The storage layer uses RETURNING (SQLite >= 3.35); RHEL 9 ships
-#     3.34.1. A static libsqlite3.a is built from the amalgamation into a local
-#     prefix and handed to find_package(SQLite3) — nothing under /usr is
-#     touched.
+#   * SQLite. The storage layer uses RETURNING (SQLite >= 3.35) and links
+#     SQLite statically. If the host already has a static libsqlite3.a that is
+#     new enough, the script uses it as-is; only when that is missing does it
+#     fetch the official amalgamation for CMake to compile, and the sources are
+#     cached under .deps/ so later runs neither re-download nor re-fetch.
+#     Stock RHEL 9 has neither (sqlite-devel is 3.34.1 and ships no .a), so the
+#     first run there builds SQLite once.
 #   * Clang/LLVM. clang-devel + llvm-devel supply libclang-cpp, libLLVM, and
 #     the ClangConfig.cmake/LLVMConfig.cmake that find_package(Clang) needs.
 #     They stay dynamically linked: to run the binary elsewhere the host needs
@@ -27,16 +30,12 @@
 # Knobs (env vars):
 #   GCC_TOOLSET             gcc-toolset major for C++23 (default 15; 14 is the
 #                           minimum — std::ranges::to landed in libstdc++ 14).
-#   SQLITE_FROM             where to get SQLite: 'amalgamation' (zip from
-#                           sqlite.org), 'git' (GitHub source), or 'auto'
-#                           (default: try the zip, fall back to GitHub if the
-#                           download is blocked).
-#   SQLITE_AMALGAMATION_URL amalgamation zip URL (default 3.45.1).
-#   SQLITE_GIT_URL          SQLite git mirror (default github.com/sqlite/sqlite).
-#   SQLITE_GIT_TAG          tag to build (default version-3.45.1).
-#   SQLITE_PREFIX           where the local SQLite lands
-#                           (default <root>/.deps/sqlite).
-#   FORCE_SQLITE=1          rebuild the local SQLite even if present.
+#   SQLITE_SOURCE_DIR       unpacked sqlite amalgamation to build from
+#                           (default <root>/.deps/sqlite-amalgamation; fetched
+#                           on first use, reused afterwards).
+#   SQLITE_AMALGAMATION_URL amalgamation zip URL (default 3.53.4).
+#   FORCE_SQLITE=1          re-fetch the amalgamation even if cached, and
+#                           ignore any system libsqlite3.a.
 #   BUILD_DIR               cmake build dir (default <root>/build-rhel9).
 #   VENV_DIR                venv holding pytest/pytest-bdd for the e2e suite
 #                           (default <root>/.venv-rhel9).
@@ -50,11 +49,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FACTS_ROOT="$(dirname "$SCRIPT_DIR")"
 
 GCC_TOOLSET="${GCC_TOOLSET:-15}"
-SQLITE_FROM="${SQLITE_FROM:-auto}"
-SQLITE_AMALGAMATION_URL="${SQLITE_AMALGAMATION_URL:-https://www.sqlite.org/2024/sqlite-amalgamation-3450100.zip}"
-SQLITE_GIT_URL="${SQLITE_GIT_URL:-https://github.com/sqlite/sqlite.git}"
-SQLITE_GIT_TAG="${SQLITE_GIT_TAG:-version-3.45.1}"
-SQLITE_PREFIX="${SQLITE_PREFIX:-$FACTS_ROOT/.deps/sqlite}"
+SQLITE_SOURCE_DIR="${SQLITE_SOURCE_DIR:-$FACTS_ROOT/.deps/sqlite-amalgamation}"
+SQLITE_AMALGAMATION_URL="${SQLITE_AMALGAMATION_URL:-https://www.sqlite.org/2026/sqlite-amalgamation-3530400.zip}"
 BUILD_DIR="${BUILD_DIR:-$FACTS_ROOT/build-rhel9}"
 VENV_DIR="${VENV_DIR:-$FACTS_ROOT/.venv-rhel9}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
@@ -87,49 +83,52 @@ fi
 TOOLSET_ENABLE="/opt/rh/gcc-toolset-${GCC_TOOLSET}/enable"
 [ -f "$TOOLSET_ENABLE" ] || { echo "error: $TOOLSET_ENABLE missing (install gcc-toolset-${GCC_TOOLSET})" >&2; exit 1; }
 
-# --- SQLite >= 3.35 (RHEL 9 ships 3.34.1, which has no RETURNING) ------------
-# Fetch the SQLite sources into $1 (leaving sqlite3.c + sqlite3.h there) from the
-# amalgamation zip or the GitHub mirror. 'auto' tries the zip and falls back to
-# GitHub when the download is blocked (e.g. a proxy returns 403).
-fetch_sqlite_src() {
-  local out="$1" got_zip=0
-  if [ "$SQLITE_FROM" = amalgamation ] || [ "$SQLITE_FROM" = auto ]; then
-    if curl -fsSL -o "$out/sqlite.zip" "$SQLITE_AMALGAMATION_URL"; then
-      ( cd "$out" && unzip -q sqlite.zip \
-        && cp sqlite-amalgamation-*/sqlite3.c sqlite-amalgamation-*/sqlite3.h \
-              sqlite-amalgamation-*/sqlite3ext.h . )
-      got_zip=1
-    elif [ "$SQLITE_FROM" = amalgamation ]; then
-      echo "error: could not download $SQLITE_AMALGAMATION_URL" >&2; return 1
-    else
-      echo "   amalgamation download blocked — generating from GitHub source"
-    fi
-  fi
-  if [ "$got_zip" -eq 0 ]; then
-    # GitHub mirror: build the amalgamation from the tag (needs tcl to run
-    # tool/mksqlite3c.tcl via ./configure && make sqlite3.c).
-    [ "${SKIP_DEPS:-0}" = "1" ] || $SUDO dnf -y install git tcl file >/dev/null
-    git clone --depth 1 -b "$SQLITE_GIT_TAG" "$SQLITE_GIT_URL" "$out/src"
-    ( cd "$out/src" && ./configure >/dev/null && make sqlite3.c >/dev/null )
-    cp "$out/src/sqlite3.c" "$out/src/sqlite3.h" "$out/src/sqlite3ext.h" "$out/"
-  fi
+# --- SQLite >= 3.35, statically linked ---------------------------------------
+# Nothing is built here if the host can already satisfy it: a system
+# libsqlite3.a that is new enough is linked directly. Otherwise CMake compiles
+# the amalgamation, whose sources are cached in $SQLITE_SOURCE_DIR so only the
+# first run fetches anything.
+SQLITE_ARGS=()
+
+system_static_sqlite() {
+  local hdr=/usr/include/sqlite3.h lib version
+  [ "${FORCE_SQLITE:-0}" = "1" ] && return 1
+  [ -f "$hdr" ] || return 1
+  for lib in /usr/lib64/libsqlite3.a /usr/lib/libsqlite3.a; do
+    [ -f "$lib" ] && break || lib=""
+  done
+  [ -n "$lib" ] || return 1
+  version="$(sed -n 's/^#define SQLITE_VERSION_NUMBER  *\([0-9]*\).*/\1/p' "$hdr" | head -1)"
+  [ -n "$version" ] && [ "$version" -ge 3035000 ] || return 1
+  SYSTEM_SQLITE_LIB="$lib"
+  return 0
 }
 
-if [ ! -f "$SQLITE_PREFIX/lib/libsqlite3.a" ] || [ "${FORCE_SQLITE:-0}" = "1" ]; then
-  echo "==> building $SQLITE_PREFIX/lib/libsqlite3.a (SQLITE_FROM=$SQLITE_FROM)"
-  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-  fetch_sqlite_src "$tmp"
-  # SQLITE_USE_URI keeps URI filenames working the way macOS's system SQLite
-  # does, so a database path is interpreted identically on both platforms.
-  gcc -O2 -fPIC -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_JSON1 -DSQLITE_ENABLE_RTREE \
-      -DSQLITE_USE_URI=1 -DSQLITE_OMIT_LOAD_EXTENSION=1 \
-      -c "$tmp/sqlite3.c" -o "$tmp/sqlite3.o"
-  mkdir -p "$SQLITE_PREFIX/lib" "$SQLITE_PREFIX/include"
-  ar rcs "$SQLITE_PREFIX/lib/libsqlite3.a" "$tmp/sqlite3.o"
-  install -m 0644 "$tmp/sqlite3.h" "$tmp/sqlite3ext.h" "$SQLITE_PREFIX/include/"
-  rm -rf "$tmp"; trap - EXIT
+if system_static_sqlite; then
+  echo "==> using the installed static SQLite ($SYSTEM_SQLITE_LIB)"
+  SQLITE_ARGS=(-DFACTS_SYSTEM_SQLITE=ON
+               -DSQLite3_INCLUDE_DIR=/usr/include
+               -DSQLite3_LIBRARY="$SYSTEM_SQLITE_LIB")
 else
-  echo "==> $SQLITE_PREFIX/lib/libsqlite3.a already present (FORCE_SQLITE=1 to rebuild)"
+  if [ ! -f "$SQLITE_SOURCE_DIR/sqlite3.c" ] || [ "${FORCE_SQLITE:-0}" = "1" ]; then
+    echo "==> fetching the SQLite amalgamation into $SQLITE_SOURCE_DIR"
+    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+    if curl -fsSL -o "$tmp/sqlite.zip" "$SQLITE_AMALGAMATION_URL"; then
+      ( cd "$tmp" && unzip -q sqlite.zip )
+      rm -rf "$SQLITE_SOURCE_DIR"
+      mkdir -p "$(dirname "$SQLITE_SOURCE_DIR")"
+      mv "$tmp"/sqlite-amalgamation-*/ "$SQLITE_SOURCE_DIR"
+    else
+      # No local copy: let CMake's FetchContent do the download itself.
+      echo "   could not download $SQLITE_AMALGAMATION_URL — leaving it to cmake"
+    fi
+    rm -rf "$tmp"; trap - EXIT
+  else
+    echo "==> reusing the cached SQLite amalgamation in $SQLITE_SOURCE_DIR"
+  fi
+  if [ -f "$SQLITE_SOURCE_DIR/sqlite3.c" ]; then
+    SQLITE_ARGS=(-DFETCHCONTENT_SOURCE_DIR_SQLITE3="$SQLITE_SOURCE_DIR")
+  fi
 fi
 
 # --- python venv for the pytest-bdd e2e suite --------------------------------
@@ -156,11 +155,10 @@ source "$TOOLSET_ENABLE"
 LLVM_CMAKEDIR="$(llvm-config --cmakedir)"
 CLANG_CMAKEDIR="$(dirname "$LLVM_CMAKEDIR")/clang"
 cmake -G Ninja -S "$FACTS_ROOT" -B "$BUILD_DIR" \
+  "${SQLITE_ARGS[@]}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
   -DLLVM_DIR="$LLVM_CMAKEDIR" -DClang_DIR="$CLANG_CMAKEDIR" \
-  -DSQLite3_INCLUDE_DIR="$SQLITE_PREFIX/include" \
-  -DSQLite3_LIBRARY="$SQLITE_PREFIX/lib/libsqlite3.a" \
   -DPython3_EXECUTABLE="$PYTHON" \
   -DBUILD_TESTING="$([ "${SKIP_TESTS:-0}" = "1" ] && echo OFF || echo ON)"
 cmake --build "$BUILD_DIR" -j"$JOBS"
