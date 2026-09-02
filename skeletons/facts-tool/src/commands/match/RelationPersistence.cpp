@@ -8,6 +8,7 @@
 #include "storage/FactStore.h"
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/Stmt.h>
 
 #include <array>
 #include <iostream>

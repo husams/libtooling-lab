@@ -3,7 +3,7 @@ Feature: Targeted dynamic AST matching
 
   Scenario Outline: Persist each supported symbol binding
     Given the targeted matcher corpus is imported
-    When match runs with matcher "<matcher>"
+    When match runs twice with matcher "<matcher>"
     Then match succeeds and reports symbol kind "<kind>"
     And the selected symbol "<name>" is stored once as kind <stored_kind> with properties <properties>
 
@@ -13,7 +13,7 @@ Feature: Targeted dynamic AST matching
       | function   | 13          | 0          | targeted_match::caller          | functionDecl(hasName("targeted_match::caller")).bind("symbol") |
       | method     | 17          | 0          | targeted_match::Record::run     | cxxMethodDecl(hasName("targeted_match::Record::run"),isDefinition()).bind("symbol") |
       | field      | 15          | 0          | targeted_match::Record::field   | fieldDecl(hasName("targeted_match::Record::field")).bind("symbol") |
-      | variable   | 14          | 0          | targeted_match::variable        | varDecl(hasName("targeted_match::variable")).bind("symbol") |
+      | variable   | 14          | 0          | targeted_match::variable        | varDecl(hasName("targeted_match::variable"),hasType(qualType(hasCanonicalType(asString("int"))))).bind("symbol") |
       | enum       | 6           | 0          | targeted_match::Colour          | enumDecl(hasName("targeted_match::Colour")).bind("symbol") |
       | enumerator | 16          | 0          | targeted_match::Red             | enumConstantDecl(hasName("targeted_match::Red")).bind("symbol") |
       | template   | 7           | 1          | targeted_match::Box             | classTemplateDecl(hasName("targeted_match::Box")).bind("symbol") |

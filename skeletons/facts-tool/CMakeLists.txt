@@ -385,6 +385,16 @@ if(BUILD_TESTING)
     COMMAND stored-compilation-database-test
             ${CMAKE_CURRENT_BINARY_DIR}/stored-compilation-database.sqlite
   )
+  add_executable(stored-compilation-missing-command-test
+                 tests/StoredCompilationMissingCommandTest.cpp)
+  target_link_libraries(stored-compilation-missing-command-test
+                        PRIVATE facts-tooling facts-storage facts-clang
+                                facts-sqlite)
+  add_test(
+    NAME stored-compilation-missing-command
+    COMMAND stored-compilation-missing-command-test
+            ${CMAKE_CURRENT_BINARY_DIR}/stored-compilation-missing-command.sqlite
+  )
   add_executable(platform-flags-test tests/PlatformFlagsTest.cpp)
   target_link_libraries(platform-flags-test PRIVATE facts-platform facts-clang)
   add_test(

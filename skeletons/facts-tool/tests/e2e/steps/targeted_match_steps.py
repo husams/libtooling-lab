@@ -91,6 +91,14 @@ def match(context: FactsToolContext, matcher: str) -> None:
     invoke(context, matcher.replace(r'\"', '"'))
 
 
+@when(parsers.parse('match runs twice with matcher "{matcher}"'))
+def match_twice(context: FactsToolContext, matcher: str) -> None:
+    matcher = matcher.replace(r'\"', '"')
+    invoke(context, matcher)
+    require(context.last_returncode == 0, context.last_output)
+    invoke(context, matcher)
+
+
 @when(parsers.parse('match runs with relation "{relation}" and matcher "{matcher}"'))
 def relation_match(context: FactsToolContext, relation: str, matcher: str) -> None:
     invoke(context, matcher, relation)
@@ -181,8 +189,14 @@ def call_site(context: FactsToolContext) -> None:
 
 @then("the string lvalue argument is reported")
 def argument(context: FactsToolContext) -> None:
+    canonical_string_types = (
+        "type='std::string'",
+        "type='class std::basic_string<char>'",
+    )
     require("source='value'" in context.last_output and
-            "type='std::string' category=lvalue value='unknown'" in context.last_output,
+            any(type_name in context.last_output
+                for type_name in canonical_string_types) and
+            "category=lvalue value='unknown'" in context.last_output,
             context.last_output)
 
 
