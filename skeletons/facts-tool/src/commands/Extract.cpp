@@ -2,7 +2,7 @@
 
 #include "commands/CompilationDatabase.h"
 #include "commands/DatabasePaths.h"
-#include "commands/IncludedFiles.h"
+#include "commands/ExtractionSetup.h"
 
 #include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
@@ -14,7 +14,6 @@
 
 #include <clang/Tooling/Tooling.h>
 
-#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <functional>
@@ -30,8 +29,6 @@
 namespace facts::commands {
 namespace {
 
-using CompilationDatabase = clang::tooling::CompilationDatabase;
-using CompilationDatabasePtr = std::unique_ptr<CompilationDatabase>;
 using TimingClock = std::chrono::steady_clock;
 
 bool timingsEnabled() {
@@ -72,72 +69,6 @@ decltype(auto) runExtractStage(const cli::ExtractOptions &options,
   return cli::runStage(options.verbosity, "extract", stage, [&] {
     return timePhase(stage, std::forward<Operation>(operation));
   });
-}
-
-std::expected<CompilationDatabasePtr, std::string>
-requireStoredCommands(CompilationDatabasePtr database) {
-  if (database->getAllCompileCommands().empty()) {
-    return std::unexpected(
-        "project configuration is incomplete; run 'facts-tool import' to "
-        "rebuild it");
-  }
-  return database;
-}
-
-std::vector<std::string>
-selectSources(const CompilationDatabase &database,
-              const std::vector<std::string> &requested) {
-  return requested.empty() ? database.getAllFiles() : requested;
-}
-
-// The registry is a consumed input, and only an import that finished
-// registering says so. A database that was never marked is rejected here,
-// before a single translation unit is preprocessed, instead of failing on the
-// first identity it happens to be missing.
-std::expected<std::string, std::string>
-requireCompletedRegistry(FileManager &files) {
-  return files.registryStatus()
-      .transform_error([](std::error_code error) {
-        return "cannot read the file registry state: " + error.message();
-      })
-      .and_then([](const RegistryStatus &status)
-                    -> std::expected<std::string, std::string> {
-        if (!status.complete) {
-          return std::unexpected(
-              "project configuration is incomplete; run 'facts-tool import' "
-              "to rebuild it: no import has completed the file registry");
-        }
-        return status.fingerprint;
-      });
-}
-
-// A registry that was complete when it was written can still be missing a
-// header today, because the header search path is a property of this machine.
-// Saying which one moved turns an unexplained missing file into a fact.
-std::string toolchainDrift(const std::string &imported) {
-  const auto current = platformFingerprint();
-  return imported == current
-             ? std::string{}
-             : " (the toolchain moved since import: imported under " +
-                   imported + ", running under " + current + ")";
-}
-
-// The project configuration is a consumed input: every identity extraction
-// needs must already have been registered by 'facts-tool import'.
-std::expected<void, std::string> requireRegisteredSources(
-    FileManager &files, const CompilationDatabase &database,
-    const std::vector<std::string> &sources, const std::string &fingerprint) {
-  return discoverIncludedFiles(database, sources)
-      .and_then([&](const std::vector<std::string> &included) {
-        const auto missing = std::ranges::find_if(
-            included, [&](const auto &source) { return !files.getId(source); });
-        return missing == included.end()
-                   ? std::expected<void, std::string>{}
-                   : std::expected<void, std::string>{std::unexpected(
-                         "project configuration is incomplete; run "
-                         "'facts-tool import' to rebuild it: " +
-                         *missing + toolchainDrift(fingerprint))};
-      });
 }
 
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,

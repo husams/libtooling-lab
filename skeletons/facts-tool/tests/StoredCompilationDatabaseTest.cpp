@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
                                                       missingRequested);
   require(!missing);
   require(missing.error() ==
-          "no stored compile command for requested source '" +
+          "requested source is not imported: '" +
               facts::logicalCompilationPath(root / "missing.cpp").string() +
               "'");
 

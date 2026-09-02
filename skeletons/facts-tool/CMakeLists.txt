@@ -281,8 +281,19 @@ add_library(facts-commands STATIC
   src/commands/DatabasePaths.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
+  src/commands/ExtractionSetup.cpp
   src/commands/IncludedFiles.cpp
   src/commands/Import.cpp
+  src/commands/Match.cpp
+  src/commands/match/ArgumentOutput.cpp
+  src/commands/match/DirectCall.cpp
+  src/commands/match/MatchCallback.cpp
+  src/commands/match/MatchContract.cpp
+  src/commands/match/NearestCaller.cpp
+  src/commands/match/RelationKinds.cpp
+  src/commands/match/RelationPersistence.cpp
+  src/commands/match/RelationValidation.cpp
+  src/commands/match/SymbolDispatch.cpp
   src/commands/analyse/CallGraphCommand.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -300,6 +311,7 @@ target_link_libraries(facts-commands PRIVATE
 add_library(facts-cli STATIC
   src/cli/CommandLine.cpp
   src/cli/Dispatch.cpp
+  src/cli/MatchCommandLine.cpp
   src/cli/catalog/Repository.cpp
   src/cli/catalog/Component.cpp
   src/cli/catalog/Directory.cpp
@@ -373,6 +385,16 @@ if(BUILD_TESTING)
     COMMAND stored-compilation-database-test
             ${CMAKE_CURRENT_BINARY_DIR}/stored-compilation-database.sqlite
   )
+  add_executable(stored-compilation-missing-command-test
+                 tests/StoredCompilationMissingCommandTest.cpp)
+  target_link_libraries(stored-compilation-missing-command-test
+                        PRIVATE facts-tooling facts-storage facts-clang
+                                facts-sqlite)
+  add_test(
+    NAME stored-compilation-missing-command
+    COMMAND stored-compilation-missing-command-test
+            ${CMAKE_CURRENT_BINARY_DIR}/stored-compilation-missing-command.sqlite
+  )
   add_executable(platform-flags-test tests/PlatformFlagsTest.cpp)
   target_link_libraries(platform-flags-test PRIVATE facts-platform facts-clang)
   add_test(
@@ -424,6 +446,15 @@ if(BUILD_TESTING)
   target_link_libraries(type-resolution-error-test PRIVATE
     facts-ast facts-storage facts-model facts-clang facts-sqlite)
   add_test(NAME type-resolution-error COMMAND type-resolution-error-test)
+  add_executable(match-relation-contract-test
+                 tests/match/RelationContractTest.cpp)
+  target_link_libraries(match-relation-contract-test PRIVATE
+                        facts-commands facts-clang)
+  add_test(NAME match-relation-contract COMMAND match-relation-contract-test)
+  add_executable(match-nearest-caller-test tests/match/NearestCallerTest.cpp)
+  target_link_libraries(match-nearest-caller-test PRIVATE
+                        facts-commands facts-clang)
+  add_test(NAME match-nearest-caller COMMAND match-nearest-caller-test)
   add_executable(file-database-persistence-test
                  tests/FileDatabasePersistenceTest.cpp)
   target_link_libraries(file-database-persistence-test

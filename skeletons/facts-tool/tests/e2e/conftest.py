@@ -40,6 +40,7 @@ pytest_plugins = (
     "steps.symbol_inventory_steps",
     "steps.symbol_stability_steps",
     "steps.template_steps",
+    "steps.targeted_match_steps",
 )
 
 

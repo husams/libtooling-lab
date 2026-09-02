@@ -1,18 +1,15 @@
 #include "cli/CommandLine.h"
-
 #include "cli/Dispatch.h"
+#include "cli/MatchCommandLine.h"
 #include "cli/Verbose.h"
 #include "cli/catalog/Configure.h"
-
 #include <CLI/CLI.hpp>
-
 #include <expected>
 #include <limits>
 #include <utility>
 
 namespace facts::cli {
 namespace {
-
 class Parser {
 public:
   Parser() : app_("Extract and import C++ project facts", "facts-tool") {
@@ -21,6 +18,7 @@ public:
         "extract", "Extract facts using a stored project configuration"));
     configureImport(*app_.add_subcommand(
         "import", "Import compile commands into a project configuration"));
+    matchCommand_ = configureMatch(app_, match_);
     analyseCommand_ =
         app_.add_subcommand("analyse", "Run explicitly requested analyses");
     analyseCommand_->require_subcommand(1, 1);
@@ -41,10 +39,11 @@ public:
     } catch (const CLI::ParseError &error) {
       return std::unexpected(app_.exit(error));
     }
-
     if (extractCommand_->parsed()) {
       return Command{std::move(extract_)};
     }
+    if (matchCommand_->parsed())
+      return Command{std::move(match_)};
     if (repositoryCommand_->parsed())
       return Command{std::move(repository_)};
     if (componentCommand_->parsed())
@@ -193,10 +192,12 @@ private:
   CLI::App *analyseCommand_ = nullptr;
   CLI::App *dependencyCommand_ = nullptr;
   CLI::App *callGraphCommand_ = nullptr;
+  CLI::App *matchCommand_ = nullptr;
   ExtractOptions extract_;
   ImportOptions import_;
   DependencyOptions dependency_;
   CallGraphOptions callGraph_;
+  MatchOptions match_;
   CLI::App *repositoryCommand_ = nullptr;
   CLI::App *componentCommand_ = nullptr;
   CLI::App *directoryCommand_ = nullptr;
@@ -208,7 +209,6 @@ private:
   FileOptions file_;
   SymbolOptions symbol_;
 };
-
 } // namespace
 
 int run(int argc, char **argv) {

@@ -1,14 +1,10 @@
 #pragma once
-
 #include "cli/catalog/Options.h"
-
 #include <optional>
 #include <string>
 #include <variant>
 #include <vector>
-
 namespace facts::cli {
-
 struct ExtractOptions {
   int verbosity = 0;
   std::string output;
@@ -16,7 +12,6 @@ struct ExtractOptions {
   std::vector<std::string> extraArguments;
   std::vector<std::string> sources;
 };
-
 struct ImportOptions {
   int verbosity = 0;
   std::string configuration;
@@ -25,7 +20,6 @@ struct ImportOptions {
   std::vector<std::string> extraArguments;
   std::vector<std::string> sources;
 };
-
 struct DependencyOptions {
   int verbosity = 0;
   std::string output;
@@ -33,7 +27,6 @@ struct DependencyOptions {
   std::vector<std::string> extraArguments;
   std::vector<std::string> sources;
 };
-
 struct CallGraphOptions {
   int verbosity = 0;
   std::string facts;
@@ -41,10 +34,17 @@ struct CallGraphOptions {
   bool all = false;
   std::optional<int> maxDepth;
 };
+struct MatchOptions {
+  int verbosity = 0;
+  std::string facts;
+  std::string matcher;
+  std::optional<std::string> relationKind;
+  std::vector<std::string> sources;
+};
 
-using Command =
-    std::variant<ExtractOptions, ImportOptions, DependencyOptions,
-                 CallGraphOptions, RepositoryOptions, ComponentOptions,
-                 DirectoryOptions, FileOptions, SymbolOptions>;
+using Command = std::variant<ExtractOptions, ImportOptions, DependencyOptions,
+                             CallGraphOptions, MatchOptions, RepositoryOptions,
+                             ComponentOptions, DirectoryOptions, FileOptions,
+                             SymbolOptions>;
 
 } // namespace facts::cli
