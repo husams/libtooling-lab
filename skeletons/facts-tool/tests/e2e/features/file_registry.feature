@@ -36,6 +36,9 @@ Feature: Canonical source file registry
       | shared.hpp |
       | system/external_base.hpp |
       | system/external_string |
+      | targeted_match.cpp |
+      | targeted_match_broken.cpp |
+      | targeted_match_two.cpp |
       | toolchain_targets.cpp |
       | undeclared_template_instances.cpp |
       | one.cpp    |

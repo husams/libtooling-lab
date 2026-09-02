@@ -281,8 +281,19 @@ add_library(facts-commands STATIC
   src/commands/DatabasePaths.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
+  src/commands/ExtractionSetup.cpp
   src/commands/IncludedFiles.cpp
   src/commands/Import.cpp
+  src/commands/Match.cpp
+  src/commands/match/ArgumentOutput.cpp
+  src/commands/match/DirectCall.cpp
+  src/commands/match/MatchCallback.cpp
+  src/commands/match/MatchContract.cpp
+  src/commands/match/NearestCaller.cpp
+  src/commands/match/RelationKinds.cpp
+  src/commands/match/RelationPersistence.cpp
+  src/commands/match/RelationValidation.cpp
+  src/commands/match/SymbolDispatch.cpp
   src/commands/analyse/CallGraphCommand.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -300,6 +311,7 @@ target_link_libraries(facts-commands PRIVATE
 add_library(facts-cli STATIC
   src/cli/CommandLine.cpp
   src/cli/Dispatch.cpp
+  src/cli/MatchCommandLine.cpp
   src/cli/catalog/Repository.cpp
   src/cli/catalog/Component.cpp
   src/cli/catalog/Directory.cpp
