@@ -149,6 +149,30 @@ def argument(context: FactsToolContext) -> None:
             context.last_output)
 
 
+@then("function method constructor and lambda callers are stored")
+def callable_owners(context: FactsToolContext) -> None:
+    require(context.last_returncode == 0, context.last_output)
+    found = [row[0] for row in rows(
+        context, "SELECT source.qualified_name FROM relation edge "
+                 "JOIN symbol source ON source.id=edge.source_id "
+                 "JOIN symbol target ON target.id=edge.destination_id "
+                 "WHERE edge.kind=1 AND target.qualified_name="
+                 "'targeted_match::sink' ORDER BY source.qualified_name")]
+    require("targeted_match::functionOwner" in found, str(found))
+    require("targeted_match::OwnerCalls::method" in found, str(found))
+    require("targeted_match::OwnerCalls::OwnerCalls" in found, str(found))
+    require(len(found) == 4 and any("lambda" in name for name in found), str(found))
+    require(rows(context, "SELECT COUNT(*) FROM relation_site WHERE kind=1") == [(4,)],
+            str(found))
+
+
+@then("the constant argument value is reported")
+def constant_argument(context: FactsToolContext) -> None:
+    require(context.last_returncode == 0 and "source='42'" in context.last_output and
+            "type='int' category=prvalue value='42'" in context.last_output,
+            context.last_output)
+
+
 @then(parsers.parse('match fails with "{message}"'))
 def failure(context: FactsToolContext, message: str) -> None:
     require(context.last_returncode == 1 and message in context.last_output,

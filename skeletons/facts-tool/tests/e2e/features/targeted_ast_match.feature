@@ -46,6 +46,22 @@ Feature: Targeted dynamic AST matching
     And one Calls relation site is stored
     And the string lvalue argument is reported
 
+  Scenario: Derive each nearest callable owner
+    Given the targeted matcher corpus is imported
+    When match runs with matcher "callExpr(callee(functionDecl(hasName(\"targeted_match::sink\")).bind(\"callee\"))).bind(\"call\")"
+    Then function method constructor and lambda callers are stored
+
+  Scenario: Print an evaluable direct-call argument
+    Given the targeted matcher corpus is imported
+    When match runs with matcher "callExpr(callee(functionDecl(hasName(\"targeted_match::number\")).bind(\"callee\"))).bind(\"call\")"
+    Then the constant argument value is reported
+
+  Scenario: Reject an indirect call without guessing a target
+    Given the targeted matcher corpus is imported
+    When match runs with matcher "callExpr(callee(expr(ignoringParenImpCasts(declRefExpr(to(varDecl(hasName(\"function\")))))).bind(\"callee\"))).bind(\"call\")"
+    Then match fails with "callee must bind FunctionDecl"
+    And no targeted facts are stored
+
   Scenario: Reject invalid bindings without partial writes
     Given the targeted matcher corpus is imported
     When match runs with matcher "functionDecl(hasName(\"targeted_match::caller\")).bind(\"wrong\")"
