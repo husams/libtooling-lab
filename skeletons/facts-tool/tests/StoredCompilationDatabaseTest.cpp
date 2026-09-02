@@ -169,9 +169,20 @@ int main(int argc, char **argv) {
                                                       missingRequested);
   require(!missing);
   require(missing.error() ==
-          "no stored compile command for requested source '" +
+          "requested source is not imported: '" +
               facts::logicalCompilationPath(root / "missing.cpp").string() +
               "'");
+
+  require(sqlite3_open(databasePath.c_str(), &database) == SQLITE_OK);
+  execute(database, "UPDATE file SET compile_options=NULL WHERE id=24");
+  sqlite3_close(database);
+  const std::vector<std::string> noCommandRequested{secondSource.string()};
+  auto noCommand = facts::loadStoredCompilationDatabase(databasePath.string(),
+                                                        noCommandRequested);
+  require(!noCommand);
+  require(noCommand.error() ==
+          "no stored compile command for requested source '" +
+              facts::logicalCompilationPath(secondSource).string() + "'");
 
   require(sqlite3_open(databasePath.c_str(), &database) == SQLITE_OK);
   execute(database,

@@ -50,19 +50,13 @@ std::expected<void, std::string> persistRelation(const RelationMatch &match,
       .and_then([&](PersistedSymbol source) {
         return persistSymbol(match.target, context, files, store)
             .and_then([&](PersistedSymbol target) {
-              if (match.kind == RelationKind::Overrides &&
-                  match.declarationSite &&
-                  match.declarationSite->getCanonicalDecl() !=
-                      match.source.getCanonicalDecl())
-                return std::expected<void, std::string>{std::unexpected(
-                    "Overrides site must bind the source declaration")};
               const Relation relation{.source = source.id,
                                       .destination = target.id,
                                       .kind = match.kind};
               auto persisted = [&] {
                 if (siteBacked(match.kind))
-                  return saveSite(relation, siteLocation(match), context,
-                                  files, store);
+                  return saveSite(relation, siteLocation(match), context, files,
+                                  store);
                 const std::array relations{relation};
                 return store.addRelations(relations).transform_error(
                     [](std::error_code error) { return error.message(); });

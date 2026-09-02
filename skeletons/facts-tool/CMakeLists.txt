@@ -436,6 +436,15 @@ if(BUILD_TESTING)
   target_link_libraries(type-resolution-error-test PRIVATE
     facts-ast facts-storage facts-model facts-clang facts-sqlite)
   add_test(NAME type-resolution-error COMMAND type-resolution-error-test)
+  add_executable(match-relation-contract-test
+                 tests/match/RelationContractTest.cpp)
+  target_link_libraries(match-relation-contract-test PRIVATE
+                        facts-commands facts-clang)
+  add_test(NAME match-relation-contract COMMAND match-relation-contract-test)
+  add_executable(match-nearest-caller-test tests/match/NearestCallerTest.cpp)
+  target_link_libraries(match-nearest-caller-test PRIVATE
+                        facts-commands facts-clang)
+  add_test(NAME match-nearest-caller COMMAND match-nearest-caller-test)
   add_executable(file-database-persistence-test
                  tests/FileDatabasePersistenceTest.cpp)
   target_link_libraries(file-database-persistence-test

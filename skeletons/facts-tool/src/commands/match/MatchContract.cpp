@@ -31,11 +31,14 @@ relationContract(const Map &nodes, RelationKind kind, bool hasSite) {
       hasSite ? nodes.at("site").get<clang::NamedDecl>() : nullptr;
   if (hasSite && !stmt && !decl)
     return std::unexpected("site binding must be a statement or declaration");
-  if (siteBacked(kind) && !hasSite)
+  if (kind == RelationKind::Uses && !hasSite)
     return std::unexpected(std::string{relationName(kind)} +
                            " requires site binding");
-  if (kind == RelationKind::Overrides && !decl)
-    return std::unexpected("Overrides site must bind its source declaration");
+  if (kind == RelationKind::Overrides && hasSite && !decl)
+    return std::unexpected("Overrides site must bind a declaration");
+  if (kind == RelationKind::Overrides && decl &&
+      decl->getCanonicalDecl() != source->getCanonicalDecl())
+    return std::unexpected("Overrides site must bind the source declaration");
   if (!siteBacked(kind) && hasSite)
     return std::unexpected(std::string{relationName(kind)} +
                            " forbids site binding");
@@ -53,20 +56,19 @@ classify(const clang::ast_matchers::BoundNodes &bound,
     if (relationKind)
       return std::unexpected("symbol binding forbids --relation-kind");
     auto *symbol = nodes.at("symbol").get<clang::NamedDecl>();
-    return symbol ? Contract{SymbolMatch{*symbol}}
-                  : std::expected<Contract, std::string>{std::unexpected(
-                        "symbol binding must be a supported declaration")};
+    if (!symbol)
+      return std::unexpected("symbol binding must be a supported declaration");
+    return Contract{SymbolMatch{*symbol}};
   }
   if (exactKeys(nodes, {"call", "callee"})) {
     if (relationKind && *relationKind != "Calls")
       return std::unexpected("call and callee bindings only support Calls");
     auto *call = nodes.at("call").get<clang::CallExpr>();
     auto *callee = nodes.at("callee").get<clang::FunctionDecl>();
-    return call && callee
-               ? Contract{DirectCallMatch{*call, *callee}}
-               : std::expected<Contract, std::string>{
-                     std::unexpected("call must bind CallExpr and callee must "
-                                     "bind FunctionDecl")};
+    if (!call || !callee)
+      return std::unexpected(
+          "call must bind CallExpr and callee must bind FunctionDecl");
+    return Contract{DirectCallMatch{*call, *callee}};
   }
   const bool noSite = exactKeys(nodes, {"source", "target"});
   const bool withSite = exactKeys(nodes, {"source", "target", "site"});

@@ -4,7 +4,8 @@
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Expr.h>
 #include <clang/Lex/Lexer.h>
-#include <llvm/Support/raw_ostream.h>
+
+#include <iostream>
 
 namespace facts::commands::match {
 namespace {
@@ -39,11 +40,11 @@ std::string value(const clang::Expr &expression, clang::ASTContext &context) {
 void printArguments(const clang::CallExpr &call, clang::ASTContext &context) {
   for (unsigned index = 0; index < call.getNumArgs(); ++index) {
     const auto &argument = *call.getArg(index);
-    llvm::outs() << "argument index=" << index << " source='"
-                 << sourceText(argument, context) << "' type='"
-                 << argument.getType().getCanonicalType().getAsString()
-                 << "' category=" << valueCategory(argument) << " value='"
-                 << value(argument, context) << "'\n";
+    std::cout << "argument index=" << index << " source='"
+              << sourceText(argument, context) << "' type='"
+              << argument.getType().getCanonicalType().getAsString()
+              << "' category=" << valueCategory(argument) << " value='"
+              << value(argument, context) << "'\n";
   }
 }
 

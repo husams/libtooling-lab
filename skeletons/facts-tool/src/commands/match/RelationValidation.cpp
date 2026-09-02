@@ -3,8 +3,26 @@
 #include "commands/match/RelationKinds.h"
 
 #include <clang/AST/DeclCXX.h>
+#include <clang/AST/DeclTemplate.h>
 
 namespace facts::commands::match {
+namespace {
+bool supportedSymbol(const clang::NamedDecl &node) {
+  return llvm::isa<clang::CXXRecordDecl, clang::FunctionDecl, clang::FieldDecl,
+                   clang::VarDecl, clang::EnumDecl, clang::EnumConstantDecl,
+                   clang::ClassTemplateDecl, clang::FunctionTemplateDecl,
+                   clang::VarTemplateDecl>(node);
+}
+
+bool containsSource(const clang::NamedDecl &node) {
+  return llvm::isa<clang::CXXRecordDecl, clang::EnumDecl, clang::TemplateDecl>(
+      node);
+}
+
+bool usesSource(const clang::NamedDecl &node) {
+  return llvm::isa<clang::FunctionDecl, clang::VarDecl>(node);
+}
+} // namespace
 
 std::expected<void, std::string>
 validateEndpoints(RelationKind kind, const clang::NamedDecl &source,
@@ -19,14 +37,13 @@ validateEndpoints(RelationKind kind, const clang::NamedDecl &source,
     valid = records;
     break;
   case RelationKind::Contains:
-    valid = llvm::isa<clang::NamespaceDecl, clang::CXXRecordDecl,
-                      clang::FunctionDecl, clang::EnumDecl>(source);
+    valid = containsSource(source) && supportedSymbol(target);
     break;
   case RelationKind::Overrides:
     valid = methods;
     break;
   case RelationKind::Uses:
-    valid = true;
+    valid = usesSource(source) && supportedSymbol(target);
     break;
   case RelationKind::FieldOf:
     valid = llvm::isa<clang::FieldDecl>(source) &&

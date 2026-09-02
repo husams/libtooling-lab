@@ -237,30 +237,29 @@ bindRequestedFile(storage::Statement &statement,
 std::expected<StoredCompileFile, std::string>
 readRequestedFile(storage::Statement &statement,
                   const RequestedFileIdentity &identity, sqlite3 *database) {
-  return bindRequestedFile(statement, identity, database).and_then([&] {
-    auto status = sqlite3_step(statement.get());
-    if (status == SQLITE_DONE) {
-      return std::expected<StoredCompileFile, std::string>{
-          std::unexpected("no stored compile command for requested source '" +
-                          identity.path.string() + "'")};
-    }
-    if (status != SQLITE_ROW) {
-      return std::expected<StoredCompileFile, std::string>{
-          std::unexpected(sqliteMessage(database))};
-    }
-    auto file = storedCompileFile(statement.get());
-    status = sqlite3_step(statement.get());
-    if (status == SQLITE_ROW) {
-      return std::expected<StoredCompileFile, std::string>{std::unexpected(
-          "ambiguous stored compile commands for requested source '" +
-          identity.path.string() + "'")};
-    }
-    if (status != SQLITE_DONE) {
-      return std::expected<StoredCompileFile, std::string>{
-          std::unexpected(sqliteMessage(database))};
-    }
-    return std::expected<StoredCompileFile, std::string>{std::move(file)};
-  });
+  return bindRequestedFile(statement, identity, database)
+      .and_then([&]() -> std::expected<StoredCompileFile, std::string> {
+        auto status = sqlite3_step(statement.get());
+        if (status == SQLITE_DONE)
+          return std::unexpected("requested source is not imported: '" +
+                                 identity.path.string() + "'");
+        if (status != SQLITE_ROW)
+          return std::unexpected(sqliteMessage(database));
+        if (sqlite3_column_type(statement.get(), 10) == SQLITE_NULL)
+          return std::unexpected(
+              "no stored compile command for requested source '" +
+              identity.path.string() + "'");
+        auto file = storedCompileFile(statement.get());
+        status = sqlite3_step(statement.get());
+        for (; status == SQLITE_ROW; status = sqlite3_step(statement.get()))
+          if (sqlite3_column_type(statement.get(), 10) != SQLITE_NULL)
+            return std::unexpected(
+                "ambiguous stored compile commands for requested source '" +
+                identity.path.string() + "'");
+        if (status != SQLITE_DONE)
+          return std::unexpected(sqliteMessage(database));
+        return file;
+      });
 }
 
 std::expected<std::vector<StoredCompileFile>, std::string>
@@ -275,8 +274,8 @@ readRequestedFiles(sqlite3 *database,
       "JOIN component ON component.id=directory.component_id "
       "LEFT JOIN repository ON repository.id=component.repository_id "
       "LEFT JOIN clone ON clone.id=repository.active_clone_id "
-      "WHERE file.compile_options IS NOT NULL AND component.id=?1 "
-      "AND directory.path=?2 AND file.name=?3 ORDER BY file.id";
+      "WHERE component.id=?1 AND directory.path=?2 AND file.name=?3 "
+      "ORDER BY file.compile_options IS NULL,file.id";
   return prepareStatement(database, sql)
       .and_then([database, &identities](storage::Statement statement) {
         std::vector<StoredCompileFile> files;

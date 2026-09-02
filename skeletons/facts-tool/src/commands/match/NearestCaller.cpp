@@ -22,7 +22,8 @@ nearestCaller(const clang::CallExpr &call, clang::ASTContext &context) {
     if (const auto *function = node.get<clang::FunctionDecl>())
       return &referenceOwner(*function);
     if (node.get<clang::BlockDecl>() || node.get<clang::CXXDefaultArgExpr>() ||
-        node.get<clang::CXXDefaultInitExpr>() || node.get<clang::FieldDecl>())
+        node.get<clang::CXXDefaultInitExpr>() || node.get<clang::FieldDecl>() ||
+        node.get<clang::ParmVarDecl>())
       return std::unexpected("call is not owned by a function body");
   }
 }

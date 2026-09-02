@@ -23,13 +23,14 @@ def rows(context: FactsToolContext, sql: str) -> list[tuple]:
 
 
 def invoke(context: FactsToolContext, matcher: str,
-           relation: str | None = None, sources: bool = True) -> None:
+           relation: str | None = None,
+           sources: list[str] | None = None) -> None:
     arguments = [str(context.facts_tool), "match", "-v", "0", "-f",
                  str(context.facts_database_path), "--matcher", matcher]
     if relation:
         arguments.extend(("--relation-kind", relation))
-    if sources:
-        arguments.append(str(context.targeted_match_source))
+    arguments.extend(sources if sources is not None else
+                     [str(context.targeted_match_source)])
     completed = run(arguments)
     context.last_returncode = completed.returncode
     context.last_output = completed.stdout + completed.stderr
@@ -58,6 +59,7 @@ def import_sources(context: FactsToolContext, names: tuple[str, ...]) -> None:
     context.prepare()
     sources = tuple((context.fixture_root / name).resolve(strict=True) for name in names)
     context.targeted_match_source = sources[0]
+    context.targeted_match_sources = [str(source) for source in sources]
     context.files_database = context.run_root_path / "targeted-match.sqlite"
     context.facts_database = context.files_database
     completed = run([str(context.facts_tool), "import", "-v", "0", "-c",
@@ -94,11 +96,43 @@ def relation_match(context: FactsToolContext, relation: str, matcher: str) -> No
     invoke(context, matcher, relation)
 
 
+@when(parsers.parse(
+    'match runs twice with relation "{relation}" and matcher "{matcher}"'))
+def relation_match_twice(context: FactsToolContext, relation: str,
+                         matcher: str) -> None:
+    invoke(context, matcher, relation)
+    require(context.last_returncode == 0, context.last_output)
+    invoke(context, matcher, relation)
+
+
 @when("match runs without source arguments")
 def match_all(context: FactsToolContext) -> None:
     invoke(context,
            'functionDecl(matchesName("targeted_match::(caller|second)")).bind("symbol")',
-           sources=False)
+           sources=[])
+
+
+@when("match runs with both sources in reverse order")
+def reverse_sources(context: FactsToolContext) -> None:
+    invoke(context,
+           'functionDecl(matchesName("targeted_match::(caller|second)")).bind("symbol")',
+           sources=list(reversed(context.targeted_match_sources)))
+
+
+@when("match runs for an unknown source")
+def unknown_source(context: FactsToolContext) -> None:
+    invoke(context, 'functionDecl().bind("symbol")',
+           sources=[str(context.fixture_root / "not_imported.cpp")])
+
+
+@when("match runs for the second source after its compile command is removed")
+def missing_command(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.files_database_path) as database:
+        database.execute(
+            "UPDATE file SET compile_options=NULL,driver=NULL WHERE name=?",
+            ("targeted_match_two.cpp",))
+    invoke(context, 'functionDecl().bind("symbol")',
+           sources=[context.targeted_match_sources[1]])
 
 
 @when("the Record symbol matcher runs twice")
@@ -116,11 +150,14 @@ def symbol_success(context: FactsToolContext, kind: str) -> None:
     require(f"symbol kind={kind}" in context.last_output, context.last_output)
 
 
-@then(parsers.parse('the selected symbol "{name}" exists once'))
-def symbol_once(context: FactsToolContext, name: str) -> None:
-    found = rows(context, "SELECT COUNT(*) FROM symbol WHERE qualified_name=?"
-                 .replace("?", "'" + name + "'"))
-    require(found == [(1,)], str(found))
+@then(parsers.parse(
+    'the selected symbol "{name}" is stored once as kind {kind:d} '
+    'with properties {properties:d}'))
+def symbol_once(context: FactsToolContext, name: str, kind: int,
+                properties: int) -> None:
+    found = rows(context, "SELECT COUNT(*),kind,properties FROM symbol "
+                          f"WHERE qualified_name='{name}'")
+    require(found == [(1, kind, properties)], str(found))
 
 
 @then(parsers.parse('match succeeds and stores one "{relation}" relation'))
@@ -196,6 +233,14 @@ def stored_order(context: FactsToolContext) -> None:
     names = [line.split("name=", 1)[1] for line in context.last_output.splitlines()
              if line.startswith("symbol kind=")]
     require(names == ["targeted_match::caller", "targeted_match::second"], str(names))
+
+
+@then("both translation units match in reverse order")
+def reverse_order(context: FactsToolContext) -> None:
+    require(context.last_returncode == 0, context.last_output)
+    names = [line.split("name=", 1)[1] for line in context.last_output.splitlines()
+             if line.startswith("symbol kind=")]
+    require(names == ["targeted_match::second", "targeted_match::caller"], str(names))
 
 
 @then("translation unit failure rolls back every fact")
