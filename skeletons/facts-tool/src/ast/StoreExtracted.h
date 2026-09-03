@@ -36,6 +36,8 @@ inline std::string_view extractionErrorName(ExtractionError error) {
     return "invalid presumed location";
   case ExtractionError::InvalidUsr:
     return "invalid USR";
+  case ExtractionError::RelationTarget:
+    return "relation target resolution";
   case ExtractionError::InvalidType:
     return "invalid type";
   }

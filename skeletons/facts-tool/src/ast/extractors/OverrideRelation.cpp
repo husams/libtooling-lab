@@ -2,8 +2,7 @@
 
 #include "ast/extractors/File.h"
 #include "ast/extractors/Location.h"
-#include "ast/extractors/NamedDecl.h"
-#include "ast/extractors/TargetResolution.h"
+#include "ast/extractors/RelationTarget.h"
 
 #include <clang/AST/DeclCXX.h>
 
@@ -18,27 +17,24 @@ extractOverrideRelations(const clang::CXXMethodDecl &method,
   const auto file = resolveFile(sourceManager, method.getLocation(), files);
   if (!location || !file)
     return facts;
-  auto sourceUsr = extractUsr(method);
-  if (!sourceUsr)
-    return std::unexpected(sourceUsr.error());
-  auto source =
-      findOrStoreSymbolTarget(method, sourceManager, files, store, *sourceUsr);
+  auto source = resolveRelationTarget(method, sourceManager, files, store);
   if (!source)
-    return std::unexpected(ExtractionError::InvalidUsr);
+    return std::unexpected(source.error());
+  if (!*source)
+    return facts;
   for (const auto *base : method.overridden_methods()) {
-    auto usr = extractUsr(*base);
-    if (!usr)
-      return std::unexpected(usr.error());
     auto destination =
-        findOrStoreSymbolTarget(*base, sourceManager, files, store, *usr);
+        resolveRelationTarget(*base, sourceManager, files, store);
     if (!destination)
-      return std::unexpected(ExtractionError::InvalidUsr);
-    const Relation relation{.source = *source,
-                            .destination = *destination,
+      return std::unexpected(destination.error());
+    if (!*destination)
+      continue;
+    const Relation relation{.source = **source,
+                            .destination = **destination,
                             .kind = RelationKind::Overrides};
     facts.push_back({relation,
-                     RelationSite{.source = *source,
-                                  .destination = *destination,
+                     RelationSite{.source = **source,
+                                  .destination = **destination,
                                   .kind = RelationKind::Overrides,
                                   .file = *file,
                                   .location = *location},

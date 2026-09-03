@@ -210,6 +210,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/CallSite.cpp
   src/ast/extractors/ReceiverContext.cpp
   src/ast/extractors/OverrideRelation.cpp
+  src/ast/extractors/RelationTarget.cpp
   src/ast/extractors/TargetResolution.cpp
   src/ast/extractors/TemplatePattern.cpp
   src/ast/extractors/TemplateSpecialization.cpp

@@ -5,7 +5,7 @@
 #include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/ReceiverContext.h"
 #include "ast/extractors/Reference.h"
-#include "ast/extractors/TargetResolution.h"
+#include "ast/extractors/RelationTarget.h"
 #include "storage/FactStore.h"
 
 #include <clang/AST/DeclCXX.h>
@@ -29,17 +29,12 @@ extractCallSite(const clang::FunctionDecl &caller,
                     -> ExtractionResult<std::optional<callgraph::CallFact>> {
         if (!source)
           return std::nullopt;
-        return extractUsr(targetDecl)
-            .and_then([&](std::string targetUsr) {
-              return findOrStoreSymbolTarget(targetDecl, sourceManager, files,
-                                             store, targetUsr)
-                  .transform_error([](std::error_code) {
-                    return ExtractionError::InvalidUsr;
-                  });
-            })
+        return resolveRelationTarget(targetDecl, sourceManager, files, store)
             .and_then(
-                [&](SymbolId destination)
+                [&](std::optional<SymbolId> destination)
                     -> ExtractionResult<std::optional<callgraph::CallFact>> {
+                  if (!destination)
+                    return std::nullopt;
                   auto location =
                       extractLocation(sourceManager, site.getExprLoc());
                   auto file =
@@ -50,14 +45,14 @@ extractCallSite(const clang::FunctionDecl &caller,
                                                 store)
                       .transform([&](ReceiverContext receiver) {
                         const Relation relation{.source = *source,
-                                                .destination = destination,
+                                                .destination = *destination,
                                                 .kind = RelationKind::Calls};
                         const auto *method =
                             llvm::dyn_cast<clang::CXXMethodDecl>(&targetDecl);
                         return callgraph::CallFact{
                             relation,
                             RelationSite{.source = *source,
-                                         .destination = destination,
+                                         .destination = *destination,
                                          .kind = RelationKind::Calls,
                                          .file = *file,
                                          .location = *location,
