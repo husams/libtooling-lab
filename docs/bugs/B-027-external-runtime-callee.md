@@ -41,14 +41,26 @@ void reproduce() {
 }
 ```
 
-## Planned tests
+## Implementation
+
+Relation extraction now uses `resolveRelationTarget` for calls, uses, and
+overrides. The pipeline filters only declarations for which Clang cannot
+generate a USR; a valid missing USR is persisted through the canonical external
+symbol path. Before persistence, the target is advanced to its most recent
+redeclaration so compiler-created declarations with invalid source locations
+can use the visible standard-library declaration and its registered file.
+
+Lookup, file-resolution, and persistence failures after USR generation are
+reported as relation-target failures and retain translation-unit rollback.
+
+## Tests
 
 Extend `tests/e2e/features/external_targets.feature` with scenarios proving:
 
 - extraction commits without the call-site `InvalidUsr` diagnostic;
 - the exact aligned-delete USR has one externally classified symbol row;
 - the originating call-site relation targets that row;
-- a second translation unit reuses the symbol and creates no duplicate relation;
+- a second translation unit reuses the symbol and creates no duplicate edge;
 - a genuinely un-USR-able declaration retains B-019 skip/trace behavior and
   never enters the external-symbol insertion path;
 - the full `facts-tool-e2e` CTest target passes without failures or skips.

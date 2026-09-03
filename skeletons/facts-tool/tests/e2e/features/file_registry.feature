@@ -10,6 +10,8 @@ Feature: Canonical source file registry
       | fixture   |
       | dependent_base.cpp |
       | dependent_template_types.cpp |
+      | b027_external_callee.cpp |
+      | b027_external_callee_second.cpp |
       | call_graph.hpp |
       | call_graph_one.cpp |
       | call_graph_possible.cpp |

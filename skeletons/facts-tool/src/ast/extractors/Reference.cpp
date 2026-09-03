@@ -3,6 +3,7 @@
 #include "ast/extractors/File.h"
 #include "ast/extractors/Location.h"
 #include "ast/extractors/NamedDecl.h"
+#include "ast/extractors/RelationTarget.h"
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
 
@@ -56,7 +57,7 @@ ExtractionResult<std::optional<UseFact>>
 addTarget(const clang::NamedDecl &referenced, clang::SourceLocation site,
           const clang::SourceManager &sourceManager, FileManager &files,
           FactStore &store, SymbolId source) {
-  return resolveStoredSymbol(referenced, store)
+  return resolveRelationTarget(referenced, sourceManager, files, store)
       .and_then([&](std::optional<SymbolId> destination)
                     -> ExtractionResult<std::optional<UseFact>> {
         if (!destination) {
