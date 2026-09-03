@@ -1,5 +1,5 @@
-#include <string>
 #include <new>
+#include <string>
 
 struct alignas(64) RuntimeAllocated {};
 

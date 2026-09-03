@@ -9,7 +9,10 @@ from support.database import query, require
 from support.scenario import FactsToolContext
 
 ALIGNED_DELETE_USR = "c:@F@operator delete#*v#l#$@N@std@E@align_val_t#"
-FIXTURES = ("b027_external_callee.cpp", "b027_external_callee_second.cpp")
+FIXTURES = (
+    "b027_std_string_external_callee.cpp",
+    "b027_stream_temporary_external_callee.cpp",
+)
 
 
 @given(
@@ -18,6 +21,15 @@ FIXTURES = ("b027_external_callee.cpp", "b027_external_callee_second.cpp")
 )
 def given_runtime_callee_fixture(context: FactsToolContext) -> tuple[Path, ...]:
     source = prepare_compile_database(context, FIXTURES[0], "b027-runtime")
+    return (source,)
+
+
+@given(
+    "a B-027 compile database with the stream-temporary source",
+    target_fixture="b027_sources",
+)
+def given_stream_temporary_fixture(context: FactsToolContext) -> tuple[Path, ...]:
+    source = prepare_compile_database(context, FIXTURES[1], "b027-stream")
     return (source,)
 
 
@@ -49,6 +61,7 @@ def given_both_runtime_callee_fixtures(
 
 
 @when("B-027 extraction runs for the runtime-callee source")
+@when("B-027 extraction runs for the stream-temporary source")
 @when("B-027 extraction runs for both runtime-callee sources")
 def when_extracts_runtime_callee(
     context: FactsToolContext, b027_sources: tuple[Path, ...]

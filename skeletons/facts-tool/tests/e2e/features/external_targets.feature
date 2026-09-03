@@ -34,6 +34,12 @@ Feature: Filtered external relation targets
     Then the B-027 extraction commits without invalid-USR diagnostics
     And the aligned runtime delete is one lightweight external call target
 
+  Scenario: Persist the runtime callee reached through stream temporaries
+    Given a B-027 compile database with the stream-temporary source
+    When B-027 extraction runs for the stream-temporary source
+    Then the B-027 extraction commits without invalid-USR diagnostics
+    And the aligned runtime delete is one lightweight external call target
+
   Scenario: Reuse the implicit runtime callee across translation units
     Given a B-027 compile database with both runtime-callee sources
     When B-027 extraction runs for both runtime-callee sources

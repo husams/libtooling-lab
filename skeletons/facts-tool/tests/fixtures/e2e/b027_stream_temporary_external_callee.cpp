@@ -1,11 +1,13 @@
-#include <string>
 #include <new>
+#include <sstream>
+#include <string>
 
 struct alignas(64) RuntimeAllocatedAgain {};
 
-void reproduceExternalCalleeAgain() {
-  std::string value = "temporary";
-  delete new RuntimeAllocatedAgain;
+std::string reproduceStreamTemporary(const std::string &value) {
+  std::ostringstream stream;
+  stream << "value=" << value;
+  return stream.str();
 }
 
 void releaseAlignedAgain(void *memory) {
