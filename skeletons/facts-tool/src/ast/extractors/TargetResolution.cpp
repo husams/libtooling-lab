@@ -31,7 +31,8 @@ Symbol externalSymbol(const clang::NamedDecl &target, std::string usr) {
 std::expected<SymbolId, std::error_code> findOrStoreSymbolTarget(
     const clang::NamedDecl &target, const clang::SourceManager &sourceManager,
     FileManager &files, FactStore &store, const std::string &usr) {
-  const auto &visibleTarget = *target.getMostRecentDecl();
+  const auto &visibleTarget =
+      target.getLocation().isInvalid() ? *target.getMostRecentDecl() : target;
   return store.findId(usr).and_then(
       [&](std::optional<SymbolId> destination)
           -> std::expected<SymbolId, std::error_code> {

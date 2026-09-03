@@ -27,9 +27,7 @@ resolveRelationTarget(const clang::NamedDecl &target,
           [](std::error_code) { return ExtractionError::RelationTarget; })
       .and_then([&](std::optional<SymbolId> id)
                     -> ExtractionResult<std::optional<SymbolId>> {
-        const auto &visible = *target.getMostRecentDecl();
-        if (id || (visible.getLocation().isValid() &&
-                   !sourceManager.isInSystemHeader(visible.getLocation()))) {
+        if (id) {
           return id;
         }
         return findOrStoreSymbolTarget(target, sourceManager, files, store,

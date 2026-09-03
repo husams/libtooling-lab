@@ -4,6 +4,7 @@
 #include "ast/extractors/Location.h"
 #include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/RelationTarget.h"
+#include "cli/Trace.h"
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
 
@@ -57,6 +58,15 @@ ExtractionResult<std::optional<UseFact>>
 addTarget(const clang::NamedDecl &referenced, clang::SourceLocation site,
           const clang::SourceManager &sourceManager, FileManager &files,
           FactStore &store, SymbolId source) {
+  if (const auto *variable = llvm::dyn_cast<clang::VarDecl>(&referenced);
+      variable && variable->isLocalVarDeclOrParm()) {
+    cli::logVerbose(store.verbosity(), 3,
+                    "facts-tool: trace: reference target name='{}' "
+                    "result=filtered reason='local declaration outside symbol "
+                    "model'",
+                    referenced.getQualifiedNameAsString());
+    return std::nullopt;
+  }
   return resolveRelationTarget(referenced, sourceManager, files, store)
       .and_then([&](std::optional<SymbolId> destination)
                     -> ExtractionResult<std::optional<UseFact>> {
