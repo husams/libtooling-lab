@@ -104,8 +104,8 @@ std::vector<std::string> normalizePathOptions(
     const ProjectClone &clone) {
   constexpr std::string_view pathFlags[] = {
       "-include-pch", "-iframework", "-idirafter", "-resource-dir",
-      "--sysroot",    "-isystem",    "-iquote",    "-include",
-      "-imacros",     "-isysroot",   "-F",         "-I"};
+      "--sysroot",    "-isystem",    "-iquote",    "-isysroot",
+      "-F",           "-I"};
   const auto pathFlag = [&](std::string_view option) {
     return std::ranges::find_if(pathFlags, [&](std::string_view flag) {
       return option == flag ||
