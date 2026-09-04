@@ -1,6 +1,7 @@
 #include "commands/Import.h"
 
 #include "commands/CompilationDatabase.h"
+#include "commands/ExtraArguments.h"
 #include "commands/IncludedFiles.h"
 
 #include "cli/Verbose.h"
@@ -70,18 +71,21 @@ parseComponents(const std::vector<std::string> &specifications) {
 
 std::expected<CompilationDatabasePtr, std::string>
 loadCompilationDatabase(const cli::ImportOptions &options) {
-  if (options.compilationDatabase.empty()) {
-    if (options.sources.empty()) {
-      return std::unexpected(
-          "import requires --compilation-database or at least one source");
-    }
-    return std::make_unique<clang::tooling::FixedCompilationDatabase>(
-        std::filesystem::current_path().string(), options.extraArguments);
-  }
-  return loadJsonCompilationDatabase(options.compilationDatabase)
-      .transform([&](CompilationDatabasePtr database) {
-        return appendExtraArguments(std::move(database),
-                                    options.extraArguments);
+  return tokenizeExtraArguments(options.extraArguments)
+      .and_then([&](std::vector<std::string> arguments)
+                    -> std::expected<CompilationDatabasePtr, std::string> {
+        if (options.compilationDatabase.empty()) {
+          if (options.sources.empty()) {
+            return std::unexpected("import requires --compilation-database or "
+                                   "at least one source");
+          }
+          return std::make_unique<clang::tooling::FixedCompilationDatabase>(
+              std::filesystem::current_path().string(), std::move(arguments));
+        }
+        return loadJsonCompilationDatabase(options.compilationDatabase)
+            .transform([&](CompilationDatabasePtr database) {
+              return appendExtraArguments(std::move(database), arguments);
+            });
       });
 }
 

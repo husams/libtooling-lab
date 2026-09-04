@@ -62,6 +62,18 @@ Feature: Forced include headers use compiler lookup semantics
     And the stored forced-include option is "forced.hpp"
     And extracting with the stored forced header succeeds
 
+  Scenario: ForcedIncludeSingleExtraArg
+    Given a temporary forced-include fixture from the B-028 note
+    When the real facts-tool imports one shell-style forced-header argument
+    Then the forced-include import succeeds
+    And the stored options preserve the single forced-header argument
+
+  Scenario: QuotedExtraArgument
+    Given a temporary forced-include fixture from the B-028 note
+    When the real facts-tool imports a quoted extra argument with a space
+    Then the forced-include import succeeds
+    And the stored quoted definition remains one token
+
   Scenario: MissingForcedHeader
     Given a temporary forced-include fixture from the B-028 note
     When the real facts-tool imports a missing forced header

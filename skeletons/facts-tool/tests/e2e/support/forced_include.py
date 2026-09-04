@@ -70,3 +70,7 @@ class ForcedIncludeFixture:
         context.last_returncode = result.returncode
         context.last_output = result.stdout + result.stderr
         context.files_database = self.conf
+
+
+def fixture(context: FactsToolContext) -> ForcedIncludeFixture:
+    return context.forced_include

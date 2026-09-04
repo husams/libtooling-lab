@@ -2,6 +2,7 @@
 
 #include "commands/CompilationDatabase.h"
 #include "commands/DatabasePaths.h"
+#include "commands/ExtraArguments.h"
 #include "commands/ExtractionSetup.h"
 
 #include "ast/FactExtractor.h"
@@ -155,9 +156,11 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
                                                options.sources);
         });
       })
-      .transform([&](CompilationDatabasePtr database) {
-        return appendExtraArguments(std::move(database),
-                                    options.extraArguments);
+      .and_then([&](CompilationDatabasePtr database) {
+        return tokenizeExtraArguments(options.extraArguments)
+            .transform([&](std::vector<std::string> arguments) {
+              return appendExtraArguments(std::move(database), arguments);
+            });
       })
       .and_then([&](CompilationDatabasePtr database) {
         return runExtractStage(options, "validate stored commands", [&] {
