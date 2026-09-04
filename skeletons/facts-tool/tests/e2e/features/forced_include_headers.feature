@@ -12,6 +12,18 @@ Feature: Forced include headers use compiler lookup semantics
     Then the forced-include import succeeds
     And the stored forced-include options preserve compiler order
 
+  Scenario: SystemHeaderByName
+    Given a temporary forced-include fixture from the B-028 note
+    And the compiler control for the standard forced header succeeds
+    When the real facts-tool imports the fixed command with the standard forced header
+    Then the forced-include import succeeds
+    And the stored forced-include option is "optional"
+    And extracting with the stored forced header succeeds
+    When the real facts-tool imports the compilation database with the standard forced header
+    Then the forced-include import succeeds
+    And the stored forced-include option is "optional"
+    And extracting with the stored forced header succeeds
+
   Scenario: StoredForcedIncludeExtraction
     Given a temporary forced-include fixture from the B-028 note
     When the real facts-tool imports the compilation database with the standard forced header
@@ -36,6 +48,18 @@ Feature: Forced include headers use compiler lookup semantics
     When the real facts-tool imports the imacros forced header path
     Then the forced-include import succeeds
     And the stored imacros option is unchanged
+    And extracting with the stored forced header succeeds
+
+  Scenario: IsystemDirectoryHeader
+    Given a temporary forced-include fixture with a system-search header
+    And the compiler control for the system-search forced header succeeds
+    When the real facts-tool imports the fixed command with the system-search forced header
+    Then the forced-include import succeeds
+    And the stored forced-include option is "forced.hpp"
+    And extracting with the stored forced header succeeds
+    When the real facts-tool imports the compilation database with the system-search forced header
+    Then the forced-include import succeeds
+    And the stored forced-include option is "forced.hpp"
     And extracting with the stored forced header succeeds
 
   Scenario: MissingForcedHeader

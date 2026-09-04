@@ -19,7 +19,9 @@ class ForcedIncludeFixture:
     conf: Path | None = None
 
     @classmethod
-    def create(cls, context: FactsToolContext, local_header: bool) -> ForcedIncludeFixture:
+    def create(
+        cls, context: FactsToolContext, local_header: bool, system_header: bool = False
+    ) -> ForcedIncludeFixture:
         context.output_root.mkdir(parents=True, exist_ok=True)
         root = Path(tempfile.mkdtemp(prefix="b028-", dir=context.output_root)).resolve()
         shutil.copytree(context.fixture_root / "forced-include", root,
@@ -27,7 +29,7 @@ class ForcedIncludeFixture:
         source = root / "optional.cpp"
         header = None
         if local_header:
-            header = root / "include" / "forced.hpp"
+            header = root / ("system" if system_header else "include") / "forced.hpp"
             source = root / "paths.cpp"
         return cls(root, source, header)
 

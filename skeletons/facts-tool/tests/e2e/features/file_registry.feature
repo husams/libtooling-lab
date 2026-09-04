@@ -22,6 +22,7 @@ Feature: Canonical source file registry
       | forced-include/include/forced.hpp |
       | forced-include/optional.cpp |
       | forced-include/paths.cpp |
+      | forced-include/system/forced.hpp |
       | forward_template_target.cpp |
       | forward_template_target_system.hpp |
       | initializer_dependent_alignment.cpp |
