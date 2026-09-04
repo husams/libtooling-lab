@@ -86,8 +86,8 @@ if [ ! -f "$YAML_SOURCE_DIR/CMakeLists.txt" ]; then
   curl -fsSL -o "$tmp_yaml/yaml.tar.gz" "$YAML_URL"
   echo "$YAML_SHA256  $tmp_yaml/yaml.tar.gz" | sha256sum -c -
   mkdir -p "$(dirname "$YAML_SOURCE_DIR")"
-  tar -xzf "$tmp_yaml/yaml.tar.gz" -C "$tmp_yaml"
-  mv "$tmp_yaml/yaml-cpp-yaml-cpp-0.9.0" "$YAML_SOURCE_DIR"
+  mkdir -p "$YAML_SOURCE_DIR"
+  tar -xzf "$tmp_yaml/yaml.tar.gz" -C "$YAML_SOURCE_DIR"
   rm -rf "$tmp_yaml"
 else
   echo "==> reusing pinned yaml-cpp 0.9.0 in $YAML_SOURCE_DIR"
