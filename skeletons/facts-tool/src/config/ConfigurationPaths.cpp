@@ -29,7 +29,10 @@ std::filesystem::path builtInRoot() {
 
 std::expected<Resolved, std::string> resolve(const Request &request) {
   const auto root = projectRoot(cwd());
-  Resolved result{.projectRoot = root, .source = "built-in", .storageRoot = env("XDG_DATA_HOME"), .templateText = "{relative_path}/{filename}.db"};
+  Resolved result{.projectRoot = root,
+                  .storageRoot = env("XDG_DATA_HOME"),
+                  .templateText = "{relative_path}/{filename}.db",
+                  .source = "built-in"};
   if (request.selector.empty() && present("FACTS_TOOL_CONFIG") && env("FACTS_TOOL_CONFIG").empty())
     return std::unexpected("FACTS_TOOL_CONFIG must not be empty");
   if (request.direct.empty() && present("FACTS_TOOL_CONF") && env("FACTS_TOOL_CONF").empty())
