@@ -81,6 +81,23 @@ std::string normalizePathValue(const ProjectRoot &root,
   return portablePath(projectPath(root, command, value), component, clone);
 }
 
+bool isHeaderName(std::string_view value) {
+  const auto path = std::filesystem::path(value);
+  return !path.is_absolute() && path.parent_path().empty() && value != "." &&
+         value != "..";
+}
+
+std::string normalizePathOption(const ProjectRoot &root,
+                                const clang::tooling::CompileCommand &command,
+                                std::string_view flag, std::string value,
+                                const ProjectComponent &component,
+                                const ProjectClone &clone) {
+  if (flag == "-include" && isHeaderName(value)) {
+    return value;
+  }
+  return normalizePathValue(root, command, std::move(value), component, clone);
+}
+
 std::string compilerDriver(const clang::tooling::CompileCommand &command,
                            std::size_t start,
                            const std::filesystem::path &source) {
@@ -127,8 +144,9 @@ std::vector<std::string> normalizePathOptions(
     if (option == flag) {
       result.push_back(std::move(option));
       if (index < options.size()) {
-        result.push_back(normalizePathValue(
-            root, command, std::move(options[index++]), component, clone));
+        result.push_back(normalizePathOption(root, command, flag,
+                                             std::move(options[index++]),
+                                             component, clone));
       }
       continue;
     }
@@ -136,9 +154,9 @@ std::vector<std::string> normalizePathOptions(
     if (value.starts_with('=')) {
       value.erase(0, 1);
     }
-    result.push_back(
-        std::string(flag) + (flag.starts_with("--") ? "=" : "") +
-        normalizePathValue(root, command, std::move(value), component, clone));
+    result.push_back(std::string(flag) + (flag.starts_with("--") ? "=" : "") +
+                     normalizePathOption(root, command, flag, std::move(value),
+                                         component, clone));
   }
   return result;
 }

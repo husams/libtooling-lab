@@ -15,6 +15,7 @@ pytest_plugins = (
     "steps.dependent_template_type_steps",
     "steps.enumeration_steps",
     "steps.external_target_steps",
+    "steps.forced_include_steps",
     "steps.b027_external_callee_symbol_steps",
     "steps.b027_external_callee_failure_steps",
     "steps.field_steps",
