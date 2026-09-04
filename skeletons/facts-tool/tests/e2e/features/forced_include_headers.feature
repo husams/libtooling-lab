@@ -23,8 +23,20 @@ Feature: Forced include headers use compiler lookup semantics
   Scenario: ExplicitForcedHeaderPaths
     Given a temporary forced-include fixture with an explicit local header
     When the real facts-tool imports the relative forced header path
-    And the real facts-tool imports the absolute forced header path
     Then the forced-include import succeeds
+    And the stored forced-include option is "include/forced.hpp"
+    And extracting with the stored forced header succeeds
+    When the real facts-tool imports the absolute forced header path
+    Then the forced-include import succeeds
+    And the stored forced-include option is the unchanged absolute header path
+    And extracting with the stored forced header succeeds
+
+  Scenario: ImacrosHeaderPath
+    Given a temporary forced-include fixture with an explicit local header
+    When the real facts-tool imports the imacros forced header path
+    Then the forced-include import succeeds
+    And the stored imacros option is unchanged
+    And extracting with the stored forced header succeeds
 
   Scenario: MissingForcedHeader
     Given a temporary forced-include fixture from the B-028 note

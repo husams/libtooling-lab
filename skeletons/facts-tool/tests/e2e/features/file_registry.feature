@@ -19,6 +19,9 @@ Feature: Canonical source file registry
       | call_graph_two.cpp |
       | external_targets.cpp |
       | external_template_specialization.cpp |
+      | forced-include/include/forced.hpp |
+      | forced-include/optional.cpp |
+      | forced-include/paths.cpp |
       | forward_template_target.cpp |
       | forward_template_target_system.hpp |
       | initializer_dependent_alignment.cpp |

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 
-from pytest_bdd import given, then, when
+from pytest_bdd import given, parsers, then, when
 from support.database import require
 from support.forced_include import ForcedIncludeFixture
 from support.scenario import FactsToolContext
@@ -70,6 +70,14 @@ def when_absolute_path(context: FactsToolContext) -> None:
                            state.root / "absolute.sqlite")
 
 
+@when("the real facts-tool imports the imacros forced header path")
+def when_imacros_path(context: FactsToolContext) -> None:
+    state = fixture(context)
+    state.write_compilation_database(context, ["-std=c++17", "-imacros",
+                                               "include/forced.hpp"])
+    state.run_database_import(context, state.root / "imacros.sqlite")
+
+
 @when("the real facts-tool imports a missing forced header")
 def when_missing_header(context: FactsToolContext) -> None:
     state = fixture(context)
@@ -88,6 +96,33 @@ def then_options_preserve_order(context: FactsToolContext) -> None:
     include = options.index("-include")
     require(options[include + 1] == "optional", options)
     require(options.index("-std=c++17") < include, options)
+
+
+@then(parsers.parse('the stored forced-include option is "{expected}"'))
+def then_stored_option(context: FactsToolContext, expected: str) -> None:
+    options = fixture(context).stored_options()
+    include = options.index("-include")
+    require(options[include + 1] == expected, options)
+
+
+@then("the stored forced-include option is the unchanged absolute header path")
+def then_absolute_stored_option(context: FactsToolContext) -> None:
+    options = fixture(context).stored_options()
+    include = options.index("-include")
+    require(options[include + 1] == str(fixture(context).header), options)
+
+
+@then("the stored imacros option is unchanged")
+def then_imacros_option(context: FactsToolContext) -> None:
+    options = fixture(context).stored_options()
+    imacros = options.index("-imacros")
+    require(options[imacros + 1] == "include/forced.hpp", options)
+
+
+@then("extracting with the stored forced header succeeds")
+def then_stored_extraction_succeeds(context: FactsToolContext) -> None:
+    fixture(context).extract(context)
+    require(context.last_returncode == 0, context.last_output)
 
 
 @then("the forced-include import fails with an actionable diagnostic")

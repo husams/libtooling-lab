@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 import subprocess
 import tempfile
@@ -21,23 +22,13 @@ class ForcedIncludeFixture:
     def create(cls, context: FactsToolContext, local_header: bool) -> ForcedIncludeFixture:
         context.output_root.mkdir(parents=True, exist_ok=True)
         root = Path(tempfile.mkdtemp(prefix="b028-", dir=context.output_root)).resolve()
+        shutil.copytree(context.fixture_root / "forced-include", root,
+                        dirs_exist_ok=True)
         source = root / "optional.cpp"
-        source.write_text("""// Intentionally omit <optional>; supply it with -include optional.
-std::optional<int> maybe_value(bool enabled) {
-  return enabled ? std::optional<int>{42} : std::nullopt;
-}
-
-int main() {
-  return maybe_value(true).value_or(0) == 42 ? 0 : 1;
-}
-""")
         header = None
         if local_header:
             header = root / "include" / "forced.hpp"
-            header.parent.mkdir()
-            header.write_text("#define B028_FORCED_VALUE 42\n")
             source = root / "paths.cpp"
-            source.write_text("int forced_value() { return B028_FORCED_VALUE; }\n")
         return cls(root, source, header)
 
     def run_fixed_import(self, context: FactsToolContext, options: list[str], conf: Path) -> None:
