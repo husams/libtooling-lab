@@ -82,6 +82,9 @@ def main() -> None:
             all(command in output(symbol_help) for command in
                 ("list", "ls", "show", "browser")), output(symbol_help))
 
+    empty_config = run(tool, "config", "show", "--config", "")
+    require(empty_config.returncode != 0, output(empty_config))
+
     removed_symbol_view = run(tool, "symbol", "view")
     require(removed_symbol_view.returncode != 0, output(removed_symbol_view))
 
@@ -92,7 +95,8 @@ def main() -> None:
 
     missing_file_conf = run(tool, "file", "list")
     require(missing_file_conf.returncode != 0 and
-            "--conf" in output(missing_file_conf), output(missing_file_conf))
+            "project configuration database not found" in output(missing_file_conf),
+            output(missing_file_conf))
 
     extract_help = run(tool, "extract", "--help")
     require(extract_help.returncode == 0, output(extract_help))
@@ -119,9 +123,9 @@ def main() -> None:
         output(import_help),
     )
     require(
-        "Compiler argument appended to fixed-command or"
+        "Compiler argument appended after YAML tokens to fixed-command or"
         in output(import_help)
-        and "compile_commands.json imports; repeatable"
+        and "compile_commands.json imports; shell-tokenized and repeatable"
         in output(import_help),
         output(import_help),
     )
@@ -151,6 +155,18 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="facts-tool-cli-") as temporary:
         root = Path(temporary)
         configuration = root / "project.sqlite"
+
+        (root / ".facts-tool.yaml").write_text("conf_root: [bad\n")
+        direct_catalog = run(
+            tool, "repo", "list", "--conf", str(configuration),
+            working_directory=root,
+        )
+        require(direct_catalog.returncode != 0, output(direct_catalog))
+        require(
+            "configuration error" not in output(direct_catalog)
+            and "project configuration database not found" in output(direct_catalog),
+            output(direct_catalog),
+        )
 
         malformed_component = run(
             tool,

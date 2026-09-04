@@ -10,10 +10,10 @@ void symbolOptions(CLI::App &command, SymbolOptions &options) {
       ->type_name("FILE");
   command
       .add_option("-c,--conf", options.configuration,
-                  "Project configuration database for source paths")
+                  "Project database for source paths; YAML yaml-cpp 0.9.0 resolver")
       ->type_name("FILE");
   command.add_option("--config", options.configurationFile,
-                     "YAML defaults file");
+                     "YAML yaml-cpp 0.9.0 defaults file");
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
       ->expected(0, 1)
       ->default_str("1")

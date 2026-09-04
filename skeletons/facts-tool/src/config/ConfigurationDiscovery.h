@@ -16,12 +16,13 @@ inline bool present(const char *name) { return std::getenv(name) != nullptr; }
 inline std::filesystem::path cwd() { return std::filesystem::canonical("."); }
 
 inline std::filesystem::path projectRoot(std::filesystem::path path) {
+  const auto startingPath = path;
   for (;;) {
     if (std::filesystem::exists(path / ".facts-tool.yaml") ||
         std::filesystem::exists(path / ".git"))
       return path;
     const auto parent = path.parent_path();
-    if (parent == path) return path;
+    if (parent == path) return startingPath;
     path = parent;
   }
 }

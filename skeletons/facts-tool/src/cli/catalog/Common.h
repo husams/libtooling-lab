@@ -11,10 +11,10 @@ template <typename Options>
 void catalogOptions(CLI::App &command, Options &options) {
   command
       .add_option("-c,--conf", options.configuration,
-                  "Project configuration database (default: YAML resolver)")
+                  "Project database; YAML yaml-cpp 0.9.0 defaults use project/XDG/HOME lookup")
       ->type_name("FILE");
   command.add_option("--config", options.configurationFile,
-                     "YAML defaults file");
+                     "YAML yaml-cpp 0.9.0 defaults; --config overrides env/project/XDG/HOME");
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
       ->expected(0, 1)
       ->default_str("1")

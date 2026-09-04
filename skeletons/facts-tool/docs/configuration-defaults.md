@@ -21,9 +21,10 @@ owning project, so a collision is rejected. Use `--conf PATH` or
 
 `extra_args` entries are complete compiler tokens. Repeatable CLI
 `--extra-arg` values are shell-tokenized once and appended after YAML tokens;
-they preserve duplicates and option/operand order. Import stores the original
-compile options plus explicit CLI fragments, while extraction and dependency
-analysis apply current YAML defaults at runtime.
+they preserve duplicates and option/operand order. The effective command is
+base compile options, then YAML tokens, then flattened CLI fragments. Import
+stores the original compile options plus explicit CLI fragments, while
+extraction and dependency analysis apply current YAML defaults at runtime.
 
 Inspect resolution without creating files:
 

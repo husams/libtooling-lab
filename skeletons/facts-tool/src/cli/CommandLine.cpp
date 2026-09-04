@@ -31,18 +31,42 @@ public:
     directoryCommand_ = configureDirectory(app_, directory_);
     fileCommand_ = configureFile(app_, file_);
     symbolCommand_ = configureSymbol(app_, symbol_);
-    configCommand_ = app_.add_subcommand("config", "Inspect effective YAML defaults");
+    configCommand_ = app_.add_subcommand(
+        "config",
+        "Inspect YAML defaults with yaml-cpp 0.9.0; lookup is --config, "
+        "FACTS_TOOL_CONFIG, project, XDG, HOME; --conf overrides generated "
+        "naming and ownership");
     configCommand_->require_subcommand(1, 1);
-    auto &show = *configCommand_->add_subcommand("show", "Show resolved defaults");
-    show.add_option("--config", config_.configurationFile, "YAML configuration file");
-    show.add_option("--conf", config_.direct, "Direct project database path");
+    auto &show = *configCommand_->add_subcommand(
+        "show", "Show resolved YAML defaults and ordered discovery");
+    show.add_option_function<std::string>(
+            "--config",
+            [this](const std::string &value) {
+              if (value.empty())
+                throw CLI::ValidationError("--config must not be empty");
+              config_.configurationFile = value;
+            },
+            "YAML file; lookup is --config, FACTS_TOOL_CONFIG, project, XDG, HOME")
+        ->trigger_on_parse()
+        ->type_name("FILE");
+    show.add_option_function<std::string>(
+            "--conf",
+            [this](const std::string &value) {
+              if (value.empty())
+                throw CLI::ValidationError("--conf must not be empty");
+              config_.direct = value;
+            },
+            "Direct database override; bypasses generated naming and ownership")
+        ->trigger_on_parse()
+        ->type_name("FILE");
   }
 
   std::expected<Command, int> parse(int argc, char **argv) {
     try {
       app_.parse(argc, argv);
     } catch (const CLI::ParseError &error) {
-      return std::unexpected(app_.exit(error));
+      const auto exitCode = app_.exit(error);
+      return std::unexpected(exitCode == 0 ? 0 : 2);
     }
     if (extractCommand_->parsed()) {
       return Command{std::move(extract_)};
@@ -88,17 +112,17 @@ private:
         ->type_name("FILE");
     command
         .add_option("-c,--conf", extract_.configuration,
-                    "Project configuration database (default: YAML resolver)")
+                    "Project database; YAML yaml-cpp 0.9.0 resolver supplies defaults")
         ->type_name("FILE");
     command.add_option("--config", extract_.configurationFile,
-                       "YAML defaults file");
+                       "YAML defaults file (yaml-cpp 0.9.0; --config then env/project/XDG/HOME)");
     command
         .add_option_function<std::string>(
             "--extra-arg",
             [this](const std::string &argument) {
               extract_.extraArguments.push_back(argument);
             },
-            "Compiler argument appended to stored commands; repeatable")
+            "Compiler argument appended after YAML tokens; shell-tokenized and repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
     command.add_option(
@@ -111,10 +135,10 @@ private:
     configureVerbosity(command, import_.verbosity);
     command
         .add_option("-c,--conf", import_.configuration,
-                    "Project configuration database (default: YAML resolver)")
+                    "Project database; YAML yaml-cpp 0.9.0 resolver supplies defaults")
         ->type_name("FILE");
     command.add_option("--config", import_.configurationFile,
-                       "YAML defaults file");
+                       "YAML defaults file (yaml-cpp 0.9.0; --config then env/project/XDG/HOME)");
     command
         .add_option("-p,--compilation-database", import_.compilationDatabase,
                     "Directory containing compile_commands.json")
@@ -135,8 +159,8 @@ private:
             [this](const std::string &argument) {
               import_.extraArguments.push_back(argument);
             },
-            "Compiler argument appended to fixed-command or "
-            "compile_commands.json imports; repeatable")
+            "Compiler argument appended after YAML tokens to fixed-command or "
+            "compile_commands.json imports; shell-tokenized and repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
     command.add_option(
@@ -155,17 +179,17 @@ private:
         ->type_name("FILE");
     command
         .add_option("-c,--conf", dependency_.configuration,
-                    "Project configuration database (default: YAML resolver)")
+                    "Project database; YAML yaml-cpp 0.9.0 resolver supplies defaults")
         ->type_name("FILE");
     command.add_option("--config", dependency_.configurationFile,
-                       "YAML defaults file");
+                       "YAML defaults file (yaml-cpp 0.9.0; --config then env/project/XDG/HOME)");
     command
         .add_option_function<std::string>(
             "--extra-arg",
             [this](const std::string &argument) {
               dependency_.extraArguments.push_back(argument);
             },
-            "Compiler argument appended to stored commands; repeatable")
+            "Compiler argument appended after YAML tokens; shell-tokenized and repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
     command

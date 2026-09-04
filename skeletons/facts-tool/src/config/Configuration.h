@@ -11,6 +11,7 @@ struct Request {
   std::string selector;
   std::string direct;
   bool create = false;
+  bool loadDefaults = true;
 };
 
 struct Resolved {

@@ -165,8 +165,7 @@ registerFiles(FileManager &files, const CompilationDatabase &stored,
 
 std::expected<int, std::string> import(const cli::ImportOptions &options,
                                        std::vector<ProjectComponent> components,
-                                       CompilationDatabasePtr database,
-                                       CompilationDatabasePtr applied) {
+                                       CompilationDatabasePtr database) {
   cli::logVerbose(options.verbosity, 2,
                   "facts-tool: import: requested_sources={}, components={}",
                   options.sources.size(), components.size());
@@ -178,8 +177,8 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
   // Storing the compile commands registers the sources themselves, so the
   // reported figure is what the whole import added to the registry: a repeated
   // import of an unchanged project adds nothing and says so.
-  auto sources = database->getAllFiles();
-  if (sources.empty()) sources = options.sources;
+  auto sources = options.sources.empty() ? database->getAllFiles()
+                                         : options.sources;
   return cli::runStage(options.verbosity, "import", "read file registry",
                        [&] { return registeredFileCount(files); })
       .and_then([&](std::size_t before) {
@@ -194,7 +193,16 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
               return cli::runStage(
                          options.verbosity, "import", "register files",
                          [&] {
-                           return registerFiles(files, *applied, sources);
+                           return loadStoredCompilationDatabase(
+                                      options.configuration)
+                               .transform([&](CompilationDatabasePtr stored) {
+                                 return appendExtraArguments(
+                                     std::move(stored),
+                                     options.defaultExtraArguments);
+                               })
+                               .and_then([&](CompilationDatabasePtr applied) {
+                                 return registerFiles(files, *applied, sources);
+                               });
                          })
                   .and_then(
                       [&](std::size_t) { return registeredFileCount(files); })
@@ -220,14 +228,8 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
   return cli::runStage(configured.verbosity, "import", "parse components",
                        [&] { return parseComponents(configured.components); })
       .and_then([&](std::vector<ProjectComponent> components) {
-        return mergedArguments(configured.defaultExtraArguments,
-                               configured.extraArguments)
-            .and_then([&](auto arguments) {
-              auto explicitArguments = arguments;
-              explicitArguments.erase(
-                  explicitArguments.begin(),
-                  explicitArguments.begin() +
-                      configured.defaultExtraArguments.size());
+        return tokenizeExtraArguments(configured.extraArguments)
+            .and_then([&](auto explicitArguments) {
               return cli::runStage(
                          configured.verbosity, "import",
                          "load compilation database", [&] {
@@ -235,18 +237,14 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
                                                           explicitArguments);
                          })
                   .and_then([&](CompilationDatabasePtr database) {
-                    return loadCompilationDatabase(configured, arguments)
-                        .and_then([&](CompilationDatabasePtr applied) {
-                          if (resolved->generated) {
-                            auto owned = config::ensureOwnedDatabase(*resolved);
-                            if (!owned)
-                              return std::expected<int, std::string>(
-                                  std::unexpected(owned.error()));
-                          }
-                          return import(configured, std::move(components),
-                                        std::move(database),
-                                        std::move(applied));
-                        });
+                    if (resolved->generated) {
+                      auto owned = config::ensureOwnedDatabase(*resolved);
+                      if (!owned)
+                        return std::expected<int, std::string>(
+                            std::unexpected(owned.error()));
+                    }
+                    return import(configured, std::move(components),
+                                  std::move(database));
                   });
             });
       });

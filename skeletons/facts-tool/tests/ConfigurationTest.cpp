@@ -1,8 +1,15 @@
 #include "commands/ConfigurationSupport.h"
 #include <cassert>
 #include <filesystem>
+#include <unistd.h>
 
 int main() {
+  const auto unmarked = std::filesystem::temp_directory_path() /
+                        ("facts-tool-unmarked-" + std::to_string(getpid()));
+  std::filesystem::create_directories(unmarked / "nested");
+  assert(facts::config::detail::projectRoot(unmarked / "nested") == unmarked /
+         "nested");
+
   facts::config::Resolved value;
   value.projectRoot = "/work/acme.v2";
   value.storageRoot = "/tmp/facts";
