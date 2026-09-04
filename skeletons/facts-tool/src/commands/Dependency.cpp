@@ -6,6 +6,7 @@
 #include "commands/CompilationDatabase.h"
 #include "commands/DatabasePaths.h"
 #include "commands/ExtraArguments.h"
+#include "commands/ConfigurationSupport.h"
 #include "model/Dependency.h"
 #include "platform/PlatformFlags.h"
 #include "storage/DependencyDatabase.h"
@@ -236,32 +237,39 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
 
 std::expected<int, std::string>
 runDependency(const cli::DependencyOptions &options) {
-  return runDependencyStage(options, "validate sources",
-                            [&] { return validateSources(options); })
+  auto resolved = loadConfiguration(options.configuration,
+                                    options.configurationFile, false);
+  if (!resolved) return std::unexpected(resolved.error());
+  auto configured = options;
+  configured.configuration = resolved->database.string();
+  configured.defaultExtraArguments = std::move(resolved->extraArguments);
+  return runDependencyStage(configured, "validate sources",
+                            [&] { return validateSources(configured); })
       .and_then([&] {
-        return runDependencyStage(options, "validate database paths", [&] {
-          return validateDatabasePaths(options.output, options.configuration);
+        return runDependencyStage(configured, "validate database paths", [&] {
+          return validateDatabasePaths(configured.output, configured.configuration);
         });
       })
       .and_then([&] {
-        return runDependencyStage(options, "load compilation database", [&] {
-          return loadStoredCompilationDatabase(options.configuration);
+        return runDependencyStage(configured, "load compilation database", [&] {
+          return loadStoredCompilationDatabase(configured.configuration);
         });
       })
       .and_then([&](CompilationDatabasePtr database) {
-        return tokenizeExtraArguments(options.extraArguments)
+        return mergedArguments(options.defaultExtraArguments,
+                               options.extraArguments)
             .transform([&](std::vector<std::string> arguments) {
               return appendExtraArguments(std::move(database), arguments);
             });
       })
       .and_then([&](CompilationDatabasePtr database) {
-        return runDependencyStage(options, "validate stored commands", [&] {
+        return runDependencyStage(configured, "validate stored commands", [&] {
           return requireStoredCommands(std::move(database));
         });
       })
       .and_then([&](CompilationDatabasePtr database) {
-        return runDependencyStage(options, "analyse dependency graph", [&] {
-          return analyse(options, std::move(database));
+        return runDependencyStage(configured, "analyse dependency graph", [&] {
+          return analyse(configured, std::move(database));
         });
       });
 }

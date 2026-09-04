@@ -31,6 +31,11 @@ public:
     directoryCommand_ = configureDirectory(app_, directory_);
     fileCommand_ = configureFile(app_, file_);
     symbolCommand_ = configureSymbol(app_, symbol_);
+    configCommand_ = app_.add_subcommand("config", "Inspect effective YAML defaults");
+    configCommand_->require_subcommand(1, 1);
+    auto &show = *configCommand_->add_subcommand("show", "Show resolved defaults");
+    show.add_option("--config", config_.configurationFile, "YAML configuration file");
+    show.add_option("--conf", config_.direct, "Direct project database path");
   }
 
   std::expected<Command, int> parse(int argc, char **argv) {
@@ -54,6 +59,7 @@ public:
       return Command{std::move(file_)};
     if (symbolCommand_->parsed())
       return Command{std::move(symbol_)};
+    if (configCommand_->parsed()) return Command{std::move(config_)};
     if (callGraphCommand_->parsed())
       return Command{std::move(callGraph_)};
     return importCommand_->parsed() ? Command{std::move(import_)}
@@ -82,9 +88,10 @@ private:
         ->type_name("FILE");
     command
         .add_option("-c,--conf", extract_.configuration,
-                    "Full path to the stored project configuration")
-        ->required()
+                    "Project configuration database (default: YAML resolver)")
         ->type_name("FILE");
+    command.add_option("--config", extract_.configurationFile,
+                       "YAML defaults file");
     command
         .add_option_function<std::string>(
             "--extra-arg",
@@ -104,9 +111,10 @@ private:
     configureVerbosity(command, import_.verbosity);
     command
         .add_option("-c,--conf", import_.configuration,
-                    "Full path for the stored project configuration")
-        ->required()
+                    "Project configuration database (default: YAML resolver)")
         ->type_name("FILE");
+    command.add_option("--config", import_.configurationFile,
+                       "YAML defaults file");
     command
         .add_option("-p,--compilation-database", import_.compilationDatabase,
                     "Directory containing compile_commands.json")
@@ -147,9 +155,10 @@ private:
         ->type_name("FILE");
     command
         .add_option("-c,--conf", dependency_.configuration,
-                    "Full path to the stored project configuration")
-        ->required()
+                    "Project configuration database (default: YAML resolver)")
         ->type_name("FILE");
+    command.add_option("--config", dependency_.configurationFile,
+                       "YAML defaults file");
     command
         .add_option_function<std::string>(
             "--extra-arg",
@@ -203,11 +212,13 @@ private:
   CLI::App *directoryCommand_ = nullptr;
   CLI::App *fileCommand_ = nullptr;
   CLI::App *symbolCommand_ = nullptr;
+  CLI::App *configCommand_ = nullptr;
   RepositoryOptions repository_;
   ComponentOptions component_;
   DirectoryOptions directory_;
   FileOptions file_;
   SymbolOptions symbol_;
+  ConfigOptions config_;
 };
 } // namespace
 

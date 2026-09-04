@@ -11,8 +11,10 @@ template <typename Options>
 void catalogOptions(CLI::App &command, Options &options) {
   command
       .add_option("-c,--conf", options.configuration,
-                  "Project configuration database (required)")
+                  "Project configuration database (default: YAML resolver)")
       ->type_name("FILE");
+  command.add_option("--config", options.configurationFile,
+                     "YAML defaults file");
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
       ->expected(0, 1)
       ->default_str("1")
@@ -35,9 +37,6 @@ CLI::App &catalogLeaf(CLI::App &group, const char *name,
   auto &leaf = *group.add_subcommand(name, description);
   catalogOptions(leaf, options);
   leaf.callback([&options, action] {
-    if (options.configuration.empty()) {
-      throw CLI::RequiredError("--conf");
-    }
     options.action = action;
   });
   return leaf;

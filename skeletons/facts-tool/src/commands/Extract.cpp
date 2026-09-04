@@ -4,6 +4,7 @@
 #include "commands/DatabasePaths.h"
 #include "commands/ExtraArguments.h"
 #include "commands/ExtractionSetup.h"
+#include "commands/ConfigurationSupport.h"
 
 #include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
@@ -144,7 +145,7 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
 
 } // namespace
 
-std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
+std::expected<int, std::string> runExtractResolved(const cli::ExtractOptions &options) {
   return runExtractStage(options, "validate database paths",
                          [&] {
                            return validateDatabasePaths(options.output,
@@ -157,7 +158,8 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
         });
       })
       .and_then([&](CompilationDatabasePtr database) {
-        return tokenizeExtraArguments(options.extraArguments)
+        return mergedArguments(options.defaultExtraArguments,
+                               options.extraArguments)
             .transform([&](std::vector<std::string> arguments) {
               return appendExtraArguments(std::move(database), arguments);
             });
@@ -175,6 +177,16 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
                                });
                              });
       });
+}
+
+std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
+  auto resolved = loadConfiguration(options.configuration,
+                                    options.configurationFile, false);
+  if (!resolved) return std::unexpected(resolved.error());
+  auto configured = options;
+  configured.configuration = resolved->database.string();
+  configured.defaultExtraArguments = std::move(resolved->extraArguments);
+  return runExtractResolved(configured);
 }
 
 } // namespace facts::commands

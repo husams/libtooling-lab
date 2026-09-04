@@ -5,7 +5,10 @@ namespace facts::catalog {
 
 Result<Database> open(const std::string &path, bool writable, bool create) {
   try {
-    if (create && !std::filesystem::exists(path)) {
+    if (!create && !std::filesystem::exists(path))
+      return std::unexpected("project configuration database not found: " + path +
+                             " (set --conf or FACTS_TOOL_CONFIG)");
+    if (create) {
       FileDatabase initialize(path);
     }
     return FileDatabase::openReadOnly(path)

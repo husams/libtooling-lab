@@ -2,6 +2,7 @@
 
 #include "commands/CompilationDatabase.h"
 #include "commands/ExtraArguments.h"
+#include "commands/ConfigurationSupport.h"
 #include "commands/IncludedFiles.h"
 
 #include "cli/Verbose.h"
@@ -70,22 +71,17 @@ parseComponents(const std::vector<std::string> &specifications) {
 }
 
 std::expected<CompilationDatabasePtr, std::string>
-loadCompilationDatabase(const cli::ImportOptions &options) {
-  return tokenizeExtraArguments(options.extraArguments)
-      .and_then([&](std::vector<std::string> arguments)
-                    -> std::expected<CompilationDatabasePtr, std::string> {
-        if (options.compilationDatabase.empty()) {
-          if (options.sources.empty()) {
-            return std::unexpected("import requires --compilation-database or "
-                                   "at least one source");
-          }
-          return std::make_unique<clang::tooling::FixedCompilationDatabase>(
-              std::filesystem::current_path().string(), std::move(arguments));
-        }
-        return loadJsonCompilationDatabase(options.compilationDatabase)
-            .transform([&](CompilationDatabasePtr database) {
-              return appendExtraArguments(std::move(database), arguments);
-            });
+loadCompilationDatabase(const cli::ImportOptions &options,
+                       const std::vector<std::string> &arguments) {
+  if (options.compilationDatabase.empty()) {
+    if (options.sources.empty())
+      return std::unexpected("import requires --compilation-database or at least one source");
+    return std::make_unique<clang::tooling::FixedCompilationDatabase>(
+        std::filesystem::current_path().string(), arguments);
+  }
+  return loadJsonCompilationDatabase(options.compilationDatabase)
+      .transform([&](CompilationDatabasePtr database) {
+        return appendExtraArguments(std::move(database), arguments);
       });
 }
 
@@ -107,11 +103,12 @@ registeredFileCount(FileManager &files) {
 // command sanitizes its flags and rewrites its paths, and a set discovered
 // before that round trip is not the set discovered after it.
 std::expected<std::vector<std::string>, std::string>
-discoverRegistryFiles(const CompilationDatabase &stored) {
+discoverRegistryFiles(const CompilationDatabase &stored,
+                      const std::vector<std::string> &sources) {
   return discoverCompilationFiles(stored, {})
       .and_then([&](CompilationFiles discovered) {
         reportDiagnostics(discovered.diagnostics);
-        return discoverIncludedFiles(stored, stored.getAllFiles())
+        return discoverIncludedFiles(stored, sources)
             .transform([identities = std::move(discovered.files)](
                            std::vector<std::string> included) mutable {
               std::ranges::move(included, std::back_inserter(identities));
@@ -143,11 +140,9 @@ requireResolvableIdentities(FileManager &files,
 // Import owns the file registry: every path a later command can resolve is
 // discovered and stored here, so extraction only ever reads it.
 std::expected<std::size_t, std::string>
-registerFiles(FileManager &files, const std::string &configuration) {
-  return loadStoredCompilationDatabase(configuration)
-      .and_then([&](CompilationDatabasePtr stored) {
-        return discoverRegistryFiles(*stored);
-      })
+registerFiles(FileManager &files, const CompilationDatabase &stored,
+              const std::vector<std::string> &sources) {
+  return discoverRegistryFiles(stored, sources)
       .and_then([&](std::vector<std::string> identities) {
         return files.addBulk(identities)
             .transform_error([](std::error_code error) {
@@ -170,7 +165,8 @@ registerFiles(FileManager &files, const std::string &configuration) {
 
 std::expected<int, std::string> import(const cli::ImportOptions &options,
                                        std::vector<ProjectComponent> components,
-                                       CompilationDatabasePtr database) {
+                                       CompilationDatabasePtr database,
+                                       CompilationDatabasePtr applied) {
   cli::logVerbose(options.verbosity, 2,
                   "facts-tool: import: requested_sources={}, components={}",
                   options.sources.size(), components.size());
@@ -182,6 +178,8 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
   // Storing the compile commands registers the sources themselves, so the
   // reported figure is what the whole import added to the registry: a repeated
   // import of an unchanged project adds nothing and says so.
+  auto sources = database->getAllFiles();
+  if (sources.empty()) sources = options.sources;
   return cli::runStage(options.verbosity, "import", "read file registry",
                        [&] { return registeredFileCount(files); })
       .and_then([&](std::size_t before) {
@@ -196,7 +194,7 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
               return cli::runStage(
                          options.verbosity, "import", "register files",
                          [&] {
-                           return registerFiles(files, options.configuration);
+                           return registerFiles(files, *applied, sources);
                          })
                   .and_then(
                       [&](std::size_t) { return registeredFileCount(files); })
@@ -214,15 +212,42 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
 } // namespace
 
 std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
-  return cli::runStage(options.verbosity, "import", "parse components",
-                       [&] { return parseComponents(options.components); })
+  auto resolved = loadConfiguration(options.configuration,
+                                    options.configurationFile, false);
+  if (!resolved) return std::unexpected(resolved.error());
+  auto configured = options;
+  configured.configuration = resolved->database.string();
+  return cli::runStage(configured.verbosity, "import", "parse components",
+                       [&] { return parseComponents(configured.components); })
       .and_then([&](std::vector<ProjectComponent> components) {
-        return cli::runStage(options.verbosity, "import",
-                             "load compilation database",
-                             [&] { return loadCompilationDatabase(options); })
-            .and_then([&](CompilationDatabasePtr database) {
-              return import(options, std::move(components),
-                            std::move(database));
+        return mergedArguments(configured.defaultExtraArguments,
+                               configured.extraArguments)
+            .and_then([&](auto arguments) {
+              auto explicitArguments = arguments;
+              explicitArguments.erase(
+                  explicitArguments.begin(),
+                  explicitArguments.begin() +
+                      configured.defaultExtraArguments.size());
+              return cli::runStage(
+                         configured.verbosity, "import",
+                         "load compilation database", [&] {
+                           return loadCompilationDatabase(configured,
+                                                          explicitArguments);
+                         })
+                  .and_then([&](CompilationDatabasePtr database) {
+                    return loadCompilationDatabase(configured, arguments)
+                        .and_then([&](CompilationDatabasePtr applied) {
+                          if (resolved->generated) {
+                            auto owned = config::ensureOwnedDatabase(*resolved);
+                            if (!owned)
+                              return std::expected<int, std::string>(
+                                  std::unexpected(owned.error()));
+                          }
+                          return import(configured, std::move(components),
+                                        std::move(database),
+                                        std::move(applied));
+                        });
+                  });
             });
       });
 }

@@ -33,6 +33,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(ftxui)
 
+set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+  yaml_cpp
+  URL https://github.com/jbeder/yaml-cpp/releases/download/yaml-cpp-0.9.0/yaml-cpp-yaml-cpp-0.9.0.tar.gz
+  URL_HASH SHA256=298593d9c440fd9034b8b193d96318b76d49bc97c6ceadb7b0836edf0b6d7539
+)
+FetchContent_MakeAvailable(yaml_cpp)
+
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
@@ -189,6 +200,15 @@ target_include_directories(facts-tooling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang
                                             facts-sqlite)
 
+add_library(facts-config STATIC
+  src/config/ConfigurationPaths.cpp
+  src/config/ConfigurationRender.cpp
+  src/config/ConfigurationYaml.cpp
+  src/config/ConfigurationOwnership.cpp
+)
+target_include_directories(facts-config PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(facts-config PUBLIC yaml-cpp::yaml-cpp facts-sqlite)
+
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
   src/ast/extractors/Definition.cpp
@@ -280,6 +300,7 @@ add_library(facts-commands STATIC
   src/commands/catalog/File.cpp
   src/commands/catalog/Symbol.cpp
   src/commands/DatabasePaths.cpp
+  src/commands/Configuration.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
   src/commands/ExtractionSetup.cpp
@@ -305,6 +326,7 @@ target_link_libraries(facts-commands PRIVATE
   facts-symbols
   facts-symbol-ui
   facts-tooling
+  facts-config
   facts-clang
 )
 
@@ -413,6 +435,9 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_BINARY_DIR}/project-configuration.sqlite
             ${CMAKE_CURRENT_SOURCE_DIR}
   )
+  add_executable(configuration-test tests/ConfigurationTest.cpp)
+  target_link_libraries(configuration-test PRIVATE facts-config)
+  add_test(NAME configuration COMMAND configuration-test)
   add_executable(
     storage-schema-test
     tests/storage/FreshSchemaTest.cpp

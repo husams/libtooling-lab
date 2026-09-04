@@ -47,9 +47,13 @@ def main() -> None:
     require(root_help.returncode == 0, output(root_help))
     require(
         all(command in output(root_help) for command in
-            ("extract", "import", "file", "symbol")),
+            ("extract", "import", "config", "file", "symbol")),
         output(root_help),
     )
+
+    config_help = run(tool, "config", "show", "--help")
+    require(config_help.returncode == 0 and "YAML" in output(config_help),
+            output(config_help))
 
     file_help = run(tool, "file", "--help")
     require(file_help.returncode == 0, output(file_help))

@@ -11,6 +11,7 @@ pytest_plugins = (
     "steps.b019_extraction_completeness_steps",
     "steps.call_graph_steps",
     "steps.common_steps",
+    "steps.configuration_defaults_steps",
     "steps.database_steps",
     "steps.dependent_template_type_steps",
     "steps.enumeration_steps",

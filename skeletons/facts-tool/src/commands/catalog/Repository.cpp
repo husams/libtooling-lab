@@ -70,6 +70,7 @@ catalog::Result<int> runRepository(const cli::RepositoryOptions &options) {
   const bool writable = !options.dryRun && options.action != Action::list &&
                         options.action != Action::show;
   return runCatalog(options.configuration, writable,
-                    [&](auto &database) { return operate(database, options); });
+                    [&](auto &database) { return operate(database, options); },
+                    false, options.configurationFile);
 }
 } // namespace facts::commands

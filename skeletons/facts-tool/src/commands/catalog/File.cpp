@@ -158,7 +158,8 @@ catalog::Result<int> runFile(const cli::FileOptions &options) {
                         options.action == Action::setOption ||
                         options.action == Action::clearOption;
   return runCatalog(options.configuration, writable,
-                    [&](auto &database) { return operate(database, options); });
+                    [&](auto &database) { return operate(database, options); },
+                    false, options.configurationFile);
 }
 
 } // namespace facts::commands
