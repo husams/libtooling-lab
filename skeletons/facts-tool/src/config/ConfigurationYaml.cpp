@@ -52,8 +52,14 @@ readYaml(const std::filesystem::path &path, Resolved result) {
       if (key != "extra_args") {
         if (auto valid = scalar(entry.second, key); !valid)
           return std::unexpected(valid.error());
-        if (key == "conf_root") result.storageRoot = entry.second.Scalar();
-        if (key == "conf_template") result.templateText = entry.second.Scalar();
+        if (key == "conf_root") {
+          result.storageRoot = entry.second.Scalar();
+          result.storageRootSource = path.string() + ": conf_root";
+        }
+        if (key == "conf_template") {
+          result.templateText = entry.second.Scalar();
+          result.templateSource = path.string() + ": conf_template";
+        }
       } else {
         if (!entry.second || entry.second.IsNull() || !entry.second.IsSequence())
           return std::unexpected("extra_args must be a sequence of strings");
@@ -63,6 +69,7 @@ readYaml(const std::filesystem::path &path, Resolved result) {
             return std::unexpected(valid.error());
           result.extraArguments.push_back(value.Scalar());
         }
+        result.extraArgumentsSource = path.string() + ": extra_args";
       }
     }
     return result;

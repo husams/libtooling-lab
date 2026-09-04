@@ -22,6 +22,10 @@ struct Resolved {
   bool generated = true;
   std::vector<std::string> extraArguments;
   std::string diagnostics;
+  std::string storageRootSource;
+  std::string templateSource;
+  std::string extraArgumentsSource;
+  std::vector<std::string> discovery;
 };
 
 std::expected<Resolved, std::string> resolve(const Request &request);
