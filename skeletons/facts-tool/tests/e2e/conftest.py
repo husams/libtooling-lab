@@ -7,6 +7,7 @@ import pytest
 from support.scenario import FactsToolContext
 
 pytest_plugins = (
+    "steps.batch_steps",
     "steps.cli_yaml_precedence_steps",
     "steps.cli_yaml_precedence_assert_steps",
     "steps.cli_yaml_symbol_steps",

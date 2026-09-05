@@ -625,6 +625,12 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/gcc_clang_ast_shim_test.py
   )
 
+  add_test(
+    NAME facts-tool-batch
+    COMMAND ${Python3_EXECUTABLE} -m pytest
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/batch -q
+  )
+
   # A precompiled header is only readable by the exact Clang that wrote it, so
   # the prefix-header scenarios need the clang++ that ships beside the libClang
   # this tool links -- CMAKE_CXX_COMPILER may be GCC, whose PCH Clang rejects.
