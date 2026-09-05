@@ -1,6 +1,7 @@
 #include "StorageSchemaTestCases.h"
 #include "StorageSchemaTestSupport.h"
 
+#include "storage/Schema.h"
 #include "storage/SchemaMigration.h"
 #include "storage/Storage.h"
 
@@ -8,6 +9,23 @@
 
 namespace storage_schema_test {
 namespace {
+
+bool verifyFreshReturnSchema() {
+  sqlite3 *database = nullptr;
+  if (sqlite3_open(":memory:", &database) != SQLITE_OK)
+    return false;
+  // The published fresh schema must be complete without Storage applying
+  // extra scripts after it has already recorded user_version=9.
+  const auto valid =
+      execute(database, facts::schemaSql) &&
+      require(scalar(database, "PRAGMA user_version") == 9,
+              "fresh schema does not declare version nine") &&
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
+                               "'callable_return_type')") == 2,
+              "authoritative fresh schema omits callable_return_type");
+  sqlite3_close(database);
+  return valid;
+}
 
 bool populateReturnTypes(const std::filesystem::path &path,
                          facts::SymbolId &callable) {
@@ -89,6 +107,8 @@ bool migrateReturnTypes(sqlite3 *database, facts::SymbolId callable) {
 } // namespace
 
 bool verifyReturnTypeStorage(const std::filesystem::path &path) {
+  if (!verifyFreshReturnSchema())
+    return false;
   removeDatabase(path);
   facts::SymbolId callable{};
   if (!populateReturnTypes(path, callable))

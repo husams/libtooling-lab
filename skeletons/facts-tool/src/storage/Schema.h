@@ -84,6 +84,12 @@ CREATE TABLE IF NOT EXISTS symbol (
 CREATE INDEX IF NOT EXISTS idx_symbol_qualified_name ON symbol(qualified_name);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_symbol_unique_usr ON symbol(usr);
 
+-- Canonical return spelling complements ReturnType target identity edges.
+CREATE TABLE IF NOT EXISTS callable_return_type (
+  symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  canonical_type TEXT NOT NULL CHECK(canonical_type <> '')
+);
+
 -- Where the body is. A side table and not columns on symbol because only
 -- records and functions can have one, and because a missing row already says
 -- "declared, never defined" — no size-0 sentinel needed. file_id is separate:
@@ -97,7 +103,7 @@ CREATE TABLE IF NOT EXISTS definition (
 
 -- Enum-only facts. The underlying type is a packed SymbolId rather than a
 -- relation target because compiler-provided builtin types use FileId zero and
--- deliberately have no symbol row.
+-- need no symbol row unless materialized as a relation target.
 CREATE TABLE IF NOT EXISTS enumeration (
   symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
   underlying_type INTEGER NOT NULL,

@@ -27,6 +27,10 @@ Feature: Persist callable return types
     When I extract the callable fixture again into the same database
     Then callable identities and return-type facts are unchanged without duplicates
 
+  Scenario: Declaration listings exclude predefined return targets
+    Then every selected callable has exactly its expected return-type facts
+    And the declaration catalog excludes predefined return targets without deleting facts
+
   Scenario: Upgrade an existing facts database without changing existing facts
     Given the callable facts database has the previous schema without return types
     Then legacy callable symbols remain queryable without rewriting the database

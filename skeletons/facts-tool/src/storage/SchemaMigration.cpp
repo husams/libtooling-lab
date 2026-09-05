@@ -1,5 +1,4 @@
 #include "storage/SchemaMigration.h"
-#include "storage/ReturnTypeSchema.h"
 
 #include "storage/Sqlite.h"
 
@@ -306,6 +305,14 @@ ADD COLUMN certainty INTEGER;
 PRAGMA user_version=8;
 )sql";
 
+inline constexpr auto returnTypeMigrationSql = R"sql(
+CREATE TABLE IF NOT EXISTS callable_return_type (
+  symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  canonical_type TEXT NOT NULL CHECK(canonical_type <> '')
+);
+PRAGMA user_version=9;
+)sql";
+
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
@@ -367,9 +374,7 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
             .and_then([database] {
               return schemaVersion(database).and_then([database](int version) {
                 return version < 9
-                           ? execute(database, returnTypeSchemaSql).and_then([&] {
-                               return execute(database, "PRAGMA user_version=9;");
-                             })
+                           ? execute(database, returnTypeMigrationSql)
                            : std::expected<void, std::error_code>{};
               });
             });

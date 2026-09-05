@@ -1,7 +1,6 @@
 #include "storage/Storage.h"
 
 #include "storage/Schema.h"
-#include "storage/ReturnTypeSchema.h"
 #include "storage/SchemaMigration.h"
 #include <sqlite3.h>
 
@@ -27,9 +26,6 @@ storage::Database openDatabase(const std::string &path) {
           .and_then([&](storage::Transaction transaction) {
             return storage::migrateSchema(database.nativeHandle())
                 .and_then([&] { return database.executeScript(schemaSql); })
-                .and_then([&] {
-                  return database.executeScript(storage::returnTypeSchemaSql);
-                })
                 .and_then([&] { return transaction.commit(); });
           })
           .and_then([&] {

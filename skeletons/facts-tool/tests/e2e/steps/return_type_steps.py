@@ -174,3 +174,26 @@ def query_legacy(context: FactsToolContext):
     require(" -> " not in result.stdout, "legacy query invented a missing return type")
     require(context.facts_database_path.read_bytes() == before,
             "read-only symbol query rewrote the old facts schema")
+
+
+@then("the declaration catalog excludes predefined return targets without deleting facts")
+def declaration_catalog(context: FactsToolContext):
+    before = context.facts_database_path.read_bytes()
+    builtins = query(context.facts_database_path,
+                     "SELECT qualified_name FROM symbol WHERE (id >> 32)=0")
+    require(set(builtins) == {("int",), ("void",)},
+            f"the fixture must retain its predefined return targets: {builtins}")
+    expected = query(context.facts_database_path,
+                     "SELECT qualified_name FROM symbol WHERE (id >> 32)<>0")
+    # List and browser share loadSymbols; compare the entire declaration set
+    # so excluding bookkeeping rows cannot silently discard real declarations.
+    result = context._run([str(context.facts_tool), "symbol", "list", "--facts",
+                           str(context.facts_database_path)])
+    require(result.returncode == 0, context.last_output)
+    listed = [line.split(maxsplit=1)[1] for line in result.stdout.splitlines()[1:]]
+    require(sorted(listed) == sorted(name for (name,) in expected),
+            f"declaration catalog contains wrong symbols: {result.stdout}")
+    require(context.facts_database_path.read_bytes() == before,
+            "listing declarations changed stored return targets")
+    require(inventory(context) == context.return_inventory,
+            "listing declarations changed return facts")

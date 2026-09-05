@@ -159,7 +159,8 @@ querySymbols(storage::Database &database, const std::vector<SourceFile> &files,
                 "JOIN symbol destination ON "
                 "destination.id=relation.destination_id "
                 "WHERE relation.source_id=s.id AND relation.kind=? LIMIT 1)) "
-                "FROM symbol s WHERE (? IS NULL OR qualified_name=?) ORDER BY "
+                "FROM symbol s WHERE ((id >> 32)<>0 OR ? IS NOT NULL) "
+                "AND (? IS NULL OR qualified_name=?) ORDER BY "
                 "id",
             [&files](const storage::Row &row) {
               SymbolFact value;
@@ -199,7 +200,7 @@ querySymbols(storage::Database &database, const std::vector<SourceFile> &files,
               }
               return value;
             },
-            static_cast<int>(RelationKind::ReturnType), name, name);
+            static_cast<int>(RelationKind::ReturnType), name, name, name);
       })
       .and_then([&database](auto values) {
         return loadParameters(database).transform(
