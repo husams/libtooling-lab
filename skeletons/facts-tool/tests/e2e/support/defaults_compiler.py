@@ -45,6 +45,22 @@ class CompileDefaults:
             cmd += ["-o", str(d.root / (family + ".db")), str(self.source)]
         return d.run(*cmd, *d.args, *(self.cli if cli else []))
 
+    # Import does not compile, but its include discovery does preprocess with
+    # the merged defaults: only when VALUE and USER_SEEN come out as expected
+    # does the source pull in a header that lives outside the component
+    # directory (files inside it are registered by enumeration regardless),
+    # so its registration makes user -> project order observable for import.
+    def require_import_effect(self, value):
+        header = self.d.root / "order/order-ok.hpp"
+        header.parent.mkdir(exist_ok=True)
+        header.write_text("struct OrderOk {};\n")
+        self.source.write_text(f"#if VALUE == {value} && USER_SEEN\n"
+            '#include "../order/order-ok.hpp"\n#endif\nstruct Ordered {};\n')
+
+    def registered(self, name):
+        with sqlite3.connect(self.db) as db:
+            return name in {x[0] for x in db.execute("SELECT name FROM file")}
+
     def require_effect(self, value):
         self.source.write_text(f"#if VALUE != {value} || !YAML_SEEN || !USER_SEEN\n"
             '#include "wrong_argument_order.h"\n#endif\nstruct Ordered {};\n')

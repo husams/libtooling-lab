@@ -38,8 +38,12 @@ meaning: the project directory's parent relative to `/`, and the complete
 project basename (`/` uses `_root`). Every rendered path is checked
 canonically against one anchor and may not escape it, even through a
 symlink, so a template is accepted in any of these forms: a raw leading `~/`
-expands against `HOME` and anchors to `HOME`; a leading placeholder such as
-`{project_root}` or `${ENV_NAME}` anchors to its own expanded value; an
+expands against `HOME` and anchors to `HOME` (the template body is
+substituted once and the `HOME` text is joined afterwards, never re-parsed);
+a leading placeholder such as `{project_root}` or `${ENV_NAME}` anchors to
+its own expanded value, or to that value's parent directory when the
+placeholder already names the complete file (for example
+`conf_template: "${MY_DB}"`); an
 absolute literal (one that starts with `/` before any substitution) anchors
 to the literal prefix the user wrote before the first placeholder; and a
 relative template joins onto `conf_root` (itself anchored to the canonical
@@ -84,7 +88,8 @@ suffice. Absent keys use built-ins; explicit null/empty values do not.
 Known placeholders may repeat or be omitted; no extension is appended.
 Substitution preserves spaces, Unicode, dots, and braces in project names.
 Repeated separators/dot components normalize; any `..` (in any tier's
-template, even one a higher tier overrides), trailing separators, root-only results, invalid
+template, even one a higher tier overrides, and even when substitution of
+`${ENV_NAME}` or `{user}` introduces it), trailing separators, root-only results, invalid
 braces, backslashes, NUL/newline (including inside a substituted
 `{user}`/`{project_root}`/`{project_name}`/`${ENV_NAME}` value), and
 canonical symlink escapes are rejected before creation. Parents are

@@ -11,7 +11,14 @@ def compile_twice(defaults, family):
     # Without CLI fragments the project tier's -DVALUE=2 must beat the user
     # tier's -DVALUE=0 while the user's -DUSER_SEEN=1 still reaches the
     # compiler: observable proof of user -> project order.
-    if family != "import":
+    if family == "import":
+        c.require_import_effect(0)
+        assert c.run(family, cli=False).returncode == 0
+        assert not c.registered("order-ok.hpp")
+        c.require_import_effect(2)
+        assert c.run(family, cli=False).returncode == 0
+        assert c.registered("order-ok.hpp")
+    else:
         c.require_effect(2)
         result = c.run(family, cli=False)
         assert result.returncode == 0, result.stdout + result.stderr

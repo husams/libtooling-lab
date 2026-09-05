@@ -34,11 +34,15 @@ std::filesystem::path literalPrefix(std::string_view text) {
   return std::filesystem::path(std::string(text.substr(0, stop))).parent_path();
 }
 
-// Shared by conf_template and facts_template. Every rendered path is checked
-// canonically against one anchor and may not escape it, even through a
-// symlink: "~/" anchors to HOME, a leading placeholder ({project_root},
-// ${ENV}) to its own value, an absolute literal to its literal prefix before
-// the first placeholder, and a relative template to `relativeBase`.
+// Shared by conf_template and facts_template. The template body is
+// substituted exactly once; environment-derived prefixes (HOME for "~/") are
+// joined afterwards as literal text and never re-parsed. Every rendered path
+// is then checked canonically against one anchor and may not escape it, even
+// through a symlink: "~/" anchors to HOME, a leading placeholder
+// ({project_root}, ${ENV}) to its own value (or that value's parent when the
+// placeholder already names the complete file), an absolute literal to its
+// literal prefix before the first placeholder, and a relative template to
+// `relativeBase`.
 std::expected<std::filesystem::path, std::string>
 renderTemplate(const std::string &templateText, const detail::PlaceholderContext &context,
               const char *key, const std::string &source, const std::filesystem::path &relativeBase,
@@ -46,37 +50,41 @@ renderTemplate(const std::string &templateText, const detail::PlaceholderContext
   const auto fail = [&](const std::string &reason) {
     return std::unexpected(detail::settingError(key, source, reason, discovery));
   };
-  std::string text = templateText;
+  std::string body = templateText;
+  std::filesystem::path prefix;
   std::filesystem::path anchor = relativeBase;
   std::string anchorLabel = rootLabel;
-  if (text.starts_with("~/")) {
+  if (body.starts_with("~/")) {
     if (detail::env("HOME").empty()) return fail("requires HOME for ~/ expansion");
-    anchor = detail::env("HOME");
+    prefix = anchor = detail::env("HOME");
     anchorLabel = "HOME";
-    text = anchor.string() + text.substr(1);
-  } else if (text.starts_with('/')) {
-    anchor = literalPrefix(text);
+    body = templateText.substr(2);
+  } else if (body.starts_with('/')) {
+    anchor = literalPrefix(body);
     anchorLabel = "its literal prefix " + anchor.string();
-  } else if (const auto leading = leadingPlaceholder(text); !leading.empty()) {
+  } else if (const auto leading = leadingPlaceholder(body); !leading.empty()) {
     auto rootText = detail::expandPlaceholders(leading, context);
     if (!rootText) return fail(rootText.error());
     if (std::filesystem::path(*rootText).is_absolute()) {
-      anchor = *rootText;
-      anchorLabel = std::string(leading) + " (" + *rootText + ")";
+      const auto rest = std::string_view(body).substr(leading.size());
+      anchor = rest.starts_with('/') ? std::filesystem::path(*rootText)
+                                     : std::filesystem::path(*rootText).parent_path();
+      anchorLabel = std::string(leading) + " (" + anchor.string() + ")";
     }
   }
-  auto substituted = detail::expandPlaceholders(text, context);
+  auto substituted = detail::expandPlaceholders(body, context);
   if (!substituted) return fail(substituted.error());
-  text = std::move(*substituted);
+  auto text = std::move(*substituted);
   // An empty {relative_path} immediately followed by a literal "/" (the
   // default conf_template's root-level case) would otherwise render a
   // leading "/" that looks like an absolute path.
-  if (context.relativePath.empty() && leadingPlaceholder(templateText) == "{relative_path}" &&
-      templateText.substr(std::string_view("{relative_path}").size()).starts_with('/') &&
+  if (prefix.empty() && context.relativePath.empty() &&
+      leadingPlaceholder(body) == "{relative_path}" &&
+      body.substr(std::string_view("{relative_path}").size()).starts_with('/') &&
       text.starts_with('/'))
     text.erase(0, 1);
   if (detail::invalidPathShape(text)) return fail("is invalid");
-  const auto expanded = std::filesystem::path(text);
+  const auto expanded = prefix.empty() ? std::filesystem::path(text) : prefix / text;
   const auto target = (expanded.is_absolute() ? expanded : relativeBase / expanded).lexically_normal();
   std::error_code error;
   const auto canonicalRoot = std::filesystem::weakly_canonical(anchor, error);

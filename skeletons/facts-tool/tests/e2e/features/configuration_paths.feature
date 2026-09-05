@@ -152,6 +152,34 @@ Feature: Canonical configuration identity and safe path rendering
       | project | default | project |
       | user,project | explicit | explicit |
 
+  Scenario Outline: HOME text is joined literally after single-pass substitution (<key>)
+    Given HOME is a directory named "home{literal}" and <fixture>
+    When <action>
+    Then <check>
+    Examples:
+      | key | fixture | action | check |
+      | conf_template | conf_template "~/project.db" | I inspect the effective configuration twice | conf matches the expected rendered path |
+      | facts_template | a facts_template "~/{filename}.db" | I extract with no explicit output and one source | the facts database was written at the expected path |
+
+  Scenario: A whole-path environment variable is a complete conf_template
+    Given an environment variable naming a whole "conf_template" path
+    When I inspect the effective configuration twice
+    Then conf matches the expected rendered path
+
+  Scenario: A whole-path environment variable is a complete facts_template
+    Given an environment variable naming a whole "facts_template" path
+    When I extract with no explicit output and one source
+    Then the facts database was written at the expected path
+
+  Scenario Outline: A .. introduced by substitution in an overridden lower tier still fails (<key>)
+    Given a user "<key>" with a substituted .. overridden by a valid project "<key>"
+    When I attempt configuration inspection
+    Then configuration fails with "<key>"
+    Examples:
+      | key |
+      | conf_template |
+      | facts_template |
+
   Scenario: A leading ~/ conf_template anchors to HOME, like conf_root's own ~/
     Given conf_template "~/project.db"
     When I inspect the effective configuration twice

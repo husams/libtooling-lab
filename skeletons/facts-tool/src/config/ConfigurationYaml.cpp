@@ -19,8 +19,20 @@ std::expected<void, std::string> templateSyntax(std::string_view key, const std:
   if (detail::invalidPathShape(text))
     return std::unexpected(std::string(key) + " template must not be empty, end with a separator, "
                            "or contain a .. component");
-  return detail::expandPlaceholders(text, {})
-      .transform([](auto &&) {})
+  // Safe non-empty stand-ins for the project/source placeholders so only the
+  // template's own text and real ${ENV}/{user} values can introduce a bad
+  // shape (for example an environment variable that expands to "..").
+  static const detail::PlaceholderContext probe{.projectRoot = "/probe-project",
+                                                .projectName = "probe",
+                                                .relativePath = "probe",
+                                                .filename = "probe"};
+  return detail::expandPlaceholders(text.starts_with("~/") ? text.substr(2) : text, probe)
+      .and_then([&](const std::string &expanded) -> std::expected<void, std::string> {
+        if (detail::invalidPathShape(expanded))
+          return std::unexpected("substituted value must not introduce a .. component, "
+                                 "an empty path, or a trailing separator");
+        return {};
+      })
       .transform_error([&](auto &&reason) { return std::string(key) + " " + reason; });
 }
 

@@ -13,6 +13,7 @@ pytest_plugins = (
     "steps.defaults_compiler_steps",
     "steps.defaults_path_steps",
     "steps.defaults_facts_steps",
+    "steps.defaults_anchor_steps",
     "steps.defaults_ownership_steps",
     "steps.alias_steps",
     "steps.b019_extraction_completeness_steps",

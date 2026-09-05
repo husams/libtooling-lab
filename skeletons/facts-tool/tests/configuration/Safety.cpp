@@ -50,8 +50,38 @@ void safety() {
     bad.templateText = text;
     assert(!facts::config::renderDatabasePath(bad));
   }
-  f.factsTemplate = "{project_root}/{filename}.db";
-  assert(!facts::config::renderFactsPath(bad, {source}));
+  for (const auto text : {"{project_root}/{filename}.db", "{project_name}/{filename}.db"}) {
+    bad.factsTemplate = text;
+    auto rendered = facts::config::renderFactsPath(bad, {source});
+    assert(!rendered && rendered.error().find("invalid characters") != std::string::npos);
+  }
+  setenv("USER", "bad\\user", 1);
+  f.factsTemplate = "{project_root}/{user}.db";
+  auto badUser = facts::config::renderFactsPath(f, {source});
+  assert(!badUser && badUser.error().find("invalid characters") != std::string::npos);
+  if (saved) setenv("USER", saved->c_str(), 1); else unsetenv("USER");
+  // A whole-path ${ENV} value is a complete filename, not a directory anchor;
+  // HOME text is joined literally, never re-parsed as template syntax.
+  setenv("FACTS_TOOL_TEST_DB", (box.root / "env/whole.db").c_str(), 1);
+  v.templateText = "${FACTS_TOOL_TEST_DB}";
+  assert(*facts::config::renderDatabasePath(v) == box.root / "env/whole.db");
+  f.factsTemplate = "${FACTS_TOOL_TEST_DB}";
+  assert(*facts::config::renderFactsPath(f, {}) == box.root / "env/whole.db");
+  const auto braces = box.root / "home{literal}";
+  fs::create_directories(braces);
+  setenv("HOME", braces.c_str(), 1);
+  v.templateText = "~/project.db";
+  assert(*facts::config::renderDatabasePath(v) == braces / "project.db");
+  f.factsTemplate = "~/{filename}.db";
+  assert(*facts::config::renderFactsPath(f, {source}) == braces / "a.db");
+  setenv("HOME", box.root.c_str(), 1);
+  // A .. introduced by substitution in a losing tier still fails per tier.
+  setenv("FACTS_TOOL_TEST_DOTDOT", "..", 1);
+  box.write(".config/facts-tool/config.yaml", "conf_template: '${FACTS_TOOL_TEST_DOTDOT}/outside.db'");
+  box.write(".facts-tool.yaml", "conf_template: '{filename}.db'\nfacts_template: 'x.db'");
+  assert(!facts::config::resolve({}));
+  box.write(".config/facts-tool/config.yaml", "facts_template: '{project_root}/${FACTS_TOOL_TEST_DOTDOT}/x.db'");
+  assert(!facts::config::resolve({}));
   // A ".." component in a losing tier still fails the whole resolution.
   box.write(".facts-tool.yaml", "conf_template: '{filename}.db'");
   fs::create_directories(box.root / ".config/facts-tool");
