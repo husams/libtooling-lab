@@ -144,7 +144,7 @@ querySymbols(storage::Database &database, const std::vector<SourceFile> &files,
              "(SELECT destination.qualified_name FROM relation "
              "JOIN symbol destination ON "
              "destination.id=relation.destination_id "
-             "WHERE relation.source_id=s.id AND relation.kind=? LIMIT 1) "
+             "WHERE relation.source_id=s.id AND relation.kind=? LIMIT 1),is_volatile "
              "FROM symbol s WHERE (? IS NULL OR qualified_name=?) ORDER BY id",
              [&files](const storage::Row &row) {
                SymbolFact value;

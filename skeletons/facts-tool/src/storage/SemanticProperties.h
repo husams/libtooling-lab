@@ -71,6 +71,7 @@ struct SymbolProperties {
   bool hasExternStorage;
   std::string_view constantEvaluation;
   bool isNoexcept;
+  bool isVolatile;
 };
 
 struct RelationProperties {
@@ -205,6 +206,7 @@ constexpr SymbolProperties symbolProperties(std::uint32_t flags) {
       .hasExternStorage = hasBit(flags, ExternStorageBit),
       .constantEvaluation = constantEvaluationName(flags),
       .isNoexcept = hasBit(flags, NoexceptBit),
+      .isVolatile = hasBit(flags, VolatileBit),
   };
 }
 
@@ -230,7 +232,8 @@ constexpr std::uint32_t symbolFlags(SymbolProperties properties) {
          flagWhen(PolymorphicBit, properties.isPolymorphic) |
          flagWhen(ExternStorageBit, properties.hasExternStorage) |
          constantEvaluationFlags(properties.constantEvaluation) |
-         flagWhen(NoexceptBit, properties.isNoexcept);
+         flagWhen(NoexceptBit, properties.isNoexcept) |
+         flagWhen(VolatileBit, properties.isVolatile);
 }
 
 constexpr RelationProperties relationProperties(std::uint16_t flags) {

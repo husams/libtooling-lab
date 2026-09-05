@@ -28,6 +28,11 @@ Feature: Canonical source file registry
       | modern/module.mpp |
       | modern/partition.cxxm |
       | modern/unit.ixx |
+      | qualifiers/cv.hpp |
+      | qualifiers/implicit.hpp |
+      | qualifiers/one.cpp |
+      | qualifiers/specifiers.hpp |
+      | qualifiers/two.cpp |
       | references.hpp |
       | references_one.cpp |
       | references_two.cpp |

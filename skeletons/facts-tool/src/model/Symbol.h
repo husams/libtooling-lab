@@ -35,7 +35,7 @@ namespace facts {
 //   a flag: flags & bit(PureBit) / flags |= bit(VirtualBit)
 //
 // A plain uint32_t and not a std::bitset: libc++ stores every bitset up to 64
-// bits in one size_t, so even bitset<8> costs 8 bytes. 25 bits are in use.
+// bits in one size_t, so even bitset<8> costs 8 bytes. 26 bits are in use.
 //
 // Template-ness and function-local-ness are not here — SymbolInfo::Properties
 // already carries Generic / TemplateSpecialization / Local.
@@ -77,6 +77,7 @@ enum SymbolBit : std::size_t {
   PolymorphicBit = 20,   // a record with a vtable
   ExternStorageBit = 21, // the declaration was written with extern storage
   // bits 22-23: constexpr/consteval/constinit field, see above
+  VolatileBit = 25, // volatile-qualified instance method
   NoexceptBit = 24, // declared not to throw. The written spec has fourteen
                     // spellings (EST_BasicNoexcept, EST_NoexceptTrue,
                     // EST_DynamicNone, ...) and one useful question.

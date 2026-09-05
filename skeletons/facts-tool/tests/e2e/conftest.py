@@ -7,6 +7,9 @@ import pytest
 from support.scenario import FactsToolContext
 
 pytest_plugins = (
+    "steps.callable_steps",
+    "steps.callable_persistence_steps",
+    "steps.callable_semantics_steps",
     "steps.alias_steps",
     "steps.b019_extraction_completeness_steps",
     "steps.call_graph_steps",

@@ -196,6 +196,8 @@ add_library(facts-ast STATIC
   src/ast/extractors/EnumDecl.cpp
   src/ast/extractors/FieldDecl.cpp
   src/ast/extractors/File.cpp
+  src/ast/extractors/CallableProperties.cpp
+  src/ast/extractors/MethodFlags.cpp
   src/ast/extractors/FunctionDecl.cpp
   src/ast/extractors/FunctionTemplate.cpp
   src/ast/extractors/Initializer.cpp

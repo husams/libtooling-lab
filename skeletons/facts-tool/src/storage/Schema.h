@@ -77,7 +77,8 @@ CREATE TABLE IF NOT EXISTS symbol (
   has_extern_storage INTEGER NOT NULL CHECK(has_extern_storage IN (0,1)),
   constant_evaluation TEXT NOT NULL
     CHECK(constant_evaluation IN ('none','constexpr','consteval','constinit')),
-  is_noexcept    INTEGER NOT NULL CHECK(is_noexcept IN (0,1))
+  is_noexcept    INTEGER NOT NULL CHECK(is_noexcept IN (0,1)),
+  is_volatile    INTEGER NOT NULL DEFAULT 0 CHECK(is_volatile IN (0,1))
 );
 
 -- '%name%' over qualified_name is the search; USR is the sole symbol identity.
@@ -241,7 +242,7 @@ CREATE TABLE IF NOT EXISTS relation_site (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=8;
+PRAGMA user_version=9;
 
 )sql";
 

@@ -7,6 +7,7 @@
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/DeclCXX.h>
+#include <clang/AST/DeclTemplate.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/ExprCXX.h>
 
@@ -112,6 +113,12 @@ bool BodyVisitor::TraverseLambdaExpr(clang::LambdaExpr *expression) {
   status_.record(
       collectDeclaredSymbol(*callOperator, context_, files_, store_));
   schedule(*callOperator);
+  if (const auto *generic = callOperator->getDescribedFunctionTemplate()) {
+    for (auto *instance : generic->specializations()) {
+      status_.record(collectDeclaredSymbol(*instance, context_, files_, store_));
+      schedule(*instance);
+    }
+  }
   return true;
 }
 
