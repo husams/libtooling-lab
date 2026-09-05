@@ -41,8 +41,8 @@ and defaults, and variadic declarations display the ellipsis.
   TU order, migration from version 8 and fresh semantic parity. Parameter
   source spans may reflect either redeclaration; parameter contracts are stable.
 - AC8: list/detail qualifier/default rendering, template/special-member
-  formatting and read-only catalog behavior; `symbol-browser` tests exercise
-  the same declaration formatter used by the interactive browser.
+  formatting and read-only catalog behavior. The interactive browser detail
+  calls the same `displaySymbol` formatter exercised by these CLI scenarios.
 - AC9/10: run the complete pytest-bdd harness through CTest on LLVM 22 macOS
   and LLVM 21 Linux, alongside the full native CTest suite.
 - AC7: storage schema tests retain fresh round-trip and legacy migration checks.
