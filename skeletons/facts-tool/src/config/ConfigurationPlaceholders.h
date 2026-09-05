@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdlib>
 #include <expected>
 #include <pwd.h>
 #include <string>
