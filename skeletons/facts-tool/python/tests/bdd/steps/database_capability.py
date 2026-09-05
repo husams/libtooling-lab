@@ -11,19 +11,22 @@ def unavailable_capability(cb, world):
         start(codebase()) | view(name) | nodes()
         for name in ("entity", "type", "type_layer", "call_argument")
     )
-    codes = []
-    for query in queries:
+    results = []
+    for _, database in cb:
+        codes = []
+        for query in queries:
+            try:
+                database.executor.run(query.plan)
+            except FactsToolError as exc:
+                codes.append(exc.code)
         try:
-            cb.executor.run(query.plan)
+            database.executor.explain(queries[0].plan)
         except FactsToolError as exc:
             codes.append(exc.code)
-    try:
-        cb.executor.explain(queries[0].plan)
-    except FactsToolError as exc:
-        codes.append(exc.code)
-    world["capability_codes"] = codes
+        results.append(codes)
+    world["capability_codes"] = results
 
 
 @then("E_CAPABILITY is raised without fallback")
 def capability_result(world):
-    assert world["capability_codes"] == ["E_CAPABILITY"] * 6
+    assert world["capability_codes"] == [["E_CAPABILITY"] * 6] * 2

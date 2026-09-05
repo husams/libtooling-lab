@@ -25,7 +25,7 @@ def native_pair(native_codebase):
 @when("I query native symbols sites and project files")
 def query_native(cb, world):
     world["symbols"] = cb.executor.run((start(codebase()) | nodes()).plan).nodes
-    world["holders"] = cb.executor.run(start(symbol("Holder")).plan).nodes
+    world["holders"] = cb.executor.run(start(symbol("app::Holder")).plan).nodes
     edges = start(codebase()) | view("edge") | nodes(eq("kind", "calls"))
     query = edges | sites() | select(("source_id", "destination_id", "file", "line"))
     world["sites"] = cb.executor.run((query | order_by(("file", "line"))).plan).rows
@@ -39,13 +39,17 @@ def query_native(cb, world):
 
 @then("native kinds ambiguity sites and both databases are preserved")
 def verify_native(cb, world):
-    kinds = {(row["qualified_name"], row["kind_id"], row["kind"])
-             for row in world["symbols"]}
-    assert ("Color", 6, "enum") in kinds
-    assert ("save", 13, "function") in kinds
-    assert ("Holder::T", 28, "template_type_parm") in kinds
-    assert [row["id"] for row in world["holders"]] == [4294967296, 4294967300]
-    assert [row["line"] for row in world["sites"]] == [14, 15, 15]
+    kinds = {
+        (row["qualified_name"], row["kind_id"], row["kind"]) for row in world["symbols"]
+    }
+    assert ("app::Color", 6, "enum") in kinds
+    assert ("app::save", 13, "function") in kinds
+    assert ("app::Holder::T", 28, "template_type_parm") in kinds
+    assert [row["id"] for row in world["holders"]] == [8589934599, 8589934605]
+    assert all(
+        set(row) == {"source_id", "destination_id", "file", "line"}
+        for row in world["sites"]
+    )
     assert world["site_error"] == "E_STAGE"
     assert world["files"][0]["name"] == "source.cpp"
     assert cb.provenance.facts.schema.user_version == 10

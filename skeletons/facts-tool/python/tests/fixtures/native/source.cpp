@@ -1,16 +1,29 @@
-template <typename T> struct Holder {
-  T value{};
-  void flush() {}
-};
+#include "api.hpp"
 
-template struct Holder<int>;
+namespace app {
 
-enum Color { Red };
+template struct Box<int, 7>;
+template struct Holder<int, 4>;
 
-int save() { return 1; }
+int configured = 42;
+int persist() { return 1; }
+int save() { return persist(); }
 
-int run() {
-  Holder<int> holder;
-  holder.flush();
-  return save() + save() + holder.value;
+int run(Box<int, 7> box) noexcept {
+  return save() + save() + box.value;
 }
+
+int dispatch_probe(Box<int, 7> &box) {
+  box.flush();
+  return box.value;
+}
+
+int diamond_end() { return 1; }
+int diamond_left() { return diamond_end(); }
+int diamond_right() { return diamond_end(); }
+int diamond_source() { return diamond_left() + diamond_right(); }
+
+int cycle_a() { return cycle_b(); }
+int cycle_b() { return cycle_a(); }
+
+}  // namespace app

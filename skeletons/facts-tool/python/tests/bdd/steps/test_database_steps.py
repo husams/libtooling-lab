@@ -15,21 +15,23 @@ scenarios("../features/database.feature")
 
 
 @when("successful invalid and error queries are attempted")
-def read_only_queries(cb, paired_databases, world):
-    facts, project = paired_databases
-    before = (facts.read_bytes(), project.read_bytes(), set(facts.parent.iterdir()))
-    cb.executor.run((start(codebase()) | nodes()).plan)
-    with pytest.raises(FactsToolError):
-        cb.executor.run((start(symbol("missing")) | out("calls")).plan)
-    world["preserved"] = (
-        before,
-        (facts.read_bytes(), project.read_bytes(), set(facts.parent.iterdir())),
-    )
+def read_only_queries(cb, world):
+    results = []
+    for _, database in cb:
+        facts = Path(database.provenance.facts.path)
+        project = Path(database.provenance.project.path)
+        before = (facts.read_bytes(), project.read_bytes(), set(facts.parent.iterdir()))
+        database.executor.run((start(codebase()) | nodes()).plan)
+        with pytest.raises(FactsToolError):
+            database.executor.run((start(symbol("missing")) | out("calls")).plan)
+        after = (facts.read_bytes(), project.read_bytes(), set(facts.parent.iterdir()))
+        results.append((before, after))
+    world["preserved"] = results
 
 
 @then("neither database nor adjacent files change")
 def databases_preserved(world):
-    assert world["preserved"][0] == world["preserved"][1]
+    assert all(before == after for before, after in world["preserved"])
 
 
 @given("missing database paths")

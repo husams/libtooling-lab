@@ -46,7 +46,9 @@ class Executor:
         if len(state.values) > cap:
             state.values = state.values[:cap]
             state.truncated = True
-            state.cursor = str(state.values[-1].get("id", state.values[-1]["_key"]))
+            marker = state.values[-1].get("id", state.values[-1].get("_key"))
+            if marker is not None:
+                state.cursor = str(marker)
         return Result(
             state.shape,
             state.view,

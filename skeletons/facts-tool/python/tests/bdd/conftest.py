@@ -29,5 +29,5 @@ def native_codebase() -> CodeBase:
 
 
 @given("a valid paired facts and project database", target_fixture="cb")
-def valid_pair(codebase: CodeBase) -> CodeBase:
-    return codebase
+def valid_pair(codebase: CodeBase, native_codebase: CodeBase):
+    return ((False, codebase), (True, native_codebase))

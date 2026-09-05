@@ -29,6 +29,8 @@ from facts_tool.queryplan import (
     uses,
 )
 
+from .matrix import run_matrix
+
 
 @when("I execute every semantic helper and target-set constructor")
 def semantic_helpers(cb, world):
@@ -56,11 +58,15 @@ def semantic_helpers(cb, world):
         is_template(),
         is_instance(),
     )
-    world["helper_results"] = [
-        cb.executor.run((start(codebase()) | nodes(pred)).plan) for pred in predicates
-    ]
+    world["helper_results"] = run_matrix(
+        cb,
+        lambda database, _: [
+            database.executor.run((start(codebase()) | nodes(pred)).plan)
+            for pred in predicates
+        ],
+    )
 
 
 @then("every helper produces a valid executable predicate")
 def helper_result(world):
-    assert len(world["helper_results"]) == 22
+    assert all(len(results) == 22 for _, results in world["helper_results"])
