@@ -234,8 +234,9 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
                         return std::expected<int, std::string>(
                             std::unexpected("facts-tool: configuration error: " + owned.error()));
                     }
-                    auto views = compilationViews(std::move(database),
-                        configured.defaultExtraArguments, explicitArguments);
+                    auto views = compilationViews(
+                        std::move(database), configured.defaultExtraArguments,
+                        explicitArguments, configured.extraArgumentsProvided);
                     return import(configured, std::move(components),
                                   std::move(views.stored), std::move(views.applied));
                   });

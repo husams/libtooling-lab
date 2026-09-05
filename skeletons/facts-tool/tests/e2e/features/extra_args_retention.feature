@@ -1,5 +1,5 @@
-Feature: YAML extra_args supplement compilation database commands (B-032)
-  Additional arguments preserve each translation unit's base command,
+Feature: CLI extra_args override YAML and preserve compilation database commands (B-033)
+  Resolved arguments preserve each translation unit's original command,
   working directory, token boundaries and independent compiler requirements.
 
   Scenario Outline: JSON-only and YAML-only requirements reach <family> from <representation> using <driver>
@@ -32,7 +32,7 @@ Feature: YAML extra_args supplement compilation database commands (B-032)
       | extract    |
       | dependency |
 
-  Scenario Outline: Explicit CLI tokens supplement JSON and YAML for <family>
+  Scenario Outline: Explicit CLI tokens replace YAML for <family>
     Given an independent requirements project with "command" entries and "clang++" driver
     And retention YAML extra_args are "enabled"
     When I exercise retention for "<family>" 1 times with "explicit" CLI additions

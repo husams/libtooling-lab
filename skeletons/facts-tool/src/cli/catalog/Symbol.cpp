@@ -7,11 +7,14 @@ namespace facts::cli {
 namespace {
 
 void symbolOptions(CLI::App &command, SymbolOptions &options) {
-  command
-      .add_option("-f,--facts", options.facts,
-                  "Extracted facts database; defaults to facts_template "
-                  "when omitted (project-scoped templates only)")
-      ->type_name("FILE");
+  auto *facts = command.add_option(
+      "-f,--facts", options.facts,
+      "Extracted facts database; defaults to facts_template when omitted "
+      "(project-scoped templates only)");
+  facts->each([&options, facts](std::string) {
+    if (facts->count() > 0) options.factsProvided = true;
+  });
+  facts->type_name("FILE");
   configurationOptions(command, options.configuration, options.configurationFile);
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
       ->expected(0, 1)

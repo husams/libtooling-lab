@@ -38,6 +38,7 @@ struct SymbolOptions {
   enum class Action { list, show, browser };
   int verbosity = 0;
   std::string facts;
+  bool factsProvided = false;
   std::string configuration;
   std::string configurationFile;
   Action action = Action::list;

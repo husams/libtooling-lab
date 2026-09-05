@@ -102,10 +102,20 @@ def main() -> None:
     removed_symbol_view = run(tool, "symbol", "view")
     require(removed_symbol_view.returncode != 0, output(removed_symbol_view))
 
-    missing_symbol_facts = run(tool, "symbol", "list")
+    isolated = {
+        "HOME": "/tmp/facts-tool-b033-no-home",
+        "XDG_CONFIG_HOME": "/tmp/facts-tool-b033-no-config",
+    }
+    missing_symbol_facts = run(tool, "symbol", "list", environment=isolated)
     require(missing_symbol_facts.returncode != 0 and
             "--facts" in output(missing_symbol_facts),
             output(missing_symbol_facts))
+    for spelling in ("--facts", "-f"):
+        empty_symbol_facts = run(tool, "symbol", "list", spelling, "",
+                                 environment=isolated)
+        require(empty_symbol_facts.returncode != 0, output(empty_symbol_facts))
+        require("unresolved conf" not in output(empty_symbol_facts),
+                output(empty_symbol_facts))
 
     missing_file_conf = run(tool, "file", "list")
     require(missing_file_conf.returncode != 0 and
@@ -137,7 +147,7 @@ def main() -> None:
         output(import_help),
     )
     require(
-        "Compiler argument appended after YAML tokens to fixed-command or"
+        "Compiler argument replacing YAML extra_args for fixed-command or"
         in output(import_help)
         and "compile_commands.json imports; shell-tokenized and repeatable"
         in output(import_help),
@@ -158,7 +168,14 @@ def main() -> None:
     # -o/--output is no longer unconditionally required: it falls back to
     # facts_template (B-030). With no facts_template configured, the usage
     # error still asks for -o/--facts explicitly.
-    missing = run(tool, "extract")
+    missing = run(
+        tool,
+        "extract",
+        environment={
+            "HOME": "/tmp/facts-tool-b033-no-home",
+            "XDG_CONFIG_HOME": "/tmp/facts-tool-b033-no-config",
+        },
+    )
     require(missing.returncode == 2, output(missing))
     require(
         "-o" in output(missing) and "--facts" in output(missing),
