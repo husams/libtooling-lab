@@ -53,5 +53,21 @@ void placeholders() {
   empty.projectRoot = box.root;
   auto missing = facts::config::renderFactsPath(empty, {});
   assert(!missing && missing.error().starts_with("usage:"));
+
+  // A raw literal absolute template is still rejected (only ~/ or a
+  // placeholder may make the result absolute); ~/ with a placeholder suffix
+  // is trusted as-is; a symlink after a leading placeholder still escapes.
+  v.templateText = "/outside.db";
+  assert(!facts::config::renderDatabasePath(v));
+  v.templateText = "~/{project_name}.db";
+  assert(*facts::config::renderDatabasePath(v) ==
+        box.root / (box.root.filename().string() + ".db"));
+  const auto outside = box.root.parent_path() / "escaped-outside";
+  fs::create_directories(outside);
+  fs::create_directory_symlink(outside, box.root / "linked");
+  f.factsTemplate = "{project_root}/linked/{filename}.db";
+  auto escaped = facts::config::renderFactsPath(f, {source});
+  assert(!escaped && escaped.error().find("escapes") != std::string::npos);
+  fs::remove_all(outside);
 }
 }

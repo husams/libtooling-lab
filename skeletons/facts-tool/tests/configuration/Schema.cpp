@@ -31,13 +31,32 @@ void schema() {
   assert(!parsed->confRoot && !parsed->confTemplate && !parsed->factsTemplate);
 
   // When path settings do not apply (a direct db override is active),
-  // conf_root/conf_template/facts_template are left unpopulated and
-  // unvalidated, but extra_args is always required to be well-formed.
+  // conf_root/conf_template are left unpopulated and unvalidated, but
+  // extra_args and facts_template (B-030 C-3113: it governs the separate
+  // facts database, not the overridden project conf database) are always
+  // required to be well-formed.
   auto unused = facts::config::readTier(box.write("unused.yaml",
-      "conf_root: null\nconf_template: []\nfacts_template: 3\nextra_args: []"), false);
-  assert(unused && !unused->confRoot && !unused->confTemplate && !unused->factsTemplate);
+      "conf_root: null\nconf_template: []\nextra_args: []"), false);
+  assert(unused && !unused->confRoot && !unused->confTemplate);
   auto stillChecked = facts::config::readTier(box.write("bad-args.yaml",
       "conf_root: null\nextra_args: [1]"), false);
   assert(!stillChecked);
+  auto factsAlwaysValidated = facts::config::readTier(box.write("bad-facts-template.yaml",
+      "conf_root: null\nfacts_template: 3"), false);
+  assert(!factsAlwaysValidated);
+  auto factsAlwaysCaptured = facts::config::readTier(box.write("facts-template.yaml",
+      "conf_root: null\nfacts_template: 'a.db'"), false);
+  assert(factsAlwaysCaptured && !factsAlwaysCaptured->confRoot &&
+        factsAlwaysCaptured->factsTemplate == "a.db");
+
+  // Template syntax (unknown placeholder, unmatched braces, unset ${ENV})
+  // is validated per tier, independent of which tier wins the merge later.
+  assert(!facts::config::readTier(box.write("bad-template-syntax.yaml",
+      "conf_template: '{unknown}.db'"), true));
+  assert(!facts::config::readTier(box.write("bad-facts-syntax.yaml",
+      "facts_template: '{unmatched'"), true));
+  unsetenv("FACTS_TOOL_TEST_UNSET_TOKEN");
+  assert(!facts::config::readTier(box.write("bad-env-syntax.yaml",
+      "conf_template: '${FACTS_TOOL_TEST_UNSET_TOKEN}.db'"), true));
 }
 }
