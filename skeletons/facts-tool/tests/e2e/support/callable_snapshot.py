@@ -4,7 +4,7 @@ import sqlite3
 def snapshot(path):
     with sqlite3.connect(path) as db:
         values = {name: db.execute(f"SELECT * FROM {name} ORDER BY 1,2").fetchall()
-                  for name in ("symbol", "parameter_default", "relation",
+                  for name in ("symbol", "parameter_default", "callable_return_type", "relation",
                                "definition", "template_parameter", "template_argument")}
         # Parameter spelling locations can belong to either redeclaration;
         # compare the parameter contract, not the last visited source span.

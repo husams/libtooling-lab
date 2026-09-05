@@ -1,18 +1,16 @@
 #include "cli/CommandLine.h"
-
+#include "cli/ConfigurationOptions.h"
 #include "cli/Dispatch.h"
+#include "cli/MatchCommandLine.h"
 #include "cli/Verbose.h"
 #include "cli/catalog/Configure.h"
-
 #include <CLI/CLI.hpp>
-
 #include <expected>
 #include <limits>
 #include <utility>
 
 namespace facts::cli {
 namespace {
-
 class Parser {
 public:
   Parser() : app_("Extract and import C++ project facts", "facts-tool") {
@@ -21,6 +19,7 @@ public:
         "extract", "Extract facts using a stored project configuration"));
     configureImport(*app_.add_subcommand(
         "import", "Import compile commands into a project configuration"));
+    matchCommand_ = configureMatch(app_, match_);
     analyseCommand_ =
         app_.add_subcommand("analyse", "Run explicitly requested analyses");
     analyseCommand_->require_subcommand(1, 1);
@@ -33,18 +32,29 @@ public:
     directoryCommand_ = configureDirectory(app_, directory_);
     fileCommand_ = configureFile(app_, file_);
     symbolCommand_ = configureSymbol(app_, symbol_);
+    configCommand_ = app_.add_subcommand(
+        "config",
+        "Inspect YAML defaults with yaml-cpp 0.9.0; lookup is --config, "
+        "FACTS_TOOL_CONFIG, project, XDG, HOME; --conf overrides generated "
+        "naming and ownership");
+    configCommand_->require_subcommand(1, 1);
+    auto &show = *configCommand_->add_subcommand(
+        "show", "Show resolved YAML defaults (yaml-cpp 0.9.0) and ordered discovery");
+    configurationOptions(show, config_.direct, config_.configurationFile);
   }
 
   std::expected<Command, int> parse(int argc, char **argv) {
     try {
       app_.parse(argc, argv);
     } catch (const CLI::ParseError &error) {
-      return std::unexpected(app_.exit(error));
+      const auto exitCode = app_.exit(error);
+      return std::unexpected(exitCode == 0 ? 0 : 2);
     }
-
     if (extractCommand_->parsed()) {
       return Command{std::move(extract_)};
     }
+    if (matchCommand_->parsed())
+      return Command{std::move(match_)};
     if (repositoryCommand_->parsed())
       return Command{std::move(repository_)};
     if (componentCommand_->parsed())
@@ -55,6 +65,7 @@ public:
       return Command{std::move(file_)};
     if (symbolCommand_->parsed())
       return Command{std::move(symbol_)};
+    if (configCommand_->parsed()) return Command{std::move(config_)};
     if (callGraphCommand_->parsed())
       return Command{std::move(callGraph_)};
     return importCommand_->parsed() ? Command{std::move(import_)}
@@ -81,18 +92,14 @@ private:
                     "SQLite database for extracted facts")
         ->required()
         ->type_name("FILE");
-    command
-        .add_option("-c,--conf", extract_.configuration,
-                    "Full path to the stored project configuration")
-        ->required()
-        ->type_name("FILE");
+    configurationOptions(command, extract_.configuration, extract_.configurationFile);
     command
         .add_option_function<std::string>(
             "--extra-arg",
             [this](const std::string &argument) {
               extract_.extraArguments.push_back(argument);
             },
-            "Compiler argument appended to stored commands; repeatable")
+            "Compiler argument appended after YAML tokens; shell-tokenized and repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
     command.add_option(
@@ -103,11 +110,7 @@ private:
   void configureImport(CLI::App &command) {
     importCommand_ = &command;
     configureVerbosity(command, import_.verbosity);
-    command
-        .add_option("-c,--conf", import_.configuration,
-                    "Full path for the stored project configuration")
-        ->required()
-        ->type_name("FILE");
+    configurationOptions(command, import_.configuration, import_.configurationFile);
     command
         .add_option("-p,--compilation-database", import_.compilationDatabase,
                     "Directory containing compile_commands.json")
@@ -128,8 +131,8 @@ private:
             [this](const std::string &argument) {
               import_.extraArguments.push_back(argument);
             },
-            "Compiler argument appended to fixed-command or "
-            "compile_commands.json imports; repeatable")
+            "Compiler argument appended after YAML tokens to fixed-command or "
+            "compile_commands.json imports; shell-tokenized and repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
     command.add_option(
@@ -146,18 +149,14 @@ private:
                     "SQLite database for extracted dependency facts")
         ->required()
         ->type_name("FILE");
-    command
-        .add_option("-c,--conf", dependency_.configuration,
-                    "Full path to the stored project configuration")
-        ->required()
-        ->type_name("FILE");
+    configurationOptions(command, dependency_.configuration, dependency_.configurationFile);
     command
         .add_option_function<std::string>(
             "--extra-arg",
             [this](const std::string &argument) {
               dependency_.extraArguments.push_back(argument);
             },
-            "Compiler argument appended to stored commands; repeatable")
+            "Compiler argument appended after YAML tokens; shell-tokenized and repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
     command
@@ -193,22 +192,25 @@ private:
   CLI::App *analyseCommand_ = nullptr;
   CLI::App *dependencyCommand_ = nullptr;
   CLI::App *callGraphCommand_ = nullptr;
+  CLI::App *matchCommand_ = nullptr;
   ExtractOptions extract_;
   ImportOptions import_;
   DependencyOptions dependency_;
   CallGraphOptions callGraph_;
+  MatchOptions match_;
   CLI::App *repositoryCommand_ = nullptr;
   CLI::App *componentCommand_ = nullptr;
   CLI::App *directoryCommand_ = nullptr;
   CLI::App *fileCommand_ = nullptr;
   CLI::App *symbolCommand_ = nullptr;
+  CLI::App *configCommand_ = nullptr;
   RepositoryOptions repository_;
   ComponentOptions component_;
   DirectoryOptions directory_;
   FileOptions file_;
   SymbolOptions symbol_;
+  ConfigOptions config_;
 };
-
 } // namespace
 
 int run(int argc, char **argv) {

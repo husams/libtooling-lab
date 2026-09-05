@@ -1,0 +1,5 @@
+conf_root: .facts-data
+conf_template: "{relative_path}/{filename}.sqlite"
+extra_args:
+  - "-std=c++23"
+  - "-DNAME=value with spaces"

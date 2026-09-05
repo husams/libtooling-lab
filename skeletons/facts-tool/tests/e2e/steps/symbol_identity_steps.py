@@ -13,7 +13,7 @@ def symbols_by_file(context: FactsToolContext) -> dict[int, list[tuple[int, int]
     for packed, file_id, file_index in query(
         context.facts_database_path,
         "SELECT id,((id >> 32) & 4294967295),(id & 4294967295) "
-        "FROM symbol ORDER BY id",
+        "FROM symbol WHERE (id >> 32)<>0 ORDER BY id",
     ):
         result[file_id].append((file_index, packed))
     require(result, "expected captured symbols")

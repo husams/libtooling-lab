@@ -17,7 +17,7 @@ database clients decode implementation-specific bit positions.
   references.
 - `relation` stores access plus virtual-base, implicit-edge, and lexical-edge
   booleans.
-- The currently inactive template tables use the exact flag vocabularies from
+- The template tables use the exact flag vocabularies from
   their repository-defined models: template arguments expose parameter-pack,
   non-type, and template-template booleans; template parameters expose the
   same six properties as function parameters.
@@ -33,13 +33,33 @@ existing identities, and the executable stability scenarios run extraction
 again against the same database. Requiring deletion would break that existing
 workflow.
 
-On open, schema migration detects the legacy `symbol.flags` column. A single
-`BEGIN IMMEDIATE` transaction then adds and backfills every explicit property
-column, drops all five opaque `flags` columns, records SQLite
-`user_version = 1`, and commits. The template-table layouts are migrated too,
-even though they have no active writer in the current skeleton, so a populated
-legacy database does not lose those properties. Fresh databases are created
-directly at version 1 and never contain a packed persisted flag.
+On open, `storage/SchemaMigration.cpp` detects legacy packed flags and applies
+versioned upgrades inside the storage connection's `BEGIN IMMEDIATE`
+transaction. Existing identities and facts are preserved. The complete fresh
+schema is defined by `storage/Schema.h`; fresh databases are created directly
+at SQLite `user_version = 9` without packed persisted flags.
+
+The version-8-to-9 migration adds `callable_return_type`, keyed by `symbol_id`
+with a cascading foreign key to `symbol`. Its nonempty `canonical_type` text
+preserves the full return spelling, including pointer, reference and const
+qualification. A `relation` edge with `kind = 21` (`ReturnType`) identifies the
+resolved target type separately. Functions, methods, lambda closure call
+operators and function-object call operators share this representation;
+constructors/destructors have no return type, and undeduced template returns
+wait for a concrete specialization.
+
+Predefined primitive targets use the same fixed FileId-0 IDs as parameter types.
+Their implicit, external `symbol` rows satisfy relation foreign keys, but are
+excluded from declaration listings and the symbol browser. Explicit named
+queries can still inspect them. Return-type edges and spelling are replaced
+together, and extraction rollback or deleting a callable also rolls back or
+removes its return facts.
+
+Migration does not invent return spellings for previously indexed functions;
+re-extract the source to populate those facts. Symbol queries can read older
+databases without migrating or writing them, using existing target names when
+available. `FileSchemaMigration` belongs to the separate project configuration
+registry and is not involved in facts-schema upgrades.
 
 Readback composes the explicit columns into the original compact in-memory
 flags, preserving the public C++ model and extraction behavior.

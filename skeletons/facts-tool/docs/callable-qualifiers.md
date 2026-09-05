@@ -13,15 +13,15 @@ those specifications. Extraction never forces template instantiation.
 `is_explicit` likewise records a true semantic explicit condition; dependent
 conditions are not assumed true. Constant evaluation is an enum, not bit flags.
 
-Schema version 9 adds `symbol.is_volatile`, backed by previously unused bit 25.
+Schema version 10 adds `symbol.is_volatile`, backed by previously unused bit 25.
 All earlier bit assignments remain unchanged. Opening storage for extraction
 migrates supported old schemas and preserves existing rows and identities.
 Migrated rows initially contain zero for volatility: historical extraction did
 not record the property, so that zero is unknown historical metadata rather
 than evidence the source was non-volatile. Re-extract all relevant translation
 units before relying on qualifiers in an old database, including const/ref and
-other callable fields that older tools left unset. Catalog readers are read-only;
-perform migration through extraction before using an old database with them.
+other callable fields that older tools left unset. Catalog readers are read-only and accept older schemas, displaying unknown
+volatility as absent until extraction migrates and refreshes their metadata.
 
 List, detail and the shared browser declaration formatter use const, volatile,
 ref and noexcept suffix order. Detail flags expose other supported specifiers;
@@ -38,7 +38,7 @@ and defaults, and variadic declarations display the ellipsis.
   defaulted/deleted special members, implicit exception specifications and
   ordinary/generic const/mutable lambdas. True/false controls match exact USRs.
 - AC5/6/7: `callable_persistence.feature`: reopen, repeat extraction, reverse
-  TU order, migration from version 8 and fresh semantic parity. Parameter
+  TU order, migration from versions 8 and 9 and fresh semantic parity. Parameter
   source spans may reflect either redeclaration; parameter contracts are stable.
 - AC8: list/detail qualifier/default rendering, template/special-member
   formatting and read-only catalog behavior. The interactive browser detail

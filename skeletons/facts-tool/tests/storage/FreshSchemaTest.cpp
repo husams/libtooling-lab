@@ -443,7 +443,7 @@ SELECT group_concat(record, char(10)) FROM (
                                "'relation_site') WHERE [table]='relation' "
                                "AND on_delete='CASCADE'") == 4,
               "relation-site cascade key is incorrect") &&
-      require(scalar(database, "PRAGMA user_version") == 9,
+      require(scalar(database, "PRAGMA user_version") == 10,
               "fresh schema version was not recorded");
   sqlite3_close(database);
   return valid;

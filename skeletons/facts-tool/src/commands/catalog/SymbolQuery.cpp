@@ -132,59 +132,83 @@ querySymbols(storage::Database &database, const std::vector<SourceFile> &files,
              const std::optional<std::string> &name) {
   return catalog::query(
              database,
-             "SELECT "
-             "id,node,kind,sub_kind,lang,properties,usr,qualified_name,line,"
-             "col,offset,access,is_definition,is_implicit,is_static,is_virtual,"
-             "is_const,is_inline,is_pure,ref_qualifier,is_override,"
-             "has_internal_linkage,is_external,is_variadic,is_deleted,is_"
-             "defaulted,"
-             "is_explicit,is_final,is_abstract,is_polymorphic,has_extern_"
-             "storage,"
-             "constant_evaluation,is_noexcept,"
-             "(SELECT destination.qualified_name FROM relation "
-             "JOIN symbol destination ON "
-             "destination.id=relation.destination_id "
-             "WHERE relation.source_id=s.id AND relation.kind=? LIMIT 1),is_volatile "
-             "FROM symbol s WHERE (? IS NULL OR qualified_name=?) ORDER BY id",
-             [&files](const storage::Row &row) {
-               SymbolFact value;
-               value.id = row.get<SymbolId>(0);
-               value.line = row.integer(8);
-               value.column = row.integer(9);
-               value.qualifiedName = row.string(7);
-               value.usr = row.string(6);
-               value.type = std::string(symbolNodeName(
-                   static_cast<Storage::SymbolNode>(row.integer(1))));
-               // The column holds the storage numbering, not this build's
-               // enum: decode it the same way Storage does.
-               value.kind = clang::index::getSymbolKindString(
-                                storage::symbolKindFromStored(row.integer(2)))
-                                .str();
-               value.subKind =
-                   normalizeNone(clang::index::getSymbolSubKindString(
-                                     row.get<clang::index::SymbolSubKind>(3))
-                                     .str());
-               value.language =
-                   normalizeNone(clang::index::getSymbolLanguageString(
-                                     row.get<clang::index::SymbolLanguage>(4))
-                                     .str());
-               value.access = row.string(11);
-               value.properties = row.integer(5);
-               value.refQualifier = row.string(19);
-               value.constantEvaluation = row.string(31);
-               value.returnType = row.isNull(33) ? "" : row.string(33);
-               value.flags = trueFlags(row);
-               const auto file =
-                   std::ranges::find(files, value.id.file, &SourceFile::id);
-               if (file == files.end())
-                 value.sourceName = std::format("<file {}>", value.id.file);
-               else {
-                 value.sourceName = file->name;
-                 value.sourcePath = file->path;
-               }
-               return value;
-             },
-             static_cast<int>(RelationKind::ReturnType), name, name)
+             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' "
+             "AND name='callable_return_type'), EXISTS(SELECT 1 FROM "
+             "pragma_table_info('symbol') WHERE name='is_volatile')",
+             [](const storage::Row &row) {
+               return std::pair{row.integer(0) != 0, row.integer(1) != 0};
+             })
+      .and_then([&](const auto &present) {
+        const std::string storedReturn =
+            present.front().first
+                ? "(SELECT canonical_type FROM "
+                  "callable_return_type WHERE symbol_id=s.id)"
+                : "NULL";
+        const std::string volatility =
+            present.front().second ? "is_volatile" : "0";
+        return catalog::query(
+            database,
+            std::string{"SELECT "} +
+                "id,node,kind,sub_kind,lang,properties,usr,qualified_name,line,"
+                "col,offset,access,is_definition,is_implicit,is_static,is_"
+                "virtual,"
+                "is_const,is_inline,is_pure,ref_qualifier,is_override,"
+                "has_internal_linkage,is_external,is_variadic,is_deleted,is_"
+                "defaulted,"
+                "is_explicit,is_final,is_abstract,is_polymorphic,has_extern_"
+                "storage,"
+                "constant_evaluation,is_noexcept,"
+                "COALESCE(" +
+                storedReturn +
+                ","
+                "(SELECT destination.qualified_name FROM relation "
+                "JOIN symbol destination ON "
+                "destination.id=relation.destination_id "
+                "WHERE relation.source_id=s.id AND relation.kind=? LIMIT 1))," +
+                volatility + " "
+                "FROM symbol s WHERE ((id >> 32)<>0 OR ? IS NOT NULL) "
+                "AND (? IS NULL OR qualified_name=?) ORDER BY "
+                "id",
+            [&files](const storage::Row &row) {
+              SymbolFact value;
+              value.id = row.get<SymbolId>(0);
+              value.line = row.integer(8);
+              value.column = row.integer(9);
+              value.qualifiedName = row.string(7);
+              value.usr = row.string(6);
+              value.type = std::string(symbolNodeName(
+                  static_cast<Storage::SymbolNode>(row.integer(1))));
+              // The column holds the storage numbering, not this build's
+              // enum: decode it the same way Storage does.
+              value.kind = clang::index::getSymbolKindString(
+                               storage::symbolKindFromStored(row.integer(2)))
+                               .str();
+              value.subKind =
+                  normalizeNone(clang::index::getSymbolSubKindString(
+                                    row.get<clang::index::SymbolSubKind>(3))
+                                    .str());
+              value.language =
+                  normalizeNone(clang::index::getSymbolLanguageString(
+                                    row.get<clang::index::SymbolLanguage>(4))
+                                    .str());
+              value.access = row.string(11);
+              value.properties = row.integer(5);
+              value.refQualifier = row.string(19);
+              value.constantEvaluation = row.string(31);
+              value.returnType = row.isNull(33) ? "" : row.string(33);
+              value.flags = trueFlags(row);
+              const auto file =
+                  std::ranges::find(files, value.id.file, &SourceFile::id);
+              if (file == files.end())
+                value.sourceName = std::format("<file {}>", value.id.file);
+              else {
+                value.sourceName = file->name;
+                value.sourcePath = file->path;
+              }
+              return value;
+            },
+            static_cast<int>(RelationKind::ReturnType), name, name, name);
+      })
       .and_then([&database](auto values) {
         return loadParameters(database).transform(
             [&values](const auto &parameters) mutable {

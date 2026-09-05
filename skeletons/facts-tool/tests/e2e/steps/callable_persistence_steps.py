@@ -1,5 +1,5 @@
 import sqlite3
-from pytest_bdd import then
+from pytest_bdd import then, parsers
 from support.callable_snapshot import snapshot, semantics
 from support.database import query
 
@@ -18,8 +18,8 @@ def stable_callables(context):
     assert semantics(context.facts_database_path) == expected
 
 
-@then("callable facts survive migration and re-extraction")
-def migrated_callables(context):
+@then(parsers.parse("callable facts survive version {version:d} migration and re-extraction"))
+def migrated_callables(context, version):
     before = snapshot(context.facts_database_path)
     with sqlite3.connect(context.facts_database_path) as db:
         # RHEL's Python uses SQLite 3.34, before ALTER TABLE DROP COLUMN.
@@ -32,11 +32,16 @@ def migrated_callables(context):
         db.execute(f"INSERT INTO legacy_symbol({names}) SELECT {names} FROM symbol")
         db.execute("DROP TABLE symbol")
         db.execute("ALTER TABLE legacy_symbol RENAME TO symbol")
-        db.execute("PRAGMA user_version=8")
+        db.execute(f"PRAGMA user_version={version}")
+        if version == 8:
+            db.execute("DROP TABLE callable_return_type")
         db.execute("UPDATE symbol SET is_const=0,ref_qualifier='none',is_noexcept=0")
+    historical = context.facts_database_path.read_bytes()
+    assert "qualifiers::Cv::split" in output(context, "show", "qualifiers::Cv::split")
+    assert context.facts_database_path.read_bytes() == historical
     context.run_tool()
     assert snapshot(context.facts_database_path) == before
-    assert query(context.facts_database_path, "PRAGMA user_version") == [(9,)]
+    assert query(context.facts_database_path, "PRAGMA user_version") == [(10,)]
     context.run_tool()
     assert snapshot(context.facts_database_path) == before
 

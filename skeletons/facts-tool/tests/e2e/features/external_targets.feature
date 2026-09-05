@@ -27,3 +27,26 @@ Feature: Filtered external relation targets
     When the real extraction command indexes the external-target fixture
     Then the stored external-target driver is preserved
     And the external-target extraction exits successfully without incomplete diagnostics
+
+  Scenario: Persist an implicit aligned runtime deallocation callee
+    Given a B-027 compile database with one runtime-callee source
+    When B-027 extraction runs for the runtime-callee source
+    Then the B-027 extraction commits without invalid-USR diagnostics
+    And the aligned runtime delete is one lightweight external call target
+
+  Scenario: Persist the runtime callee reached through stream temporaries
+    Given a B-027 compile database with the stream-temporary source
+    When B-027 extraction runs for the stream-temporary source
+    Then the B-027 extraction commits without invalid-USR diagnostics
+    And the aligned runtime delete is one lightweight external call target
+
+  Scenario: Reuse the implicit runtime callee across translation units
+    Given a B-027 compile database with both runtime-callee sources
+    When B-027 extraction runs for both runtime-callee sources
+    Then the B-027 extraction commits without invalid-USR diagnostics
+    And the aligned runtime delete is one lightweight external call target
+
+  Scenario: Report a genuine external-symbol persistence failure
+    Given a B-027 compile database with one runtime-callee source
+    When B-027 runtime-target persistence is forced to fail on a rerun
+    Then the relation-target failure is reported and the rerun is rolled back

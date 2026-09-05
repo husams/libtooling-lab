@@ -34,6 +34,7 @@
 #                           (default <root>/.deps/sqlite-amalgamation; fetched
 #                           on first use, reused afterwards).
 #   SQLITE_AMALGAMATION_URL amalgamation zip URL (default 3.53.4).
+#   YAML_SOURCE_DIR      unpacked yaml-cpp 0.9.0 source override/cache.
 #   FORCE_SQLITE=1          re-fetch the amalgamation even if cached, and
 #                           ignore any system libsqlite3.a.
 #   BUILD_DIR               cmake build dir (default <root>/build-rhel9).
@@ -50,6 +51,9 @@ FACTS_ROOT="$(dirname "$SCRIPT_DIR")"
 
 GCC_TOOLSET="${GCC_TOOLSET:-15}"
 SQLITE_SOURCE_DIR="${SQLITE_SOURCE_DIR:-$FACTS_ROOT/.deps/sqlite-amalgamation}"
+YAML_SOURCE_DIR="${YAML_SOURCE_DIR:-$FACTS_ROOT/.deps/yaml-cpp-0.9.0}"
+YAML_URL="${YAML_URL:-https://github.com/jbeder/yaml-cpp/releases/download/yaml-cpp-0.9.0/yaml-cpp-yaml-cpp-0.9.0.tar.gz}"
+YAML_SHA256="298593d9c440fd9034b8b193d96318b76d49bc97c6ceadb7b0836edf0b6d7539"
 SQLITE_AMALGAMATION_URL="${SQLITE_AMALGAMATION_URL:-https://www.sqlite.org/2026/sqlite-amalgamation-3530400.zip}"
 BUILD_DIR="${BUILD_DIR:-$FACTS_ROOT/build-rhel9}"
 VENV_DIR="${VENV_DIR:-$FACTS_ROOT/.venv-rhel9}"
@@ -70,10 +74,25 @@ if [ "${SKIP_DEPS:-0}" != "1" ]; then
     || echo "   (could not enable CRB automatically — continuing)"
   $SUDO dnf -y install \
     "gcc-toolset-${GCC_TOOLSET}" "gcc-toolset-${GCC_TOOLSET}-libstdc++-devel" \
-    cmake ninja-build make git tar xz unzip which \
+    cmake ninja-build make git tar xz unzip which curl \
     python3 python3-pip \
     clang-devel llvm-devel clang-libs llvm-libs
 fi
+
+YAML_ARGS=()
+if [ ! -f "$YAML_SOURCE_DIR/CMakeLists.txt" ]; then
+  echo "==> fetching pinned yaml-cpp 0.9.0 into $YAML_SOURCE_DIR"
+  tmp_yaml="$(mktemp -d)"
+  curl -fsSL -o "$tmp_yaml/yaml.tar.gz" "$YAML_URL"
+  echo "$YAML_SHA256  $tmp_yaml/yaml.tar.gz" | sha256sum -c -
+  mkdir -p "$(dirname "$YAML_SOURCE_DIR")"
+  mkdir -p "$YAML_SOURCE_DIR"
+  tar -xzf "$tmp_yaml/yaml.tar.gz" -C "$YAML_SOURCE_DIR"
+  rm -rf "$tmp_yaml"
+else
+  echo "==> reusing pinned yaml-cpp 0.9.0 in $YAML_SOURCE_DIR"
+fi
+YAML_ARGS=(-DFETCHCONTENT_SOURCE_DIR_YAML_CPP="$YAML_SOURCE_DIR")
 
 if [ "${DEPS_ONLY:-0}" = "1" ]; then
   echo "==> DEPS_ONLY: dependencies installed; skipping build"
@@ -156,6 +175,7 @@ LLVM_CMAKEDIR="$(llvm-config --cmakedir)"
 CLANG_CMAKEDIR="$(dirname "$LLVM_CMAKEDIR")/clang"
 cmake -G Ninja -S "$FACTS_ROOT" -B "$BUILD_DIR" \
   "${SQLITE_ARGS[@]}" \
+  "${YAML_ARGS[@]}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
   -DLLVM_DIR="$LLVM_CMAKEDIR" -DClang_DIR="$CLANG_CMAKEDIR" \
@@ -170,6 +190,10 @@ fi
 
 echo
 echo "==> built: $BUILD_DIR/facts-tool"
+ldd "$BUILD_DIR/facts-tool" | grep -q 'libyaml-cpp' && {
+  echo "error: yaml-cpp is dynamically linked" >&2
+  exit 1
+} || echo "    yaml-cpp: static (no libyaml-cpp.so dependency)"
 # --help still opens the databases named by the default options, so smoke-test
 # from a scratch directory instead of dropping facts.db/project.db in the repo.
 smoke="$(mktemp -d)"

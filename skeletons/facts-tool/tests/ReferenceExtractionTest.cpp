@@ -43,13 +43,14 @@ void verifyExtractorSkips(const std::filesystem::path &outputRoot) {
   }
   assert(owner != nullptr && target != nullptr);
 
+  std::filesystem::remove_all(outputRoot);
   std::filesystem::create_directories(outputRoot);
   facts::FileManager files((outputRoot / "files.sqlite").string());
   facts::FactStore store((outputRoot / "facts.sqlite").string());
   const auto ownerUsr = facts::extractUsr(*owner);
   const auto targetUsr = facts::extractUsr(*target);
   assert(ownerUsr && targetUsr);
-  facts::Function ownerSymbol;
+  facts::Function ownerSymbol{};
   ownerSymbol.usr = *ownerUsr;
   ownerSymbol.qualifiedName = "owner";
   assert(store.save(1, ownerSymbol));
@@ -57,9 +58,11 @@ void verifyExtractorSkips(const std::filesystem::path &outputRoot) {
   const auto unresolved =
       facts::extractUseReference(*owner, *target, target->getLocation(),
                                  ast->getSourceManager(), files, store);
-  assert(unresolved && !*unresolved);
+  // A valid DB-miss USR now uses canonical external-target extraction; an
+  // unregistered in-memory source cannot supply its required file identity.
+  assert(!unresolved && unresolved.error() == facts::ExtractionError::RelationTarget);
 
-  facts::Variable targetSymbol;
+  facts::Variable targetSymbol{};
   targetSymbol.usr = *targetUsr;
   targetSymbol.qualifiedName = "target";
   assert(store.save(1, targetSymbol));

@@ -10,6 +10,8 @@ Feature: Canonical source file registry
       | fixture   |
       | dependent_base.cpp |
       | dependent_template_types.cpp |
+      | b027_std_string_external_callee.cpp |
+      | b027_stream_temporary_external_callee.cpp |
       | call_graph.hpp |
       | call_graph_one.cpp |
       | call_graph_possible.cpp |
@@ -17,6 +19,10 @@ Feature: Canonical source file registry
       | call_graph_two.cpp |
       | external_targets.cpp |
       | external_template_specialization.cpp |
+      | forced-include/include/forced.hpp |
+      | forced-include/optional.cpp |
+      | forced-include/paths.cpp |
+      | forced-include/system/forced.hpp |
       | forward_template_target.cpp |
       | forward_template_target_system.hpp |
       | initializer_dependent_alignment.cpp |
@@ -38,9 +44,13 @@ Feature: Canonical source file registry
       | references_two.cpp |
       | relation_resolution.cpp |
       | relation_resolution.hpp |
+      | return_types.cpp                     |
       | shared.hpp |
       | system/external_base.hpp |
       | system/external_string |
+      | targeted_match.cpp |
+      | targeted_match_broken.cpp |
+      | targeted_match_two.cpp |
       | toolchain_targets.cpp |
       | undeclared_template_instances.cpp |
       | one.cpp    |

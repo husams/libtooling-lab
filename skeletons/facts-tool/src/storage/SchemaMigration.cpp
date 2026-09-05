@@ -305,6 +305,14 @@ ADD COLUMN certainty INTEGER;
 PRAGMA user_version=8;
 )sql";
 
+inline constexpr auto returnTypeMigrationSql = R"sql(
+CREATE TABLE IF NOT EXISTS callable_return_type (
+  symbol_id INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  canonical_type TEXT NOT NULL CHECK(canonical_type <> '')
+);
+PRAGMA user_version=9;
+)sql";
+
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
@@ -364,12 +372,19 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
               });
             })
             .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 9
+                           ? execute(database, returnTypeMigrationSql)
+                           : std::expected<void, std::error_code>{};
+              });
+            })
+            .and_then([database] {
               return hasColumn(database, "symbol", "is_volatile")
                   .and_then([database](bool exists) {
                     return exists ? std::expected<void, std::error_code>{}
                         : execute(database, "ALTER TABLE symbol ADD COLUMN "
                             "is_volatile INTEGER NOT NULL DEFAULT 0 "
-                            "CHECK(is_volatile IN (0,1)); PRAGMA user_version=9;");
+                            "CHECK(is_volatile IN (0,1)); PRAGMA user_version=10;");
                   });
             });
       });

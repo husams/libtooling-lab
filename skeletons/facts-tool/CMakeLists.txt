@@ -33,6 +33,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(ftxui)
 
+set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+  yaml_cpp
+  URL https://github.com/jbeder/yaml-cpp/releases/download/yaml-cpp-0.9.0/yaml-cpp-yaml-cpp-0.9.0.tar.gz
+  URL_HASH SHA256=298593d9c440fd9034b8b193d96318b76d49bc97c6ceadb7b0836edf0b6d7539
+)
+FetchContent_MakeAvailable(yaml_cpp)
+
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
@@ -153,6 +164,7 @@ add_library(facts-storage STATIC
   src/storage/FunctionInstance.cpp
   src/storage/FunctionTemplate.cpp
   src/storage/Initializer.cpp
+  src/storage/ReturnType.cpp
   src/storage/Parameter.cpp
   src/storage/ProjectConfiguration.cpp
   src/storage/Record.cpp
@@ -189,6 +201,15 @@ target_include_directories(facts-tooling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang
                                             facts-sqlite)
 
+add_library(facts-config STATIC
+  src/config/ConfigurationPaths.cpp
+  src/config/ConfigurationRender.cpp
+  src/config/ConfigurationYaml.cpp
+  src/config/ConfigurationOwnership.cpp
+)
+target_include_directories(facts-config PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(facts-config PUBLIC yaml-cpp::yaml-cpp facts-sqlite)
+
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
   src/ast/extractors/Definition.cpp
@@ -212,9 +233,11 @@ add_library(facts-ast STATIC
   src/ast/extractors/CallSite.cpp
   src/ast/extractors/ReceiverContext.cpp
   src/ast/extractors/OverrideRelation.cpp
+  src/ast/extractors/RelationTarget.cpp
   src/ast/extractors/TargetResolution.cpp
   src/ast/extractors/TemplatePattern.cpp
   src/ast/extractors/TemplateSpecialization.cpp
+  src/ast/extractors/ReturnType.cpp
   src/ast/extractors/Type.cpp
   src/ast/extractors/ValueDecl.cpp
   src/ast/extractors/VarDecl.cpp
@@ -281,10 +304,22 @@ add_library(facts-commands STATIC
   src/commands/catalog/File.cpp
   src/commands/catalog/Symbol.cpp
   src/commands/DatabasePaths.cpp
+  src/commands/Configuration.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
+  src/commands/ExtractionSetup.cpp
   src/commands/IncludedFiles.cpp
   src/commands/Import.cpp
+  src/commands/Match.cpp
+  src/commands/match/ArgumentOutput.cpp
+  src/commands/match/DirectCall.cpp
+  src/commands/match/MatchCallback.cpp
+  src/commands/match/MatchContract.cpp
+  src/commands/match/NearestCaller.cpp
+  src/commands/match/RelationKinds.cpp
+  src/commands/match/RelationPersistence.cpp
+  src/commands/match/RelationValidation.cpp
+  src/commands/match/SymbolDispatch.cpp
   src/commands/analyse/CallGraphCommand.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -295,6 +330,7 @@ target_link_libraries(facts-commands PRIVATE
   facts-symbols
   facts-symbol-ui
   facts-tooling
+  facts-config
   facts-clang
 )
 
@@ -302,6 +338,7 @@ target_link_libraries(facts-commands PRIVATE
 add_library(facts-cli STATIC
   src/cli/CommandLine.cpp
   src/cli/Dispatch.cpp
+  src/cli/MatchCommandLine.cpp
   src/cli/catalog/Repository.cpp
   src/cli/catalog/Component.cpp
   src/cli/catalog/Directory.cpp
@@ -375,6 +412,16 @@ if(BUILD_TESTING)
     COMMAND stored-compilation-database-test
             ${CMAKE_CURRENT_BINARY_DIR}/stored-compilation-database.sqlite
   )
+  add_executable(stored-compilation-missing-command-test
+                 tests/StoredCompilationMissingCommandTest.cpp)
+  target_link_libraries(stored-compilation-missing-command-test
+                        PRIVATE facts-tooling facts-storage facts-clang
+                                facts-sqlite)
+  add_test(
+    NAME stored-compilation-missing-command
+    COMMAND stored-compilation-missing-command-test
+            ${CMAKE_CURRENT_BINARY_DIR}/stored-compilation-missing-command.sqlite
+  )
   add_executable(platform-flags-test tests/PlatformFlagsTest.cpp)
   target_link_libraries(platform-flags-test PRIVATE facts-platform facts-clang)
   add_test(
@@ -392,9 +439,17 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_BINARY_DIR}/project-configuration.sqlite
             ${CMAKE_CURRENT_SOURCE_DIR}
   )
+  add_executable(configuration-test tests/ConfigurationTest.cpp
+    tests/configuration/Schema.cpp tests/configuration/Paths.cpp
+    tests/configuration/Discovery.cpp tests/configuration/Arguments.cpp
+    tests/configuration/Ownership.cpp
+    tests/configuration/Policies.cpp)
+  target_link_libraries(configuration-test PRIVATE facts-config facts-clang)
+  add_test(NAME configuration COMMAND configuration-test)
   add_executable(
     storage-schema-test
     tests/storage/FreshSchemaTest.cpp
+    tests/storage/ReturnTypeTest.cpp
     tests/storage/CallGraphMigrationTest.cpp
     tests/storage/LegacySchemaMigrationTest.cpp
     tests/storage/StorageSchemaTestMain.cpp
@@ -426,6 +481,15 @@ if(BUILD_TESTING)
   target_link_libraries(type-resolution-error-test PRIVATE
     facts-ast facts-storage facts-model facts-clang facts-sqlite)
   add_test(NAME type-resolution-error COMMAND type-resolution-error-test)
+  add_executable(match-relation-contract-test
+                 tests/match/RelationContractTest.cpp)
+  target_link_libraries(match-relation-contract-test PRIVATE
+                        facts-commands facts-clang)
+  add_test(NAME match-relation-contract COMMAND match-relation-contract-test)
+  add_executable(match-nearest-caller-test tests/match/NearestCallerTest.cpp)
+  target_link_libraries(match-nearest-caller-test PRIVATE
+                        facts-commands facts-clang)
+  add_test(NAME match-nearest-caller COMMAND match-nearest-caller-test)
   add_executable(file-database-persistence-test
                  tests/FileDatabasePersistenceTest.cpp)
   target_link_libraries(file-database-persistence-test
@@ -583,4 +647,11 @@ if(BUILD_TESTING)
   # The suite parses every fixture once per scenario; a slower box needs well
 # over the 120s this used to allow.
 set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 600)
+  # Test assertions include required operations; execute them in release builds too.
+  get_property(FACTS_LOCAL_TARGETS DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+  foreach(FACTS_TEST_TARGET IN LISTS FACTS_LOCAL_TARGETS)
+    if(FACTS_TEST_TARGET MATCHES "-test$")
+      target_compile_options(${FACTS_TEST_TARGET} PRIVATE -UNDEBUG)
+    endif()
+  endforeach()
 endif()
