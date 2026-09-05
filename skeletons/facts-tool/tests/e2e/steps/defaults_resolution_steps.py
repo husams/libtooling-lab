@@ -27,19 +27,19 @@ def selected(defaults, tier):
 
 @given("every YAML tier contains a different value")
 def all_tiers(defaults):
-    defaults.tiers("cli,env,project,xdg,home")
+    defaults.tiers("config-file,project,user")
 
-@then("only the highest YAML compiler list is used")
-def no_merge(defaults):
-    assert defaults.value("extra_args") == "[-DTIER=cli]"
-    assert "cli.yaml: extra_args" in defaults.value("extra_args_source")
-    assert "[skipped]" in defaults.last.stdout
+@then("extra_args concatenates user, then project, then config-file")
+def merged_order(defaults):
+    assert defaults.value("extra_args") == "[-DTIER=user] [-DTIER=project] [-DTIER=config-file]"
+    for tier in ("user", "project", "config-file"):
+        assert str(defaults.files[tier]) in defaults.value("extra_args_source")
     assert defaults.snapshot() == defaults.before
 
 @given("a malformed lower-priority file")
 def malformed_lower(defaults):
-    defaults.files["home"].parent.mkdir(parents=True, exist_ok=True)
-    defaults.files["home"].write_text("extra_args: [bad")
+    defaults.files["user"].parent.mkdir(parents=True, exist_ok=True)
+    defaults.files["user"].write_text("extra_args: [bad")
 
 @given("an unreadable selected YAML directory")
 def unreadable(defaults):
@@ -65,5 +65,5 @@ def missing(defaults):
 def diagnostics(defaults):
     output = defaults.last.stderr
     assert "configuration in " in output and "; searched:" in output, output
-    assert "[skipped]" in output or "[selected]" in output, output
+    assert "[absent]" in output, output
     assert "; set --config or FACTS_TOOL_CONFIG" in output, output

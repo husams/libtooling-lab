@@ -6,45 +6,32 @@ Feature: Configuration precedence and provenance
     Examples:
       | tiers | winner |
       | direct,db-env | direct |
-      | direct,cli | direct |
-      | direct,env | direct |
+      | direct,config-file | direct |
       | direct,project | direct |
-      | direct,xdg | direct |
-      | direct,home | direct |
+      | direct,user | direct |
       | direct,builtin | direct |
-      | db-env,cli | db-env |
-      | db-env,env | db-env |
+      | db-env,config-file | db-env |
       | db-env,project | db-env |
-      | db-env,xdg | db-env |
-      | db-env,home | db-env |
+      | db-env,user | db-env |
       | db-env,builtin | db-env |
-      | cli,env | cli |
-      | cli,project | cli |
-      | cli,xdg | cli |
-      | cli,home | cli |
-      | cli,builtin | cli |
-      | env,project | env |
-      | env,xdg | env |
-      | env,home | env |
-      | env,builtin | env |
-      | project,xdg | project |
-      | project,home | project |
+      | config-file,project | config-file |
+      | config-file,user | config-file |
+      | config-file,builtin | config-file |
+      | project,user | project |
       | project,builtin | project |
-      | xdg,home | xdg |
-      | xdg,builtin | xdg |
-      | home,builtin | home |
+      | user,builtin | user |
 
-  Scenario: Every conflicting file selects one compiler list
+  Scenario: Every conflicting file selects one scalar tier but merges extra_args
     Given every YAML tier contains a different value
     When I inspect the effective configuration twice
-    Then the selected database comes from "cli"
-    And only the highest YAML compiler list is used
+    Then the selected database comes from "config-file"
+    And extra_args concatenates user, then project, then config-file
 
-  Scenario: Invalid lower files are not opened
+  Scenario: Invalid lower-precedence files are still configuration errors
     Given defaults exist at tiers "project"
     And a malformed lower-priority file
-    When I inspect the effective configuration twice
-    Then the selected database comes from "project"
+    When I attempt configuration inspection
+    Then configuration fails with "configuration in "
 
   Scenario Outline: Missing keys use built-ins
     Given the selected YAML contains "<content>"
