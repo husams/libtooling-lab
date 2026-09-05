@@ -43,10 +43,20 @@ def then_symbols_use_registered_file_ids(context: FactsToolContext) -> None:
         file_id
         for (file_id,) in query(
             context.facts_database_path,
-            "SELECT DISTINCT ((id >> 32) & 4294967295) FROM symbol",
+            "SELECT DISTINCT ((id >> 32) & 4294967295) FROM symbol WHERE (id >> 32)<>0",
         )
     }
-    require(0 not in symbol_file_ids, "captured symbols must not use builtin FileId 0")
+    # Predefined return targets have no physical file; validate their reserved
+    # identity separately instead of treating them as source declarations.
+    predefined = query(context.facts_database_path,
+                       "SELECT id,usr,node,is_implicit,is_external FROM symbol WHERE (id >> 32)=0")
+    require(all(0 < identity < 2**32 and usr == f"c:@BT@{identity}" and
+                node == 5 and implicit == external == 1
+                for identity, usr, node, implicit, external in predefined),
+            f"invalid predefined symbol identities: {predefined}")
+    require(not query(context.facts_database_path,
+                      "SELECT file_id FROM symbol_allocator WHERE file_id=0"),
+            "predefined IDs must not consume a physical-file allocator")
     require(
         symbol_file_ids <= imported_ids,
         f"symbols reference non-preimported FileIds: {symbol_file_ids - imported_ids}",

@@ -39,6 +39,7 @@ Feature: Canonical source file registry
       | references_two.cpp |
       | relation_resolution.cpp |
       | relation_resolution.hpp |
+      | return_types.cpp                     |
       | shared.hpp |
       | system/external_base.hpp |
       | system/external_string |

@@ -40,11 +40,11 @@ Feature: C++ templates
     Then the supplied template parameters include
       | qualified_name                             | position | value | type        | kind | pack_index |
       | e2e::StructTemplate                        | 0        |       | e2e::Widget | 1    | -1         |
-      | e2e::StructTemplate                        | 1        | 7     |             | 2    | -1         |
+      | e2e::StructTemplate                        | 1        | 7     | int         | 2    | -1         |
       | e2e::UnionTemplate                         | 0        |       | e2e::Widget | 4    | 0          |
       | e2e::UnionTemplate                         | 1        |       | e2e::Policy | 4    | 1          |
       | e2e::functionTemplate                      | 0        |       | e2e::Widget | 1    | -1         |
-      | e2e::functionTemplate                      | 1        | 9     |             | 2    | -1         |
+      | e2e::functionTemplate                      | 1        | 9     | int         | 2    | -1         |
       | e2e::MethodTemplateFixture::methodTemplate | 0        |       | e2e::Widget | 1    | -1         |
     And a partial record specialization retains open slots and supplied values
     And the template instance relations include

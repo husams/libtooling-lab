@@ -104,7 +104,7 @@ def then_symbols_use_the_in_project_identity(context: FactsToolContext) -> None:
         owner
         for (owner,) in query(
             context.facts_database_path,
-            "SELECT DISTINCT ((id >> 32) & 4294967295) FROM symbol",
+            "SELECT DISTINCT ((id >> 32) & 4294967295) FROM symbol WHERE (id >> 32)<>0",
         )
     }
     require(owners, "extraction recorded no symbols")

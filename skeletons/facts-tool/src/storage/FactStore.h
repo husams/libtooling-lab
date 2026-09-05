@@ -148,6 +148,13 @@ public:
     return result;
   }
 
+  std::expected<void, std::error_code>
+  saveReturnType(SymbolId callable, const ReturnType &type) {
+    auto result = storage_.saveReturnType(callable, type);
+    cli::tracePersistenceResult(verbosity_, "save-return-type", result);
+    return result;
+  }
+
   bool contains(std::string_view usr) const;
 
   std::size_t cachedIdCount() const { return idsByUsr_.size(); }
