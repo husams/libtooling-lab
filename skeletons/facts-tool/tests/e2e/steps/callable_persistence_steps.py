@@ -22,7 +22,16 @@ def stable_callables(context):
 def migrated_callables(context):
     before = snapshot(context.facts_database_path)
     with sqlite3.connect(context.facts_database_path) as db:
-        db.execute("ALTER TABLE symbol DROP COLUMN is_volatile")
+        # RHEL's Python uses SQLite 3.34, before ALTER TABLE DROP COLUMN.
+        schema = db.execute("SELECT sql FROM sqlite_master WHERE name='symbol'").fetchone()[0]
+        schema = schema.rsplit(",\n", 1)[0] + "\n)"
+        columns = [r[1] for r in db.execute("PRAGMA table_info(symbol)")
+                   if r[1] != "is_volatile"]
+        db.execute(schema.replace("CREATE TABLE symbol", "CREATE TABLE legacy_symbol", 1))
+        names = ",".join(columns)
+        db.execute(f"INSERT INTO legacy_symbol({names}) SELECT {names} FROM symbol")
+        db.execute("DROP TABLE symbol")
+        db.execute("ALTER TABLE legacy_symbol RENAME TO symbol")
         db.execute("PRAGMA user_version=8")
         db.execute("UPDATE symbol SET is_const=0,ref_qualifier='none',is_noexcept=0")
     context.run_tool()
