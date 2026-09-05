@@ -47,4 +47,5 @@ void discovery();
 void arguments();
 void ownership();
 void policies();
+void placeholders();
 } // namespace configuration_test
