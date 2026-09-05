@@ -137,3 +137,102 @@ def usage_error(defaults):
 def wrote_explicit(defaults):
     assert defaults.last.returncode == 0, defaults.last.stderr
     assert defaults.explicit_output.is_file()
+
+@given("the acceptance-example conf_template and facts_template")
+def acceptance_example(defaults):
+    defaults.write(conf_template="{project_root}/.index/project.db",
+                   facts_template="{project_root}/.index/{relative_path}/{filename}.db")
+
+@then("conf is the project root's .index/project.db")
+def conf_is_index_project(defaults):
+    assert defaults.value("conf") == str(defaults.cwd / ".index/project.db"), defaults.last.stdout
+
+@then("extracting one source writes the project root's .index/src/a/b.db")
+def extract_writes_index_src(defaults):
+    project = FactsTemplateProject(defaults, "{project_root}/.index/{relative_path}/{filename}.db")
+    result = project.extract(project.sources[0])
+    assert result.returncode == 0, result.stderr
+    assert (defaults.cwd / ".index/src/a.db").is_file()
+
+@then("conf is directly under HOME")
+def conf_under_home(defaults):
+    assert defaults.value("conf") == str(defaults.root / "home/project.db"), defaults.last.stdout
+
+@given("a project facts_template that escapes through a symlink after {project_root}")
+def escaping_facts_template(defaults):
+    outside = defaults.root / "escaped-outside"
+    outside.mkdir()
+    (defaults.cwd / "linked").symlink_to(outside)
+    defaults.template_project = FactsTemplateProject(
+        defaults, "{project_root}/linked/{relative_path}/{filename}.db")
+
+@then(parsers.parse('extraction fails with "{message}"'))
+def extraction_fails_with(defaults, message):
+    assert defaults.last.returncode == 3, defaults.last.stderr
+    assert message in defaults.last.stderr, defaults.last.stderr
+
+@given("a project facts_template using the source placeholder registered under a direct conf")
+def facts_template_direct(defaults):
+    defaults.template_project = FactsTemplateProject(
+        defaults, "{project_root}/.index/{relative_path}/{filename}.db",
+        conf=defaults.root / "direct.db")
+
+@when("I extract under the direct conf with no explicit output and one source")
+def extract_under_direct(defaults):
+    defaults.last = defaults.template_project.extract(defaults.template_project.sources[0])
+
+@when("I extract with no explicit output and a source that was never imported")
+def extract_unimported(defaults):
+    missing = defaults.cwd / "src/missing.cpp"
+    missing.write_text("struct S {};\n")
+    defaults.last = defaults.template_project.extract(missing)
+
+@then("extraction fails and no facts_template directory was created")
+def extraction_failed_no_directory(defaults):
+    assert defaults.last.returncode != 0, defaults.last.stdout
+    assert not (defaults.cwd / ".index").exists()
+
+@given("a user conf_template with an unknown placeholder and a valid project conf_template")
+def invalid_lower_tier(defaults):
+    defaults.write("user", conf_template="{unknown}.db")
+    defaults.write("project", conf_template="{filename}.db")
+
+@given("a malformed project file and a valid user file")
+def malformed_project_valid_user(defaults):
+    defaults.files["project"].write_text("conf_root: [bad")
+    defaults.write("user", conf_root="store")
+
+@then("discovery marks the project file invalid and the user file found")
+def discovery_marks_both(defaults):
+    assert str(defaults.files["project"]) + " [invalid]" in defaults.last.stdout
+    assert str(defaults.files["user"]) + " [found]" in defaults.last.stdout
+
+@when("I analyse dependencies with no explicit output and one source")
+def dependency_default(defaults):
+    defaults.last = defaults.template_project.dependency(defaults.template_project.sources[0])
+
+@then("dependency analysis succeeds and writes the facts_template path")
+def dependency_wrote_facts_template(defaults):
+    assert defaults.last.returncode == 0, defaults.last.stderr
+    assert (defaults.cwd / ".index/src/a.db").is_file()
+
+@when("I list symbols with no explicit --facts")
+def symbol_default(defaults):
+    defaults.last = defaults.template_project.symbol_list()
+
+@then("symbol listing fails with a usage error asking for -o/--facts")
+def symbol_usage_error(defaults):
+    assert defaults.last.returncode == 2, defaults.last.stderr
+    assert "-o" in defaults.last.stderr and "--facts" in defaults.last.stderr
+
+@given("a project-scoped facts_template with no source placeholder")
+def project_scoped_facts_template(defaults):
+    defaults.template_project = FactsTemplateProject(
+        defaults, "{project_root}/.index/project-facts.db")
+    extracted = defaults.template_project.extract(defaults.template_project.sources[0])
+    assert extracted.returncode == 0, extracted.stderr
+
+@then("symbol listing succeeds using the facts_template path")
+def symbol_used_facts_template(defaults):
+    assert defaults.last.returncode == 0, defaults.last.stderr
+    assert (defaults.cwd / ".index/project-facts.db").is_file()

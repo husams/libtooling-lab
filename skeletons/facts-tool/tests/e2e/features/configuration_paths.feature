@@ -104,3 +104,59 @@ Feature: Canonical configuration identity and safe path rendering
     Given a project facts_template using the source placeholder
     When I extract with an explicit output and one source
     Then extraction succeeds and writes the explicit output
+
+  Scenario: An absolute conf_template via {project_root} is accepted like facts_template
+    Given the acceptance-example conf_template and facts_template
+    When I inspect the effective configuration twice
+    Then conf is the project root's .index/project.db
+    And extracting one source writes the project root's .index/src/a/b.db
+
+  Scenario: A raw literal absolute conf_template is still rejected
+    Given conf_template "/outside.db"
+    When I attempt configuration inspection
+    Then configuration fails with "conf_template"
+
+  Scenario: A leading ~/ conf_template bypasses conf_root entirely, like conf_root's own ~/
+    Given conf_template "~/project.db"
+    When I inspect the effective configuration twice
+    Then conf is directly under HOME
+
+  Scenario: A symlink after a leading {project_root} in facts_template still escapes
+    Given a project facts_template that escapes through a symlink after {project_root}
+    When I extract with no explicit output and one source
+    Then extraction fails with "escapes"
+
+  Scenario: facts_template still supplies the default output under a direct --conf override
+    Given a project facts_template using the source placeholder registered under a direct conf
+    When I extract under the direct conf with no explicit output and one source
+    Then extraction succeeds and writes the facts_template path
+
+  Scenario: A facts_template default never creates its directory when extraction fails
+    Given a project facts_template using the source placeholder
+    When I extract with no explicit output and a source that was never imported
+    Then extraction fails and no facts_template directory was created
+
+  Scenario: An invalid lower-tier template is a configuration error even when a higher tier wins
+    Given a user conf_template with an unknown placeholder and a valid project conf_template
+    When I attempt configuration inspection
+    Then configuration fails with "unknown placeholder"
+
+  Scenario: Discovery is recorded for every tier even after an earlier one fails
+    Given a malformed project file and a valid user file
+    When I attempt configuration inspection
+    Then discovery marks the project file invalid and the user file found
+
+  Scenario: facts_template supplies the default output for dependency analysis
+    Given a project facts_template using the source placeholder
+    When I analyse dependencies with no explicit output and one source
+    Then dependency analysis succeeds and writes the facts_template path
+
+  Scenario: facts_template needing a source cannot default a symbol command's --facts
+    Given a project facts_template using the source placeholder
+    When I list symbols with no explicit --facts
+    Then symbol listing fails with a usage error asking for -o/--facts
+
+  Scenario: A project-scoped facts_template supplies the default --facts for symbol commands
+    Given a project-scoped facts_template with no source placeholder
+    When I list symbols with no explicit --facts
+    Then symbol listing succeeds using the facts_template path
