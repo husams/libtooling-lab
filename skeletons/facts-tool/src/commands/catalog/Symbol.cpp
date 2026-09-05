@@ -28,15 +28,30 @@ catalog::Result<int> renderScriptOutput(const cli::SymbolOptions &options,
 
 catalog::Result<int> runSymbol(const cli::SymbolOptions &options) {
   auto configured = options;
-  if (!options.configuration.empty() || !options.configurationFile.empty() ||
-      config::detail::present("FACTS_TOOL_CONF")) {
+  // An explicit --facts with no configuration flags stays independent of
+  // configuration (S-019): no discovery happens at all. Otherwise resolve,
+  // both to locate the project conf DB and to fill a missing --facts from
+  // facts_template.
+  const bool needsConfiguration = options.facts.empty() ||
+                                  !options.configuration.empty() ||
+                                  !options.configurationFile.empty() ||
+                                  config::detail::present("FACTS_TOOL_CONF");
+  if (needsConfiguration) {
     auto resolved = loadConfiguration(options.configuration,
                                       options.configurationFile, false);
     if (!resolved) return std::unexpected(resolved.error());
-    configured.configuration = resolved->database.string();
-    if (!std::filesystem::exists(resolved->database))
-      return std::unexpected("project configuration database not found: " +
-                             configured.configuration);
+    if (!options.configuration.empty() || !options.configurationFile.empty() ||
+        config::detail::present("FACTS_TOOL_CONF")) {
+      configured.configuration = resolved->database.string();
+      if (!std::filesystem::exists(resolved->database))
+        return std::unexpected("project configuration database not found: " +
+                               configured.configuration);
+    }
+    if (configured.facts.empty()) {
+      auto facts = resolveFactsOutput(*resolved, {});
+      if (!facts) return std::unexpected(facts.error());
+      configured.facts = facts->string();
+    }
   }
   const auto name = configured.action == cli::SymbolOptions::Action::show
                         ? std::optional{configured.qualifiedName}

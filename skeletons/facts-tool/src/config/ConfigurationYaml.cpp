@@ -24,10 +24,12 @@ std::expected<void, std::string> scalar(const YAML::Node &node,
     return std::unexpected(std::string(key) + " must be a string (quote numeric/boolean tokens)");
   return {};
 }
+
 }
 
-std::expected<Resolved, std::string>
-readYaml(const std::filesystem::path &path, Resolved result) {
+std::expected<Tier, std::string> readTier(const std::filesystem::path &path,
+                                          bool applyPathSettings) {
+  Tier tier{.path = path};
   try {
     std::error_code error;
     if (!std::filesystem::is_regular_file(path, error))
@@ -44,12 +46,12 @@ readYaml(const std::filesystem::path &path, Resolved result) {
     input.seekg(0);
     const auto documents = YAML::LoadAll(input);
     if (documents.empty())
-      return result;
+      return tier;
     if (documents.size() != 1)
       return std::unexpected("configuration must contain one YAML document");
     const auto root = documents.front();
     if (!root || root.IsNull())
-      return result;
+      return tier;
     if (!root.IsMap())
       return std::unexpected("configuration must be a mapping");
     std::set<std::string> keys;
@@ -57,33 +59,29 @@ readYaml(const std::filesystem::path &path, Resolved result) {
       if (!entry.first.IsScalar() || !keys.insert(entry.first.Scalar()).second)
         return std::unexpected("duplicate or invalid configuration key");
       const auto key = entry.first.Scalar();
-      if (key != "conf_root" && key != "conf_template" && key != "extra_args")
+      if (key != "conf_root" && key != "conf_template" && key != "facts_template" &&
+          key != "extra_args")
         return std::unexpected("unknown configuration key: " + key);
       if (key != "extra_args") {
-        if (!result.generated) continue;
+        if (!applyPathSettings) continue;
         if (auto valid = scalar(entry.second, key); !valid)
           return std::unexpected(valid.error());
-        if (key == "conf_root") {
-          result.storageRoot = entry.second.Scalar();
-          result.storageRootSource = path.string() + ": conf_root";
-        }
-        if (key == "conf_template") {
-          result.templateText = entry.second.Scalar();
-          result.templateSource = path.string() + ": conf_template";
-        }
+        if (key == "conf_root") tier.confRoot = entry.second.Scalar();
+        if (key == "conf_template") tier.confTemplate = entry.second.Scalar();
+        if (key == "facts_template") tier.factsTemplate = entry.second.Scalar();
       } else {
         if (!entry.second || entry.second.IsNull() || !entry.second.IsSequence())
           return std::unexpected("extra_args must be a sequence of strings");
-        result.extraArguments.clear();
+        std::vector<std::string> values;
         for (const auto &value : entry.second) {
           if (auto valid = scalar(value, "extra_args"); !valid)
             return std::unexpected(valid.error());
-          result.extraArguments.push_back(value.Scalar());
+          values.push_back(value.Scalar());
         }
-        result.extraArgumentsSource = path.string() + ": extra_args";
+        tier.extraArgs = std::move(values);
       }
     }
-    return result;
+    return tier;
   } catch (const YAML::Exception &error) {
     return std::unexpected(error.what());
   }

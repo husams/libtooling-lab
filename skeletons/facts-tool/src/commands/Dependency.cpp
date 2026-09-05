@@ -241,6 +241,11 @@ runDependency(const cli::DependencyOptions &options) {
                                     options.configurationFile, false, true);
   if (!resolved) return std::unexpected(resolved.error());
   auto configured = options;
+  if (configured.output.empty()) {
+    auto output = resolveWritableFactsOutput(*resolved, options.sources);
+    if (!output) return std::unexpected(output.error());
+    configured.output = output->string();
+  }
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = std::move(resolved->extraArguments);
   return runDependencyStage(configured, "validate sources",

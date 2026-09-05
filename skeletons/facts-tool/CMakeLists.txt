@@ -202,7 +202,8 @@ target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang
 
 add_library(facts-config STATIC
   src/config/ConfigurationPaths.cpp
-  src/config/ConfigurationRender.cpp
+  src/config/ConfigurationSearch.cpp
+  src/config/ConfigurationMerge.cpp
   src/config/ConfigurationYaml.cpp
   src/config/ConfigurationOwnership.cpp
 )
@@ -439,7 +440,8 @@ if(BUILD_TESTING)
     tests/configuration/Schema.cpp tests/configuration/Paths.cpp
     tests/configuration/Discovery.cpp tests/configuration/Arguments.cpp
     tests/configuration/Ownership.cpp
-    tests/configuration/Policies.cpp)
+    tests/configuration/Policies.cpp
+    tests/configuration/Placeholders.cpp)
   target_link_libraries(configuration-test PRIVATE facts-config facts-clang)
   add_test(NAME configuration COMMAND configuration-test)
   add_executable(
