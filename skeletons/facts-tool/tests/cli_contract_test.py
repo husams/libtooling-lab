@@ -84,6 +84,11 @@ def main() -> None:
 
     empty_config = run(tool, "config", "show", "--config", "")
     require(empty_config.returncode != 0, output(empty_config))
+    config_help = run(tool, "config", "show", "--help")
+    require("yaml-cpp 0.9.0" in output(config_help), output(config_help))
+    config_show = run(tool, "config", "show")
+    require(config_show.returncode == 0 and
+            "parser: YAML / yaml-cpp 0.9.0" in output(config_show), output(config_show))
 
     removed_symbol_view = run(tool, "symbol", "view")
     require(removed_symbol_view.returncode != 0, output(removed_symbol_view))
@@ -156,10 +161,12 @@ def main() -> None:
         root = Path(temporary)
         configuration = root / "project.sqlite"
 
-        (root / ".facts-tool.yaml").write_text("conf_root: [bad\n")
+        invalid_root = root / "invalid-defaults"
+        invalid_root.mkdir()
+        (invalid_root / ".facts-tool.yaml").write_text("conf_root: [bad\n")
         direct_catalog = run(
             tool, "repo", "list", "--conf", str(configuration),
-            working_directory=root,
+            working_directory=invalid_root,
         )
         require(direct_catalog.returncode != 0, output(direct_catalog))
         require(

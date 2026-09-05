@@ -1,4 +1,5 @@
 #include "cli/CommandLine.h"
+#include "cli/ConfigurationOptions.h"
 #include "cli/Dispatch.h"
 #include "cli/MatchCommandLine.h"
 #include "cli/Verbose.h"
@@ -38,27 +39,8 @@ public:
         "naming and ownership");
     configCommand_->require_subcommand(1, 1);
     auto &show = *configCommand_->add_subcommand(
-        "show", "Show resolved YAML defaults and ordered discovery");
-    show.add_option_function<std::string>(
-            "--config",
-            [this](const std::string &value) {
-              if (value.empty())
-                throw CLI::ValidationError("--config must not be empty");
-              config_.configurationFile = value;
-            },
-            "YAML file; lookup is --config, FACTS_TOOL_CONFIG, project, XDG, HOME")
-        ->trigger_on_parse()
-        ->type_name("FILE");
-    show.add_option_function<std::string>(
-            "--conf",
-            [this](const std::string &value) {
-              if (value.empty())
-                throw CLI::ValidationError("--conf must not be empty");
-              config_.direct = value;
-            },
-            "Direct database override; bypasses generated naming and ownership")
-        ->trigger_on_parse()
-        ->type_name("FILE");
+        "show", "Show resolved YAML defaults (yaml-cpp 0.9.0) and ordered discovery");
+    configurationOptions(show, config_.direct, config_.configurationFile);
   }
 
   std::expected<Command, int> parse(int argc, char **argv) {
@@ -110,12 +92,7 @@ private:
                     "SQLite database for extracted facts")
         ->required()
         ->type_name("FILE");
-    command
-        .add_option("-c,--conf", extract_.configuration,
-                    "Project database; YAML yaml-cpp 0.9.0 resolver supplies defaults")
-        ->type_name("FILE");
-    command.add_option("--config", extract_.configurationFile,
-                       "YAML defaults file (yaml-cpp 0.9.0; --config then env/project/XDG/HOME)");
+    configurationOptions(command, extract_.configuration, extract_.configurationFile);
     command
         .add_option_function<std::string>(
             "--extra-arg",
@@ -133,12 +110,7 @@ private:
   void configureImport(CLI::App &command) {
     importCommand_ = &command;
     configureVerbosity(command, import_.verbosity);
-    command
-        .add_option("-c,--conf", import_.configuration,
-                    "Project database; YAML yaml-cpp 0.9.0 resolver supplies defaults")
-        ->type_name("FILE");
-    command.add_option("--config", import_.configurationFile,
-                       "YAML defaults file (yaml-cpp 0.9.0; --config then env/project/XDG/HOME)");
+    configurationOptions(command, import_.configuration, import_.configurationFile);
     command
         .add_option("-p,--compilation-database", import_.compilationDatabase,
                     "Directory containing compile_commands.json")
@@ -177,12 +149,7 @@ private:
                     "SQLite database for extracted dependency facts")
         ->required()
         ->type_name("FILE");
-    command
-        .add_option("-c,--conf", dependency_.configuration,
-                    "Project database; YAML yaml-cpp 0.9.0 resolver supplies defaults")
-        ->type_name("FILE");
-    command.add_option("--config", dependency_.configurationFile,
-                       "YAML defaults file (yaml-cpp 0.9.0; --config then env/project/XDG/HOME)");
+    configurationOptions(command, dependency_.configuration, dependency_.configurationFile);
     command
         .add_option_function<std::string>(
             "--extra-arg",

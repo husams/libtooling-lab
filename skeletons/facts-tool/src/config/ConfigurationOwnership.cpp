@@ -1,4 +1,5 @@
 #include "config/Configuration.h"
+#include "config/ConfigurationLock.h"
 
 #include <sqlite3.h>
 #include <filesystem>
@@ -6,12 +7,18 @@
 namespace facts::config {
 std::expected<void, std::string> ensureOwnedDatabase(const Resolved &resolved) {
   std::error_code error;
-  const bool existed = std::filesystem::exists(resolved.database, error);
+  auto target = renderDatabasePath(resolved);
+  if (!target) return std::unexpected(target.error());
   std::filesystem::create_directories(resolved.database.parent_path(), error);
   if (error) return std::unexpected(error.message());
+  auto lock = detail::ParentLock::acquire(resolved.database.parent_path());
+  if (!lock) return std::unexpected(lock.error());
+  target = renderDatabasePath(resolved);
+  if (!target) return std::unexpected(target.error());
+  const bool existed = std::filesystem::exists(resolved.database, error);
   sqlite3 *db = nullptr;
   if (sqlite3_open_v2(resolved.database.c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) != SQLITE_OK) {
-    const auto message = db ? sqlite3_errmsg(db) : "sqlite3_open_v2 failed";
+    const auto message = std::string(db ? sqlite3_errmsg(db) : "sqlite3_open_v2 failed");
     if (db) sqlite3_close(db);
     return std::unexpected("cannot create project configuration: " + std::string(message));
   }
@@ -33,16 +40,16 @@ std::expected<void, std::string> ensureOwnedDatabase(const Resolved &resolved) {
     sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr);
     return finish(message);
   }
-  const auto existing = status == SQLITE_ROW
-                            ? reinterpret_cast<const char *>(
-                                  sqlite3_column_text(statement, 0))
-                            : nullptr;
+  const bool hasOwner = status == SQLITE_ROW;
+  const std::string existing = hasOwner
+      ? reinterpret_cast<const char *>(sqlite3_column_text(statement, 0)) : "";
   sqlite3_finalize(statement);
   const auto collision = "generated conf path collision: " + resolved.database.string() +
                          "; use --conf to select an existing database explicitly";
-  if (existing && resolved.projectRoot.string() != existing) { sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr); return finish(collision); }
-  if (existed && !existing) { sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr); return finish(collision); }
-  if (existing == nullptr) {
+  if ((hasOwner && resolved.projectRoot.string() != existing) || (existed && !hasOwner)) {
+    sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr); return finish(collision);
+  }
+  if (!hasOwner) {
     if (sqlite3_prepare_v2(db, "INSERT INTO generated_conf_owner VALUES(?)", -1,
                            &statement, nullptr) != SQLITE_OK) {
       const auto message = std::string(sqlite3_errmsg(db));

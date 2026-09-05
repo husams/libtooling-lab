@@ -29,7 +29,8 @@ struct Resolved {
   std::vector<std::string> discovery;
 };
 
-std::expected<Resolved, std::string> resolve(const Request &request);
+std::expected<Resolved, std::string> resolve(const Request &request,
+                                           Resolved *partial = nullptr);
 std::expected<Resolved, std::string>
 readYaml(const std::filesystem::path &path, Resolved result);
 std::expected<std::filesystem::path, std::string>

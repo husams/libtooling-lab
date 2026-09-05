@@ -5,6 +5,7 @@
 #include <yaml-cpp/parser.h>
 #include <fstream>
 #include <set>
+#include <regex>
 
 namespace facts::config {
 namespace {
@@ -12,9 +13,15 @@ std::expected<void, std::string> scalar(const YAML::Node &node,
                                         std::string_view key) {
   if (!node || node.IsNull() || !node.IsScalar())
     return std::unexpected(std::string(key) + " must be a nonempty string");
-  if (node.Scalar().empty() || node.Scalar().find_first_of("\0\n") !=
-                                    std::string::npos)
+  if ((key != "extra_args" && node.Scalar().empty()) ||
+      node.Scalar().find('\0') != std::string::npos ||
+      node.Scalar().find('\n') != std::string::npos)
     return std::unexpected(std::string(key) + " must be a nonempty string");
+  static const std::regex nonString(
+      R"(^([+-]?([0-9][0-9_]*(\.[0-9_]*)?([eE][+-]?[0-9]+)?|\.[0-9]+([eE][+-]?[0-9]+)?|0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|\.inf)|\.nan|true|false|yes|no|on|off)$)",
+      std::regex::icase);
+  if (node.Tag() == "?" && std::regex_match(node.Scalar(), nonString))
+    return std::unexpected(std::string(key) + " must be a string (quote numeric/boolean tokens)");
   return {};
 }
 }
@@ -22,6 +29,9 @@ std::expected<void, std::string> scalar(const YAML::Node &node,
 std::expected<Resolved, std::string>
 readYaml(const std::filesystem::path &path, Resolved result) {
   try {
+    std::error_code error;
+    if (!std::filesystem::is_regular_file(path, error))
+      return std::unexpected("cannot read configuration: not a regular file: " + path.string());
     std::ifstream input(path);
     if (!input)
       return std::unexpected("cannot read configuration: " + path.string());
@@ -50,6 +60,7 @@ readYaml(const std::filesystem::path &path, Resolved result) {
       if (key != "conf_root" && key != "conf_template" && key != "extra_args")
         return std::unexpected("unknown configuration key: " + key);
       if (key != "extra_args") {
+        if (!result.generated) continue;
         if (auto valid = scalar(entry.second, key); !valid)
           return std::unexpected(valid.error());
         if (key == "conf_root") {

@@ -5,9 +5,10 @@
 namespace facts::commands {
 std::expected<int, std::string>
 runConfiguration(const cli::ConfigOptions &options) {
-  auto value = config::resolve({options.configurationFile, options.direct, false});
-  if (!value)
-    return std::unexpected("facts-tool: configuration error: " + value.error());
+  config::Resolved partial;
+  auto result = config::resolve({options.configurationFile, options.direct, false}, &partial);
+  const auto *value = result ? &*result : &partial;
+  std::cout << "parser: YAML / yaml-cpp 0.9.0\n";
   std::cout << "project_root: " << value->projectRoot << '\n';
   std::cout << "conf: " << value->database << '\n';
   std::cout << "conf_root: " << value->storageRoot << '\n';
@@ -21,6 +22,8 @@ runConfiguration(const cli::ConfigOptions &options) {
   std::cout << '\n';
   std::cout << "discovery:\n";
   for (const auto &candidate : value->discovery) std::cout << "- " << candidate << '\n';
+  if (!result)
+    return std::unexpected("facts-tool: configuration error: " + result.error());
   return 0;
 }
 }

@@ -1,6 +1,7 @@
 #include "commands/Import.h"
 
 #include "commands/CompilationDatabase.h"
+#include "commands/CompilationViews.h"
 #include "commands/ExtraArguments.h"
 #include "commands/ConfigurationSupport.h"
 #include "commands/IncludedFiles.h"
@@ -98,14 +99,12 @@ registeredFileCount(FileManager &files) {
   });
 }
 
-// Extraction discovers the files it needs through the compile commands this
-// import has just stored, not through the ones it was handed: storing a
-// command sanitizes its flags and rewrites its paths, and a set discovered
-// before that round trip is not the set discovered after it.
+// The runtime view includes non-persisted YAML defaults; selected sources also
+// enumerate fixed databases, whose getAllCompileCommands() is empty.
 std::expected<std::vector<std::string>, std::string>
 discoverRegistryFiles(const CompilationDatabase &stored,
                       const std::vector<std::string> &sources) {
-  return discoverCompilationFiles(stored, {})
+  return discoverCompilationFiles(stored, sources)
       .and_then([&](CompilationFiles discovered) {
         reportDiagnostics(discovered.diagnostics);
         return discoverIncludedFiles(stored, sources)
@@ -165,7 +164,8 @@ registerFiles(FileManager &files, const CompilationDatabase &stored,
 
 std::expected<int, std::string> import(const cli::ImportOptions &options,
                                        std::vector<ProjectComponent> components,
-                                       CompilationDatabasePtr database) {
+                                       CompilationDatabasePtr database,
+                                       CompilationDatabasePtr applied) {
   cli::logVerbose(options.verbosity, 2,
                   "facts-tool: import: requested_sources={}, components={}",
                   options.sources.size(), components.size());
@@ -193,16 +193,7 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
               return cli::runStage(
                          options.verbosity, "import", "register files",
                          [&] {
-                           return loadStoredCompilationDatabase(
-                                      options.configuration)
-                               .transform([&](CompilationDatabasePtr stored) {
-                                 return appendExtraArguments(
-                                     std::move(stored),
-                                     options.defaultExtraArguments);
-                               })
-                               .and_then([&](CompilationDatabasePtr applied) {
-                                 return registerFiles(files, *applied, sources);
-                               });
+                           return registerFiles(files, *applied, sources);
                          })
                   .and_then(
                       [&](std::size_t) { return registeredFileCount(files); })
@@ -221,10 +212,11 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
 
 std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
   auto resolved = loadConfiguration(options.configuration,
-                                    options.configurationFile, false);
+                                    options.configurationFile, false, true);
   if (!resolved) return std::unexpected(resolved.error());
   auto configured = options;
   configured.configuration = resolved->database.string();
+  configured.defaultExtraArguments = resolved->extraArguments;
   return cli::runStage(configured.verbosity, "import", "parse components",
                        [&] { return parseComponents(configured.components); })
       .and_then([&](std::vector<ProjectComponent> components) {
@@ -233,18 +225,19 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
               return cli::runStage(
                          configured.verbosity, "import",
                          "load compilation database", [&] {
-                           return loadCompilationDatabase(configured,
-                                                          explicitArguments);
+                           return loadCompilationDatabase(configured, {});
                          })
                   .and_then([&](CompilationDatabasePtr database) {
                     if (resolved->generated) {
                       auto owned = config::ensureOwnedDatabase(*resolved);
                       if (!owned)
                         return std::expected<int, std::string>(
-                            std::unexpected(owned.error()));
+                            std::unexpected("facts-tool: configuration error: " + owned.error()));
                     }
+                    auto views = compilationViews(std::move(database),
+                        configured.defaultExtraArguments, explicitArguments);
                     return import(configured, std::move(components),
-                                  std::move(database));
+                                  std::move(views.stored), std::move(views.applied));
                   });
             });
       });

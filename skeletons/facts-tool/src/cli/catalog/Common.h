@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cli/catalog/Options.h"
+#include "cli/ConfigurationOptions.h"
 #include <CLI/CLI.hpp>
 
 namespace facts::cli {
@@ -9,12 +10,7 @@ namespace facts::cli {
 // and on each of its leaves, so `-c` works on either side of the subcommand.
 template <typename Options>
 void catalogOptions(CLI::App &command, Options &options) {
-  command
-      .add_option("-c,--conf", options.configuration,
-                  "Project database; YAML yaml-cpp 0.9.0 defaults use project/XDG/HOME lookup")
-      ->type_name("FILE");
-  command.add_option("--config", options.configurationFile,
-                     "YAML yaml-cpp 0.9.0 defaults; --config overrides env/project/XDG/HOME");
+  configurationOptions(command, options.configuration, options.configurationFile);
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
       ->expected(0, 1)
       ->default_str("1")

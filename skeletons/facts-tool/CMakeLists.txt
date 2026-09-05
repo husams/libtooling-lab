@@ -435,8 +435,12 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_BINARY_DIR}/project-configuration.sqlite
             ${CMAKE_CURRENT_SOURCE_DIR}
   )
-  add_executable(configuration-test tests/ConfigurationTest.cpp)
-  target_link_libraries(configuration-test PRIVATE facts-config)
+  add_executable(configuration-test tests/ConfigurationTest.cpp
+    tests/configuration/Schema.cpp tests/configuration/Paths.cpp
+    tests/configuration/Discovery.cpp tests/configuration/Arguments.cpp
+    tests/configuration/Ownership.cpp
+    tests/configuration/Policies.cpp)
+  target_link_libraries(configuration-test PRIVATE facts-config facts-clang)
   add_test(NAME configuration COMMAND configuration-test)
   add_executable(
     storage-schema-test
@@ -638,4 +642,11 @@ if(BUILD_TESTING)
   # The suite parses every fixture once per scenario; a slower box needs well
 # over the 120s this used to allow.
 set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 600)
+  # Test assertions include required operations; execute them in release builds too.
+  get_property(FACTS_LOCAL_TARGETS DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+  foreach(FACTS_TEST_TARGET IN LISTS FACTS_LOCAL_TARGETS)
+    if(FACTS_TEST_TARGET MATCHES "-test$")
+      target_compile_options(${FACTS_TEST_TARGET} PRIVATE -UNDEBUG)
+    endif()
+  endforeach()
 endif()

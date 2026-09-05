@@ -238,7 +238,7 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
 std::expected<int, std::string>
 runDependency(const cli::DependencyOptions &options) {
   auto resolved = loadConfiguration(options.configuration,
-                                    options.configurationFile, false);
+                                    options.configurationFile, false, true);
   if (!resolved) return std::unexpected(resolved.error());
   auto configured = options;
   configured.configuration = resolved->database.string();
@@ -256,8 +256,8 @@ runDependency(const cli::DependencyOptions &options) {
         });
       })
       .and_then([&](CompilationDatabasePtr database) {
-        return mergedArguments(options.defaultExtraArguments,
-                               options.extraArguments)
+        return mergedArguments(configured.defaultExtraArguments,
+                               configured.extraArguments)
             .transform([&](std::vector<std::string> arguments) {
               return appendExtraArguments(std::move(database), arguments);
             });

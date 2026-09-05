@@ -7,11 +7,11 @@
 namespace facts::commands {
 inline std::expected<config::Resolved, std::string>
 loadConfiguration(std::string_view direct, std::string_view selector,
-                  bool create) {
+                  bool create, bool compilerDefaults = false) {
   const bool directOverride = !direct.empty() ||
                               config::detail::present("FACTS_TOOL_CONF");
   auto result = config::resolve({std::string(selector), std::string(direct),
-                                 create, !directOverride});
+                                 create, compilerDefaults || !directOverride});
   if (!result) return std::unexpected("facts-tool: configuration error: " + result.error());
   if (create && result->generated) {
     if (auto owned = config::ensureOwnedDatabase(*result); !owned)

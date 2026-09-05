@@ -181,7 +181,7 @@ std::expected<int, std::string> runExtractResolved(const cli::ExtractOptions &op
 
 std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
   auto resolved = loadConfiguration(options.configuration,
-                                    options.configurationFile, false);
+                                    options.configurationFile, false, true);
   if (!resolved) return std::unexpected(resolved.error());
   auto configured = options;
   configured.configuration = resolved->database.string();

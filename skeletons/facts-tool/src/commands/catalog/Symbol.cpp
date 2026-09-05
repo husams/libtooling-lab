@@ -28,11 +28,15 @@ catalog::Result<int> renderScriptOutput(const cli::SymbolOptions &options,
 
 catalog::Result<int> runSymbol(const cli::SymbolOptions &options) {
   auto configured = options;
-  if (!options.configuration.empty() || !options.configurationFile.empty()) {
+  if (!options.configuration.empty() || !options.configurationFile.empty() ||
+      config::detail::present("FACTS_TOOL_CONF")) {
     auto resolved = loadConfiguration(options.configuration,
                                       options.configurationFile, false);
     if (!resolved) return std::unexpected(resolved.error());
     configured.configuration = resolved->database.string();
+    if (!std::filesystem::exists(resolved->database))
+      return std::unexpected("project configuration database not found: " +
+                             configured.configuration);
   }
   const auto name = configured.action == cli::SymbolOptions::Action::show
                         ? std::optional{configured.qualifiedName}
