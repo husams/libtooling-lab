@@ -9,10 +9,12 @@ struct ExtractOptions {
   int verbosity = 0;
   std::string output;
   bool outputFromTemplate = false;
+  bool outputProvided = false;
   std::string configuration;
   std::string configurationFile;
   std::vector<std::string> defaultExtraArguments;
   std::vector<std::string> extraArguments;
+  bool extraArgumentsProvided = false;
   std::vector<std::string> sources;
 };
 struct ImportOptions {
@@ -23,16 +25,19 @@ struct ImportOptions {
   std::string compilationDatabase;
   std::vector<std::string> components;
   std::vector<std::string> extraArguments;
+  bool extraArgumentsProvided = false;
   std::vector<std::string> sources;
 };
 struct DependencyOptions {
   int verbosity = 0;
   std::string output;
   bool outputFromTemplate = false;
+  bool outputProvided = false;
   std::string configuration;
   std::string configurationFile;
   std::vector<std::string> defaultExtraArguments;
   std::vector<std::string> extraArguments;
+  bool extraArgumentsProvided = false;
   std::vector<std::string> sources;
 };
 struct CallGraphOptions {

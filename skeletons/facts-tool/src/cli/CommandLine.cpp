@@ -88,19 +88,22 @@ private:
   void configureExtract(CLI::App &command) {
     extractCommand_ = &command;
     configureVerbosity(command, extract_.verbosity);
-    command
-        .add_option("-o,--output", extract_.output,
-                    "SQLite database for extracted facts; defaults to "
-                    "facts_template when omitted")
-        ->type_name("FILE");
+    auto *output = command.add_option(
+        "-o,--output", extract_.output,
+        "SQLite database for extracted facts; defaults to facts_template "
+        "when omitted");
+    output->each([this](std::string) { extract_.outputProvided = true; });
+    output->type_name("FILE");
     configurationOptions(command, extract_.configuration, extract_.configurationFile);
     command
         .add_option_function<std::string>(
             "--extra-arg",
             [this](const std::string &argument) {
+              extract_.extraArgumentsProvided = true;
               extract_.extraArguments.push_back(argument);
             },
-            "Compiler argument appended after YAML tokens; shell-tokenized and repeatable")
+            "Compiler argument replacing YAML extra_args; shell-tokenized and "
+            "repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
     command.add_option(
@@ -130,9 +133,10 @@ private:
         .add_option_function<std::string>(
             "--extra-arg",
             [this](const std::string &argument) {
+              import_.extraArgumentsProvided = true;
               import_.extraArguments.push_back(argument);
             },
-            "Compiler argument appended after YAML tokens to fixed-command or "
+            "Compiler argument replacing YAML extra_args for fixed-command or "
             "compile_commands.json imports; shell-tokenized and repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
@@ -145,19 +149,22 @@ private:
   void configureDependency(CLI::App &command) {
     dependencyCommand_ = &command;
     configureVerbosity(command, dependency_.verbosity);
-    command
-        .add_option("-o,--output", dependency_.output,
-                    "SQLite database for extracted dependency facts; "
-                    "defaults to facts_template when omitted")
-        ->type_name("FILE");
+    auto *output = command.add_option(
+        "-o,--output", dependency_.output,
+        "SQLite database for extracted dependency facts; defaults to "
+        "facts_template when omitted");
+    output->each([this](std::string) { dependency_.outputProvided = true; });
+    output->type_name("FILE");
     configurationOptions(command, dependency_.configuration, dependency_.configurationFile);
     command
         .add_option_function<std::string>(
             "--extra-arg",
             [this](const std::string &argument) {
+              dependency_.extraArgumentsProvided = true;
               dependency_.extraArguments.push_back(argument);
             },
-            "Compiler argument appended after YAML tokens; shell-tokenized and repeatable")
+            "Compiler argument replacing YAML extra_args; shell-tokenized and "
+            "repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
     command

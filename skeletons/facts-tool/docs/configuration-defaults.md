@@ -6,10 +6,13 @@ the CLI, an explicit `--config`/`FACTS_TOOL_CONFIG` file, the nearest project
 `.facts-tool.yaml`, the user file at `$XDG_CONFIG_HOME/facts-tool/config.yaml`
 (or `$HOME/.config/facts-tool/config.yaml`), then built-in defaults. A missing
 file at any tier is not an error; an existing but invalid file at any tier is
-a configuration error, even if a higher tier would have won. `extra_args` is
-the one exception: instead of one tier winning, it concatenates in a fixed
-order (user, then project, then the `--config` file, then CLI `--extra-arg`)
-regardless of which tier supplied the other keys. Explicit selectors are
+a configuration error, even if a higher tier would have won. Every explicitly
+supplied CLI value overrides its corresponding YAML setting. Among YAML files,
+`extra_args` concatenates in a fixed order (user, then project, then the
+`--config` file). Supplying any CLI `--extra-arg` replaces that entire merged
+YAML argument list, including non-conflicting tokens; omitting `--extra-arg`
+uses the merged YAML list. Overrides apply per option, so other YAML defaults
+remain available. Explicit selectors are
 cwd-relative; a missing explicit `--config`/`FACTS_TOOL_CONFIG` file fails.
 Relative `XDG_CONFIG_HOME` is an error. Empty selectors/overrides fail.
 
@@ -54,9 +57,10 @@ that declared it) and anchors there. For example
 `conf_template: "/srv/index/{filename}.db"` yields `/srv/index/<name>.db`. A generated database records its owning
 project, so a collision is rejected. Use `--conf PATH` or `FACTS_TOOL_CONF`
 for an existing database and to bypass generated naming and ownership;
-`--conf` beats `FACTS_TOOL_CONF`, and conf-only (catalog/symbol) commands
-skip YAML entirely under either. Compiler consumers (import, extract,
-dependency analysis) still load and merge YAML `extra_args` despite a direct
+`--conf` beats `FACTS_TOOL_CONF`, and conf-only catalog commands skip YAML
+entirely under either. A symbol command with an omitted `--facts` still
+loads YAML to resolve its independent `facts_template`. Compiler consumers (import, extract,
+dependency analysis) still load YAML defaults despite a direct
 override, ignoring the now-unused `conf_root`/`conf_template` values
 (including their validation); `facts_template` is never bypassed by a direct
 override, since it governs the separate facts database, not the overridden
@@ -97,12 +101,15 @@ rechecked immediately before opening. Concurrent creators serialize; unowned
 existing databases and different project owners are rejected.
 
 `extra_args` entries are complete compiler tokens. Repeatable CLI
-`--extra-arg` values are shell-tokenized once and appended last; they
-preserve duplicates and option/operand order. The effective command is base
-compile options, then the merged YAML tokens, then flattened CLI fragments.
+`--extra-arg` values are shell-tokenized once, preserving duplicates and
+option/operand order. The effective command is base compile options followed
+by either the explicit CLI fragments or, when none were supplied, the merged
+YAML tokens. For example, YAML `['-std=c++17', '-DYAML_ONLY=1']` with
+`--extra-arg=-std=c++23` contributes only `-std=c++23`; `-DYAML_ONLY=1` is
+removed even though it does not conflict with the CLI token.
 Import stores the original compile options plus explicit CLI fragments,
-while extraction and dependency analysis apply current merged defaults at
-runtime. For example YAML `['-DNAME=two words']` supplies one token; CLI
+while extraction and dependency analysis select current YAML or explicit CLI
+extras at runtime. For example YAML `['-DNAME=two words']` supplies one token; CLI
 `--extra-arg="-DVALUE=1 '-DNAME=two words'"` supplies two. Unterminated
 quoting fails; neither form executes a shell or expands environment
 variables/globs. Later switches take precedence only where the selected
@@ -119,7 +126,12 @@ Stored-command readback may expand include-search paths to absolute paths
 through the existing component-label mapping and add `--driver-mode=g++`;
 these changes preserve the command's meaning. The B-032 retention scenarios
 check both JSON representations, independent base/YAML requirements and
-current CLI additions across import, extraction and dependency analysis.
+CLI replacement of YAML extras across import, extraction and dependency
+analysis. When CLI extras are present, the original JSON arguments still
+remain intact; only the YAML extra-argument contribution is replaced.
+
+See [CLI/YAML precedence coverage](cli-yaml-precedence.md) for supported
+settings, aliases, defaults, and command coverage.
 
 Only one YAML mapping/document is permitted per file. Empty documents and
 empty argument lists are valid. Unknown/duplicate keys, nulls, wrong types,

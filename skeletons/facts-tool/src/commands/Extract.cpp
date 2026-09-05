@@ -166,7 +166,8 @@ std::expected<int, std::string> runExtractResolved(const cli::ExtractOptions &op
       })
       .and_then([&](CompilationDatabasePtr database) {
         return mergedArguments(options.defaultExtraArguments,
-                               options.extraArguments)
+                               options.extraArguments,
+                               options.extraArgumentsProvided)
             .transform([&](std::vector<std::string> arguments) {
               return appendExtraArguments(std::move(database), arguments);
             });
@@ -191,12 +192,15 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
                                     options.configurationFile, false, true);
   if (!resolved) return std::unexpected(resolved.error());
   auto configured = options;
-  if (configured.output.empty()) {
+  if (!configured.outputProvided) {
     auto output = resolveFactsOutput(*resolved, options.sources);
     if (!output) return std::unexpected(output.error());
     configured.output = output->string();
     configured.outputFromTemplate = true;
   }
+  if (configured.output.empty())
+    return std::unexpected(
+        "facts-tool: usage error: -o/--output must not be empty");
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = std::move(resolved->extraArguments);
   return runExtractResolved(configured);

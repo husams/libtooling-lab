@@ -8,10 +8,8 @@ class CompileDefaults:
         self.header = defaults.cwd / "yaml header.hpp"
         self.header.write_text("#define YAML_SEEN 1\n")
         self.source.write_text("struct Initial {};\n")
-        # A user-tier extra_args entry proves the merge order (user, then
-        # project, then CLI): -DVALUE=0 here is overridden by the project's
-        # -DVALUE=2 and then the CLI's -DVALUE=3, so require_effect(3)
-        # below only passes if that order actually reaches the compiler.
+        # The user/project YAML values are a fallback when CLI extras are
+        # omitted; explicit CLI extras replace that YAML list entirely.
         defaults.write("user", extra_args=["-DVALUE=0", "-DUSER_SEEN=1"])
         defaults.write(conf_root=str(defaults.root / "store"),
                        conf_template="{filename}.db",
@@ -25,7 +23,7 @@ class CompileDefaults:
         (defaults.cwd / "compile_commands.json").write_text(json.dumps([{
             "directory": str(defaults.cwd), "file": str(self.source),
             "arguments": self.base}]))
-        self.cli = ["--extra-arg=-DVALUE=3 '-DCLI_SPACE=two words'"]
+        self.cli = ["--extra-arg=-DVALUE=3 '-DUSER_SEEN=1' '-DCLI_SPACE=two words'"]
         self.result = self.run("import")
         assert self.result.returncode == 0, self.result.stderr
         self.original = self.options()
@@ -62,7 +60,7 @@ class CompileDefaults:
             return name in {x[0] for x in db.execute("SELECT name FROM file")}
 
     def require_effect(self, value):
-        self.source.write_text(f"#if VALUE != {value} || !YAML_SEEN || !USER_SEEN\n"
+        self.source.write_text(f"#if VALUE != {value} || !USER_SEEN\n"
             '#include "wrong_argument_order.h"\n#endif\nstruct Ordered {};\n')
 
     def verify(self):
@@ -77,10 +75,13 @@ class CompileDefaults:
         args = json.loads(result.stdout)[0]["arguments"]
         assert args.count("-DVALUE=3") == 1 and "-DVALUE=2" not in args, args
         assert "-include" not in args and "-DSPACE=value with spaces" not in args
-        assert args[-2:] == ["-DVALUE=3", "-DCLI_SPACE=two words"], args
+        expected_tail = ["-DVALUE=3", "-DUSER_SEEN=1", "-DCLI_SPACE=two words"]
         if self.kind == "json":
             normalized = [args[0], "--driver-mode=g++", *self.base[1:]]
-            assert args == normalized + args[-2:], args
+            assert args == normalized + expected_tail, args
+        else:
+            assert args[-len(expected_tail):] == expected_tail, args
+            assert args[0] == self.base[0] and args[1] == str(self.source), args
         with sqlite3.connect(self.db) as db:
             names = {x[0] for x in db.execute("SELECT name FROM file")}
         assert self.header.name in names

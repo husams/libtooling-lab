@@ -34,12 +34,11 @@ int main() {
 
   auto args = facts::commands::mergedArguments(
       {"-DNAME=value with spaces", "-include", "header.h"},
-      {"-DVALUE=1 '-DOTHER=two words'"});
+      {"-DVALUE=1 '-DOTHER=two words'"}, true);
   assert(args);
-  assert(args->size() == 5);
-  assert((*args)[1] == "-include");
-  assert((*args)[3] == "-DVALUE=1");
-  assert((*args)[4] == "-DOTHER=two words");
-  assert(!facts::commands::mergedArguments({}, {"'unterminated"}));
+  assert(args->size() == 2);
+  assert((*args)[0] == "-DVALUE=1");
+  assert((*args)[1] == "-DOTHER=two words");
+  assert(!facts::commands::mergedArguments({}, {"'unterminated"}, true));
   std::filesystem::remove_all(unmarked);
 }

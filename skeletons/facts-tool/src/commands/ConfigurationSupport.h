@@ -22,11 +22,10 @@ loadConfiguration(std::string_view direct, std::string_view selector,
 }
 inline std::expected<std::vector<std::string>, std::string>
 mergedArguments(const std::vector<std::string> &defaults,
-                const std::vector<std::string> &explicitValues) {
+                const std::vector<std::string> &explicitValues,
+                bool explicitProvided) {
   return tokenizeExtraArguments(explicitValues).transform([&](auto values) {
-    std::vector<std::string> result = defaults;
-    result.insert(result.end(), values.begin(), values.end());
-    return result;
+    return explicitProvided ? values : defaults;
   });
 }
 

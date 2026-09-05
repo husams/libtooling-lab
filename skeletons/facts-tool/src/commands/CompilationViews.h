@@ -24,11 +24,12 @@ struct CompilationViews {
 };
 inline CompilationViews compilationViews(CompilationDatabasePtr database,
     const std::vector<std::string> &defaults,
-    const std::vector<std::string> &explicitArguments) {
+    const std::vector<std::string> &explicitArguments,
+    bool explicitProvided) {
   std::shared_ptr<clang::tooling::CompilationDatabase> base = std::move(database);
-  auto runtime = defaults;
-  runtime.insert(runtime.end(), explicitArguments.begin(), explicitArguments.end());
-  return {appendExtraArguments(std::make_unique<SharedCompilationView>(base), explicitArguments),
+  const auto &runtime = explicitProvided ? explicitArguments : defaults;
+  return {appendExtraArguments(std::make_unique<SharedCompilationView>(base),
+                               explicitArguments),
           appendExtraArguments(std::make_unique<SharedCompilationView>(base), runtime)};
 }
 } // namespace facts::commands

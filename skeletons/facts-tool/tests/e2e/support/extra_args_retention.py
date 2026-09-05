@@ -9,6 +9,7 @@ class Retention:
         self.d = defaults
         self.db = defaults.root / "project.db"
         self.cli, self.yaml, self.version = [], False, "YAML"
+        self.runtime = False
         self.results = []
         write_sources(defaults)
         self.sources = [defaults.cwd / "unit_a.cpp", defaults.cwd / "sub/unit_b.cpp"]
@@ -41,6 +42,7 @@ class Retention:
         self.d.write(**({} if mode == "absent" else {"extra_args": args}))
 
     def run(self, family, cli=False, runtime=False):
+        self.runtime = runtime
         if family == "import":
             args = ["import", "--component", "fixture=.", "-p", str(self.d.cwd)]
         else:
@@ -71,7 +73,6 @@ class Retention:
         from support.retention_assertions import effects, commands
         for run in range(repeats):
             if family != "import" or run:
-                # Import persists explicit CLI additions; consumers reuse them.
-                self.run(family, cli if family == "import" else False)
+                self.run(family, cli)
             effects(self, family)
             commands(self)
