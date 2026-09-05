@@ -5,29 +5,6 @@
 namespace facts::config {
 namespace {
 
-enum class Presence { Optional, Required };
-
-// Checks one candidate file, records it in the discovery trail, and parses
-// it when present. A stat error is treated the same as "present" so the
-// underlying I/O failure surfaces from readTier() itself.
-std::expected<std::optional<Tier>, std::string>
-readCandidate(const std::filesystem::path &path, bool applyPathSettings,
-             Presence presence, Resolved &value) {
-  std::error_code error;
-  const bool exists = std::filesystem::exists(path, error);
-  if (!error && !exists) {
-    value.discovery.push_back(path.string() + " [absent]");
-    if (presence == Presence::Required)
-      return std::unexpected(detail::settingError(
-          "configuration", path.string(), "file not found", value.discovery));
-    return std::optional<Tier>{};
-  }
-  value.discovery.push_back(path.string() + (error ? " [inaccessible]" : " [found]"));
-  auto tier = readTier(path, applyPathSettings);
-  if (!tier) return std::unexpected(detail::keyError(tier.error(), path, value.discovery));
-  return std::optional<Tier>{std::move(*tier)};
-}
-
 std::expected<Resolved, std::string> generate(Resolved value) {
   if (value.storageRoot.empty()) {
     const auto data = detail::env("XDG_DATA_HOME");
@@ -78,14 +55,14 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
 
   detail::MergeContext context;
   if (!selector.empty()) {
-    auto configFile = readCandidate((detail::cwd() / selector).lexically_normal(),
-                                    value.generated, Presence::Required, value);
+    auto configFile = detail::readCandidate((detail::cwd() / selector).lexically_normal(),
+                                    value.generated, detail::Presence::Required, value);
     if (partial) *partial = value;
     if (!configFile) return std::unexpected(configFile.error());
     context.configFile = std::move(*configFile);
   }
-  auto project = readCandidate(detail::projectConfigPath(value.projectRoot), value.generated,
-                               Presence::Optional, value);
+  auto project = detail::readCandidate(detail::projectConfigPath(value.projectRoot), value.generated,
+                               detail::Presence::Optional, value);
   if (partial) *partial = value;
   if (!project) return std::unexpected(project.error());
   context.project = std::move(*project);
@@ -94,7 +71,7 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
   if (userCandidate.starts_with("${HOME}")) {
     value.discovery.push_back(userCandidate + " [inaccessible: HOME is unset]");
   } else {
-    auto user = readCandidate(userCandidate, value.generated, Presence::Optional, value);
+    auto user = detail::readCandidate(userCandidate, value.generated, detail::Presence::Optional, value);
     if (partial) *partial = value;
     if (!user) return std::unexpected(user.error());
     context.user = std::move(*user);

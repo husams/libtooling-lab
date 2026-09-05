@@ -77,4 +77,27 @@ inline std::string keyError(const std::string &reason, const std::filesystem::pa
                       setting ? reason.substr(split + 1) : reason, discovery);
 }
 
+enum class Presence { Optional, Required };
+
+// Checks one candidate file, records it in the discovery trail, and parses
+// it when present. A stat error is treated the same as "present" so the
+// underlying I/O failure surfaces from readTier() itself.
+inline std::expected<std::optional<Tier>, std::string>
+readCandidate(const std::filesystem::path &path, bool applyPathSettings,
+             Presence presence, Resolved &value) {
+  std::error_code error;
+  const bool exists = std::filesystem::exists(path, error);
+  if (!error && !exists) {
+    value.discovery.push_back(path.string() + " [absent]");
+    if (presence == Presence::Required)
+      return std::unexpected(settingError("configuration", path.string(),
+                                          "file not found", value.discovery));
+    return std::optional<Tier>{};
+  }
+  value.discovery.push_back(path.string() + (error ? " [inaccessible]" : " [found]"));
+  auto tier = readTier(path, applyPathSettings);
+  if (!tier) return std::unexpected(keyError(tier.error(), path, value.discovery));
+  return std::optional<Tier>{std::move(*tier)};
+}
+
 } // namespace facts::config::detail
