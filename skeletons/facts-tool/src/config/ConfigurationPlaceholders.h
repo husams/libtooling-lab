@@ -74,6 +74,12 @@ expandPlaceholders(std::string_view text, const PlaceholderContext &context) {
     const auto key = text.substr(start, end - start);
     auto value = env ? environmentValue(key) : placeholderValue(key, context);
     if (!value) return std::unexpected(value.error());
+    // {user}/{project_root}/{project_name} are not pre-checked like the
+    // relativePath/filename context fields above, so validate every
+    // substituted value here before it is appended, once, unconditionally.
+    if (invalidCharacters(*value))
+      return std::unexpected("template placeholder {" + std::string(key) +
+                             "} has invalid characters");
     result += *value;
     at = end + 1;
   }

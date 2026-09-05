@@ -94,9 +94,12 @@ readCandidate(const std::filesystem::path &path, bool applyPathSettings,
                                           "file not found", value.discovery));
     return std::optional<Tier>{};
   }
-  value.discovery.push_back(path.string() + (error ? " [inaccessible]" : " [found]"));
   auto tier = readTier(path, applyPathSettings);
-  if (!tier) return std::unexpected(keyError(tier.error(), path, value.discovery));
+  if (!tier) {
+    value.discovery.push_back(path.string() + " [invalid]");
+    return std::unexpected(keyError(tier.error(), path, value.discovery));
+  }
+  value.discovery.push_back(path.string() + (error ? " [inaccessible]" : " [found]"));
   return std::optional<Tier>{std::move(*tier)};
 }
 

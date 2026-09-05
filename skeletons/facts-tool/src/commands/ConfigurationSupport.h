@@ -41,23 +41,20 @@ resolveFactsOutput(const config::Resolved &resolved,
   });
 }
 
-// Extract and dependency analysis write the facts database, so once the
-// path is resolved they materialize its parent directory; symbol commands
-// are read-only and must call resolveFactsOutput directly instead.
-inline std::expected<std::filesystem::path, std::string>
-resolveWritableFactsOutput(const config::Resolved &resolved,
-                          const std::vector<std::string> &sources) {
-  return resolveFactsOutput(resolved, sources)
-      .and_then([](std::filesystem::path path)
-                    -> std::expected<std::filesystem::path, std::string> {
-        std::error_code error;
-        std::filesystem::create_directories(path.parent_path(), error);
-        if (error)
-          return std::unexpected(
-              "facts-tool: configuration error: cannot create facts_template "
-              "directory: " +
-              error.message());
-        return path;
-      });
+// Extract and dependency analysis write the facts database. They must only
+// call this once every other applicable check (sources, database paths,
+// stored commands) has already passed, immediately before opening the
+// database, so a later failure never leaves a created directory behind;
+// symbol commands are read-only and never call it.
+inline std::expected<void, std::string>
+materializeFactsDirectory(const std::filesystem::path &path) {
+  std::error_code error;
+  std::filesystem::create_directories(path.parent_path(), error);
+  if (error)
+    return std::unexpected(
+        "facts-tool: configuration error: cannot create facts_template "
+        "directory: " +
+        error.message());
+  return {};
 }
 }

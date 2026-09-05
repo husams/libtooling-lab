@@ -26,9 +26,12 @@ inline void configurationOptions(CLI::App &command, std::string &direct,
       "Placeholders in conf_template/facts_template: {project_root}, {project_name}, "
       "{relative_path}, {filename}, {user}, and ${ENV_NAME}. A relative conf_root or "
       "template result anchors to the canonical project root, never to a YAML file's "
-      "directory; only ~/ expands. facts_template supplies the default --facts/-o for "
-      "extract, analyse dependency, and symbol when omitted. Canonical generated conf "
-      "paths must stay below conf_root and belong to one project. "
+      "directory; a raw literal absolute template is rejected, but a leading ~/ or a "
+      "placeholder (e.g. {project_root}) may make the result absolute, trusted as-is "
+      "aside from a symlink escaping through it. facts_template supplies the default "
+      "--facts/-o for extract, analyse dependency, and symbol when omitted, and is "
+      "never bypassed by --conf/FACTS_TOOL_CONF. A relative conf_template result must "
+      "stay below conf_root and belong to one project. "
       "Use config show for per-key provenance without mutation.");
 }
 } // namespace facts::cli

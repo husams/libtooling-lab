@@ -1,4 +1,5 @@
 #include "config/Configuration.h"
+#include "config/ConfigurationPlaceholders.h"
 #include "config/ConfigurationYamlEvents.h"
 
 #include <yaml-cpp/yaml.h>
@@ -9,6 +10,16 @@
 
 namespace facts::config {
 namespace {
+// A dummy substitution pass so an invalid template (unknown placeholder,
+// unmatched braces, unset ${ENV}) is a configuration error for the tier
+// that declared it, even if a higher tier's value wins the merge (B-030
+// C-3117): none of those failure modes depend on the real project context.
+std::expected<void, std::string> templateSyntax(std::string_view key, const std::string &text) {
+  return detail::expandPlaceholders(text, {})
+      .transform([](auto &&) {})
+      .transform_error([&](auto &&reason) { return std::string(key) + " " + reason; });
+}
+
 std::expected<void, std::string> scalar(const YAML::Node &node,
                                         std::string_view key) {
   if (!node || node.IsNull() || !node.IsScalar())
@@ -62,13 +73,26 @@ std::expected<Tier, std::string> readTier(const std::filesystem::path &path,
       if (key != "conf_root" && key != "conf_template" && key != "facts_template" &&
           key != "extra_args")
         return std::unexpected("unknown configuration key: " + key);
-      if (key != "extra_args") {
+      // facts_template governs the separate facts database and stays in
+      // effect regardless of a direct --conf/FACTS_TOOL_CONF override,
+      // which only bypasses the generated project *configuration* database
+      // (conf_root/conf_template); like extra_args it is always consumed.
+      if (key == "conf_root" || key == "conf_template") {
         if (!applyPathSettings) continue;
         if (auto valid = scalar(entry.second, key); !valid)
           return std::unexpected(valid.error());
         if (key == "conf_root") tier.confRoot = entry.second.Scalar();
-        if (key == "conf_template") tier.confTemplate = entry.second.Scalar();
-        if (key == "facts_template") tier.factsTemplate = entry.second.Scalar();
+        if (key == "conf_template") {
+          if (auto valid = templateSyntax(key, entry.second.Scalar()); !valid)
+            return std::unexpected(valid.error());
+          tier.confTemplate = entry.second.Scalar();
+        }
+      } else if (key == "facts_template") {
+        if (auto valid = scalar(entry.second, key); !valid)
+          return std::unexpected(valid.error());
+        if (auto valid = templateSyntax(key, entry.second.Scalar()); !valid)
+          return std::unexpected(valid.error());
+        tier.factsTemplate = entry.second.Scalar();
       } else {
         if (!entry.second || entry.second.IsNull() || !entry.second.IsSequence())
           return std::unexpected("extra_args must be a sequence of strings");

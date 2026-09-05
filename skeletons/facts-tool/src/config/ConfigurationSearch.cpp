@@ -53,29 +53,33 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
   if (!xdgConfig.empty() && !std::filesystem::path(xdgConfig).is_absolute())
     return std::unexpected("XDG_CONFIG_HOME must be absolute");
 
+  // Every tier is checked before failing, so an invalid file names its own
+  // setting/path and "config show" still reports the full discovery trail
+  // (partial provenance) rather than stopping at the first problem.
   detail::MergeContext context;
-  if (!selector.empty()) {
-    auto configFile = detail::readCandidate((detail::cwd() / selector).lexically_normal(),
-                                    value.generated, detail::Presence::Required, value);
+  std::string firstError;
+  const auto record = [&](auto result, auto &slot) {
     if (partial) *partial = value;
-    if (!configFile) return std::unexpected(configFile.error());
-    context.configFile = std::move(*configFile);
-  }
-  auto project = detail::readCandidate(detail::projectConfigPath(value.projectRoot), value.generated,
-                               detail::Presence::Optional, value);
-  if (partial) *partial = value;
-  if (!project) return std::unexpected(project.error());
-  context.project = std::move(*project);
+    if (result) slot = std::move(*result);
+    else if (firstError.empty()) firstError = result.error();
+  };
+  if (!selector.empty())
+    record(detail::readCandidate((detail::cwd() / selector).lexically_normal(), value.generated,
+                                 detail::Presence::Required, value),
+          context.configFile);
+  record(detail::readCandidate(detail::projectConfigPath(value.projectRoot), value.generated,
+                               detail::Presence::Optional, value),
+        context.project);
 
   const auto userCandidate = detail::userConfigCandidate();
   if (userCandidate.starts_with("${HOME}")) {
     value.discovery.push_back(userCandidate + " [inaccessible: HOME is unset]");
-  } else {
-    auto user = detail::readCandidate(userCandidate, value.generated, detail::Presence::Optional, value);
     if (partial) *partial = value;
-    if (!user) return std::unexpected(user.error());
-    context.user = std::move(*user);
+  } else {
+    record(detail::readCandidate(userCandidate, value.generated, detail::Presence::Optional, value),
+          context.user);
   }
+  if (!firstError.empty()) return std::unexpected(firstError);
 
   value = detail::mergeTiers(std::move(value), context);
   if (partial) *partial = value;
