@@ -11,9 +11,7 @@ void symbolOptions(CLI::App &command, SymbolOptions &options) {
       "-f,--facts", options.facts,
       "Extracted facts database; defaults to facts_template when omitted "
       "(project-scoped templates only)");
-  facts->each([&options, facts](std::string) {
-    if (facts->count() > 0) options.factsProvided = true;
-  });
+  facts->each([&options](std::string) { options.factsProvided = true; });
   facts->type_name("FILE");
   configurationOptions(command, options.configuration, options.configurationFile);
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")

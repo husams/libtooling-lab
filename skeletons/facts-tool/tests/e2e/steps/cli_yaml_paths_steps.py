@@ -63,3 +63,20 @@ def assert_equal_output(defaults):
     assert defaults.last.returncode == 0, defaults.last.stderr
     assert defaults.equal_path.is_file()
 
+
+@when(parsers.parse('I run "{family}" with repeated "{first}" and "{second}" output'))
+def run_repeated_output(defaults, family, first, second):
+    root, source = defaults.path_project
+    command = ["extract"] if family == "extract" else ["analyse", "dependency"]
+    defaults.before_duplicate = defaults.snapshot()
+    defaults.duplicate_paths = (root / "first.db", root / "second.db")
+    defaults.last = defaults.run(*command, first, defaults.duplicate_paths[0],
+                                 second, defaults.duplicate_paths[1], source)
+
+
+@then("the repeated output is rejected without mutation")
+def assert_repeated_output(defaults):
+    assert defaults.last.returncode == 2, defaults.last.stderr
+    assert not any(path.exists() for path in defaults.duplicate_paths)
+    assert not (defaults.path_project[0] / "yaml-facts.db").exists()
+    assert defaults.snapshot() == defaults.before_duplicate

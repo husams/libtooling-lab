@@ -25,6 +25,19 @@ Feature: Explicit path options override YAML paths (B-033)
     When I run extract with --output at the fallback path
     Then the equal fallback output succeeds
 
+  Scenario Outline: repeated output aliases remain parser errors for <family>
+    Given an output path precedence fixture
+    When I run "<family>" with repeated "<first>" and "<second>" output
+    Then the repeated output is rejected without mutation
+    Examples:
+      | family     | first    | second   |
+      | extract    | -o       | -o       |
+      | extract    | --output | --output |
+      | extract    | -o       | --output |
+      | dependency | -o       | -o       |
+      | dependency | --output | --output |
+      | dependency | --output | -o       |
+
   Scenario Outline: facts aliases select the requested database for symbol <action>
     Given a symbol path precedence fixture
     When I run symbol "<action>" with "<placement>" and "<alias>" facts

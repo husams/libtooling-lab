@@ -88,17 +88,12 @@ private:
   void configureExtract(CLI::App &command) {
     extractCommand_ = &command;
     configureVerbosity(command, extract_.verbosity);
-    command
-        .add_option_function<std::string>(
-            "-o,--output",
-            [this](const std::string &value) {
-              extract_.output = value;
-              extract_.outputProvided = true;
-            },
-            "SQLite database for extracted facts; defaults to facts_template "
-            "when omitted")
-        ->trigger_on_parse()
-        ->type_name("FILE");
+    auto *output = command.add_option(
+        "-o,--output", extract_.output,
+        "SQLite database for extracted facts; defaults to facts_template "
+        "when omitted");
+    output->each([this](std::string) { extract_.outputProvided = true; });
+    output->type_name("FILE");
     configurationOptions(command, extract_.configuration, extract_.configurationFile);
     command
         .add_option_function<std::string>(
@@ -154,17 +149,12 @@ private:
   void configureDependency(CLI::App &command) {
     dependencyCommand_ = &command;
     configureVerbosity(command, dependency_.verbosity);
-    command
-        .add_option_function<std::string>(
-            "-o,--output",
-            [this](const std::string &value) {
-              dependency_.output = value;
-              dependency_.outputProvided = true;
-            },
-            "SQLite database for extracted dependency facts; defaults to "
-            "facts_template when omitted")
-        ->trigger_on_parse()
-        ->type_name("FILE");
+    auto *output = command.add_option(
+        "-o,--output", dependency_.output,
+        "SQLite database for extracted dependency facts; defaults to "
+        "facts_template when omitted");
+    output->each([this](std::string) { dependency_.outputProvided = true; });
+    output->type_name("FILE");
     configurationOptions(command, dependency_.configuration, dependency_.configurationFile);
     command
         .add_option_function<std::string>(
