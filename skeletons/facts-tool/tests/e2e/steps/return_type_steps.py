@@ -191,7 +191,14 @@ def declaration_catalog(context: FactsToolContext):
                            str(context.facts_database_path)])
     require(result.returncode == 0, context.last_output)
     listed = [line.split(maxsplit=1)[1] for line in result.stdout.splitlines()[1:]]
-    require(sorted(listed) == sorted(name for (name,) in expected),
+    names = sorted((name for (name,) in expected), key=len, reverse=True)
+    # Listings now append callable signatures; retain the complete identity-set
+    # assertion, including names that themselves contain operator/lambda ().
+    listed_names = [next((name for name in names if declaration == name or
+                         declaration.startswith(name + "(") or
+                         declaration.startswith(name + " -> ")), declaration)
+                    for declaration in listed]
+    require(sorted(listed_names) == sorted(names),
             f"declaration catalog contains wrong symbols: {result.stdout}")
     require(context.facts_database_path.read_bytes() == before,
             "listing declarations changed stored return targets")
