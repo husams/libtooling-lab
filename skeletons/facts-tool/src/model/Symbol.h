@@ -77,10 +77,10 @@ enum SymbolBit : std::size_t {
   PolymorphicBit = 20,   // a record with a vtable
   ExternStorageBit = 21, // the declaration was written with extern storage
   // bits 22-23: constexpr/consteval/constinit field, see above
-  VolatileBit = 25, // volatile-qualified instance method
   NoexceptBit = 24, // declared not to throw. The written spec has fourteen
                     // spellings (EST_BasicNoexcept, EST_NoexceptTrue,
                     // EST_DynamicNone, ...) and one useful question.
+  VolatileBit = 25, // volatile-qualified instance method
 };
 
 // Kind / SubKind / Lang / Properties come from the base — one

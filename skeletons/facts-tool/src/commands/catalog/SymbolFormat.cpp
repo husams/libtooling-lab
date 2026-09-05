@@ -119,8 +119,7 @@ bool hasFlag(const SymbolFact &value, std::string_view flag) {
 
 std::string declaration(const SymbolFact &value) {
   auto result = value.qualifiedName;
-  if (value.type == "Function" || value.type == "FunctionTemplate" ||
-      value.type == "FunctionInstance") {
+  if (value.type == "Function") {
     std::vector<std::string> parameters;
     parameters.reserve(value.parameters.size());
     for (const auto &parameter : value.parameters)
