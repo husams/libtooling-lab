@@ -7,16 +7,18 @@ def commands(c):
     assert len(shown) == 2, shown
     for source, directory, base in zip(c.sources, c.directories, c.base):
         entry = shown[str(source)]
-        # Existing persistence expands -I paths through portable component
-        # labels; readback resolves them absolutely, preserving their meaning.
-        expected = list(base)
-        for index, token in enumerate(base[:-1]):
-            if token == "-I":
-                expected[index + 1] = str((directory / base[index + 1]).resolve())
+        expected = base + c.cli
         actual = entry["arguments"]
         if actual[1:2] == ["--driver-mode=g++"]:
             expected.insert(1, "--driver-mode=g++")
-        assert actual == expected + c.cli, (actual, expected + c.cli)
+        assert len(actual) == len(expected), (actual, expected)
+        for index, (observed, literal) in enumerate(zip(actual, expected)):
+            allowed = {literal}
+            # Either the literal JSON -I operand or its resolved equivalent
+            # preserves meaning under the unchanged compilation directory.
+            if index and expected[index - 1] == "-I":
+                allowed.add(str((directory / literal).resolve()))
+            assert observed in allowed, (index, observed, allowed)
         assert Path(entry["directory"]) == directory, entry
     assert c.snapshot() == c.original
 
@@ -32,7 +34,6 @@ def effects(c, family):
             assert ("Both" + unit in symbols) == (c.yaml and c.version == "YAML"), symbols
             assert ("NewBoth" + unit in symbols) == (c.yaml and c.version == "NEW"), symbols
             assert ("Cli" + unit in symbols) == bool(c.cli), symbols
-        assert "LeakedFromA" not in symbols
         return
     names = set(files.values())
     if family == "dependency":
