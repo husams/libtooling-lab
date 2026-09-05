@@ -36,6 +36,7 @@ pytest_plugins = (
     "steps.method_steps",
     "steps.parameter_default_steps",
     "steps.parameter_steps",
+    "steps.return_type_steps",
     "steps.catalog_common_steps",
     "steps.catalog_repository_steps",
     "steps.catalog_component_steps",

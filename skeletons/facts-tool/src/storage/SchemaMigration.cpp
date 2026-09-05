@@ -1,4 +1,5 @@
 #include "storage/SchemaMigration.h"
+#include "storage/ReturnTypeSchema.h"
 
 #include "storage/Sqlite.h"
 
@@ -360,6 +361,15 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
               return schemaVersion(database).and_then([database](int version) {
                 return version < 8
                            ? execute(database, relationSiteContextMigrationSql)
+                           : std::expected<void, std::error_code>{};
+              });
+            })
+            .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 9
+                           ? execute(database, returnTypeSchemaSql).and_then([&] {
+                               return execute(database, "PRAGMA user_version=9;");
+                             })
                            : std::expected<void, std::error_code>{};
               });
             });

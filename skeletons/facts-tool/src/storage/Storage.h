@@ -3,6 +3,7 @@
 
 #include "model/AnySymbol.h"
 #include "model/Relation.h"
+#include "model/ReturnType.h"
 #include "model/RelationSite.h"
 #include "model/TemplateArgument.h"
 #include "model/TemplateParameter.h"
@@ -51,6 +52,8 @@ public:
 
   std::expected<void, std::error_code>
   addRelations(std::span<const Relation> relations);
+  std::expected<void, std::error_code>
+  saveReturnType(SymbolId callable, const ReturnType &type);
   std::expected<void, std::error_code>
   addRelationSites(std::span<const RelationSite> sites);
   std::expected<void, std::error_code>

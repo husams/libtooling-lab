@@ -8,6 +8,9 @@ Feature: Extracted symbol and fact inventory
   Scenario: List every stored symbol with its concrete node kind
     Then the complete symbol inventory is
       | node | qualified_name          |
+      | 5    | void                                  |
+      | 5    | int                                   |
+      | 5    | bool                                  |
       | 1    | e2e::fun                |
       | 1    | e2e::functionTemplate   |
       | 1    | e2e::headerHelper       |

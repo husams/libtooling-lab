@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS relation_site (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=8;
+PRAGMA user_version=9;
 
 )sql";
 

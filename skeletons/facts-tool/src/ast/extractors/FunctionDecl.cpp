@@ -7,6 +7,7 @@
 #include "ast/extractors/MethodDecl.h"
 #include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/Parameters.h"
+#include "ast/extractors/ReturnType.h"
 #include "model/AnySymbol.h"
 
 #include "clang/AST/ASTContext.h"
@@ -71,7 +72,8 @@ IndexingResult collectSymbol(clang::FunctionDecl &node,
                              FactStore &store) {
   const auto storeRelations = [&](SymbolId function) {
     return storeMethodRelation(node, function, context.getSourceManager(),
-                               files, store);
+                               files, store)
+        .and_then([&] { return storeReturnType(node, function, files, store); });
   };
 
   if (node.getTemplateSpecializationInfo() != nullptr) {
@@ -79,8 +81,7 @@ IndexingResult collectSymbol(clang::FunctionDecl &node,
       return toFunctionInstance(std::move(function), node, files, store);
     };
     const auto storeInstanceRelations = [&](SymbolId function) {
-      return storeMethodRelation(node, function, context.getSourceManager(),
-                                 files, store)
+      return storeRelations(function)
           .and_then([&] {
             return storeFunctionInstanceRelations(node, function, files, store);
           });

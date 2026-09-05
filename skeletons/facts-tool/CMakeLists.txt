@@ -164,6 +164,7 @@ add_library(facts-storage STATIC
   src/storage/FunctionInstance.cpp
   src/storage/FunctionTemplate.cpp
   src/storage/Initializer.cpp
+  src/storage/ReturnType.cpp
   src/storage/Parameter.cpp
   src/storage/ProjectConfiguration.cpp
   src/storage/Record.cpp
@@ -234,6 +235,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/TargetResolution.cpp
   src/ast/extractors/TemplatePattern.cpp
   src/ast/extractors/TemplateSpecialization.cpp
+  src/ast/extractors/ReturnType.cpp
   src/ast/extractors/Type.cpp
   src/ast/extractors/ValueDecl.cpp
   src/ast/extractors/VarDecl.cpp
@@ -445,6 +447,7 @@ if(BUILD_TESTING)
   add_executable(
     storage-schema-test
     tests/storage/FreshSchemaTest.cpp
+    tests/storage/ReturnTypeTest.cpp
     tests/storage/CallGraphMigrationTest.cpp
     tests/storage/LegacySchemaMigrationTest.cpp
     tests/storage/StorageSchemaTestMain.cpp
