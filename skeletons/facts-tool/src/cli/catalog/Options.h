@@ -12,6 +12,7 @@ struct RepositoryOptions {
   enum class Action { list, show, addClone, switchClone, removeClone, remove };
   int verbosity = 0;
   std::string configuration;
+  std::string configurationFile;
   Action action = Action::list;
   std::string name;
   std::string path;
@@ -24,6 +25,7 @@ struct FileOptions {
   enum class Action { add, remove, list, show, setOption, clearOption };
   int verbosity = 0;
   std::string configuration;
+  std::string configurationFile;
   Action action = Action::list;
   std::string path;
   std::string driver;
@@ -37,6 +39,7 @@ struct SymbolOptions {
   int verbosity = 0;
   std::string facts;
   std::string configuration;
+  std::string configurationFile;
   Action action = Action::list;
   std::string qualifiedName;
 };
@@ -45,6 +48,7 @@ struct ComponentOptions {
   enum class Action { list, show, add, setVersion, compileCommands, remove };
   int verbosity = 0;
   std::string configuration;
+  std::string configurationFile;
   Action action = Action::list;
   CatalogSelector selector;
   std::string repository;
@@ -58,6 +62,7 @@ struct DirectoryOptions {
   enum class Action { list, remove };
   int verbosity = 0;
   std::string configuration;
+  std::string configurationFile;
   Action action = Action::list;
   CatalogSelector selector;
   std::string component;

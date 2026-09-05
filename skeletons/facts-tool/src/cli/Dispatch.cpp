@@ -1,6 +1,7 @@
 #include "cli/Dispatch.h"
 #include "cli/Verbose.h"
 #include "commands/Dependency.h"
+#include "commands/Configuration.h"
 #include "commands/Extract.h"
 #include "commands/Import.h"
 #include "commands/Match.h"
@@ -17,6 +18,7 @@ std::string_view commandName(const ImportOptions &) { return "import"; }
 std::string_view commandName(const DependencyOptions &) { return "dependency"; }
 std::string_view commandName(const CallGraphOptions &) { return "call-graph"; }
 std::string_view commandName(const MatchOptions &) { return "match"; }
+std::string_view commandName(const ConfigOptions &) { return "config"; }
 std::string_view commandName(const RepositoryOptions &) { return "repo"; }
 std::string_view commandName(const ComponentOptions &) { return "component"; }
 std::string_view commandName(const DirectoryOptions &) { return "dir"; }
@@ -57,6 +59,7 @@ std::string commandDetails(const MatchOptions &options) {
   return std::format("facts='{}', requested_sources={}", options.facts,
                      options.sources.size());
 }
+std::string commandDetails(const ConfigOptions &) { return {}; }
 
 std::string commandDetails(const SymbolOptions &options) {
   return std::format("facts='{}'", options.facts);
@@ -81,6 +84,9 @@ std::expected<int, std::string> execute(const CallGraphOptions &options) {
 std::expected<int, std::string> execute(const MatchOptions &options) {
   return commands::runMatch(options);
 }
+std::expected<int, std::string> execute(const ConfigOptions &options) {
+  return commands::runConfiguration(options);
+}
 
 std::expected<int, std::string> execute(const RepositoryOptions &options) {
   return commands::runRepository(options);
@@ -104,8 +110,9 @@ std::expected<int, std::string> execute(const SymbolOptions &options) {
 
 int report(std::expected<int, std::string> result) {
   if (!result) {
-    std::cerr << "facts-tool: " << result.error() << '\n';
-    return 1;
+    const auto prefixed = result.error().starts_with("facts-tool:");
+    std::cerr << (prefixed ? "" : "facts-tool: ") << result.error() << '\n';
+    return result.error().starts_with("facts-tool: configuration error:") ? 3 : 1;
   }
   return *result;
 }

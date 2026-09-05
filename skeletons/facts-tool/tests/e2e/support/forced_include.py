@@ -64,7 +64,8 @@ class ForcedIncludeFixture:
             (encoded,) = connection.execute(
                 "SELECT compile_options FROM file WHERE name=?", (self.source.name,)
             ).fetchone()
-        return json.loads(encoded)
+        return [arg for arg in json.loads(encoded)
+                if arg != "\x1ffacts-tool-source-argument"]
 
     def _record(self, context: FactsToolContext, result: subprocess.CompletedProcess[str]) -> None:
         context.last_returncode = result.returncode

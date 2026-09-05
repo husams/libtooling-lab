@@ -101,7 +101,7 @@ identifyFile(std::span<const ProjectComponent> components,
   const auto relative =
       normalizedSource(std::move(source)).lexically_relative(root);
   auto name = relative.filename().string();
-  if (relative.empty() || name.empty()) {
+  if (relative.empty() || relative == "." || name.empty()) {
     return std::unexpected(outsideComponentError());
   }
   auto directory = relative.parent_path().generic_string();

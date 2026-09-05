@@ -368,7 +368,7 @@ sqlite3 *StoredDatabase::get() const noexcept { return handle_; }
 std::expected<StoredDatabase, std::string>
 openStoredDatabase(const std::filesystem::path &path) {
   if (!std::filesystem::is_regular_file(path)) {
-    return std::unexpected("stored compilation database does not exist: " +
+    return std::unexpected("project configuration database not found: " +
                            path.string());
   }
   sqlite3 *database = nullptr;

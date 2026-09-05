@@ -7,10 +7,17 @@ import pytest
 from support.scenario import FactsToolContext
 
 pytest_plugins = (
+    "steps.defaults_resolution_steps",
+    "steps.defaults_validation_steps",
+    "steps.defaults_policy_steps",
+    "steps.defaults_compiler_steps",
+    "steps.defaults_path_steps",
+    "steps.defaults_ownership_steps",
     "steps.alias_steps",
     "steps.b019_extraction_completeness_steps",
     "steps.call_graph_steps",
     "steps.common_steps",
+    "steps.configuration_defaults_steps",
     "steps.database_steps",
     "steps.dependent_template_type_steps",
     "steps.enumeration_steps",

@@ -344,10 +344,10 @@ int main(int argc, char **argv) {
   sqlite3 *database = nullptr;
   assert(sqlite3_open(databasePath.c_str(), &database) == SQLITE_OK);
   assert(scalar(database, "SELECT COUNT(*) FROM symbol") == 14);
-  assert(scalar(database, "SELECT COUNT(DISTINCT file_id) FROM symbol") == 2);
+  assert(scalar(database, "SELECT COUNT(DISTINCT (id >> 32)) FROM symbol") == 2);
   assert(
       scalar(database,
-             "SELECT COUNT(DISTINCT file_index) FROM symbol WHERE file_id=7") ==
+             "SELECT COUNT(DISTINCT (id & 4294967295)) FROM symbol WHERE (id >> 32)=7") ==
       9);
   assert(scalar(database, "SELECT COUNT(*) FROM definition") == 2);
   assert(scalar(database, "SELECT COUNT(*) FROM definition WHERE file_id=7 AND "

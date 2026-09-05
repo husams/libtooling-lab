@@ -9,12 +9,16 @@ struct ExtractOptions {
   int verbosity = 0;
   std::string output;
   std::string configuration;
+  std::string configurationFile;
+  std::vector<std::string> defaultExtraArguments;
   std::vector<std::string> extraArguments;
   std::vector<std::string> sources;
 };
 struct ImportOptions {
   int verbosity = 0;
   std::string configuration;
+  std::string configurationFile;
+  std::vector<std::string> defaultExtraArguments;
   std::string compilationDatabase;
   std::vector<std::string> components;
   std::vector<std::string> extraArguments;
@@ -24,6 +28,8 @@ struct DependencyOptions {
   int verbosity = 0;
   std::string output;
   std::string configuration;
+  std::string configurationFile;
+  std::vector<std::string> defaultExtraArguments;
   std::vector<std::string> extraArguments;
   std::vector<std::string> sources;
 };
@@ -41,9 +47,14 @@ struct MatchOptions {
   std::optional<std::string> relationKind;
   std::vector<std::string> sources;
 };
+struct ConfigOptions {
+  int verbosity = 0;
+  std::string configurationFile;
+  std::string direct;
+};
 
 using Command = std::variant<ExtractOptions, ImportOptions, DependencyOptions,
-                             CallGraphOptions, MatchOptions, RepositoryOptions,
+                             CallGraphOptions, MatchOptions, ConfigOptions, RepositoryOptions,
                              ComponentOptions, DirectoryOptions, FileOptions,
                              SymbolOptions>;
 

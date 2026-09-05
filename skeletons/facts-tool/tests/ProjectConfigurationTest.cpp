@@ -12,6 +12,7 @@
 #include <ranges>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 namespace {
 
@@ -69,12 +70,16 @@ int main(int argc, char **argv) {
   assert(argc == 3);
   const auto databasePath = std::filesystem::absolute(argv[1]);
   const auto fixtureRoot = std::filesystem::canonical(argv[2]);
-  const auto cloneOne = databasePath.parent_path() / "cpp-indexer";
-  const auto cloneTwo = databasePath.parent_path() / "clone-two";
+  const auto cloneRoot = std::filesystem::canonical(
+                             std::filesystem::temp_directory_path()) /
+                         ("facts-tool-project-" + std::to_string(getpid()));
+  const auto cloneOne = cloneRoot / "cpp-indexer";
+  const auto cloneTwo = cloneRoot / "clone-two";
   const auto sourceRelative =
       std::filesystem::path("tests/fixtures/tu_one.cpp");
   std::filesystem::remove_all(cloneOne);
   std::filesystem::remove_all(cloneTwo);
+  std::filesystem::remove(databasePath);
   std::filesystem::create_directories(cloneOne / sourceRelative.parent_path());
   std::filesystem::create_directories(cloneTwo / sourceRelative.parent_path());
   std::filesystem::copy_file(fixtureRoot / sourceRelative,
@@ -234,4 +239,5 @@ int main(int argc, char **argv) {
 
   stored = facts::loadStoredCompilationDatabase(databasePath.string());
   assert(stored && (*stored)->getAllCompileCommands().size() == 1);
+  std::filesystem::remove_all(cloneRoot);
 }

@@ -1,4 +1,5 @@
 #include "cli/catalog/Configure.h"
+#include "cli/ConfigurationOptions.h"
 #include "cli/catalog/Options.h"
 #include <CLI/CLI.hpp>
 
@@ -8,10 +9,7 @@ namespace {
 void symbolOptions(CLI::App &command, SymbolOptions &options) {
   command.add_option("-f,--facts", options.facts, "Extracted facts database")
       ->type_name("FILE");
-  command
-      .add_option("-c,--conf", options.configuration,
-                  "Project configuration database for source paths")
-      ->type_name("FILE");
+  configurationOptions(command, options.configuration, options.configurationFile);
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
       ->expected(0, 1)
       ->default_str("1")
