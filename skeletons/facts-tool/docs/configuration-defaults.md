@@ -109,6 +109,18 @@ variables/globs. Later switches take precedence only where the selected
 compiler defines that behavior. Changed YAML defaults require no reimport
 and never accumulate.
 
+For example, a JSON command containing `-DJSON_ONLY=1 -I include` keeps
+both options when YAML supplies `extra_args: ['-DYAML_ONLY=1', '-include',
+'header with spaces.hpp']`. Each YAML list element is one argument:
+`'-include header.hpp'` would be a single compiler token, not an option
+followed by its operand. Relative operands use each JSON command's
+`directory`, including when different source files use different directories.
+Stored-command readback may expand include-search paths to absolute paths
+through the existing component-label mapping and add `--driver-mode=g++`;
+these changes preserve the command's meaning. The B-032 retention scenarios
+check both JSON representations, independent base/YAML requirements and
+current CLI additions across import, extraction and dependency analysis.
+
 Only one YAML mapping/document is permitted per file. Empty documents and
 empty argument lists are valid. Unknown/duplicate keys, nulls, wrong types,
 tags, anchors, aliases, multiple documents, and NUL/newline strings are
