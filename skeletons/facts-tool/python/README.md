@@ -22,7 +22,7 @@ with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
 ```
 
 Both paths are mandatory and must identify different existing files. The SDK
-opens each with SQLite `mode=ro` and immutable semantics, validates its role,
+opens each with SQLite `mode=ro` and query-only semantics, validates its role,
 and refuses unsupported facts schema versions or missing FileId mappings.
 
 ## Documentation
@@ -30,7 +30,7 @@ and refuses unsupported facts schema versions or missing FileId mappings.
 - [Quickstart](docs/quickstart.md)
 - [Language sources and predicates](docs/language-predicates.md)
 - [Language stages and paths](docs/language-stages.md)
-- [Relations](docs/relations.md) and [views](docs/views.md)
+- [Relations](docs/relations.md), [views](docs/views.md), and [symbol kinds](docs/symbol-kinds.md)
 - [Database lifecycle and mapping](docs/databases.md)
 - [Results, errors, and budgets](docs/results.md)
 - [Typed and fluent APIs](docs/model-api.md)

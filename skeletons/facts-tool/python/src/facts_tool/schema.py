@@ -32,6 +32,10 @@ def inspect_schema(db: sqlite3.Connection, role: str) -> SchemaIdentity:
     ).fetchall()
     tables = tuple(str(row[0]) for row in rows)
     required = FACTS_TABLES if role == "facts" else PROJECT_TABLES
+    version = _scalar(db, "PRAGMA user_version")
+    facts_shape = {"symbol", "relation"} <= set(tables)
+    if role == "facts" and facts_shape and version != 10:
+        fail("E_SCHEMA", f"facts schema user_version {version} is unsupported; need 10")
     missing = sorted(required - set(tables))
     if missing:
         fail("E_DATABASE_ROLE", f"{role} database lacks tables: {', '.join(missing)}")
@@ -40,9 +44,6 @@ def inspect_schema(db: sqlite3.Connection, role: str) -> SchemaIdentity:
         absent = sorted(COLUMNS[table] - actual)
         if absent:
             fail("E_SCHEMA", f"{role}.{table} lacks columns: {', '.join(absent)}")
-    version = _scalar(db, "PRAGMA user_version")
-    if role == "facts" and version != 10:
-        fail("E_SCHEMA", f"facts schema user_version {version} is unsupported; need 10")
     return SchemaIdentity(role, version, _scalar(db, "PRAGMA schema_version"), tables)
 
 

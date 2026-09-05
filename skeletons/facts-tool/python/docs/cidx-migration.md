@@ -44,6 +44,20 @@ separate interface edge.
 | call-argument objects | `E_CAPABILITY` |
 | inferred devirtualization from type layers | `E_CAPABILITY` |
 
+Two visible layout/API adaptations are deliberate. The reference repository's
+BDD layout is `python/tests/e2e/features/steps`; this package uses the ordinary
+pytest-bdd layout `python/tests/bdd/features` plus `python/tests/bdd/steps`.
+The reference convenience form `cb.find(pattern)` is represented by exact
+`CodeBase.get(ref)` lookup and declarative glob search:
+
+```python
+start(codebase()) | nodes(glob("qualified_name", pattern))
+```
+
+`symbol(ref)` seeds exact USR matches first, then every exact qualified-name
+match, then every exact short spelling match. Multiple matches are retained in
+ascending persisted identity order for deterministic template queries.
+
 facts-tool physical template names are reversed from standard/cidx wording.
 Public `template_parameter` reads physical `template_argument` (declared slot),
 and public `template_argument` reads physical `template_parameter` (supplied

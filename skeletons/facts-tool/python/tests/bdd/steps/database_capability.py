@@ -17,9 +17,13 @@ def unavailable_capability(cb, world):
             cb.executor.run(query.plan)
         except FactsToolError as exc:
             codes.append(exc.code)
+    try:
+        cb.executor.explain(queries[0].plan)
+    except FactsToolError as exc:
+        codes.append(exc.code)
     world["capability_codes"] = codes
 
 
 @then("E_CAPABILITY is raised without fallback")
 def capability_result(world):
-    assert world["capability_codes"] == ["E_CAPABILITY"] * 5
+    assert world["capability_codes"] == ["E_CAPABILITY"] * 6

@@ -4,6 +4,7 @@ SYMBOL_KINDS = (
     "namespace",
     "namespace_alias",
     "macro",
+    "include_directive",
     "enum",
     "struct",
     "class",
@@ -26,8 +27,10 @@ SYMBOL_KINDS = (
     "conversion_function",
     "parameter",
     "using",
+    "template_type_parm",
+    "template_template_parm",
+    "non_type_template_parm",
     "concept",
-    "comment_tag",
 )
 NODE_KINDS = {
     1: "function",

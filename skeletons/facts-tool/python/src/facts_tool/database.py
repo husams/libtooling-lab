@@ -19,7 +19,7 @@ def canonical_path(value: str | os.PathLike[str], role: str) -> Path:
 
 
 def open_readonly(path: Path, role: str) -> sqlite3.Connection:
-    uri = f"file:{quote(str(path), safe='/')}?mode=ro&immutable=1"
+    uri = f"file:{quote(str(path), safe='/')}?mode=ro"
     connection: sqlite3.Connection | None = None
     try:
         connection = sqlite3.connect(uri, uri=True)

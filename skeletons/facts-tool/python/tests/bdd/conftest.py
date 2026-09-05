@@ -19,6 +19,15 @@ def codebase(paired_databases: tuple[Path, Path]) -> CodeBase:
         yield value
 
 
+@pytest.fixture
+def native_codebase() -> CodeBase:
+    root = Path(__file__).parents[1] / "fixtures" / "native"
+    with open_codebase(
+        facts_db=root / "facts.sqlite", project_db=root / "project.sqlite"
+    ) as value:
+        yield value
+
+
 @given("a valid paired facts and project database", target_fixture="cb")
 def valid_pair(codebase: CodeBase) -> CodeBase:
     return codebase

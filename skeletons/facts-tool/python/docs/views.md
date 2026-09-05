@@ -12,6 +12,9 @@ static, virtual, const, volatile, inline, pure, override, linkage/external,
 variadic, deleted/defaulted/explicit/final/abstract/polymorphic, constexpr kind,
 noexcept, and reference qualifier.
 
+`kind_id` is the stored LLVM 22 `clang::index::SymbolKind` integer, mapped
+without renumbering. The complete numeric table is in [Symbol kinds](symbol-kinds.md).
+
 Parameters expose owner, source order, name, packed type identity, location and
 region, pointer/reference/forwarding-reference/const/pack flags, and distinct
 `has_default`, expression, evaluated kind, and evaluated value fields.

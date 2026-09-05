@@ -21,7 +21,7 @@ All public failures are `FactsToolError` with stable `code` and `message`:
 
 | Code | Meaning |
 |---|---|
-| `E_SOURCE` | missing or ambiguous source |
+| `E_SOURCE` | missing source |
 | `E_VIEW`, `E_FIELD`, `E_KIND` | invalid catalog input |
 | `E_RELATION`, `E_DEPTH` | invalid graph request |
 | `E_LIMIT`, `E_BUDGET` | invalid or exhausted bound |

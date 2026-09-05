@@ -70,7 +70,8 @@ def invalid_roles(paired_databases, tmp_path: Path, world):
     old = tmp_path / "facts-v9.sqlite"
     shutil.copy2(facts, old)
     with sqlite3.connect(old) as db:
-        db.execute("PRAGMA user_version=9")
+        db.execute("DROP TABLE callable_return_type")
+        db.execute("PRAGMA user_version=7")
     world["invalid_pairs"] = (
         (project, facts, "E_DATABASE_ROLE"),
         (old, project, "E_SCHEMA"),

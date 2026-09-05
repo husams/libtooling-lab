@@ -17,9 +17,12 @@ deduplicates complete rows, `order_by(fields)` sorts nulls last with stable
 logical-identity ties, `limit(n)` intentionally bounds output, and `count()`
 produces a terminal scalar. Traversal cannot follow rows or scalars.
 
-`sites()` changes matching edge nodes into occurrence rows without losing
-relation position or duplicate source locations. `mode="devirtualized"` fails
-with `E_CAPABILITY`; query the persisted `dispatch_calls` relation explicitly.
+`sites()` changes matching edge nodes into the `site` view without losing
+relation position or duplicate source locations. Selection and ordering after
+`sites()` validate against site fields. A following `view("site")` is an
+`E_STAGE` error because `sites()` already performed that transition.
+`mode="devirtualized"` fails during validation and explain with `E_CAPABILITY`;
+query the persisted `dispatch_calls` relation explicitly.
 
 `path(to, relation, min_depth=1, max_depth=8, shortest=0, inbound=False)`
 returns deterministic shortest simple witnesses per start. A repeat is

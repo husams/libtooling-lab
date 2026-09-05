@@ -12,10 +12,9 @@ def resolve_source(source: Source, loader: ViewLoader) -> ExecutionState:
     matches = lookup_symbol(loader.facts, loader.files, source.ref)
     if not matches:
         fail("E_SOURCE", f"symbol {source.ref!r} was not found")
-    if len(matches) > 1:
-        choices = ", ".join(str(row["qualified_name"]) for row in matches[:5])
-        fail("E_SOURCE", f"symbol {source.ref!r} is ambiguous: {choices}")
-    return ExecutionState(values=matches, context_ids={int(matches[0]["id"])})
+    return ExecutionState(
+        values=matches, context_ids={int(row["id"]) for row in matches}
+    )
 
 
 def enumerate_view(

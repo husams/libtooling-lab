@@ -40,13 +40,22 @@ def validate(plan: Plan) -> None:
                 current_view = target_view(relation_name, stage.op == "in")
         if stage.op == "out" and stage.mode not in {"static", "devirtualized"}:
             fail("E_KIND", f"unknown traversal mode {stage.mode!r}")
+        if stage.op == "out" and stage.mode == "devirtualized":
+            fail(
+                "E_CAPABILITY",
+                "devirtualized traversal is unavailable; use dispatch_calls",
+            )
         if stage.op == "sites" and current_view != "edge":
             fail("E_STAGE", "sites requires the edge view")
+        if stage.op == "sites":
+            current_view = "site"
         if stage.op == "reverse_type_use":
             depth(1, stage.max_depth)
             if current_view != "symbol":
                 fail("E_STAGE", "reverse_type_use requires the symbol view")
         if stage.op == "view":
+            if current_view == "site" and stage.level == "site":
+                fail("E_STAGE", "view('site') cannot follow sites()")
             if stage.level in {"entity", "type", "type_layer", "call_argument"}:
                 fail("E_CAPABILITY", f"view {stage.level!r} is not persisted")
             if stage.level not in VIEWS:
