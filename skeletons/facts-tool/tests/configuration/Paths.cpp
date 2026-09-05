@@ -15,7 +15,7 @@ void paths() {
     const auto result = facts::config::renderDatabasePath(v);
     assert(result && *result == v.storageRoot / suffix);
   }
-  for (const auto format : {"", "/", ".", "..", "../x", "x/../y", "/x",
+  for (const auto format : {"", "/", ".", "..", "../x", "x/../y",
                            "{}", "{wrong}", "{filename", "x}", "dir/", "x\\y", "x\ny"}) {
     v.templateText = format;
     assert(!facts::config::renderDatabasePath(v));

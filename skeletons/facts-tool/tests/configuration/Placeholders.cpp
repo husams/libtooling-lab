@@ -54,14 +54,8 @@ void placeholders() {
   auto missing = facts::config::renderFactsPath(empty, {});
   assert(!missing && missing.error().starts_with("usage:"));
 
-  // A raw literal absolute template is still rejected (only ~/ or a
-  // placeholder may make the result absolute); ~/ with a placeholder suffix
-  // is trusted as-is; a symlink after a leading placeholder still escapes.
-  v.templateText = "/outside.db";
-  assert(!facts::config::renderDatabasePath(v));
-  v.templateText = "~/{project_name}.db";
-  assert(*facts::config::renderDatabasePath(v) ==
-        box.root / (box.root.filename().string() + ".db"));
+  // A symlink after a leading placeholder still escapes (Safety.cpp covers
+  // the absolute-literal and ~/ anchors).
   const auto outside = box.root.parent_path() / "escaped-outside";
   fs::create_directories(outside);
   fs::create_directory_symlink(outside, box.root / "linked");

@@ -12,7 +12,7 @@ class CompileDefaults:
         # project, then CLI): -DVALUE=0 here is overridden by the project's
         # -DVALUE=2 and then the CLI's -DVALUE=3, so require_effect(3)
         # below only passes if that order actually reaches the compiler.
-        defaults.write("user", extra_args=["-DVALUE=0"])
+        defaults.write("user", extra_args=["-DVALUE=0", "-DUSER_SEEN=1"])
         defaults.write(conf_root=str(defaults.root / "store"),
                        conf_template="{filename}.db",
                        extra_args=["-DVALUE=2", "-include", str(self.header),
@@ -46,7 +46,7 @@ class CompileDefaults:
         return d.run(*cmd, *d.args, *(self.cli if cli else []))
 
     def require_effect(self, value):
-        self.source.write_text(f"#if VALUE != {value} || !YAML_SEEN\n"
+        self.source.write_text(f"#if VALUE != {value} || !YAML_SEEN || !USER_SEEN\n"
             '#include "wrong_argument_order.h"\n#endif\nstruct Ordered {};\n')
 
     def verify(self):

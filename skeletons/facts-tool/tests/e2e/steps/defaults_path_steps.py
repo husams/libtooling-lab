@@ -138,21 +138,22 @@ def wrote_explicit(defaults):
     assert defaults.last.returncode == 0, defaults.last.stderr
     assert defaults.explicit_output.is_file()
 
-@given("the acceptance-example conf_template and facts_template")
+@given("the acceptance-example conf_template and facts_template in the user file")
 def acceptance_example(defaults):
-    defaults.write(conf_template="{project_root}/.index/project.db",
+    defaults.write("user", conf_template="{project_root}/.index/project.db",
                    facts_template="{project_root}/.index/{relative_path}/{filename}.db")
 
 @then("conf is the project root's .index/project.db")
 def conf_is_index_project(defaults):
     assert defaults.value("conf") == str(defaults.cwd / ".index/project.db"), defaults.last.stdout
 
-@then("extracting one source writes the project root's .index/src/a/b.db")
+@then("importing and extracting src/a/b.cpp writes both .index/project.db and .index/src/a/b.db")
 def extract_writes_index_src(defaults):
-    project = FactsTemplateProject(defaults, "{project_root}/.index/{relative_path}/{filename}.db")
+    project = FactsTemplateProject(defaults, None, sources=("src/a/b.cpp",))
+    assert (defaults.cwd / ".index/project.db").is_file()
     result = project.extract(project.sources[0])
     assert result.returncode == 0, result.stderr
-    assert (defaults.cwd / ".index/src/a.db").is_file()
+    assert (defaults.cwd / ".index/src/a/b.db").is_file()
 
 @then("conf is directly under HOME")
 def conf_under_home(defaults):

@@ -8,6 +8,15 @@ def fixture(defaults, override, input):
 @when(parsers.parse('I run "{family}" with ordered YAML and CLI tokens twice'))
 def compile_twice(defaults, family):
     c = defaults.compiler
+    # Without CLI fragments the project tier's -DVALUE=2 must beat the user
+    # tier's -DVALUE=0 while the user's -DUSER_SEEN=1 still reaches the
+    # compiler: observable proof of user -> project order.
+    if family != "import":
+        c.require_effect(2)
+        result = c.run(family, cli=False)
+        assert result.returncode == 0, result.stdout + result.stderr
+        c.require_effect(0)
+        assert c.run(family, cli=False).returncode != 0
     c.require_effect(3)
     for _ in range(2):
         result = c.run(family)

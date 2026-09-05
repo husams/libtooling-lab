@@ -35,20 +35,19 @@ are configuration errors before any file or directory is created.
 
 In `conf_template`, `{relative_path}`/`{filename}` keep their original
 meaning: the project directory's parent relative to `/`, and the complete
-project basename (`/` uses `_root`). A raw literal absolute template (one
-that starts with `/` before any substitution) is always rejected as an
-escape attempt. A raw leading `~/` expands against `HOME`, like `conf_root`'s
-own `~/` support, and the result is trusted as-is with no containment check.
-Otherwise the template is substituted: a relative result joins onto
-`conf_root` (itself anchored to the canonical project root when relative,
-never to the directory holding the YAML file that declared it) and must stay
-strictly inside it, exactly as before; but when a *placeholder* makes the
-result absolute — typically a leading `{project_root}` — that value is
-trusted as the database's actual location (bypassing `conf_root` entirely),
-with only a narrower check that no literal path segment coming after that
-leading placeholder escapes it through a symlink. For example
+project basename (`/` uses `_root`). Every rendered path is checked
+canonically against one anchor and may not escape it, even through a
+symlink, so a template is accepted in any of these forms: a raw leading `~/`
+expands against `HOME` and anchors to `HOME`; a leading placeholder such as
+`{project_root}` or `${ENV_NAME}` anchors to its own expanded value; an
+absolute literal (one that starts with `/` before any substitution) anchors
+to the literal prefix the user wrote before the first placeholder; and a
+relative template joins onto `conf_root` (itself anchored to the canonical
+project root when relative, never to the directory holding the YAML file
+that declared it) and anchors there. For example
 `conf_template: "{project_root}/.index/project.db"` yields
-`<root>/.index/project.db` directly. A generated database records its owning
+`<root>/.index/project.db` directly, and a literal
+`conf_template: "/srv/index/{filename}.db"` yields `/srv/index/<name>.db`. A generated database records its owning
 project, so a collision is rejected. Use `--conf PATH` or `FACTS_TOOL_CONF`
 for an existing database and to bypass generated naming and ownership;
 `--conf` beats `FACTS_TOOL_CONF`, and conf-only (catalog/symbol) commands
@@ -68,11 +67,9 @@ the template needs a source placeholder but the run does not resolve to
 exactly one source (symbol commands never do; extract/dependency do when zero
 or more than one source apply), the command fails with a usage error (exit 2)
 asking for `-o`/`--facts`. An explicit `-o`/`--facts` always wins over
-`facts_template`, which follows the same absolute/`~/`/relative rules as
-`conf_template` above, except a relative result anchors to the project root
-directly (there is no separate `facts_root` setting) and an absolute result
-is still checked against a symlink escaping through the placeholder that
-made it absolute. Parent directories are created only by write consumers
+`facts_template`, which follows the same anchoring rules as `conf_template`
+above, except a relative result anchors to the project root directly (there
+is no separate `facts_root` setting). Parent directories are created only by write consumers
 (extract, dependency analysis), only once every other applicable check
 (sources, database paths, stored commands) has already passed; `symbol` is
 read-only and never creates them.
@@ -86,8 +83,8 @@ suffice. Absent keys use built-ins; explicit null/empty values do not.
 
 Known placeholders may repeat or be omitted; no extension is appended.
 Substitution preserves spaces, Unicode, dots, and braces in project names.
-Repeated separators/dot components normalize; a raw literal absolute
-`conf_template`, any `..`, trailing separators, root-only results, invalid
+Repeated separators/dot components normalize; any `..` (in any tier's
+template, even one a higher tier overrides), trailing separators, root-only results, invalid
 braces, backslashes, NUL/newline (including inside a substituted
 `{user}`/`{project_root}`/`{project_name}`/`${ENV_NAME}` value), and
 canonical symlink escapes are rejected before creation. Parents are

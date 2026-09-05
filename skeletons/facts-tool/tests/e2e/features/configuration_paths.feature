@@ -34,7 +34,6 @@ Feature: Canonical configuration identity and safe path rendering
       | template |
       | ../outside.db |
       | inside/../outside.db |
-      | /outside.db |
       | {unknown}.db |
       | {}.db |
       | {filename |
@@ -105,18 +104,55 @@ Feature: Canonical configuration identity and safe path rendering
     When I extract with an explicit output and one source
     Then extraction succeeds and writes the explicit output
 
-  Scenario: An absolute conf_template via {project_root} is accepted like facts_template
-    Given the acceptance-example conf_template and facts_template
+  Scenario: The user-level acceptance example renders both databases end to end
+    Given the acceptance-example conf_template and facts_template in the user file
     When I inspect the effective configuration twice
     Then conf is the project root's .index/project.db
-    And extracting one source writes the project root's .index/src/a/b.db
+    And importing and extracting src/a/b.cpp writes both .index/project.db and .index/src/a/b.db
 
-  Scenario: A raw literal absolute conf_template is still rejected
-    Given conf_template "/outside.db"
+  Scenario: An absolute literal conf_template is accepted as written
+    Given an absolute literal conf_template below the project root
+    When I inspect the effective configuration twice
+    Then conf matches the expected rendered path
+
+  Scenario: A facts_template escaping HOME through a symlink after ~/ is rejected before mutation
+    Given a facts_template that escapes HOME through a symlink after ~/
+    When I extract with no explicit output and one source
+    Then extraction fails with "escapes HOME"
+    And no facts database was created anywhere
+
+  Scenario Outline: An overridden lower-tier template with a .. component still fails
+    Given a user conf_template "<lower>" overridden by project conf_template "{filename}.db"
     When I attempt configuration inspection
     Then configuration fails with "conf_template"
+    Examples:
+      | lower |
+      | ../outside.db |
+      | inside/../outside.db |
 
-  Scenario: A leading ~/ conf_template bypasses conf_root entirely, like conf_root's own ~/
+  Scenario: A facts_template default never creates its directory without an imported configuration database
+    Given a project facts_template but no imported configuration database
+    When I extract with no explicit output and one source
+    Then extraction fails with a runtime error and the filesystem is unchanged
+
+  Scenario: A facts_template default never creates its directory when the configuration database is corrupt
+    Given a project facts_template whose configuration database is corrupt
+    When I extract with no explicit output and one source
+    Then extraction fails with a runtime error and the filesystem is unchanged
+
+  Scenario Outline: facts_template inherits per key from <tiers> and "<explicit>" output wins
+    Given facts_template declared at tiers "<tiers>"
+    When I extract one source with "<explicit>" output
+    Then only the "<winner>" facts database exists
+    Examples:
+      | tiers | explicit | winner |
+      | user | default | user |
+      | user,project | default | project |
+      | user,project,config-file | default | config-file |
+      | project | default | project |
+      | user,project | explicit | explicit |
+
+  Scenario: A leading ~/ conf_template anchors to HOME, like conf_root's own ~/
     Given conf_template "~/project.db"
     When I inspect the effective configuration twice
     Then conf is directly under HOME

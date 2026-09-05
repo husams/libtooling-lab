@@ -1,5 +1,6 @@
 #include "config/Configuration.h"
 #include "config/ConfigurationPlaceholders.h"
+#include "config/ConfigurationShape.h"
 #include "config/ConfigurationYamlEvents.h"
 
 #include <yaml-cpp/yaml.h>
@@ -10,11 +11,14 @@
 
 namespace facts::config {
 namespace {
-// A dummy substitution pass so an invalid template (unknown placeholder,
-// unmatched braces, unset ${ENV}) is a configuration error for the tier
-// that declared it, even if a higher tier's value wins the merge (B-030
-// C-3117): none of those failure modes depend on the real project context.
+// Shape and dummy-substitution checks so an invalid template (a .. component,
+// unknown placeholder, unmatched braces, unset ${ENV}) is a configuration
+// error for the tier that declared it, even if a higher tier's value wins
+// the merge (B-030 C-3117): none of these depend on the real project context.
 std::expected<void, std::string> templateSyntax(std::string_view key, const std::string &text) {
+  if (detail::invalidPathShape(text))
+    return std::unexpected(std::string(key) + " template must not be empty, end with a separator, "
+                           "or contain a .. component");
   return detail::expandPlaceholders(text, {})
       .transform([](auto &&) {})
       .transform_error([&](auto &&reason) { return std::string(key) + " " + reason; });

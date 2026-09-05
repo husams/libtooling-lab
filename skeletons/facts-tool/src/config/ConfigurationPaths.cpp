@@ -1,6 +1,7 @@
 #include "config/Configuration.h"
 #include "config/ConfigurationDiscovery.h"
 #include "config/ConfigurationPlaceholders.h"
+#include "config/ConfigurationShape.h"
 
 #include <algorithm>
 
@@ -11,16 +12,6 @@ bool contained(const std::filesystem::path &root, const std::filesystem::path &t
   for (; left != root.end() && right != target.end(); ++left, ++right)
     if (*left != *right) return false;
   return left == root.end();
-}
-
-bool hasDotDot(const std::filesystem::path &value) {
-  return std::ranges::any_of(value, [](const auto &part) { return part == ".."; });
-}
-
-bool invalidBody(const std::string &text) {
-  const auto expanded = std::filesystem::path(text);
-  return text.empty() || text.back() == '/' || expanded.lexically_normal() == "." ||
-        hasDotDot(expanded);
 }
 
 std::string projectName(const std::filesystem::path &projectRoot) {
@@ -36,15 +27,18 @@ std::string_view leadingPlaceholder(std::string_view text) {
   return end == text.npos ? std::string_view{} : text.substr(0, end + 1);
 }
 
-// Shared by conf_template and facts_template. A raw literal "/..." is
-// always an escape attempt and rejected outright; a raw literal "~/..."
-// expands like conf_root's own tilde support and is trusted as-is (no
-// escape check, matching conf_root). Otherwise the template is substituted:
-// if the result stays relative it joins onto `relativeBase` and must not
-// escape it (the historical containment invariant); if a placeholder made
-// the result absolute (typically {project_root}), that value is trusted,
-// but any literal path segment after it still may not escape it through a
-// symlink.
+// The literal text before the first placeholder of an absolute template: the
+// part the user wrote verbatim and therefore trusts.
+std::filesystem::path literalPrefix(std::string_view text) {
+  const auto stop = std::min(text.find('{'), text.find("${"));
+  return std::filesystem::path(std::string(text.substr(0, stop))).parent_path();
+}
+
+// Shared by conf_template and facts_template. Every rendered path is checked
+// canonically against one anchor and may not escape it, even through a
+// symlink: "~/" anchors to HOME, a leading placeholder ({project_root},
+// ${ENV}) to its own value, an absolute literal to its literal prefix before
+// the first placeholder, and a relative template to `relativeBase`.
 std::expected<std::filesystem::path, std::string>
 renderTemplate(const std::string &templateText, const detail::PlaceholderContext &context,
               const char *key, const std::string &source, const std::filesystem::path &relativeBase,
@@ -52,49 +46,45 @@ renderTemplate(const std::string &templateText, const detail::PlaceholderContext
   const auto fail = [&](const std::string &reason) {
     return std::unexpected(detail::settingError(key, source, reason, discovery));
   };
-  if (templateText.starts_with('/'))
-    return fail("must not be an absolute literal; use ~/, a placeholder, or a relative path");
-  if (templateText.starts_with("~/")) {
+  std::string text = templateText;
+  std::filesystem::path anchor = relativeBase;
+  std::string anchorLabel = rootLabel;
+  if (text.starts_with("~/")) {
     if (detail::env("HOME").empty()) return fail("requires HOME for ~/ expansion");
-    auto suffix = detail::expandPlaceholders(templateText.substr(2), context);
-    if (!suffix) return fail(suffix.error());
-    if (invalidBody(*suffix)) return fail("is invalid");
-    return (std::filesystem::path(detail::env("HOME")) / *suffix).lexically_normal();
+    anchor = detail::env("HOME");
+    anchorLabel = "HOME";
+    text = anchor.string() + text.substr(1);
+  } else if (text.starts_with('/')) {
+    anchor = literalPrefix(text);
+    anchorLabel = "its literal prefix " + anchor.string();
+  } else if (const auto leading = leadingPlaceholder(text); !leading.empty()) {
+    auto rootText = detail::expandPlaceholders(leading, context);
+    if (!rootText) return fail(rootText.error());
+    if (std::filesystem::path(*rootText).is_absolute()) {
+      anchor = *rootText;
+      anchorLabel = std::string(leading) + " (" + *rootText + ")";
+    }
   }
-  auto substituted = detail::expandPlaceholders(templateText, context);
+  auto substituted = detail::expandPlaceholders(text, context);
   if (!substituted) return fail(substituted.error());
-  auto text = std::move(*substituted);
+  text = std::move(*substituted);
   // An empty {relative_path} immediately followed by a literal "/" (the
   // default conf_template's root-level case) would otherwise render a
-  // leading "/" that looks like an absolute-literal escape attempt.
+  // leading "/" that looks like an absolute path.
   if (context.relativePath.empty() && leadingPlaceholder(templateText) == "{relative_path}" &&
       templateText.substr(std::string_view("{relative_path}").size()).starts_with('/') &&
       text.starts_with('/'))
     text.erase(0, 1);
-  if (invalidBody(text)) return fail("is invalid");
+  if (detail::invalidPathShape(text)) return fail("is invalid");
   const auto expanded = std::filesystem::path(text);
+  const auto target = (expanded.is_absolute() ? expanded : relativeBase / expanded).lexically_normal();
   std::error_code error;
-  if (!expanded.is_absolute()) {
-    const auto target = (relativeBase / expanded).lexically_normal();
-    const auto canonicalRoot = std::filesystem::weakly_canonical(relativeBase, error);
-    if (error) return fail("cannot resolve: " + error.message());
-    const auto canonicalTarget = std::filesystem::weakly_canonical(target, error);
-    if (error) return fail("cannot resolve: " + error.message());
-    if (canonicalTarget == canonicalRoot || !contained(canonicalRoot, canonicalTarget))
-      return std::unexpected(std::string(key) + " escapes " + rootLabel + ": " + target.string());
-    return canonicalTarget;
-  }
-  const auto leading = leadingPlaceholder(templateText);
-  if (leading.empty()) return expanded.lexically_normal();
-  auto rootText = detail::expandPlaceholders(leading, context);
-  if (!rootText) return fail(rootText.error());
-  const auto canonicalRoot = std::filesystem::weakly_canonical(*rootText, error);
+  const auto canonicalRoot = std::filesystem::weakly_canonical(anchor, error);
   if (error) return fail("cannot resolve: " + error.message());
-  const auto canonicalTarget = std::filesystem::weakly_canonical(expanded, error);
+  const auto canonicalTarget = std::filesystem::weakly_canonical(target, error);
   if (error) return fail("cannot resolve: " + error.message());
-  if (!contained(canonicalRoot, canonicalTarget))
-    return std::unexpected(std::string(key) + " escapes " + *rootText + " through a symlink: " +
-                           expanded.string());
+  if (canonicalTarget == canonicalRoot || !contained(canonicalRoot, canonicalTarget))
+    return std::unexpected(std::string(key) + " escapes " + anchorLabel + ": " + target.string());
   return canonicalTarget;
 }
 } // namespace

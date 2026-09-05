@@ -12,6 +12,7 @@ int main() {
   configuration_test::ownership();
   configuration_test::policies();
   configuration_test::placeholders();
+  configuration_test::safety();
   const auto unmarked = std::filesystem::temp_directory_path() /
                         ("facts-tool-unmarked-" + std::to_string(getpid()));
   std::filesystem::create_directories(unmarked / "nested");
