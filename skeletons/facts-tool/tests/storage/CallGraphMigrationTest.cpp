@@ -48,7 +48,7 @@ bool verifyVersionSevenMigration(const std::filesystem::path &path) {
                "failed to open migrated version-seven database"))
     return false;
   const auto valid =
-      require(scalar(database, "PRAGMA user_version") == 9,
+      require(scalar(database, "PRAGMA user_version") == 10,
               "version-seven migration was not recorded") &&
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'relation_site')") == 10,

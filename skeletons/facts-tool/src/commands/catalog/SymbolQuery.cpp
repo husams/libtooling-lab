@@ -132,14 +132,20 @@ querySymbols(storage::Database &database, const std::vector<SourceFile> &files,
              const std::optional<std::string> &name) {
   return catalog::query(
              database,
-             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
-             "AND name='callable_return_type'",
-             [](const storage::Row &row) { return row.integer(0) != 0; })
+             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' "
+             "AND name='callable_return_type'), EXISTS(SELECT 1 FROM "
+             "pragma_table_info('symbol') WHERE name='is_volatile')",
+             [](const storage::Row &row) {
+               return std::pair{row.integer(0) != 0, row.integer(1) != 0};
+             })
       .and_then([&](const auto &present) {
         const std::string storedReturn =
-            present.front() ? "(SELECT canonical_type FROM "
-                              "callable_return_type WHERE symbol_id=s.id)"
-                            : "NULL";
+            present.front().first
+                ? "(SELECT canonical_type FROM "
+                  "callable_return_type WHERE symbol_id=s.id)"
+                : "NULL";
+        const std::string volatility =
+            present.front().second ? "is_volatile" : "0";
         return catalog::query(
             database,
             std::string{"SELECT "} +
@@ -158,7 +164,8 @@ querySymbols(storage::Database &database, const std::vector<SourceFile> &files,
                 "(SELECT destination.qualified_name FROM relation "
                 "JOIN symbol destination ON "
                 "destination.id=relation.destination_id "
-                "WHERE relation.source_id=s.id AND relation.kind=? LIMIT 1)) "
+                "WHERE relation.source_id=s.id AND relation.kind=? LIMIT 1))," +
+                volatility + " "
                 "FROM symbol s WHERE ((id >> 32)<>0 OR ? IS NOT NULL) "
                 "AND (? IS NULL OR qualified_name=?) ORDER BY "
                 "id",

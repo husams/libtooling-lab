@@ -24,7 +24,7 @@ auto verifyFreshSchema(const std::filesystem::path &path) -> bool {
       static_cast<std::uint32_t>(clang::AS_private) |
       facts::bit(facts::DefinitionBit) | facts::bit(facts::ConstBit) |
       facts::bit(facts::ExternStorageBit) | (2U << facts::refQualifierShift) |
-      (2U << facts::constexprShift) | facts::bit(facts::NoexceptBit);
+      (2U << facts::constexprShift) | facts::bit(facts::NoexceptBit) | facts::bit(facts::VolatileBit);
   const auto parameterFlags = facts::bit(facts::ParameterBit::PointerBit) |
                               facts::bit(facts::ParameterBit::ConstBit) |
                               facts::bit(facts::ParameterBit::PackBit);
@@ -390,7 +390,7 @@ SELECT group_concat(record, char(10)) FROM (
                          " AND access='private' AND is_definition=1 AND "
                          "is_const=1 AND ref_qualifier='rvalue' AND "
                          "has_extern_storage=1 AND "
-                         "constant_evaluation='consteval' AND is_noexcept=1") ==
+                         "constant_evaluation='consteval' AND is_noexcept=1 AND is_volatile=1") ==
                   1,
               "symbol semantic columns are incorrect") &&
       require(scalar(database,
@@ -443,7 +443,7 @@ SELECT group_concat(record, char(10)) FROM (
                                "'relation_site') WHERE [table]='relation' "
                                "AND on_delete='CASCADE'") == 4,
               "relation-site cascade key is incorrect") &&
-      require(scalar(database, "PRAGMA user_version") == 9,
+      require(scalar(database, "PRAGMA user_version") == 10,
               "fresh schema version was not recorded");
   sqlite3_close(database);
   return valid;

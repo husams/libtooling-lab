@@ -15,10 +15,6 @@
 namespace facts {
 namespace {
 
-std::uint32_t flagWhen(SymbolBit flag, bool condition) {
-  return condition ? bit(flag) : 0;
-}
-
 const clang::CXXMethodDecl *supportedMethod(const clang::FunctionDecl &node) {
   const auto *method = llvm::dyn_cast<clang::CXXMethodDecl>(&node);
   if (!method || llvm::isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
@@ -29,25 +25,6 @@ const clang::CXXMethodDecl *supportedMethod(const clang::FunctionDecl &node) {
 }
 
 } // namespace
-
-ExtractionResult<Function> addMethodFlags(Function function,
-                                          const clang::FunctionDecl &node) {
-  const auto *method = supportedMethod(node);
-  if (!method) {
-    return function;
-  }
-
-  function.flags |=
-      static_cast<std::uint32_t>(method->getAccess()) |
-      flagWhen(StaticBit, method->isStatic()) |
-      flagWhen(VirtualBit, method->isVirtual()) |
-      flagWhen(PureBit, method->isPureVirtual()) |
-      flagWhen(OverrideBit, method->size_overridden_methods() != 0) |
-      flagWhen(InlineBit, method->isInlined()) |
-      flagWhen(DefaultedBit, method->isDefaulted()) |
-      flagWhen(DeletedBit, method->isDeleted());
-  return function;
-}
 
 IndexingResult storeMethodRelation(const clang::FunctionDecl &node,
                                    SymbolId function,

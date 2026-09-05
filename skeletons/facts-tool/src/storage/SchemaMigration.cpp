@@ -377,6 +377,21 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
                            ? execute(database, returnTypeMigrationSql)
                            : std::expected<void, std::error_code>{};
               });
+            })
+            .and_then([database] {
+              return hasColumn(database, "symbol", "is_volatile")
+                  .and_then([database](bool exists) {
+                    return exists ? std::expected<void, std::error_code>{}
+                        : execute(database, "ALTER TABLE symbol ADD COLUMN "
+                            "is_volatile INTEGER NOT NULL DEFAULT 0 "
+                            "CHECK(is_volatile IN (0,1));");
+                  })
+                  .and_then([database] {
+                    return schemaVersion(database).and_then([database](int version) {
+                      return version < 10 ? execute(database, "PRAGMA user_version=10;")
+                                          : std::expected<void, std::error_code>{};
+                    });
+                  });
             });
       });
 }

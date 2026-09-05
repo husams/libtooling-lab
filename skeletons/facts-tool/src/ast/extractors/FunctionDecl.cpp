@@ -2,6 +2,7 @@
 
 #include "ast/StoreExtracted.h"
 #include "ast/extractors/Definition.h"
+#include "ast/extractors/CallableProperties.h"
 #include "ast/extractors/FunctionTemplate.h"
 #include "ast/extractors/Location.h"
 #include "ast/extractors/MethodDecl.h"
@@ -55,7 +56,10 @@ extractFunction(const clang::FunctionDecl &node,
   };
 
   const auto addFlags = [&](Function function) {
-    return addMethodFlags(std::move(function), node);
+    return addCallableProperties(std::move(function), node)
+        .and_then([&](Function value) {
+          return addMethodFlags(std::move(value), node);
+        });
   };
 
   return extractSymbol<Symbol, clang::NamedDecl>(node, sourceManager)

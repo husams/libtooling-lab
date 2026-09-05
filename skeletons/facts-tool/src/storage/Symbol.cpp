@@ -46,10 +46,10 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node, const Symbol &symbol) {
           "variadic,"
           "is_deleted,is_defaulted,is_explicit,is_final,is_abstract,is_"
           "polymorphic,"
-          "has_extern_storage,constant_evaluation,is_noexcept) "
+          "has_extern_storage,constant_evaluation,is_noexcept,is_volatile) "
           "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,"
           "?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,"
-          "?33) "
+          "?33,?34) "
           "ON CONFLICT(id) DO UPDATE SET node=excluded.node,"
           "kind=excluded.kind,sub_kind=excluded.sub_kind,lang=excluded.lang,"
           "properties=excluded.properties,usr=excluded.usr,"
@@ -80,7 +80,8 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node, const Symbol &symbol) {
           "storage),"
           "constant_evaluation=CASE WHEN excluded.constant_evaluation<>'none' "
           "THEN excluded.constant_evaluation ELSE constant_evaluation END,"
-          "is_noexcept=MAX(is_noexcept,excluded.is_noexcept)",
+          "is_noexcept=MAX(is_noexcept,excluded.is_noexcept),"
+          "is_volatile=MAX(is_volatile,excluded.is_volatile)",
           rows,
           storage::detail::typedBinder([id, node](auto bind,
                                                   const Symbol &value) {
@@ -99,7 +100,8 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node, const Symbol &symbol) {
                         properties.isExplicit, properties.isFinal,
                         properties.isAbstract, properties.isPolymorphic,
                         properties.hasExternStorage,
-                        properties.constantEvaluation, properties.isNoexcept);
+                        properties.constantEvaluation, properties.isNoexcept,
+                        properties.isVolatile);
           }))
       .transform([](const storage::BulkResult &) {});
 }
@@ -112,7 +114,7 @@ std::expected<Symbol, std::error_code> Storage::loadSymbolRow(SymbolNode node,
       "is_inline,is_pure,ref_qualifier,is_override,has_internal_linkage,"
       "is_external,is_variadic,is_deleted,is_defaulted,is_explicit,is_final,"
       "is_abstract,is_polymorphic,has_extern_storage,constant_evaluation,"
-      "is_noexcept "
+      "is_noexcept,is_volatile "
       "FROM symbol WHERE id=?1 AND node=?2",
       [id](const storage::Row &row) {
         Symbol symbol;
@@ -148,6 +150,7 @@ std::expected<Symbol, std::error_code> Storage::loadSymbolRow(SymbolNode node,
             .hasExternStorage = row.get<bool>(28),
             .constantEvaluation = row.get<std::string>(29),
             .isNoexcept = row.get<bool>(30),
+            .isVolatile = row.get<bool>(31),
         });
         return symbol;
       },

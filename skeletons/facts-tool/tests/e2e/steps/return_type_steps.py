@@ -156,8 +156,8 @@ def previous_schema(context: FactsToolContext):
 @then("the upgrade preserves existing identities and unrelated facts")
 def verify_upgrade(context: FactsToolContext):
     require(unrelated_facts(context) == context.before_upgrade, "upgrade changed unrelated facts")
-    require(query(context.facts_database_path, "PRAGMA user_version") == [(9,)],
-            "return-type schema migration did not advance to version 9")
+    require(query(context.facts_database_path, "PRAGMA user_version") == [(10,)],
+            "return-type schema migration did not advance to version 10")
     context.run_tool()
     require(unrelated_facts(context) == context.before_upgrade, "second migration changed facts")
     require(inventory(context) == context.return_inventory, "second migration changed return facts")
@@ -191,7 +191,14 @@ def declaration_catalog(context: FactsToolContext):
                            str(context.facts_database_path)])
     require(result.returncode == 0, context.last_output)
     listed = [line.split(maxsplit=1)[1] for line in result.stdout.splitlines()[1:]]
-    require(sorted(listed) == sorted(name for (name,) in expected),
+    names = sorted((name for (name,) in expected), key=len, reverse=True)
+    # Listings now append callable signatures; retain the complete identity-set
+    # assertion, including names that themselves contain operator/lambda ().
+    listed_names = [next((name for name in names if declaration == name or
+                         declaration.startswith(name + "(") or
+                         declaration.startswith(name + " -> ")), declaration)
+                    for declaration in listed]
+    require(sorted(listed_names) == sorted(names),
             f"declaration catalog contains wrong symbols: {result.stdout}")
     require(context.facts_database_path.read_bytes() == before,
             "listing declarations changed stored return targets")

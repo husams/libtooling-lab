@@ -30,7 +30,8 @@ std::vector<std::string> trueFlags(const storage::Row &row) {
                                           std::pair{28, "abstract"},
                                           std::pair{29, "polymorphic"},
                                           std::pair{30, "extern-storage"},
-                                          std::pair{32, "noexcept"}};
+                                          std::pair{32, "noexcept"},
+                                          std::pair{34, "volatile"}};
   std::vector<std::string> flags;
   for (const auto &[column, name] : flagColumns)
     if (row.integer(column))
@@ -123,9 +124,13 @@ std::string declaration(const SymbolFact &value) {
     parameters.reserve(value.parameters.size());
     for (const auto &parameter : value.parameters)
       parameters.push_back(renderParameter(parameter));
+    if (hasFlag(value, "variadic"))
+      parameters.emplace_back("...");
     result += "(" + join(parameters) + ")";
     if (hasFlag(value, "const"))
       result += " const";
+    if (hasFlag(value, "volatile"))
+      result += " volatile";
     if (value.refQualifier == "lvalue" || value.refQualifier == "&")
       result += " &";
     if (value.refQualifier == "rvalue" || value.refQualifier == "&&")
@@ -156,7 +161,7 @@ std::string displaySymbols(const std::vector<SymbolFact> &values) {
   std::vector<std::array<std::string, 2>> rows;
   rows.reserve(values.size());
   for (const auto &value : values)
-    rows.push_back({value.kind, value.qualifiedName});
+    rows.push_back({value.kind, symbolDeclaration(value)});
   auto kindWidth = headers[0].size();
   for (const auto &row : rows)
     kindWidth = std::max(kindWidth, row[0].size());
