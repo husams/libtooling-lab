@@ -1,0 +1,3 @@
+.codex/
+*.db
+**.sqlite
