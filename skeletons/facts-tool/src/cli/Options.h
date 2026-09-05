@@ -8,6 +8,7 @@ namespace facts::cli {
 struct ExtractOptions {
   int verbosity = 0;
   std::string output;
+  bool outputFromTemplate = false;
   std::string configuration;
   std::string configurationFile;
   std::vector<std::string> defaultExtraArguments;
@@ -27,6 +28,7 @@ struct ImportOptions {
 struct DependencyOptions {
   int verbosity = 0;
   std::string output;
+  bool outputFromTemplate = false;
   std::string configuration;
   std::string configurationFile;
   std::vector<std::string> defaultExtraArguments;

@@ -54,6 +54,15 @@ def main() -> None:
     config_help = run(tool, "config", "show", "--help")
     require(config_help.returncode == 0 and "YAML" in output(config_help),
             output(config_help))
+    require(
+        "project" in output(config_help)
+        and "user file" in output(config_help)
+        and "facts_template" in output(config_help)
+        and "{project_root}" in output(config_help)
+        and "{user}" in output(config_help)
+        and "${ENV_NAME}" in output(config_help),
+        output(config_help),
+    )
 
     file_help = run(tool, "file", "--help")
     require(file_help.returncode == 0, output(file_help))
@@ -146,10 +155,13 @@ def main() -> None:
         output(dependency_help),
     )
 
+    # -o/--output is no longer unconditionally required: it falls back to
+    # facts_template (B-030). With no facts_template configured, the usage
+    # error still asks for -o/--facts explicitly.
     missing = run(tool, "extract")
-    require(missing.returncode != 0, output(missing))
+    require(missing.returncode == 2, output(missing))
     require(
-        "--output" in output(missing) and "required" in output(missing).lower(),
+        "-o" in output(missing) and "--facts" in output(missing),
         output(missing),
     )
 

@@ -34,11 +34,73 @@ inline std::filesystem::path builtInRoot() {
          "facts-tool";
 }
 
+// The user-tier file: $XDG_CONFIG_HOME/facts-tool/config.yaml, else
+// $HOME/.config/facts-tool/config.yaml. When HOME is unset and XDG is also
+// unset there is no user file to look for; the caller records that
+// symbolically instead of resolving a path.
+inline std::string userConfigCandidate() {
+  const auto xdg = env("XDG_CONFIG_HOME"), home = env("HOME");
+  if (!xdg.empty()) return xdg + "/facts-tool/config.yaml";
+  if (!home.empty()) return home + "/.config/facts-tool/config.yaml";
+  return "${HOME}/.config/facts-tool/config.yaml";
+}
+
+inline std::filesystem::path projectConfigPath(const std::filesystem::path &root) {
+  return root / ".facts-tool.yaml";
+}
+
 inline std::string searched(const std::vector<std::string> &values) {
   std::string result;
   for (const auto &value : values)
     result += (result.empty() ? "" : ", ") + value;
   return result;
+}
+
+// Attributes one setting's problem to the file that supplied it (or
+// "built-in" when none did), plus the ordered tiers already walked.
+inline std::string settingError(std::string_view key, const std::string &sourceLabel,
+                                const std::string &reason,
+                                const std::vector<std::string> &discovery) {
+  return std::string(key) + " in " + sourceLabel + ": " + reason +
+         "; searched: " + searched(discovery) + "; set --config or FACTS_TOOL_CONFIG";
+}
+
+// Wraps a readTier() failure with the offending file and the tiers already
+// walked, matching what "config show" and compiler consumers report.
+inline std::string keyError(const std::string &reason, const std::filesystem::path &path,
+                            const std::vector<std::string> &discovery) {
+  const auto split = reason.find(' ');
+  const auto key = reason.substr(0, split);
+  const bool setting = key == "conf_root" || key == "conf_template" ||
+                       key == "facts_template" || key == "extra_args";
+  return settingError(setting ? key : "configuration", path.string(),
+                      setting ? reason.substr(split + 1) : reason, discovery);
+}
+
+enum class Presence { Optional, Required };
+
+// Checks one candidate file, records it in the discovery trail, and parses
+// it when present. A stat error is treated the same as "present" so the
+// underlying I/O failure surfaces from readTier() itself.
+inline std::expected<std::optional<Tier>, std::string>
+readCandidate(const std::filesystem::path &path, bool applyPathSettings,
+             Presence presence, Resolved &value) {
+  std::error_code error;
+  const bool exists = std::filesystem::exists(path, error);
+  if (!error && !exists) {
+    value.discovery.push_back(path.string() + " [absent]");
+    if (presence == Presence::Required)
+      return std::unexpected(settingError("configuration", path.string(),
+                                          "file not found", value.discovery));
+    return std::optional<Tier>{};
+  }
+  auto tier = readTier(path, applyPathSettings);
+  if (!tier) {
+    value.discovery.push_back(path.string() + " [invalid]");
+    return std::unexpected(keyError(tier.error(), path, value.discovery));
+  }
+  value.discovery.push_back(path.string() + (error ? " [inaccessible]" : " [found]"));
+  return std::optional<Tier>{std::move(*tier)};
 }
 
 } // namespace facts::config::detail

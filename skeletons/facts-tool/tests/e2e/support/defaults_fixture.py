@@ -14,10 +14,9 @@ class Defaults:
                     if not k.startswith(("FACTS_TOOL_", "XDG_")) and k != "HOME"}
         self.env["HOME"] = str(self.root / "home")
         self.files = {
-            "cli": self.root / "cli.yaml", "env": self.root / "env.yaml",
+            "config-file": self.root / "team.yaml",
             "project": self.cwd / ".facts-tool.yaml",
-            "xdg": self.root / "xdg/facts-tool/config.yaml",
-            "home": self.root / "home/.config/facts-tool/config.yaml"}
+            "user": self.root / "home/.config/facts-tool/config.yaml"}
         self.args = []
         self.last = None
 
@@ -41,6 +40,9 @@ class Defaults:
         value = line.split(": ", 1)[1]
         return json.loads(value) if value.startswith('"') else value
 
+    # A "tier" is one of: direct, db-env, config-file, project, user, builtin.
+    # Each YAML tier gets a distinguishable conf_root/conf_template/extra_args
+    # so a test can tell which tier actually won.
     def expected(self, tier):
         if tier in ("direct", "db-env"):
             return self.root / (tier + ".db")
@@ -51,7 +53,7 @@ class Defaults:
 
     def tiers(self, names):
         for tier in names.split(","):
-            if tier == "none" or tier == "builtin":
+            if tier in ("none", "builtin"):
                 continue
             if tier == "direct":
                 self.args += ["--conf", str(self.expected(tier))]
@@ -60,9 +62,7 @@ class Defaults:
             else:
                 self.write(tier, conf_root=str(self.root / ("store-" + tier)),
                     conf_template="{filename}.db", extra_args=["-DTIER=" + tier])
-                if tier == "cli": self.args += ["--config", str(self.files[tier])]
-                if tier == "env": self.env["FACTS_TOOL_CONFIG"] = str(self.files[tier])
-                if tier == "xdg": self.env["XDG_CONFIG_HOME"] = str(self.root / "xdg")
+                if tier == "config-file": self.args += ["--config", str(self.files[tier])]
 
     def snapshot(self):
         return {str(p.relative_to(self.root)): p.read_bytes()

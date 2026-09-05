@@ -63,5 +63,6 @@ def unused(defaults, family):
 @then("partial provenance identifies the selected file")
 def partial(defaults):
     assert "parser: YAML / yaml-cpp 0.9.0" in defaults.last.stdout
-    assert defaults.value("source") == str(defaults.files["project"])
-    assert str(defaults.files["project"]) + " [selected]" in defaults.last.stdout
+    assert str(defaults.files["project"]) + " [invalid]" in defaults.last.stdout
+    assert str(defaults.files["user"]) + " [absent]" in defaults.last.stdout
+    assert "configuration in " + str(defaults.files["project"]) in defaults.last.stderr

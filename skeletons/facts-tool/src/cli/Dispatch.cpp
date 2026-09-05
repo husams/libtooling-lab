@@ -112,7 +112,9 @@ int report(std::expected<int, std::string> result) {
   if (!result) {
     const auto prefixed = result.error().starts_with("facts-tool:");
     std::cerr << (prefixed ? "" : "facts-tool: ") << result.error() << '\n';
-    return result.error().starts_with("facts-tool: configuration error:") ? 3 : 1;
+    if (result.error().starts_with("facts-tool: configuration error:")) return 3;
+    if (result.error().starts_with("facts-tool: usage error:")) return 2;
+    return 1;
   }
   return *result;
 }

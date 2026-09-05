@@ -1,61 +1,149 @@
-#include "config/ConfigurationSearch.h"
+#include "config/Configuration.h"
+#include "config/ConfigurationDiscovery.h"
+#include "config/ConfigurationPlaceholders.h"
+#include "config/ConfigurationShape.h"
+
+#include <algorithm>
 
 namespace facts::config {
 namespace {
-std::expected<Resolved, std::string> generate(Resolved value) {
-  if (value.storageRoot.empty()) {
-    const auto data = detail::env("XDG_DATA_HOME");
-    if (!data.empty() && !std::filesystem::path(data).is_absolute())
-      return std::unexpected("XDG_DATA_HOME must be absolute");
-    if (data.empty() && detail::env("HOME").empty())
-      return std::unexpected("unresolved conf; searched: " +
-                             detail::searched(value.discovery) +
-                             "; set --conf or FACTS_TOOL_CONF");
-    value.storageRoot = detail::builtInRoot();
-  }
-  return renderDatabasePath(value)
-      .transform([&](auto path) {
-        value.database = std::move(path);
-        return value;
-      })
-      .transform_error([&](const auto &reason) {
-        if (reason.starts_with("conf_template escapes conf_root:") ||
-            value.source == "built-in") return reason;
-        return detail::fileError(value, reason);
-      });
-}
+bool contained(const std::filesystem::path &root, const std::filesystem::path &target) {
+  auto left = root.begin(), right = target.begin();
+  for (; left != root.end() && right != target.end(); ++left, ++right)
+    if (*left != *right) return false;
+  return left == root.end();
 }
 
-std::expected<Resolved, std::string> resolve(const Request &request, Resolved *partial) {
-  const auto direct = !request.direct.empty() ? request.direct
-                                              : detail::env("FACTS_TOOL_CONF");
-  if (request.direct.empty() && detail::present("FACTS_TOOL_CONF") && direct.empty())
-    return std::unexpected("FACTS_TOOL_CONF must not be empty");
-  Resolved value{.projectRoot = detail::cwd(),
-                 .templateText = "{relative_path}/{filename}.db",
-                 .source = "built-in",
-                 .generated = direct.empty(),
-                 .storageRootSource = "built-in",
-                 .templateSource = "built-in",
-                 .extraArgumentsSource = "built-in"};
-  if (partial) *partial = value;
-  const auto useDirect = [&](Resolved resolved) {
-    resolved.database = (detail::cwd() / direct).lexically_normal();
-    resolved.source = request.direct.empty() ? "FACTS_TOOL_CONF" : "--conf";
-    return resolved;
+std::string projectName(const std::filesystem::path &projectRoot) {
+  return projectRoot.filename().empty() ? "_root" : projectRoot.filename().string();
+}
+
+// The template's leading "{name}" or "${name}" token, verbatim, or empty if
+// the template does not start with one.
+std::string_view leadingPlaceholder(std::string_view text) {
+  const bool env = text.starts_with("${");
+  if (!env && !text.starts_with('{')) return {};
+  const auto end = text.find('}', env ? 2 : 1);
+  return end == text.npos ? std::string_view{} : text.substr(0, end + 1);
+}
+
+// The literal text before the first placeholder of an absolute template: the
+// part the user wrote verbatim and therefore trusts.
+std::filesystem::path literalPrefix(std::string_view text) {
+  const auto stop = std::min(text.find('{'), text.find("${"));
+  return std::filesystem::path(std::string(text.substr(0, stop))).parent_path();
+}
+
+// Shared by conf_template and facts_template. The template body is
+// substituted exactly once; environment-derived prefixes (HOME for "~/") are
+// joined afterwards as literal text and never re-parsed. Every rendered path
+// is then checked canonically against one anchor and may not escape it, even
+// through a symlink: "~/" anchors to HOME, a leading placeholder
+// ({project_root}, ${ENV}) to its own value (or that value's parent when the
+// placeholder already names the complete file), an absolute literal to its
+// literal prefix before the first placeholder, and a relative template to
+// `relativeBase`.
+std::expected<std::filesystem::path, std::string>
+renderTemplate(const std::string &templateText, const detail::PlaceholderContext &context,
+              const char *key, const std::string &source, const std::filesystem::path &relativeBase,
+              const char *rootLabel, const std::vector<std::string> &discovery) {
+  const auto fail = [&](const std::string &reason) {
+    return std::unexpected(detail::settingError(key, source, reason, discovery));
   };
-  if (!request.loadDefaults && !direct.empty()) return useDirect(value);
-  if (request.selector.empty() && detail::present("FACTS_TOOL_CONFIG") &&
-      detail::env("FACTS_TOOL_CONFIG").empty())
-    return std::unexpected("FACTS_TOOL_CONFIG must not be empty");
-  value.projectRoot = detail::projectRoot(value.projectRoot);
-  const auto selector = !request.selector.empty() ? request.selector
-                                                 : detail::env("FACTS_TOOL_CONFIG");
-  return detail::discover(std::move(value), selector, partial)
-      .and_then([&](Resolved resolved) -> std::expected<Resolved, std::string> {
-        if (partial) *partial = resolved;
-        return direct.empty() ? generate(std::move(resolved))
-                              : useDirect(std::move(resolved));
-      });
+  std::string body = templateText;
+  std::filesystem::path prefix;
+  std::filesystem::path anchor = relativeBase;
+  std::string anchorLabel = rootLabel;
+  if (body.starts_with("~/")) {
+    if (detail::env("HOME").empty()) return fail("requires HOME for ~/ expansion");
+    prefix = anchor = detail::env("HOME");
+    anchorLabel = "HOME";
+    body = templateText.substr(2);
+  } else if (body.starts_with('/')) {
+    anchor = literalPrefix(body);
+    anchorLabel = "its literal prefix " + anchor.string();
+  } else if (const auto leading = leadingPlaceholder(body); !leading.empty()) {
+    auto rootText = detail::expandPlaceholders(leading, context);
+    if (!rootText) return fail(rootText.error());
+    if (std::filesystem::path(*rootText).is_absolute()) {
+      const auto rest = std::string_view(body).substr(leading.size());
+      anchor = rest.starts_with('/') ? std::filesystem::path(*rootText)
+                                     : std::filesystem::path(*rootText).parent_path();
+      anchorLabel = std::string(leading) + " (" + anchor.string() + ")";
+    }
+  }
+  auto substituted = detail::expandPlaceholders(body, context);
+  if (!substituted) return fail(substituted.error());
+  auto text = std::move(*substituted);
+  // An empty {relative_path} immediately followed by a literal "/" (the
+  // default conf_template's root-level case) would otherwise render a
+  // leading "/" that looks like an absolute path.
+  if (prefix.empty() && context.relativePath.empty() &&
+      leadingPlaceholder(body) == "{relative_path}" &&
+      body.substr(std::string_view("{relative_path}").size()).starts_with('/') &&
+      text.starts_with('/'))
+    text.erase(0, 1);
+  if (detail::invalidPathShape(text)) return fail("is invalid");
+  const auto expanded = prefix.empty() ? std::filesystem::path(text) : prefix / text;
+  const auto target = (expanded.is_absolute() ? expanded : relativeBase / expanded).lexically_normal();
+  std::error_code error;
+  const auto canonicalRoot = std::filesystem::weakly_canonical(anchor, error);
+  if (error) return fail("cannot resolve: " + error.message());
+  const auto canonicalTarget = std::filesystem::weakly_canonical(target, error);
+  if (error) return fail("cannot resolve: " + error.message());
+  if (canonicalTarget == canonicalRoot || !contained(canonicalRoot, canonicalTarget))
+    return std::unexpected(std::string(key) + " escapes " + anchorLabel + ": " + target.string());
+  return canonicalTarget;
+}
+} // namespace
+
+std::expected<std::filesystem::path, std::string>
+renderDatabasePath(const Resolved &value) {
+  auto root = value.storageRoot;
+  if (root.string().starts_with("~/")) {
+    if (detail::env("HOME").empty())
+      return std::unexpected(detail::settingError("conf_root", value.storageRootSource,
+          "requires HOME for ~/ expansion", value.discovery));
+    root = std::filesystem::path(detail::env("HOME")) / root.string().substr(2);
+  }
+  if (root.empty())
+    return std::unexpected(detail::settingError("conf_root", value.storageRootSource,
+        "is empty", value.discovery));
+  // S-019 guarantee: a relative conf_root anchors to the canonical project
+  // root, never to the directory holding the YAML file that declared it.
+  if (root.is_relative()) root = value.projectRoot / root;
+  auto relative = value.projectRoot.parent_path().lexically_relative("/").generic_string();
+  if (relative == ".") relative.clear();
+  detail::PlaceholderContext context{.projectRoot = value.projectRoot.generic_string(),
+                                     .projectName = projectName(value.projectRoot),
+                                     .relativePath = relative,
+                                     .filename = projectName(value.projectRoot)};
+  return renderTemplate(value.templateText, context, "conf_template", value.templateSource, root,
+                        "conf_root", value.discovery);
+}
+
+std::expected<std::filesystem::path, std::string>
+renderFactsPath(const Resolved &value, const std::vector<std::string> &sources) {
+  if (value.factsTemplate.empty())
+    return std::unexpected("usage:no facts_template is configured; pass -o/--facts explicitly");
+  const bool needsSource = value.factsTemplate.find("{relative_path}") != std::string::npos ||
+                           value.factsTemplate.find("{filename}") != std::string::npos;
+  detail::PlaceholderContext context{.projectRoot = value.projectRoot.generic_string(),
+                                     .projectName = projectName(value.projectRoot)};
+  if (needsSource) {
+    if (sources.size() != 1)
+      return std::unexpected(
+          "usage:facts_template needs exactly one source to derive a path; pass -o/--facts explicitly");
+    std::error_code error;
+    const auto canonicalSource = std::filesystem::weakly_canonical(sources.front(), error);
+    if (error)
+      return std::unexpected("facts_template cannot resolve source: " + error.message());
+    const auto relative = canonicalSource.lexically_relative(value.projectRoot);
+    const auto parent = relative.parent_path();
+    context.relativePath = (parent.empty() || parent == ".") ? "" : parent.generic_string();
+    context.filename = relative.stem().string();
+  }
+  return renderTemplate(value.factsTemplate, context, "facts_template", value.factsTemplateSource,
+                        value.projectRoot, "the project root", value.discovery);
 }
 } // namespace facts::config

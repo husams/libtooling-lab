@@ -216,6 +216,14 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
                         options.verbosity, 2,
                         "facts-tool: dependency: visited_sources={}, edges={}",
                         graph.visitedSources.size(), graph.edges.size());
+                    // Deferred until every earlier stage has passed, so a
+                    // facts_template default never creates a directory
+                    // ahead of a failure (B-030 C-3116).
+                    if (options.outputFromTemplate) {
+                      if (auto created = materializeFactsDirectory(options.output); !created)
+                        return std::expected<int, std::string>{
+                            std::unexpected(created.error())};
+                    }
                     return runDependencyStage(options, "persist graph",
                                               [&] {
                                                 return replaceDependencies(
@@ -241,6 +249,12 @@ runDependency(const cli::DependencyOptions &options) {
                                     options.configurationFile, false, true);
   if (!resolved) return std::unexpected(resolved.error());
   auto configured = options;
+  if (configured.output.empty()) {
+    auto output = resolveFactsOutput(*resolved, options.sources);
+    if (!output) return std::unexpected(output.error());
+    configured.output = output->string();
+    configured.outputFromTemplate = true;
+  }
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = std::move(resolved->extraArguments);
   return runDependencyStage(configured, "validate sources",

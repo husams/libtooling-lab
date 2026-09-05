@@ -108,6 +108,13 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         }
         clang::tooling::ClangTool tool(**configured, sources);
 
+        // Deferred until every applicable check above has passed, so a
+        // facts_template default never creates a directory ahead of a
+        // failure (B-030 C-3116).
+        if (options.outputFromTemplate) {
+          if (auto created = materializeFactsDirectory(options.output); !created)
+            return std::expected<int, std::string>{std::unexpected(created.error())};
+        }
         cli::logVerbose(options.verbosity, 1,
                         "facts-tool: extract: open output database");
         const auto openOutputStarted = TimingClock::now();
@@ -184,6 +191,12 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
                                     options.configurationFile, false, true);
   if (!resolved) return std::unexpected(resolved.error());
   auto configured = options;
+  if (configured.output.empty()) {
+    auto output = resolveFactsOutput(*resolved, options.sources);
+    if (!output) return std::unexpected(output.error());
+    configured.output = output->string();
+    configured.outputFromTemplate = true;
+  }
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = std::move(resolved->extraArguments);
   return runExtractResolved(configured);

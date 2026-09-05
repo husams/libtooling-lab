@@ -7,7 +7,10 @@ namespace facts::cli {
 namespace {
 
 void symbolOptions(CLI::App &command, SymbolOptions &options) {
-  command.add_option("-f,--facts", options.facts, "Extracted facts database")
+  command
+      .add_option("-f,--facts", options.facts,
+                  "Extracted facts database; defaults to facts_template "
+                  "when omitted (project-scoped templates only)")
       ->type_name("FILE");
   configurationOptions(command, options.configuration, options.configurationFile);
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
@@ -20,11 +23,7 @@ CLI::App &symbolLeaf(CLI::App &group, const char *name, const char *description,
                      SymbolOptions &options, SymbolOptions::Action action) {
   auto &leaf = *group.add_subcommand(name, description);
   symbolOptions(leaf, options);
-  leaf.callback([&options, action] {
-    if (options.facts.empty())
-      throw CLI::RequiredError("--facts");
-    options.action = action;
-  });
+  leaf.callback([&options, action] { options.action = action; });
   return leaf;
 }
 

@@ -34,9 +34,10 @@ public:
     symbolCommand_ = configureSymbol(app_, symbol_);
     configCommand_ = app_.add_subcommand(
         "config",
-        "Inspect YAML defaults with yaml-cpp 0.9.0; lookup is --config, "
-        "FACTS_TOOL_CONFIG, project, XDG, HOME; --conf overrides generated "
-        "naming and ownership");
+        "Inspect merged YAML defaults with yaml-cpp 0.9.0: an optional "
+        "--config/FACTS_TOOL_CONFIG file, the project file, and the user "
+        "file (XDG/HOME) merge per key; --conf overrides generated naming "
+        "and ownership");
     configCommand_->require_subcommand(1, 1);
     auto &show = *configCommand_->add_subcommand(
         "show", "Show resolved YAML defaults (yaml-cpp 0.9.0) and ordered discovery");
@@ -89,8 +90,8 @@ private:
     configureVerbosity(command, extract_.verbosity);
     command
         .add_option("-o,--output", extract_.output,
-                    "SQLite database for extracted facts")
-        ->required()
+                    "SQLite database for extracted facts; defaults to "
+                    "facts_template when omitted")
         ->type_name("FILE");
     configurationOptions(command, extract_.configuration, extract_.configurationFile);
     command
@@ -146,8 +147,8 @@ private:
     configureVerbosity(command, dependency_.verbosity);
     command
         .add_option("-o,--output", dependency_.output,
-                    "SQLite database for extracted dependency facts")
-        ->required()
+                    "SQLite database for extracted dependency facts; "
+                    "defaults to facts_template when omitted")
         ->type_name("FILE");
     configurationOptions(command, dependency_.configuration, dependency_.configurationFile);
     command

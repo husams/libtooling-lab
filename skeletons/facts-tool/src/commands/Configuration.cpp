@@ -13,9 +13,11 @@ runConfiguration(const cli::ConfigOptions &options) {
   std::cout << "conf: " << value->database << '\n';
   std::cout << "conf_root: " << value->storageRoot << '\n';
   std::cout << "conf_template: " << value->templateText << '\n';
+  std::cout << "facts_template: " << value->factsTemplate << '\n';
   std::cout << "source: " << value->source << '\n';
   std::cout << "conf_root_source: " << value->storageRootSource << '\n';
   std::cout << "conf_template_source: " << value->templateSource << '\n';
+  std::cout << "facts_template_source: " << value->factsTemplateSource << '\n';
   std::cout << "extra_args_source: " << value->extraArgumentsSource << '\n';
   std::cout << "extra_args:";
   for (const auto &argument : value->extraArguments) std::cout << " [" << argument << ']';

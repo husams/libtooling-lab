@@ -29,4 +29,32 @@ mergedArguments(const std::vector<std::string> &defaults,
     return result;
   });
 }
+
+// facts_template supplies the default -o/--facts path when the caller left
+// it empty. Errors are fully prefixed so commands can return them as-is.
+inline std::expected<std::filesystem::path, std::string>
+resolveFactsOutput(const config::Resolved &resolved,
+                   const std::vector<std::string> &sources) {
+  return config::renderFactsPath(resolved, sources).transform_error([](std::string reason) {
+    return reason.starts_with("usage:") ? "facts-tool: usage error: " + reason.substr(6)
+                                        : "facts-tool: configuration error: " + reason;
+  });
+}
+
+// Extract and dependency analysis write the facts database. They must only
+// call this once every other applicable check (sources, database paths,
+// stored commands) has already passed, immediately before opening the
+// database, so a later failure never leaves a created directory behind;
+// symbol commands are read-only and never call it.
+inline std::expected<void, std::string>
+materializeFactsDirectory(const std::filesystem::path &path) {
+  std::error_code error;
+  std::filesystem::create_directories(path.parent_path(), error);
+  if (error)
+    return std::unexpected(
+        "facts-tool: configuration error: cannot create facts_template "
+        "directory: " +
+        error.message());
+  return {};
+}
 }

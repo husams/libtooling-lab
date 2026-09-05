@@ -8,6 +8,11 @@ class CompileDefaults:
         self.header = defaults.cwd / "yaml header.hpp"
         self.header.write_text("#define YAML_SEEN 1\n")
         self.source.write_text("struct Initial {};\n")
+        # A user-tier extra_args entry proves the merge order (user, then
+        # project, then CLI): -DVALUE=0 here is overridden by the project's
+        # -DVALUE=2 and then the CLI's -DVALUE=3, so require_effect(3)
+        # below only passes if that order actually reaches the compiler.
+        defaults.write("user", extra_args=["-DVALUE=0", "-DUSER_SEEN=1"])
         defaults.write(conf_root=str(defaults.root / "store"),
                        conf_template="{filename}.db",
                        extra_args=["-DVALUE=2", "-include", str(self.header),
@@ -40,11 +45,31 @@ class CompileDefaults:
             cmd += ["-o", str(d.root / (family + ".db")), str(self.source)]
         return d.run(*cmd, *d.args, *(self.cli if cli else []))
 
+    # Import does not compile, but its include discovery does preprocess with
+    # the merged defaults: only when VALUE and USER_SEEN come out as expected
+    # does the source pull in a header that lives outside the component
+    # directory (files inside it are registered by enumeration regardless),
+    # so its registration makes user -> project order observable for import.
+    def require_import_effect(self, value):
+        header = self.d.root / "order/order-ok.hpp"
+        header.parent.mkdir(exist_ok=True)
+        header.write_text("struct OrderOk {};\n")
+        self.source.write_text(f"#if VALUE == {value} && USER_SEEN\n"
+            '#include "../order/order-ok.hpp"\n#endif\nstruct Ordered {};\n')
+
+    def registered(self, name):
+        with sqlite3.connect(self.db) as db:
+            return name in {x[0] for x in db.execute("SELECT name FROM file")}
+
     def require_effect(self, value):
-        self.source.write_text(f"#if VALUE != {value} || !YAML_SEEN\n"
+        self.source.write_text(f"#if VALUE != {value} || !YAML_SEEN || !USER_SEEN\n"
             '#include "wrong_argument_order.h"\n#endif\nstruct Ordered {};\n')
 
     def verify(self):
+        shown = self.d.show()
+        assert shown.returncode == 0, shown.stderr
+        line = next(x for x in shown.stdout.splitlines() if x.startswith("extra_args: "))
+        assert line.index("[-DVALUE=0]") < line.index("[-include]"), line
         assert self.options() == self.original
         result = self.d.run("component", "compile-commands", "fixture",
                             "--conf", str(self.db))
