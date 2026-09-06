@@ -9,12 +9,13 @@
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Expr.h>
 
+#include <utility>
+
 namespace facts::commands::match {
 
-std::expected<void, std::string> persistDirectCall(const DirectCallMatch &match,
-                                                   clang::ASTContext &context,
-                                                   FileManager &files,
-                                                   FactStore &store) {
+std::expected<std::vector<MatchedSymbol>, std::string>
+persistDirectCall(const DirectCallMatch &match, clang::ASTContext &context,
+                  FileManager &files, FactStore &store) {
   return nearestCaller(match.call, context)
       .and_then([&](const clang::FunctionDecl *caller) {
         return persistSymbol(*caller, context, files, store)
@@ -22,10 +23,13 @@ std::expected<void, std::string> persistDirectCall(const DirectCallMatch &match,
       })
       .and_then([&](const clang::FunctionDecl *caller) {
         return persistSymbol(match.callee, context, files, store)
-            .transform([caller](PersistedSymbol) { return caller; });
+            .transform([caller](PersistedSymbol callee) {
+              return std::pair{caller, std::move(callee)};
+            });
       })
-      .and_then([&](const clang::FunctionDecl *caller)
-                    -> std::expected<void, std::string> {
+      .and_then([&](auto persisted)
+                    -> std::expected<std::vector<MatchedSymbol>, std::string> {
+        const auto *caller = persisted.first;
         auto extracted =
             extractCallSite(*caller, match.callee, match.call,
                             context.getSourceManager(), files, store);
@@ -37,7 +41,10 @@ std::expected<void, std::string> persistDirectCall(const DirectCallMatch &match,
         if (!linked)
           return std::unexpected(linked.error().message);
         printArguments(match.call, context);
-        return {};
+        std::vector<MatchedSymbol> matched;
+        if (persisted.second.index)
+          matched.push_back(std::move(*persisted.second.index));
+        return matched;
       });
 }
 

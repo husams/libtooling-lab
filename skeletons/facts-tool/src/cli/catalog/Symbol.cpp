@@ -1,5 +1,5 @@
-#include "cli/catalog/Configure.h"
 #include "cli/ConfigurationOptions.h"
+#include "cli/catalog/Configure.h"
 #include "cli/catalog/Options.h"
 #include <CLI/CLI.hpp>
 
@@ -13,7 +13,8 @@ void symbolOptions(CLI::App &command, SymbolOptions &options) {
       "(project-scoped templates only)");
   facts->each([&options](std::string) { options.factsProvided = true; });
   facts->type_name("FILE");
-  configurationOptions(command, options.configuration, options.configurationFile);
+  configurationOptions(command, options.configuration,
+                       options.configurationFile);
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
       ->expected(0, 1)
       ->default_str("1")
@@ -43,6 +44,24 @@ CLI::App *configureSymbol(CLI::App &app, SymbolOptions &options) {
       ->required();
   symbolLeaf(*group, "browser", "Browse extracted symbols interactively",
              options, SymbolOptions::Action::browser);
+  auto &find = symbolLeaf(*group, "find", "Find matched symbol candidates",
+                          options, SymbolOptions::Action::find);
+  auto &selector = *find.add_option_group("selector", "Select exactly one");
+  selector.require_option(1, 1);
+  selector.add_option("--usr", options.usr, "Exact USR");
+  selector.add_option("--name", options.name,
+                      "Literal qualified-name substring");
+  find.add_option("--kind", options.kind, "Raw Clang index symbol kind");
+  find.add_option("--format", options.format, "Output: text or json")
+      ->check(CLI::IsMember({"text", "json"}));
+  auto *index = group->add_subcommand("index", "Manage matched-symbol index");
+  index->require_subcommand(1, 1);
+  symbolOptions(*index, options);
+  symbolLeaf(*index, "clear", "Clear candidates for one file", options,
+             SymbolOptions::Action::clearIndex)
+      .add_option("--file-id", options.fileId)
+      ->required()
+      ->check(CLI::PositiveNumber);
   return group;
 }
 

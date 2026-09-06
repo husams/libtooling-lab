@@ -164,9 +164,11 @@ add_library(facts-storage STATIC
   src/storage/FunctionInstance.cpp
   src/storage/FunctionTemplate.cpp
   src/storage/Initializer.cpp
+  src/storage/MatchedSymbolIndex.cpp
   src/storage/ReturnType.cpp
   src/storage/Parameter.cpp
   src/storage/ProjectConfiguration.cpp
+  src/storage/ProjectSchema.cpp
   src/storage/Record.cpp
   src/storage/RecordInstance.cpp
   src/storage/RecordTemplate.cpp
@@ -311,6 +313,8 @@ add_library(facts-commands STATIC
   src/commands/catalog/Display.cpp
   src/commands/catalog/Export.cpp
   src/commands/catalog/File.cpp
+  src/commands/catalog/MatchedSymbolFormat.cpp
+  src/commands/catalog/MatchedSymbolQuery.cpp
   src/commands/catalog/Symbol.cpp
   src/commands/DatabasePaths.cpp
   src/commands/Configuration.cpp
@@ -325,6 +329,7 @@ add_library(facts-commands STATIC
   src/commands/match/MatchCallback.cpp
   src/commands/match/MatchContract.cpp
   src/commands/match/MatchExecution.cpp
+  src/commands/match/MatchPublication.cpp
   src/commands/match/NearestCaller.cpp
   src/commands/match/RelationKinds.cpp
   src/commands/match/RelationPersistence.cpp

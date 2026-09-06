@@ -2,9 +2,10 @@
 #define FACTS_TOOL_STORAGE_STORAGE_H
 
 #include "model/AnySymbol.h"
+#include "model/MatchedSymbol.h"
 #include "model/Relation.h"
-#include "model/ReturnType.h"
 #include "model/RelationSite.h"
+#include "model/ReturnType.h"
 #include "model/TemplateArgument.h"
 #include "model/TemplateParameter.h"
 #include "storage/SqliteDatabase.h"
@@ -52,8 +53,8 @@ public:
 
   std::expected<void, std::error_code>
   addRelations(std::span<const Relation> relations);
-  std::expected<void, std::error_code>
-  saveReturnType(SymbolId callable, const ReturnType &type);
+  std::expected<void, std::error_code> saveReturnType(SymbolId callable,
+                                                      const ReturnType &type);
   std::expected<void, std::error_code>
   addRelationSites(std::span<const RelationSite> sites);
   std::expected<void, std::error_code>
@@ -65,6 +66,8 @@ public:
   std::expected<void, std::error_code>
   addTemplateArguments(SymbolId id,
                        std::span<const TemplateArgument> arguments);
+  std::expected<void, std::error_code>
+  upsertMatchedSymbols(std::span<const MatchedSymbol> symbols);
 
   template <typename Model>
     requires std::derived_from<Model, Symbol>

@@ -41,10 +41,9 @@ saveSite(Relation relation, clang::SourceLocation location,
 }
 } // namespace
 
-std::expected<void, std::string> persistRelation(const RelationMatch &match,
-                                                 clang::ASTContext &context,
-                                                 FileManager &files,
-                                                 FactStore &store) {
+std::expected<std::vector<MatchedSymbol>, std::string>
+persistRelation(const RelationMatch &match, clang::ASTContext &context,
+                FileManager &files, FactStore &store) {
   return validateEndpoints(match.kind, match.source, match.target)
       .and_then(
           [&] { return persistSymbol(match.source, context, files, store); })
@@ -66,6 +65,12 @@ std::expected<void, std::string> persistRelation(const RelationMatch &match,
                 std::cout << "relation kind=" << relationName(match.kind)
                           << " source=" << source.name
                           << " target=" << target.name << '\n';
+                std::vector<MatchedSymbol> matched;
+                if (source.index)
+                  matched.push_back(std::move(*source.index));
+                if (target.index)
+                  matched.push_back(std::move(*target.index));
+                return matched;
               });
             });
       });

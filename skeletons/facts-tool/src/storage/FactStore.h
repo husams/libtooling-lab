@@ -24,6 +24,11 @@ public:
   std::expected<void, std::error_code> end();
   std::expected<void, std::error_code> rollback();
 
+  std::expected<void, std::error_code>
+  upsertMatchedSymbols(std::span<const MatchedSymbol> symbols) {
+    return storage_.upsertMatchedSymbols(symbols);
+  }
+
   template <typename Model>
     requires std::derived_from<Model, Symbol>
   std::expected<SymbolId, std::error_code> save(const Model &object) {
@@ -148,8 +153,8 @@ public:
     return result;
   }
 
-  std::expected<void, std::error_code>
-  saveReturnType(SymbolId callable, const ReturnType &type) {
+  std::expected<void, std::error_code> saveReturnType(SymbolId callable,
+                                                      const ReturnType &type) {
     auto result = storage_.saveReturnType(callable, type);
     cli::tracePersistenceResult(verbosity_, "save-return-type", result);
     return result;

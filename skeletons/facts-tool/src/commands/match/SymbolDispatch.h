@@ -1,8 +1,10 @@
 #pragma once
 
+#include "model/MatchedSymbol.h"
 #include "model/SymbolId.h"
 
 #include <expected>
+#include <optional>
 #include <string>
 
 namespace clang {
@@ -20,6 +22,8 @@ struct PersistedSymbol {
   SymbolId id;
   std::string kind;
   std::string name;
+  std::optional<MatchedSymbol> index;
+  std::string indexSkipReason;
 };
 
 std::expected<PersistedSymbol, std::string>
