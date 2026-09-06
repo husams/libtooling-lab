@@ -1,7 +1,7 @@
 #pragma once
 
-#include "model/Relation.h"
 #include "model/ReceiverCertainty.h"
+#include "model/Relation.h"
 
 #include <expected>
 #include <optional>
@@ -10,12 +10,21 @@
 
 namespace facts::callgraph {
 
+struct QueryDefinition {
+  FileId file;
+  unsigned offset = 0;
+  unsigned size = 0;
+};
+
 struct QueryNode {
   SymbolId id;
   std::string name;
   std::string usr;
   bool definition = false;
   bool external = false;
+  unsigned line = 0;
+  unsigned column = 0;
+  std::optional<QueryDefinition> definitionLocation;
 };
 
 struct QueryEdge {

@@ -64,3 +64,27 @@ Feature: Contextual function call graph analysis
   Scenario: applies an explicit positive depth cap before an external boundary and reports depth truncation distinctly in text
     Given the exact contextual call graph corpus is extracted
     Then explicit depth truncation is distinct from an external boundary
+
+  Scenario: reproduces stored traversal completion at an unextracted project-local definition boundary
+    Given an isolated B-040 pair has a declaration-only project boundary
+    Then B-040 reports complete traversal and incomplete extraction coverage separately
+
+  Scenario: reports simulated complete catalog metadata through a validated project and facts pair
+    Given an isolated B-040 pair has complete known project coverage
+    Then B-040 reports complete paired coverage with usable paths and stable identities
+
+  Scenario: keeps genuinely unavailable definitions separate from project extraction gaps
+    Given an isolated B-040 pair has complete known project coverage
+    Then B-040 reports the genuine external definition boundary separately
+
+  Scenario: reports missing catalog coverage metadata without blindly re-extracting known facts
+    Given an isolated B-040 pair has missing coverage metadata
+    Then B-040 reports unknown coverage and metadata reconciliation
+
+  Scenario: reports simulated stale catalog evidence independently from stored graph traversal
+    Given an isolated B-040 pair has stale coverage metadata
+    Then B-040 reports stale coverage with a focused refresh action
+
+  Scenario: keeps explicit depth truncation separate from extraction coverage
+    Given an isolated B-040 pair has a declaration-only project boundary
+    Then B-040 reports depth truncation independently in structured output

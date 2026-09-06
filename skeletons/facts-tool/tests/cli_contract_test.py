@@ -117,7 +117,7 @@ def main() -> None:
         require("unresolved conf" not in output(empty_symbol_facts),
                 output(empty_symbol_facts))
 
-    missing_file_conf = run(tool, "file", "list")
+    missing_file_conf = run(tool, "file", "list", environment=isolated)
     require(missing_file_conf.returncode != 0 and
             "project configuration database not found" in output(missing_file_conf),
             output(missing_file_conf))
@@ -153,6 +153,16 @@ def main() -> None:
         in output(import_help),
         output(import_help),
     )
+
+    call_graph_help = run(tool, "analyse", "call-graph", "--help")
+    require(call_graph_help.returncode == 0 and
+            all(option in output(call_graph_help) for option in
+                ("--facts", "--conf", "--format", "--max-depth")),
+            output(call_graph_help))
+    invalid_graph_format = run(tool, "analyse", "call-graph", "-f", "missing.sqlite",
+                               "--all", "--format", "yaml")
+    require(invalid_graph_format.returncode != 0 and
+            "--format" in output(invalid_graph_format), output(invalid_graph_format))
 
     dependency_help = run(tool, "analyse", "dependency", "--help")
     require(dependency_help.returncode == 0, output(dependency_help))

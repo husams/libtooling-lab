@@ -1,9 +1,9 @@
 #include "analysis/callgraph/CallGraphTraversal.h"
 
 #include "analysis/callgraph/CallGraphContext.h"
+#include "analysis/callgraph/CallGraphCoverage.h"
+#include "analysis/callgraph/CallGraphText.h"
 
-#include <algorithm>
-#include <format>
 #include <ranges>
 #include <set>
 
@@ -15,35 +15,26 @@ const QueryNode *findNode(const QueryGraph &graph, SymbolId id) {
   return found == graph.nodes.end() ? nullptr : &*found;
 }
 
-std::string_view kindName(RelationKind kind) {
-  return kind == RelationKind::DispatchCalls ? "DispatchCalls" : "Calls";
-}
-
-std::string context(const QueryEdge &edge) {
-  if (!edge.certainty)
-    return "receiver=- certainty=-";
-  const auto certainty =
-      *edge.certainty == ReceiverCertainty::Exact ? "exact" : "possible";
-  return std::format("receiver={} certainty={}", edge.receiver.value_or("*"),
-                     certainty);
-}
-
 class Traversal {
 public:
-  Traversal(const QueryGraph &graph, std::optional<int> maxDepth)
-      : graph_(graph), maxDepth_(maxDepth) {}
+  Traversal(const QueryGraph &graph, std::optional<int> maxDepth,
+            const CoverageReport *coverage)
+      : graph_(graph), maxDepth_(maxDepth), coverage_(coverage) {}
 
   RenderedGraph run(const std::vector<const QueryNode *> &roots) {
     for (const auto *root : roots) {
-      text_ += std::format("root={} usr={}\n", root->name, root->usr);
+      recordNode(root->id);
       walk(*root, {root->id, {}, {}}, 0, {});
     }
-    text_ += std::format("complete={} truncated={}\n",
-                         truncated_ == 0 ? "true" : "false", truncated_);
-    return {std::move(text_), truncated_};
+    return {{}, truncated_, std::move(nodes_), std::move(edges_)};
   }
 
 private:
+  void recordNode(SymbolId id) {
+    if (std::ranges::find(nodes_, id) == nodes_.end())
+      nodes_.push_back(id);
+  }
+
   void walk(const QueryNode &source, const QueryContext &current, int depth,
             std::set<QueryContext> path) {
     path.insert(current);
@@ -64,31 +55,37 @@ private:
           });
       if (capped)
         ++truncated_;
-      text_ += std::format(
-          "  depth={} relation={} source={} target={} {} location=<file {}>:"
-          "{}:{} cycle={} reused={} external-boundary={} depth-truncated={}\n",
-          depth + 1, kindName(edge.kind), source.name, target->name,
-          context(edge), edge.file, edge.line, edge.column,
-          cycle ? "true" : "false", reused ? "true" : "false",
-          target->external ? "true" : "false", capped ? "true" : "false");
-      if (!cycle && !reused && !target->external && !capped)
+      const bool external = coverage_ ? !target->definition &&
+                                            !isProjectLocal(*coverage_, *target)
+                                      : target->external || !target->definition;
+      const bool definitionBoundary = coverage_ && !target->definition &&
+                                      isProjectLocal(*coverage_, *target);
+      recordNode(target->id);
+      edges_.push_back({edge, depth + 1, cycle, reused, external,
+                        definitionBoundary, capped});
+      if (!cycle && !reused && !external && !definitionBoundary && !capped)
         walk(*target, child, depth + 1, path);
     }
   }
 
   const QueryGraph &graph_;
   std::optional<int> maxDepth_;
+  const CoverageReport *coverage_;
   std::set<QueryContext> expanded_;
-  std::string text_;
   unsigned truncated_ = 0;
+  std::vector<SymbolId> nodes_;
+  std::vector<TraversedEdge> edges_;
 };
 
 } // namespace
 
 RenderedGraph renderCallGraph(const QueryGraph &graph,
                               const std::vector<const QueryNode *> &roots,
-                              std::optional<int> maxDepth) {
-  return Traversal{graph, maxDepth}.run(roots);
+                              std::optional<int> maxDepth,
+                              const CoverageReport *coverage) {
+  auto traversal = Traversal{graph, maxDepth, coverage}.run(roots);
+  traversal.text = renderCallGraphText(graph, roots, traversal, coverage);
+  return traversal;
 }
 
 } // namespace facts::callgraph

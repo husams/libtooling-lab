@@ -121,7 +121,8 @@ Result<std::vector<File>> files(Database &database) {
       "SELECT f.id,f.directory_id,c.id,c.name,c.path,c.kind,c.version,"
       "c.repository_id,cl.id,cl.repository_id,cl.path,cl.label,d.path,f.name,"
       "coalesce(f.compile_options,'[]'),coalesce(f.driver,''),"
-      "coalesce(f.working_directory,''),f.args_overridden,f.indexed "
+      "coalesce(f.working_directory,''),f.mtime,f.args_overridden,f.indexed,"
+      "coalesce(f.indexed_at,'') "
       "FROM file f JOIN directory d ON d.id=f.directory_id "
       "JOIN component c ON c.id=d.component_id "
       "LEFT JOIN repository r ON r.id=c.repository_id "
@@ -146,8 +147,10 @@ Result<std::vector<File>> files(Database &database) {
         value.compileOptions = row.string(14);
         value.driver = row.string(15);
         value.workingDirectory = row.string(16);
-        value.argsOverridden = row.integer(17) != 0;
-        value.indexed = row.integer(18) != 0;
+        value.mtime = row.get<std::optional<double>>(17);
+        value.argsOverridden = row.integer(18) != 0;
+        value.indexed = row.integer(19) != 0;
+        value.indexedAt = row.string(20);
         return value;
       });
 }

@@ -1,7 +1,7 @@
 #include "cli/Dispatch.h"
 #include "cli/Verbose.h"
-#include "commands/Dependency.h"
 #include "commands/Configuration.h"
+#include "commands/Dependency.h"
 #include "commands/Extract.h"
 #include "commands/Import.h"
 #include "commands/Match.h"
@@ -14,20 +14,32 @@
 namespace facts::cli {
 namespace {
 std::string_view commandName(const ExtractOptions &) { return "extract"; }
+
 std::string_view commandName(const ImportOptions &) { return "import"; }
+
 std::string_view commandName(const DependencyOptions &) { return "dependency"; }
+
 std::string_view commandName(const CallGraphOptions &) { return "call-graph"; }
+
 std::string_view commandName(const MatchOptions &) { return "match"; }
+
 std::string_view commandName(const ConfigOptions &) { return "config"; }
+
 std::string_view commandName(const RepositoryOptions &) { return "repo"; }
+
 std::string_view commandName(const ComponentOptions &) { return "component"; }
+
 std::string_view commandName(const DirectoryOptions &) { return "dir"; }
+
 std::string_view commandName(const FileOptions &) { return "file"; }
+
 std::string_view commandName(const SymbolOptions &) { return "symbol"; }
+
 template <typename Options>
 std::string commandDetails(const Options &options) {
   return std::format("configuration='{}'", options.configuration);
 }
+
 std::string commandDetails(const ExtractOptions &options) {
   return std::format("configuration='{}', output='{}', requested_sources={}",
                      options.configuration, options.output,
@@ -51,14 +63,16 @@ std::string commandDetails(const DependencyOptions &options) {
 }
 
 std::string commandDetails(const CallGraphOptions &options) {
-  return std::format("facts='{}', scope='{}'", options.facts,
-                     options.all ? "all" : *options.function);
+  return std::format("facts='{}', configuration='{}', scope='{}', format='{}'",
+                     options.facts, options.configuration,
+                     options.all ? "all" : *options.function, options.format);
 }
 
 std::string commandDetails(const MatchOptions &options) {
   return std::format("facts='{}', requested_sources={}", options.facts,
                      options.sources.size());
 }
+
 std::string commandDetails(const ConfigOptions &) { return {}; }
 
 std::string commandDetails(const SymbolOptions &options) {
@@ -84,6 +98,7 @@ std::expected<int, std::string> execute(const CallGraphOptions &options) {
 std::expected<int, std::string> execute(const MatchOptions &options) {
   return commands::runMatch(options);
 }
+
 std::expected<int, std::string> execute(const ConfigOptions &options) {
   return commands::runConfiguration(options);
 }
@@ -112,8 +127,10 @@ int report(std::expected<int, std::string> result) {
   if (!result) {
     const auto prefixed = result.error().starts_with("facts-tool:");
     std::cerr << (prefixed ? "" : "facts-tool: ") << result.error() << '\n';
-    if (result.error().starts_with("facts-tool: configuration error:")) return 3;
-    if (result.error().starts_with("facts-tool: usage error:")) return 2;
+    if (result.error().starts_with("facts-tool: configuration error:"))
+      return 3;
+    if (result.error().starts_with("facts-tool: usage error:"))
+      return 2;
     return 1;
   }
   return *result;
