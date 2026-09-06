@@ -372,7 +372,7 @@ if(BUILD_TESTING)
       "install tests/e2e/requirements.txt"
     )
   endif()
-
+  add_subdirectory(tests/implicit)
   add_executable(fact-store-test tests/FactStoreTest.cpp)
   target_link_libraries(fact-store-test PRIVATE facts-storage facts-model
                                               facts-sqlite)

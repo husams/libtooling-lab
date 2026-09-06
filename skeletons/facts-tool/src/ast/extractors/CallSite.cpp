@@ -18,6 +18,13 @@ extractCallSite(const clang::FunctionDecl &caller,
                 const clang::FunctionDecl &callee, const clang::Expr &site,
                 const clang::SourceManager &sourceManager, FileManager &files,
                 FactStore &store) {
+  // Excluded sites must not materialize targets or fail target resolution.
+  const auto location = extractLocation(sourceManager, site.getExprLoc());
+  if (!location)
+    return std::nullopt;
+  const auto file = resolveFile(sourceManager, site.getExprLoc(), files);
+  if (!file)
+    return std::nullopt;
   const auto &sourceDecl = referenceOwner(caller);
   const auto &targetDecl = referenceOwner(callee);
   return extractUsr(sourceDecl)
@@ -34,12 +41,6 @@ extractCallSite(const clang::FunctionDecl &caller,
                 [&](std::optional<SymbolId> destination)
                     -> ExtractionResult<std::optional<callgraph::CallFact>> {
                   if (!destination)
-                    return std::nullopt;
-                  auto location =
-                      extractLocation(sourceManager, site.getExprLoc());
-                  auto file =
-                      resolveFile(sourceManager, site.getExprLoc(), files);
-                  if (!location || !file)
                     return std::nullopt;
                   return extractReceiverContext(site, sourceManager, files,
                                                 store)

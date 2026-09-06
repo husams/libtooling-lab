@@ -37,7 +37,7 @@ On open, `storage/SchemaMigration.cpp` detects legacy packed flags and applies
 versioned upgrades inside the storage connection's `BEGIN IMMEDIATE`
 transaction. Existing identities and facts are preserved. The complete fresh
 schema is defined by `storage/Schema.h`; fresh databases are created directly
-at SQLite `user_version = 9` without packed persisted flags.
+at SQLite `user_version = 10` without packed persisted flags.
 
 The version-8-to-9 migration adds `callable_return_type`, keyed by `symbol_id`
 with a cascading foreign key to `symbol`. Its nonempty `canonical_type` text
@@ -54,6 +54,23 @@ excluded from declaration listings and the symbol browser. Explicit named
 queries can still inspect them. Return-type edges and spelling are replaced
 together, and extraction rollback or deleting a callable also rolls back or
 removes its return facts.
+
+Compiler-provided implicit callable targets with no usable declaration location
+also use FileId zero. Dynamic indices start above every reserved
+`clang::BuiltinType::Kind + 1` index, including primitives without rows, and
+above every occupied FileId-0 ID. Allocation preserves a higher recorded
+`symbol_allocator.next_index`, checks 32-bit exhaustion, and shares the ordinary
+transaction and unique-USR save path. It needs no schema migration; reopening
+an existing database reserves the range atomically on its next dynamic save.
+These symbols retain the actual USR, semantic function kind, implicit/external
+flags and callable properties, with zero declaration coordinates and no
+definition row or physical file. Caller sites keep their real file and location.
+Usable redeclarations and ordinary external targets retain file-backed behavior.
+See [compiler-provided callables](compiler-provided-callables.md) for scope,
+traversal boundaries and regression evidence.
+
+Version 9-to-10 adds `symbol.is_volatile` without changing identities; older
+supported layouts still pass through the existing migration chain.
 
 Migration does not invent return spellings for previously indexed functions;
 re-extract the source to populate those facts. Symbol queries can read older

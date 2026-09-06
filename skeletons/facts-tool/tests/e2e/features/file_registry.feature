@@ -26,6 +26,11 @@ Feature: Canonical source file registry
       | forward_template_target.cpp |
       | forward_template_target_system.hpp |
       | initializer_dependent_alignment.cpp |
+      | implicit_allocation_target.cpp |
+      | implicit_allocation_matrix.cpp |
+      | implicit_nothrow_matrix.cpp |
+      | implicit_traversal.cpp |
+      | implicit_enroll.cpp |
       | invalid_usr_declarations.cpp |
       | modern/iface.cppm |
       | modern/interface.ccm |
@@ -48,6 +53,7 @@ Feature: Canonical source file registry
       | shared.hpp |
       | system/external_base.hpp |
       | system/external_string |
+      | system/implicit_traversal.hpp |
       | targeted_match.cpp |
       | targeted_match_broken.cpp |
       | targeted_match_two.cpp |

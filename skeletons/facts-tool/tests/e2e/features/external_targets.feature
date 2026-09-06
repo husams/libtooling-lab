@@ -2,6 +2,11 @@ Feature: Filtered external relation targets
   System-header declarations used by project-owned relations are retained as
   lightweight symbols without indexing their header bodies.
 
+  Scenario: Retain an implicit allocation callee without a declaration file
+    Given an implicit allocation fixture
+    When implicit allocation extraction runs
+    Then implicit allocation commits with a real canonical call site
+
   Scenario: Extract aliases and compound external parameter types successfully
     Given a reproducing compile database for filtered external targets
     When the real extraction command indexes the external-target fixture
