@@ -200,6 +200,20 @@ private:
                     "All definition-backed functions with calls");
     scope->require_option(1, 1);
     command
+        .add_option("--direction", callGraph_.direction,
+                    "Traversal direction: callees or callers")
+        ->check(CLI::IsMember({"callees", "callers"}))
+        ->type_name("DIRECTION");
+    command
+        .add_option("--to", callGraph_.target,
+                    "Exact qualified name or USR path target")
+        ->type_name("TARGET");
+    command
+        .add_option("--path-mode", callGraph_.pathMode,
+                    "Path selection: shortest or all-simple")
+        ->check(CLI::IsMember({"shortest", "all-simple"}))
+        ->type_name("MODE");
+    command
         .add_option("--max-depth", callGraph_.maxDepth,
                     "Maximum traversal depth")
         ->check(CLI::Range(1, std::numeric_limits<int>::max()))

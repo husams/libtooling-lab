@@ -29,6 +29,24 @@ Or list every definition-backed root with calls:
 facts-tool analyse call-graph -f facts.db -c project.db --all
 ```
 
+Reverse callers and between-symbol paths are opt-in:
+
+```text
+facts-tool analyse call-graph -f facts.db -c project.db \
+  --function app::run --direction callers
+facts-tool analyse call-graph -f facts.db -c project.db \
+  --function app::start --to app::finish --path-mode all-simple
+```
+
+`callees` remains the default direction. Path mode defaults to `shortest`,
+which returns one minimum-hop path using canonical USR and relation-site
+tie-breaks. `all-simple` returns every deterministically ordered node-simple
+path, so cycles cannot produce infinite results; a source equal to its target
+is a valid zero-edge path. Exact qualified names and USRs are accepted.
+Ambiguous names report every candidate identity and exit 2 so a USR can be
+selected. `--direction callers` cannot be combined with `--to`, `--to` cannot
+be combined with `--all`, and `--path-mode` requires `--to`.
+
 `--max-depth N` adds a positive traversal cap. Without it, traversal continues
 until a cycle, a reused context, or an external symbol. External boundaries are
 complete stops and are not reported as truncation. Output ordering is canonical
@@ -45,7 +63,15 @@ third-party target remains an `external-boundary`.
 
 Use `--format json` for the stable `facts-tool.call-graph.v1` representation.
 It contains `complete`, `truncated`, `traversal`, `extraction_coverage`,
-`roots`, `nodes`, and `edges`. Node evidence includes the stable USR, resolved
+`query`, `paths`, `path_result`, `roots`, `nodes`, and `edges`. `query.mode`
+is `callees`, `callers`, or `path`; path results distinguish `found`,
+`not_found`, `unknown`, and `truncated`, and each path carries stable string
+node IDs and canonical relation-site edge keys. A `truncated` result can retain
+paths found before the requested cap; it does not imply an empty path array.
+`not_found` is emitted only
+for complete relevant extraction evidence; missing metadata or unresolved
+boundaries remain `unknown`. All query state is request-local and creates no
+cache or schema. Node evidence includes the stable USR, resolved
 declaration path, definition availability, a separate defining path/file/offset
 object, outgoing-call presence, catalog `indexed`/`indexed_at` values,
 freshness, the reserved failure member, coverage state, recommended action,

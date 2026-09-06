@@ -1,5 +1,6 @@
 #include "analysis/callgraph/CallGraphQuery.h"
 #include "analysis/callgraph/CallGraphNodes.h"
+#include "analysis/callgraph/CallGraphSelection.h"
 
 #include "storage/SqliteDatabase.h"
 #include "storage/catalog/Database.h"
@@ -13,13 +14,14 @@ auto loadEdges(storage::Database &database) {
   return catalog::query(
       database,
       "SELECT site.source_id,site.destination_id,site.kind,site.file_id,"
-      "site.line,site.col,site.offset,receiver.qualified_name,site.certainty "
+      "site.line,site.col,site.offset,receiver.qualified_name,site.certainty,"
+      "site.position "
       "FROM relation_site site LEFT JOIN symbol receiver ON receiver.id="
       "site.receiver_type_id JOIN symbol source ON source.id=site.source_id "
       "JOIN symbol destination ON destination.id=site.destination_id WHERE "
       "site.kind IN (?1,?2) ORDER BY source.qualified_name,source.usr,"
-      "destination.qualified_name,destination.usr,site.kind,site.file_id,"
-      "site.offset",
+      "destination.qualified_name,destination.usr,site.kind,site.position,"
+      "site.file_id,site.offset",
       [](const storage::Row &row) {
         QueryEdge edge{row.get<SymbolId>(0),
                        row.get<SymbolId>(1),
@@ -32,6 +34,7 @@ auto loadEdges(storage::Database &database) {
           edge.receiver = row.string(7);
         if (!row.isNull(8))
           edge.certainty = row.get<ReceiverCertainty>(8);
+        edge.position = static_cast<unsigned>(row.integer(9));
         return edge;
       },
       static_cast<int>(RelationKind::Calls),
@@ -67,18 +70,15 @@ QueryResult loadCallGraph(const std::string &path) {
 std::expected<std::vector<const QueryNode *>, std::string>
 selectRoots(const QueryGraph &graph, const std::optional<std::string> &function,
             bool all) {
+  if (!all)
+    return selectOne(graph, *function, "root").transform([](const auto *root) {
+      return std::vector{root};
+    });
   std::vector<const QueryNode *> roots;
   for (const auto &node : graph.nodes) {
-    const bool selected =
-        all ? node.definition
-            : function && (node.name == *function || node.usr == *function);
-    if (selected)
+    if (node.definition)
       roots.push_back(&node);
   }
-  if (!all && roots.empty())
-    return std::unexpected("function selector not found");
-  if (!all && roots.size() != 1)
-    return std::unexpected("ambiguous function selector");
   return roots;
 }
 

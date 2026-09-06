@@ -53,6 +53,9 @@ struct CallGraphOptions {
   std::optional<std::string> function;
   bool all = false;
   std::optional<int> maxDepth;
+  std::string direction = "callees";
+  std::optional<std::string> target;
+  std::optional<std::string> pathMode;
 };
 
 struct MatchOptions {
