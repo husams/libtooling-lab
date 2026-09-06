@@ -57,7 +57,7 @@ def template_corpus(context: FactsToolContext) -> None:
     extract(context, ("call_graph_template.cpp",))
 
 
-@then("direct method lambda and constructor-body Calls are recorded once")
+@then("direct method lambda constructor-body and constructor-invocation Calls are recorded once")
 def direct_calls(context: FactsToolContext) -> None:
     found = rows(context, "SELECT s.qualified_name,d.qualified_name FROM relation r "
         "JOIN symbol s ON s.id=r.source_id JOIN symbol d ON d.id=r.destination_id "
@@ -72,7 +72,7 @@ def direct_calls(context: FactsToolContext) -> None:
     constructor_edges = rows(context, "SELECT COUNT(*) FROM relation r JOIN symbol d "
         "ON d.id=r.destination_id WHERE r.kind=1 AND d.qualified_name="
         "'call_graph_fixture::Owner::Owner'")
-    require(constructor_edges == [(0,)], f"constructor invocation duplicated: {constructor_edges}")
+    require(constructor_edges == [(1,)], f"constructor invocation count: {constructor_edges}")
 
 
 @then("the cross-TU declaration-only callee resolves to its definition")

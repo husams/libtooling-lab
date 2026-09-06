@@ -8,7 +8,7 @@ namespace facts::callgraph {
 std::string renderCallGraphJson(const QueryGraph &graph,
                                 const std::vector<const QueryNode *> &roots,
                                 const RenderedGraph &traversal,
-                                const CoverageReport *coverage) {
+                                const CoverageReport *coverage, EdgeView view) {
   llvm::json::Array rootValues;
   for (const auto *root : roots)
     rootValues.push_back(llvm::json::Object{{"id", detail::stableId(root->id)},
@@ -28,8 +28,17 @@ std::string renderCallGraphJson(const QueryGraph &graph,
   const auto state = coverage
                          ? summarizeCoverage(*coverage, graph, traversal.nodes)
                          : std::string{"unknown"};
+  llvm::json::Object extractionCoverage{
+      {"state", state},
+      {"failure", nullptr},
+      {"recovery_candidates", std::move(candidates)}};
+  extractionCoverage["unsupported_semantics"] =
+      llvm::json::Object{{"state", "not-persisted"},
+                         {"action", "inspect-extraction-diagnostics"},
+                         {"sites", llvm::json::Array{}}};
   llvm::json::Object output{
       {"schema", "facts-tool.call-graph.v1"},
+      {"edge_view", std::string{edgeViewName(view)}},
       {"complete", traversal.truncated == 0},
       {"truncated", traversal.truncated},
       {"traversal",
@@ -37,10 +46,7 @@ std::string renderCallGraphJson(const QueryGraph &graph,
                           {"depth_truncated", traversal.truncated}}},
       {"pair",
        llvm::json::Object{{"state", coverage ? "validated" : "unavailable"}}},
-      {"extraction_coverage",
-       llvm::json::Object{{"state", state},
-                          {"failure", nullptr},
-                          {"recovery_candidates", std::move(candidates)}}},
+      {"extraction_coverage", std::move(extractionCoverage)},
       {"roots", std::move(rootValues)},
       {"nodes", std::move(nodeValues)},
       {"edges", std::move(edgeValues)}};

@@ -231,7 +231,10 @@ add_library(facts-ast STATIC
   src/ast/extractors/RecordDecl.cpp
   src/ast/extractors/RecordInstance.cpp
   src/ast/extractors/Reference.cpp
+  src/ast/extractors/CallableSite.cpp
   src/ast/extractors/CallSite.cpp
+  src/ast/extractors/DestructorCalls.cpp
+  src/ast/extractors/UnsupportedSemantics.cpp
   src/ast/extractors/ReceiverContext.cpp
   src/ast/extractors/OverrideRelation.cpp
   src/ast/extractors/RelationTarget.cpp
@@ -245,10 +248,12 @@ add_library(facts-ast STATIC
   src/ast/visitors/SymbolCollector.cpp
   src/ast/visitors/IncludeVisitor.cpp
   src/ast/visitors/BodyVisitor.cpp
+  src/ast/visitors/BodyInvocationVisitor.cpp
   src/ast/visitors/CallGraphVisitor.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
   src/analysis/callgraph/CallGraphTypes.cpp
+  src/analysis/callgraph/CallGraphSemantics.cpp
   src/analysis/callgraph/CallGraphLinker.cpp
   src/analysis/callgraph/OverrideIndex.cpp
   src/analysis/callgraph/ReceiverPropagation.cpp
@@ -261,6 +266,7 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/CallGraphNodes.cpp
   src/analysis/callgraph/CallGraphFreshness.cpp
   src/analysis/callgraph/CallGraphJson.cpp
+  src/analysis/callgraph/CallGraphJsonEdge.cpp
   src/analysis/callgraph/CallGraphJsonEvidence.cpp
   src/analysis/callgraph/CallGraphJsonLocation.cpp
   src/analysis/callgraph/CallGraphText.cpp

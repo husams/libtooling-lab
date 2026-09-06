@@ -13,10 +13,15 @@ auto loadEdges(storage::Database &database) {
   return catalog::query(
       database,
       "SELECT site.source_id,site.destination_id,site.kind,site.file_id,"
-      "site.line,site.col,site.offset,receiver.qualified_name,site.certainty "
+      "site.line,site.col,site.offset,receiver.id,receiver.qualified_name,"
+      "site.certainty,"
+      "edge.is_implicit "
       "FROM relation_site site LEFT JOIN symbol receiver ON receiver.id="
       "site.receiver_type_id JOIN symbol source ON source.id=site.source_id "
-      "JOIN symbol destination ON destination.id=site.destination_id WHERE "
+      "JOIN symbol destination ON destination.id=site.destination_id JOIN "
+      "relation edge ON edge.source_id=site.source_id AND edge.destination_id="
+      "site.destination_id AND edge.kind=site.kind AND edge.position="
+      "site.position WHERE "
       "site.kind IN (?1,?2) ORDER BY source.qualified_name,source.usr,"
       "destination.qualified_name,destination.usr,site.kind,site.file_id,"
       "site.offset",
@@ -29,9 +34,12 @@ auto loadEdges(storage::Database &database) {
                        static_cast<unsigned>(row.integer(5)),
                        static_cast<unsigned>(row.integer(6))};
         if (!row.isNull(7))
-          edge.receiver = row.string(7);
+          edge.receiverId = row.get<SymbolId>(7);
         if (!row.isNull(8))
-          edge.certainty = row.get<ReceiverCertainty>(8);
+          edge.receiver = row.string(8);
+        if (!row.isNull(9))
+          edge.certainty = row.get<ReceiverCertainty>(9);
+        edge.implicit = row.get<bool>(10);
         return edge;
       },
       static_cast<int>(RelationKind::Calls),

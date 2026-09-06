@@ -50,6 +50,7 @@ struct CallGraphOptions {
   std::string configuration;
   std::string configurationFile;
   std::string format = "text";
+  std::string edges = "semantic";
   std::optional<std::string> function;
   bool all = false;
   std::optional<int> maxDepth;

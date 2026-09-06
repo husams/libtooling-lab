@@ -44,12 +44,16 @@ runCallGraph(const cli::CallGraphOptions &options) {
                                             options.all)
                   .transform([&](const auto &roots) {
                     const auto *evidence = coverage ? &*coverage : nullptr;
+                    const auto view = options.edges == "calls"
+                                          ? callgraph::EdgeView::Calls
+                                          : callgraph::EdgeView::Semantic;
                     const auto traversal = callgraph::renderCallGraph(
-                        graph, roots, options.maxDepth, evidence);
-                    std::cout << (options.format == "json"
-                                      ? callgraph::renderCallGraphJson(
-                                            graph, roots, traversal, evidence)
-                                      : traversal.text);
+                        graph, roots, options.maxDepth, evidence, view);
+                    std::cout
+                        << (options.format == "json"
+                                ? callgraph::renderCallGraphJson(
+                                      graph, roots, traversal, evidence, view)
+                                : traversal.text);
                     return 0;
                   });
             });

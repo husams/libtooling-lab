@@ -191,6 +191,11 @@ private:
                     "Output representation: text or json")
         ->check(CLI::IsMember({"text", "json"}))
         ->type_name("FORMAT");
+    command
+        .add_option("--edges", callGraph_.edges,
+                    "Edge view: semantic callable kinds or raw calls")
+        ->check(CLI::IsMember({"semantic", "calls"}))
+        ->type_name("VIEW");
     auto *scope = command.add_option_group("scope", "Select graph roots");
     scope
         ->add_option("--function", callGraph_.function,
