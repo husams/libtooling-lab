@@ -44,25 +44,36 @@ extractCallSite(const clang::FunctionDecl &caller,
                     return std::nullopt;
                   return extractReceiverContext(site, sourceManager, files,
                                                 store)
-                      .transform([&](ReceiverContext receiver) {
+                      .and_then([&](ReceiverContext receiver)
+                                    -> ExtractionResult<
+                                        std::optional<callgraph::CallFact>> {
                         const Relation relation{.source = *source,
                                                 .destination = *destination,
                                                 .kind = RelationKind::Calls};
                         const auto *method =
                             llvm::dyn_cast<clang::CXXMethodDecl>(&targetDecl);
-                        return callgraph::CallFact{
-                            relation,
-                            RelationSite{.source = *source,
-                                         .destination = *destination,
-                                         .kind = RelationKind::Calls,
-                                         .file = *file,
-                                         .location = *location,
-                                         .receiverType = receiver.type,
-                                         .certainty = receiver.certainty},
-                            &sourceDecl,
-                            &targetDecl,
-                            receiver.declaration,
-                            method && method->isVirtual()};
+                        return store.isExternal(*destination)
+                            .transform([&](bool external) {
+                              return std::optional<callgraph::CallFact>{
+                                  callgraph::CallFact{
+                                      relation,
+                                      RelationSite{
+                                          .source = *source,
+                                          .destination = *destination,
+                                          .kind = RelationKind::Calls,
+                                          .file = *file,
+                                          .location = *location,
+                                          .receiverType = receiver.type,
+                                          .certainty = receiver.certainty},
+                                      &sourceDecl,
+                                      &targetDecl,
+                                      receiver.declaration,
+                                      method && method->isVirtual(), external}};
+                            })
+                            .transform_error(
+                                [](std::error_code) {
+                                  return ExtractionError::RelationTarget;
+                                });
                       });
                 });
       });

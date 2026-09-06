@@ -13,6 +13,8 @@ using CatalogSelector = catalog::Selector;
 struct RepositoryOptions {
   enum class Action { list, show, addClone, switchClone, removeClone, remove };
   int verbosity = 0;
+  std::string facts;
+  bool factsProvided = false;
   std::string configuration;
   std::string configurationFile;
   Action action = Action::list;
@@ -26,6 +28,8 @@ struct RepositoryOptions {
 struct FileOptions {
   enum class Action { add, remove, list, show, setOption, clearOption };
   int verbosity = 0;
+  std::string facts;
+  bool factsProvided = false;
   std::string configuration;
   std::string configurationFile;
   Action action = Action::list;
@@ -55,6 +59,8 @@ struct SymbolOptions {
 struct ComponentOptions {
   enum class Action { list, show, add, setVersion, compileCommands, remove };
   int verbosity = 0;
+  std::string facts;
+  bool factsProvided = false;
   std::string configuration;
   std::string configurationFile;
   Action action = Action::list;
@@ -69,6 +75,8 @@ struct ComponentOptions {
 struct DirectoryOptions {
   enum class Action { list, remove };
   int verbosity = 0;
+  std::string facts;
+  bool factsProvided = false;
   std::string configuration;
   std::string configurationFile;
   Action action = Action::list;

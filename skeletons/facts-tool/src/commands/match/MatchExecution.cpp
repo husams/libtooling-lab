@@ -1,5 +1,6 @@
 #include "commands/match/MatchExecution.h"
 
+#include "commands/FactPairValidation.h"
 #include "commands/match/MatchCallback.h"
 #include "commands/match/MatchPublication.h"
 #include "platform/PlatformFlags.h"
@@ -9,6 +10,9 @@
 #include <clang/ASTMatchers/Dynamic/Diagnostics.h>
 #include <clang/ASTMatchers/Dynamic/Parser.h>
 #include <clang/Tooling/Tooling.h>
+
+#include <filesystem>
+#include <optional>
 
 namespace facts::commands::match {
 using Result = std::expected<int, std::string>;
@@ -27,11 +31,36 @@ Result execute(const cli::MatchOptions &options,
       expression, &diagnostics);
   if (!matcher)
     return std::unexpected("invalid matcher: " + diagnostics.toString());
+  std::vector<FileId> selected;
+  selected.reserve(sources.size());
+  for (const auto &source : sources) {
+    auto id = files.getId(source);
+    if (!id)
+      return std::unexpected("cannot resolve match source: " +
+                             id.error().message());
+    selected.push_back(*id);
+  }
+  bool rejectLegacyWrites = false;
+  std::optional<FactPairProvenanceSnapshot> pairing;
+  if (!(options.factsProvided && options.facts == options.configuration)) {
+    if (std::filesystem::exists(options.facts)) {
+      auto legacy = legacyFactsNeedRegistration(options.facts,
+                                                options.configuration);
+      if (!legacy) return std::unexpected(legacy.error());
+      rejectLegacyWrites = *legacy;
+    }
+    if (!rejectLegacyWrites) {
+      auto prepared = prepareFactPairForWrite(options.facts,
+                                              options.configuration);
+      if (!prepared) return std::unexpected(prepared.error());
+      pairing = std::move(*prepared);
+    }
+  }
   FactStore store(options.facts, options.verbosity);
   if (auto begun = store.begin(); !begun)
     return std::unexpected("cannot begin facts transaction: " +
                            begun.error().message());
-  MatchCallback callback(options, files, store);
+  MatchCallback callback(options, files, store, rejectLegacyWrites);
   clang::ast_matchers::MatchFinder finder;
   if (!finder.addDynamicMatcher(*matcher, &callback))
     return finishMatch(store, options, 1, "matcher cannot run at the top level",
@@ -39,7 +68,8 @@ Result execute(const cli::MatchOptions &options,
   const auto status =
       tool.run(clang::tooling::newFrontendActionFactory(&finder).get());
   return finishMatch(store, options, status, callback.error(),
-                     callback.matchedSymbols());
+                     callback.matchedSymbols(), selected,
+                     pairing ? &*pairing : nullptr);
 }
 
 } // namespace facts::commands::match

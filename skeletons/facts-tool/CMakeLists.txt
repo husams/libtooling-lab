@@ -142,6 +142,10 @@ target_include_directories(facts-model INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src
 target_link_libraries(facts-model INTERFACE facts-clang)
 
 add_library(facts-storage STATIC
+  src/storage/CallGraphEntry.cpp
+  src/storage/FactProvenance.cpp
+  src/storage/ExternalReference.cpp
+  src/storage/UnresolvedCallSite.cpp
   src/storage/catalog/Database.cpp
   src/storage/catalog/Repository.cpp
   src/storage/catalog/Component.cpp
@@ -248,6 +252,7 @@ add_library(facts-ast STATIC
   src/ast/visitors/SymbolCollector.cpp
   src/ast/visitors/IncludeVisitor.cpp
   src/ast/visitors/BodyVisitor.cpp
+  src/ast/visitors/BodyCallEvidence.cpp
   src/ast/visitors/CallGraphVisitor.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
@@ -258,6 +263,9 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/DispatchResolver.cpp
   src/analysis/callgraph/CallGraphContext.cpp
   src/analysis/callgraph/CallGraphQuery.cpp
+  src/analysis/callgraph/CallGraphEntryQuery.cpp
+  src/analysis/callgraph/CallGraphEntryQueryText.cpp
+  src/analysis/callgraph/CallGraphEntryQueryJson.cpp
   src/analysis/callgraph/CallGraphSelection.cpp
   src/analysis/callgraph/CallGraphTraversal.cpp
   src/analysis/callgraph/CallGraphSearch.cpp
@@ -324,6 +332,12 @@ add_library(facts-commands STATIC
   src/commands/catalog/MatchedSymbolQuery.cpp
   src/commands/catalog/Symbol.cpp
   src/commands/DatabasePaths.cpp
+  src/commands/CallGraphInvalidation.cpp
+  src/commands/FactPairValidation.cpp
+  src/commands/FactPairValidationLegacy.cpp
+  src/commands/FactPairValidationProject.cpp
+  src/commands/FactPairValidationFacts.cpp
+  src/commands/FactPairValidationStorage.cpp
   src/commands/Configuration.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
@@ -343,6 +357,7 @@ add_library(facts-commands STATIC
   src/commands/match/RelationValidation.cpp
   src/commands/match/SymbolDispatch.cpp
   src/commands/analyse/CallGraphCommand.cpp
+  src/commands/analyse/CallGraphEntryCommand.cpp
   src/commands/analyse/CallGraphRequest.cpp
   src/commands/analyse/CallGraphRun.cpp
 )

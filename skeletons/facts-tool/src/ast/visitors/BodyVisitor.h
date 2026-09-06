@@ -10,6 +10,10 @@
 #include <utility>
 #include <vector>
 
+namespace clang {
+class CallExpr;
+}
+
 namespace facts {
 class FactStore;
 class FileManager;
@@ -27,6 +31,7 @@ public:
 
   bool VisitDeclRefExpr(clang::DeclRefExpr *expression);
   bool VisitMemberExpr(clang::MemberExpr *expression);
+  bool VisitCallExpr(clang::CallExpr *expression);
   bool VisitNamedDecl(clang::NamedDecl *decl);
 
   IndexingResult flush();
@@ -42,6 +47,7 @@ private:
   void schedule(const clang::FunctionDecl &decl);
   IndexingResult flushNestedBodies();
   IndexingResult persistUses();
+  IndexingResult stageEvidence();
 
   const clang::FunctionDecl &owner_;
   clang::ASTContext &context_;

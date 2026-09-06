@@ -20,7 +20,7 @@ class MatchCallback final
     : public clang::ast_matchers::MatchFinder::MatchCallback {
 public:
   MatchCallback(const cli::MatchOptions &options, FileManager &files,
-                FactStore &store);
+                FactStore &store, bool rejectLegacyWrites = false);
   void
   run(const clang::ast_matchers::MatchFinder::MatchResult &result) override;
 
@@ -32,6 +32,7 @@ private:
   const cli::MatchOptions &options_;
   FileManager &files_;
   FactStore &store_;
+  bool rejectLegacyWrites_ = false;
   std::optional<std::string> error_;
   std::vector<MatchedSymbol> matches_;
 };

@@ -4,7 +4,9 @@
 #include "analysis/callgraph/DispatchResolver.h"
 #include "ast/StoreExtracted.h"
 #include "ast/extractors/CallSite.h"
+#include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/OverrideRelation.h"
+#include "ast/extractors/Reference.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Expr.h>
@@ -16,6 +18,8 @@ IndexingResult CallGraphVisitor::run() {
   clang::CallGraph graph;
   graph.addToCallGraph(context_.getTranslationUnitDecl());
   callgraph::CallGraphFacts facts;
+  facts.entries = store_.takeCallGraphEntries();
+  facts.unresolved = store_.takeUnresolvedCallSites();
   for (const auto &entry : graph) {
     const auto *node = entry.second.get();
     if (node == graph.getRoot())
@@ -41,8 +45,11 @@ IndexingResult CallGraphVisitor::run() {
                                      calleeNode->getDecl())
                            : call ? call->getDirectCallee()
                                   : nullptr;
-      if (!callee || !call)
+      if (!call)
         continue;
+      if (!callee) {
+        continue;
+      }
       auto fact = extractCallSite(*caller, *callee, *call,
                                   context_.getSourceManager(), files_, store_);
       if (!fact)

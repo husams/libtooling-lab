@@ -9,12 +9,19 @@ namespace facts::cli {
 namespace {
 
 void symbolOptions(CLI::App &command, SymbolOptions &options) {
-  auto *facts = command.add_option(
-      "-f,--facts", options.facts,
-      "Extracted facts database; defaults to facts_template when omitted "
-      "(project-scoped templates only)");
-  facts->each([&options](std::string) { options.factsProvided = true; });
-  facts->type_name("FILE");
+  command
+      .add_option_function<std::string>(
+          "-f,--facts",
+          [&options](const std::string &value) {
+            if (value.empty())
+              throw CLI::ValidationError("--facts must not be empty");
+            options.facts = value;
+            options.factsProvided = true;
+          },
+          "Extracted facts database; defaults to facts_template when omitted "
+          "(project-scoped templates only)")
+      ->trigger_on_parse()
+      ->type_name("FILE");
   configurationOptions(command, options.configuration,
                        options.configurationFile);
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")

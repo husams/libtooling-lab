@@ -1,5 +1,6 @@
 #pragma once
 
+#include "commands/FactPairValidation.h"
 #include "cli/Options.h"
 #include "model/MatchedSymbol.h"
 
@@ -17,6 +18,8 @@ namespace facts::commands::match {
 std::expected<int, std::string>
 finishMatch(FactStore &store, const cli::MatchOptions &options, int status,
             std::optional<std::string> error,
-            std::span<const MatchedSymbol> symbols);
+            std::span<const MatchedSymbol> symbols,
+            std::span<const FileId> selected = {},
+            const FactPairProvenanceSnapshot *pairing = nullptr);
 
 } // namespace facts::commands::match

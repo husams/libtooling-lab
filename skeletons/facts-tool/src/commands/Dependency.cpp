@@ -7,6 +7,7 @@
 #include "commands/DatabasePaths.h"
 #include "commands/ExtraArguments.h"
 #include "commands/ConfigurationSupport.h"
+#include "commands/FactPairValidation.h"
 #include "model/Dependency.h"
 #include "platform/PlatformFlags.h"
 #include "storage/DependencyDatabase.h"
@@ -183,6 +184,11 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
   cli::logVerbose(options.verbosity, 1,
                   "facts-tool: dependency: open project database");
   FileManager files(options.configuration);
+  if (std::filesystem::exists(options.output)) {
+    auto pairing = validateFactPairForRead(options.output,
+                                           options.configuration);
+    if (!pairing) return std::unexpected(pairing.error());
+  }
   return runDependencyStage(
              options, "register files",
              [&] { return registerFiles(files, *database, options.sources); })
@@ -224,12 +230,17 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
                         return std::expected<int, std::string>{
                             std::unexpected(created.error())};
                     }
+                    auto pairing = prepareFactPairForWrite(
+                        options.output, options.configuration);
+                    if (!pairing)
+                      return std::expected<int, std::string>{
+                          std::unexpected(pairing.error())};
                     return runDependencyStage(options, "persist graph",
                                               [&] {
                                                 return replaceDependencies(
                                                     options.output,
                                                     graph.visitedSources,
-                                                    graph.edges);
+                                                    graph.edges, *pairing);
                                               })
                         .transform_error([](std::error_code error) {
                           return "cannot persist dependency graph: " +

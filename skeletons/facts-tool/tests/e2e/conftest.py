@@ -7,6 +7,15 @@ import pytest
 from support.scenario import FactsToolContext
 
 pytest_plugins = (
+    "steps.entry_graph_steps",
+    "steps.entry_external_steps",
+    "steps.entry_lifecycle_steps",
+    "steps.entry_schema_steps",
+    "steps.entry_provenance_steps",
+    "steps.entry_rebuild_steps",
+    "steps.entry_catalog_steps",
+    "steps.entry_dependency_steps",
+    "steps.entry_mutation_paths_steps",
     "steps.batch_steps",
     "steps.cli_yaml_precedence_steps",
     "steps.cli_yaml_precedence_assert_steps",

@@ -68,6 +68,7 @@ catalog::Result<int> runComponent(const cli::ComponentOptions &options) {
   return runCatalog(
       configured.configuration, writable,
       [&](auto &database) { return operate(database, configured); },
-      configured.action == Action::add, configured.configurationFile);
+      configured.action == Action::add, configured.configurationFile,
+      configured.facts);
 }
 } // namespace facts::commands

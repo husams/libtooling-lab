@@ -11,7 +11,7 @@ changes. The SDK creates no path, table, migration, backfill, journal setting,
 or persistent side file. Context exit and exceptional construction close both
 connections.
 
-Facts schema `user_version=10` is supported. A facts-shaped database with an
+Facts schemas `user_version=10` and `11` are supported. A facts-shaped database with an
 older version fails `E_SCHEMA` before missing new tables are considered.
 Required tables validate roles independently. Project schemas use required table
 shape because their current schema has no `user_version` contract. Missing

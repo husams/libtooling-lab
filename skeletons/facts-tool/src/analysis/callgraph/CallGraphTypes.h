@@ -2,6 +2,8 @@
 
 #include "model/Relation.h"
 #include "model/RelationSite.h"
+#include "model/SymbolId.h"
+#include "model/UnresolvedCallSite.h"
 
 #include <vector>
 
@@ -20,6 +22,7 @@ struct CallFact {
   const clang::FunctionDecl *callee = nullptr;
   const clang::CXXRecordDecl *receiver = nullptr;
   bool virtualCall = false;
+  bool externalTarget = false;
 };
 
 struct OverrideFact {
@@ -34,6 +37,8 @@ struct CallGraphFacts {
   std::vector<CallFact> calls;
   std::vector<OverrideFact> overrides;
   std::vector<CallFact> dispatches;
+  std::vector<SymbolId> entries;
+  std::vector<UnresolvedCallSite> unresolved;
 };
 
 } // namespace facts::callgraph

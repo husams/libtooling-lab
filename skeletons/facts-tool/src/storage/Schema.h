@@ -248,7 +248,45 @@ CREATE TABLE IF NOT EXISTS relation_site (
 CREATE INDEX IF NOT EXISTS idx_relation_destination
   ON relation(destination_id, kind);
 
-PRAGMA user_version=10;
+-- One row records that a callable's collected body is represented by the
+-- shared graph rooted at its own symbol.  The equality check prevents a
+-- second per-root graph identity from being smuggled into this table.
+CREATE TABLE IF NOT EXISTS callgraph_entry (
+  symbol_id     INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  graph_node_ref INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+  CHECK(symbol_id = graph_node_ref)
+);
+
+-- A relation site may point at a retained external symbol until a compatible
+-- project definition is encountered.  The composite foreign key makes site
+-- deletion cascade to this evidence as well.
+CREATE TABLE IF NOT EXISTS callgraph_external_reference (
+  source_id          INTEGER NOT NULL,
+  destination_id     INTEGER NOT NULL,
+  kind               INTEGER NOT NULL,
+  position           INTEGER NOT NULL,
+  file_id            INTEGER NOT NULL,
+  offset             INTEGER NOT NULL,
+  external_symbol_id INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+  PRIMARY KEY (source_id, destination_id, kind, position, file_id, offset),
+  FOREIGN KEY (source_id, destination_id, kind, position, file_id, offset)
+    REFERENCES relation_site(source_id, destination_id, kind, position,
+                             file_id, offset) ON DELETE CASCADE,
+  CHECK(destination_id = external_symbol_id)
+) WITHOUT ROWID;
+
+-- Indirect calls without a stable declaration retain their observed site, so
+-- later recovery can revisit it without inventing a destination ID.
+CREATE TABLE IF NOT EXISTS callgraph_unresolved_site (
+  source_id INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+  file_id   INTEGER NOT NULL,
+  offset    INTEGER NOT NULL,
+  line      INTEGER NOT NULL,
+  col       INTEGER NOT NULL,
+  PRIMARY KEY (source_id, file_id, offset)
+) WITHOUT ROWID;
+
+PRAGMA user_version=11;
 
 )sql";
 

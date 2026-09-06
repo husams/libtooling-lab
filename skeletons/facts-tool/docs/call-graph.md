@@ -17,6 +17,9 @@ calls, while constructor invocations remain represented only by the existing
 
 ## Querying
 
+Use [function entries](call-graph-entries.md) to distinguish committed body
+generation, missing entries, generated leaves, and retained external targets.
+
 Select one root by qualified name or USR:
 
 ```text

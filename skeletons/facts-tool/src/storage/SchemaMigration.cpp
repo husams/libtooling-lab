@@ -313,11 +313,46 @@ CREATE TABLE IF NOT EXISTS callable_return_type (
 PRAGMA user_version=9;
 )sql";
 
+inline constexpr auto callGraphEntryMigrationSql = R"sql(
+CREATE TABLE IF NOT EXISTS callgraph_entry (
+  symbol_id      INTEGER PRIMARY KEY REFERENCES symbol(id) ON DELETE CASCADE,
+  graph_node_ref INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+  CHECK(symbol_id = graph_node_ref)
+);
+CREATE TABLE IF NOT EXISTS callgraph_external_reference (
+  source_id          INTEGER NOT NULL,
+  destination_id     INTEGER NOT NULL,
+  kind               INTEGER NOT NULL,
+  position           INTEGER NOT NULL,
+  file_id            INTEGER NOT NULL,
+  offset             INTEGER NOT NULL,
+  external_symbol_id INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+  PRIMARY KEY (source_id, destination_id, kind, position, file_id, offset),
+  FOREIGN KEY (source_id, destination_id, kind, position, file_id, offset)
+    REFERENCES relation_site(source_id, destination_id, kind, position,
+                             file_id, offset) ON DELETE CASCADE,
+  CHECK(destination_id = external_symbol_id)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS callgraph_unresolved_site (
+  source_id INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+  file_id   INTEGER NOT NULL,
+  offset    INTEGER NOT NULL,
+  line      INTEGER NOT NULL,
+  col       INTEGER NOT NULL,
+  PRIMARY KEY (source_id, file_id, offset)
+) WITHOUT ROWID;
+PRAGMA user_version=11;
+)sql";
+
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
-  return hasColumn(database, "symbol", "id")
-      .and_then([database](bool existing) {
+  return schemaVersion(database).and_then([database](int current) {
+    if (current > 11) {
+      return std::expected<void, std::error_code>{std::unexpected(
+          std::make_error_code(std::errc::operation_not_supported))};
+    }
+    return hasColumn(database, "symbol", "id").and_then([database](bool existing) {
         if (!existing) {
           return std::expected<void, std::error_code>{};
         }
@@ -392,8 +427,15 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
                                           : std::expected<void, std::error_code>{};
                     });
                   });
+            })
+            .and_then([database] {
+              return schemaVersion(database).and_then([database](int version) {
+                return version < 11 ? execute(database, callGraphEntryMigrationSql)
+                                    : std::expected<void, std::error_code>{};
+              });
             });
       });
+  });
 }
 
 } // namespace facts::storage

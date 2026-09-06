@@ -23,6 +23,6 @@ catalog::Result<int> runDirectory(const cli::DirectoryOptions &options) {
                 return std::string{"Directory removed from catalog\n"};
               });
             });
-      }, false, options.configurationFile);
+      }, false, options.configurationFile, options.facts);
 }
 } // namespace facts::commands

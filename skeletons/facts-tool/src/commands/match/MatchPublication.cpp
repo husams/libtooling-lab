@@ -34,7 +34,9 @@ catalog::Result<void> publish(const std::string &path,
 
 Result finishMatch(FactStore &store, const cli::MatchOptions &options,
                    int status, std::optional<std::string> error,
-                   std::span<const MatchedSymbol> symbols) {
+                   std::span<const MatchedSymbol> symbols,
+                   std::span<const FileId> selected,
+                   const FactPairProvenanceSnapshot *pairing) {
   if (status != 0 || error) {
     auto finished = store.rollback();
     if (!finished)
@@ -49,6 +51,13 @@ Result finishMatch(FactStore &store, const cli::MatchOptions &options,
       return std::unexpected("match-index-write-failed "
                              "{facts_committed:false,index_committed:false}: " +
                              indexed.error().message());
+    }
+  }
+  if (pairing) {
+    if (auto registered = registerFactPairProvenance(store, *pairing, selected);
+        !registered) {
+      (void)store.rollback();
+      return std::unexpected(registered.error());
     }
   }
   auto finished = store.end();

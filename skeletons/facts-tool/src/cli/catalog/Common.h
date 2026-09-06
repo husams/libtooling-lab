@@ -10,6 +10,18 @@ namespace facts::cli {
 // and on each of its leaves, so `-c` works on either side of the subcommand.
 template <typename Options>
 void catalogOptions(CLI::App &command, Options &options) {
+  command
+      .add_option_function<std::string>(
+          "-f,--facts",
+          [&options](const std::string &value) {
+            if (value.empty())
+              throw CLI::ValidationError("--facts must not be empty");
+            options.facts = value;
+            options.factsProvided = true;
+          },
+          "Existing facts database whose call-graph entries are invalidated before mutation")
+      ->trigger_on_parse()
+      ->type_name("FILE");
   configurationOptions(command, options.configuration, options.configurationFile);
   command.add_option("-v,--verbose", options.verbosity, "Verbosity level")
       ->expected(0, 1)

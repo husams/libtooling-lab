@@ -25,6 +25,7 @@ struct QueryNode {
   unsigned line = 0;
   unsigned column = 0;
   std::optional<QueryDefinition> definitionLocation;
+  unsigned unresolved = 0;
 };
 
 struct QueryEdge {

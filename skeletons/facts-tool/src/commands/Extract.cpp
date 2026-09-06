@@ -5,6 +5,7 @@
 #include "commands/ExtraArguments.h"
 #include "commands/ExtractionSetup.h"
 #include "commands/ConfigurationSupport.h"
+#include "commands/FactPairValidation.h"
 
 #include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
@@ -115,6 +116,10 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
           if (auto created = materializeFactsDirectory(options.output); !created)
             return std::expected<int, std::string>{std::unexpected(created.error())};
         }
+        auto pairing = prepareFactPairForWrite(options.output,
+                                               options.configuration);
+        if (!pairing)
+          return std::expected<int, std::string>{std::unexpected(pairing.error())};
         cli::logVerbose(options.verbosity, 1,
                         "facts-tool: extract: open output database");
         const auto openOutputStarted = TimingClock::now();
@@ -135,6 +140,26 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         const auto result = toolResult != 0       ? toolResult
                             : indexing.complete() ? 0
                                                   : 1;
+        if (result == 0) {
+          std::vector<FileId> selected;
+          selected.reserve(sources.size());
+          for (const auto &source : sources) {
+            auto id = files.getId(source);
+            if (!id) {
+              (void)store.rollback();
+              return std::expected<int, std::string>{std::unexpected(
+                  "cannot resolve extracted source: " + id.error().message())};
+            }
+            selected.push_back(*id);
+          }
+          auto registered =
+              registerFactPairProvenance(store, *pairing, selected);
+          if (!registered) {
+            (void)store.rollback();
+            return std::expected<int, std::string>{
+                std::unexpected(registered.error())};
+          }
+        }
         auto finished =
             result == 0
                 ? runExtractStage(options, "commit output transaction",

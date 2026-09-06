@@ -6,6 +6,7 @@
 #include "commands/Import.h"
 #include "commands/Match.h"
 #include "commands/analyse/CallGraphCommand.h"
+#include "commands/analyse/CallGraphEntryCommand.h"
 #include "commands/catalog/Commands.h"
 #include <format>
 #include <iostream>
@@ -20,6 +21,10 @@ std::string_view commandName(const ImportOptions &) { return "import"; }
 std::string_view commandName(const DependencyOptions &) { return "dependency"; }
 
 std::string_view commandName(const CallGraphOptions &) { return "call-graph"; }
+
+std::string_view commandName(const CallGraphEntryOptions &) {
+  return "call-graph-entry";
+}
 
 std::string_view commandName(const MatchOptions &) { return "match"; }
 
@@ -48,9 +53,10 @@ std::string commandDetails(const ExtractOptions &options) {
 
 std::string commandDetails(const ImportOptions &options) {
   return std::format(
-      "configuration='{}', compilation_database='{}', requested_sources={}, "
+      "configuration='{}', facts='{}', compilation_database='{}', requested_sources={}, "
       "components={}",
       options.configuration,
+      options.facts.empty() ? "none" : options.facts,
       options.compilationDatabase.empty() ? "fixed commands"
                                           : options.compilationDatabase,
       options.sources.size(), options.components.size());
@@ -66,6 +72,12 @@ std::string commandDetails(const CallGraphOptions &options) {
   return std::format("facts='{}', configuration='{}', scope='{}', format='{}'",
                      options.facts, options.configuration,
                      options.all ? "all" : *options.function, options.format);
+}
+
+std::string commandDetails(const CallGraphEntryOptions &options) {
+  return std::format("facts='{}', configuration='{}', function='{}', format='{}'",
+                     options.facts, options.configuration, options.function,
+                     options.format);
 }
 
 std::string commandDetails(const MatchOptions &options) {
@@ -93,6 +105,11 @@ std::expected<int, std::string> execute(const DependencyOptions &options) {
 
 std::expected<int, std::string> execute(const CallGraphOptions &options) {
   return commands::runCallGraph(options);
+}
+
+std::expected<int, std::string>
+execute(const CallGraphEntryOptions &options) {
+  return commands::runCallGraphEntry(options);
 }
 
 std::expected<int, std::string> execute(const MatchOptions &options) {

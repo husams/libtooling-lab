@@ -4,6 +4,8 @@
 #include "commands/CompilationViews.h"
 #include "commands/ExtraArguments.h"
 #include "commands/ConfigurationSupport.h"
+#include "commands/CallGraphInvalidation.h"
+#include "commands/DatabasePaths.h"
 #include "commands/IncludedFiles.h"
 
 #include "cli/Verbose.h"
@@ -165,7 +167,8 @@ registerFiles(FileManager &files, const CompilationDatabase &stored,
 std::expected<int, std::string> import(const cli::ImportOptions &options,
                                        std::vector<ProjectComponent> components,
                                        CompilationDatabasePtr database,
-                                       CompilationDatabasePtr applied) {
+                                       CompilationDatabasePtr applied,
+                                       const config::Resolved &resolved) {
   cli::logVerbose(options.verbosity, 2,
                   "facts-tool: import: requested_sources={}, components={}",
                   options.sources.size(), components.size());
@@ -182,12 +185,17 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
   return cli::runStage(options.verbosity, "import", "read file registry",
                        [&] { return registeredFileCount(files); })
       .and_then([&](std::size_t before) {
-        return cli::runStage(
-                   options.verbosity, "import", "store compile commands",
-                   [&] {
-                     return importProjectConfiguration(
-                         files, *database, options.sources, importOptions);
-                   })
+        return invalidateConfiguredCallGraphEntries(
+                   resolved, options.factsProvided ? options.facts : "",
+                   options.sources)
+            .and_then([&] {
+              return cli::runStage(
+                         options.verbosity, "import", "store compile commands",
+                         [&] {
+                           return importProjectConfiguration(
+                               files, *database, options.sources, importOptions);
+                         });
+            })
             .and_then([&](const ProjectImportResult &result) {
               reportDiagnostics(result.diagnostics);
               return cli::runStage(
@@ -221,10 +229,27 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
   auto resolved = loadConfiguration(options.configuration,
                                     options.configurationFile, false, true);
   if (!resolved) return std::unexpected(resolved.error());
+  if (options.factsProvided && options.facts.empty())
+    return std::unexpected("facts-tool: usage error: --facts must not be empty");
+  if (options.factsProvided) {
+    auto paths = validateDatabasePaths(options.facts, resolved->database.string());
+    if (!paths) return std::unexpected("facts-tool: configuration error: " + paths.error());
+  }
   auto configured = options;
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = resolved->extraArguments;
   configured.sources = normalizeSourceSelectors(options.sources);
+  const bool sourceTemplate = resolved->factsTemplate.find("{relative_path}") !=
+                                  std::string::npos ||
+                              resolved->factsTemplate.find("{filename}") !=
+                                  std::string::npos;
+  if (!configured.factsProvided && !resolved->factsTemplate.empty() &&
+      (!sourceTemplate || configured.sources.size() == 1)) {
+    auto facts = resolveFactsOutput(*resolved, configured.sources);
+    if (!facts) return std::unexpected(facts.error());
+    configured.facts = facts->string();
+    configured.factsProvided = true;
+  }
   return cli::runStage(configured.verbosity, "import", "parse components",
                        [&] { return parseComponents(configured.components); })
       .and_then([&](std::vector<ProjectComponent> components) {
@@ -246,7 +271,8 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
                         std::move(database), configured.defaultExtraArguments,
                         explicitArguments, configured.extraArgumentsProvided);
                     return import(configured, std::move(components),
-                                  std::move(views.stored), std::move(views.applied));
+                                  std::move(views.stored), std::move(views.applied),
+                                  *resolved);
                   });
             });
       });

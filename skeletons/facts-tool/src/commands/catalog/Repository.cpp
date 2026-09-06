@@ -71,6 +71,6 @@ catalog::Result<int> runRepository(const cli::RepositoryOptions &options) {
                         options.action != Action::show;
   return runCatalog(options.configuration, writable,
                     [&](auto &database) { return operate(database, options); },
-                    false, options.configurationFile);
+                    false, options.configurationFile, options.facts);
 }
 } // namespace facts::commands
