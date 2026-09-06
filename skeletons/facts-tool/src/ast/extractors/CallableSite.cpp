@@ -10,6 +10,15 @@
 #include <clang/AST/DeclCXX.h>
 
 namespace facts {
+namespace {
+
+// relation_site has no flags, so its existing position key partitions
+// compiler-generated Calls from explicit Calls without changing the schema.
+constexpr std::uint16_t invocationPosition(bool implicit) {
+  return implicit ? 1 : 0;
+}
+
+} // namespace
 
 ExtractionResult<std::optional<callgraph::CallFact>> extractCallableSite(
     const clang::FunctionDecl &caller, const clang::FunctionDecl &callee,
@@ -38,11 +47,13 @@ ExtractionResult<std::optional<callgraph::CallFact>> extractCallableSite(
                            -> std::optional<callgraph::CallFact> {
               if (!destination)
                 return std::nullopt;
+              const auto position = invocationPosition(implicit);
               const Relation relation{.source = *source,
                                       .destination = *destination,
                                       .kind = RelationKind::Calls,
                                       .flags = static_cast<std::uint16_t>(
-                                          implicit ? bit(ImplicitEdgeBit) : 0)};
+                                          implicit ? bit(ImplicitEdgeBit) : 0),
+                                      .position = position};
               const auto *method =
                   llvm::dyn_cast<clang::CXXMethodDecl>(&targetDecl);
               return callgraph::CallFact{
@@ -50,6 +61,7 @@ ExtractionResult<std::optional<callgraph::CallFact>> extractCallableSite(
                   RelationSite{.source = *source,
                                .destination = *destination,
                                .kind = RelationKind::Calls,
+                               .position = position,
                                .file = *file,
                                .location = *location,
                                .receiverType = receiver.type,

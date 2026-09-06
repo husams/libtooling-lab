@@ -9,9 +9,12 @@ class SourceManager;
 }
 
 namespace facts {
+class FactStore;
+class FileManager;
 
 void reportUnsupportedSemantic(std::string_view kind,
                                clang::SourceLocation location,
-                               const clang::SourceManager &sourceManager);
+                               const clang::SourceManager &sourceManager,
+                               FileManager &files, const FactStore &store);
 
 } // namespace facts

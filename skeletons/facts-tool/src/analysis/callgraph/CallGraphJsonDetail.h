@@ -13,6 +13,6 @@ llvm::json::Object nodeJson(const QueryGraph &graph, const QueryNode &node,
 llvm::json::Value definitionJson(const QueryNode &node,
                                  const CoverageReport *coverage);
 llvm::json::Object edgeJson(const QueryGraph &graph, const TraversedEdge &edge,
-                            const CoverageReport *coverage);
+                            const CoverageReport *coverage, EdgeView view);
 
 } // namespace facts::callgraph::detail

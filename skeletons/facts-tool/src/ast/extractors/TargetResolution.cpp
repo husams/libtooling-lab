@@ -30,10 +30,9 @@ std::expected<SymbolId, std::error_code> findOrStoreSymbolTarget(
                 ? std::expected<FileId, std::error_code>{builtinFileId}
                 : resolveFile(sourceManager, visible.getLocation(), files);
         return file.and_then([&](FileId id) {
-          return externalSymbol(visible, usr, id == builtinFileId)
-              .and_then([&](Symbol symbol) {
-                return store.save(id, std::move(symbol));
-              });
+          return externalSymbol(visible, usr).and_then([&](Symbol symbol) {
+            return store.save(id, std::move(symbol));
+          });
         });
       });
 }

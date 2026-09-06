@@ -26,5 +26,10 @@ ExtractionResult<ReceiverContext>
 extractReceiverContext(const clang::Expr &site,
                        const clang::SourceManager &sourceManager,
                        FileManager &files, FactStore &store);
+ExtractionResult<ReceiverContext>
+extractReceiverContext(const clang::CXXRecordDecl &record,
+                       ReceiverCertainty certainty,
+                       const clang::SourceManager &sourceManager,
+                       FileManager &files, FactStore &store);
 
 } // namespace facts

@@ -3,7 +3,6 @@
 #include "analysis/callgraph/CallGraphLinker.h"
 #include "ast/StoreExtracted.h"
 #include "ast/extractors/CallableSite.h"
-#include "ast/extractors/DestructorCalls.h"
 #include "ast/extractors/UnsupportedSemantics.h"
 #include "storage/FactStore.h"
 
@@ -13,7 +12,6 @@
 #include <clang/AST/ExprCXX.h>
 #include <clang/Basic/SourceManager.h>
 
-#include <iterator>
 #include <ranges>
 #include <string>
 
@@ -33,18 +31,22 @@ void BodyVisitor::captureInvocation(
 bool BodyVisitor::VisitCallExpr(clang::CallExpr *expression) {
   const auto &sources = context_.getSourceManager();
   if (!expression->getDirectCallee() && !expression->isTypeDependent() &&
-      !expression->isValueDependent() &&
-      sources.isWrittenInMainFile(expression->getExprLoc()))
+      !expression->isValueDependent())
     reportUnsupportedSemantic("indirect-call", expression->getExprLoc(),
-                              sources);
+                              sources, files_, store_);
   return true;
 }
 
 bool BodyVisitor::VisitCXXConstructExpr(clang::CXXConstructExpr *expression) {
   const auto *callee = expression->getConstructor();
-  captureInvocation(extractCallableSite(
-      owner_, *callee, expression->getExprLoc(), {}, callee->isImplicit(),
-      context_.getSourceManager(), files_, store_));
+  captureInvocation(
+      extractReceiverContext(*callee->getParent(), ReceiverCertainty::Exact,
+                             context_.getSourceManager(), files_, store_)
+          .and_then([&](ReceiverContext receiver) {
+            return extractCallableSite(
+                owner_, *callee, expression->getExprLoc(), receiver, false,
+                context_.getSourceManager(), files_, store_);
+          }));
   return true;
 }
 
@@ -60,14 +62,6 @@ bool BodyVisitor::traverse(clang::Stmt *body) {
 }
 
 IndexingResult BodyVisitor::persistInvocations() {
-  auto destructors = extractDestructorCalls(owner_, context_, files_, store_);
-  if (!destructors)
-    return std::unexpected(
-        IndexingError{"cannot extract destructor invocation: " +
-                      std::string{extractionErrorName(destructors.error())}});
-  invocationFacts_.insert(invocationFacts_.end(),
-                          std::make_move_iterator(destructors->begin()),
-                          std::make_move_iterator(destructors->end()));
   return callgraph::linkCallGraphFacts(
       callgraph::CallGraphFacts{std::move(invocationFacts_), {}, {}}, store_);
 }

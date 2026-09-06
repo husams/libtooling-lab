@@ -23,9 +23,9 @@ llvm::json::Object nodeJson(const QueryGraph &graph, const QueryNode &node,
   const auto *file =
       coverage ? findCoverageEvidenceFile(*coverage, node) : nullptr;
   const auto availability = coverage ? definitionAvailability(*coverage, node)
-                            : node.definition ? "available"
-                            : node.external   ? "external-unavailable"
-                                              : "unknown";
+                            : hasDefinitionEvidence(node) ? "available"
+                            : node.external ? "external-unavailable"
+                                            : "unknown";
   llvm::json::Object source{
       {"file_id", node.id.file}, {"line", node.line}, {"column", node.column}};
   source["path"] = sourceFile ? llvm::json::Value(sourceFile->path)
@@ -55,6 +55,7 @@ llvm::json::Object nodeJson(const QueryGraph &graph, const QueryNode &node,
       {"source", std::move(source)},
       {"definition", definitionJson(node, coverage)},
       {"facts", llvm::json::Object{{"definition", node.definition},
+                                   {"implicit", node.implicit},
                                    {"outgoing_calls", outgoing}}},
       {"coverage", std::move(evidence)}};
 }

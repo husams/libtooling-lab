@@ -28,6 +28,7 @@ const CoverageFile *findCoverageFile(const CoverageReport &report, FileId id);
 const CoverageFile *findCoverageEvidenceFile(const CoverageReport &report,
                                              const QueryNode &node);
 bool isProjectLocal(const CoverageReport &report, const QueryNode &node);
+bool hasDefinitionEvidence(const QueryNode &node);
 std::string definitionAvailability(const CoverageReport &report,
                                    const QueryNode &node);
 std::string extractionCoverage(const CoverageReport &report,

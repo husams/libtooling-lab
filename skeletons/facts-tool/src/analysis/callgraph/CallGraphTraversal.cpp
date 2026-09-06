@@ -55,10 +55,12 @@ private:
           });
       if (capped)
         ++truncated_;
-      const bool external = coverage_ ? !target->definition &&
-                                            !isProjectLocal(*coverage_, *target)
-                                      : target->external || !target->definition;
-      const bool definitionBoundary = coverage_ && !target->definition &&
+      const bool external =
+          coverage_ ? !hasDefinitionEvidence(*target) &&
+                          !isProjectLocal(*coverage_, *target)
+                    : target->external || !hasDefinitionEvidence(*target);
+      const bool definitionBoundary = coverage_ &&
+                                      !hasDefinitionEvidence(*target) &&
                                       isProjectLocal(*coverage_, *target);
       recordNode(target->id);
       edges_.push_back({edge, depth + 1, cycle, reused, external,

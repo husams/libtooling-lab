@@ -15,3 +15,12 @@ Feature: Cross-component callable semantics
 
   Scenario: exposes raw relations and unsupported frontend semantics
     Then the Calls view and unsupported-semantic evidence remain inspectable
+
+  Scenario: separates explicit and implicit cleanup occurrences
+    Then mixed cleanup and destructor subobjects retain site semantics
+
+  Scenario: resolves destructor receivers and virtual dispatch
+    Then lifecycle receiver evidence and destructor dispatch are preserved
+
+  Scenario: treats synthesized special members as available definitions
+    Then implicit definitions and the raw Calls contract remain accurate

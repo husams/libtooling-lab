@@ -193,7 +193,8 @@ private:
         ->type_name("FORMAT");
     command
         .add_option("--edges", callGraph_.edges,
-                    "Edge view: semantic callable kinds or raw calls")
+                    "Presentation of the same stored edges: semantic callable "
+                    "kinds or raw Calls/DispatchCalls")
         ->check(CLI::IsMember({"semantic", "calls"}))
         ->type_name("VIEW");
     auto *scope = command.add_option_group("scope", "Select graph roots");

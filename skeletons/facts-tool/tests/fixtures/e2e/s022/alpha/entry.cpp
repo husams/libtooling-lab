@@ -24,6 +24,18 @@ int temporaryCleanup() { return Derived{}.value(); }
 
 void explicitCleanup(Derived *value) { value->~Derived(); }
 
+void mixedCleanup(Derived *other) {
+  Derived value;
+  other->~Derived();
+}
+
+void deleteBase(Base *value) { delete value; }
+
+int implicitConstruction() {
+  ImplicitValue value;
+  return consume(value);
+}
+
 int unresolved(int (*target)()) { return target(); }
 
 } // namespace s022_fixture

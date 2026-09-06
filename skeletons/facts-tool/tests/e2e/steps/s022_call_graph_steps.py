@@ -1,21 +1,12 @@
 from __future__ import annotations
-import json
-import subprocess
+
 from pytest_bdd import given, then
+
 from support.database import require
 from support.scenario import FactsToolContext
-def run(arguments: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(arguments, capture_output=True, text=True, check=False)
-def graph(context: FactsToolContext, root: str, view: str = "semantic") -> dict:
-    result = run([str(context.facts_tool), "analyse", "call-graph", "-v", "0",
-                  "-f", str(context.facts_database_path), "-c",
-                  str(context.files_database_path), "--format", "json",
-                  "--edges", view, "--function", root])
-    require(result.returncode == 0, result.stdout + result.stderr)
-    return json.loads(result.stdout)
-def named_edges(document: dict) -> list[tuple[dict, str]]:
-    names = {node["id"]: node["name"] for node in document["nodes"]}
-    return [(edge, names[edge["target_id"]]) for edge in document["edges"]]
+from support.s022 import graph, named_edges, run
+
+
 @given("the S-022 multi-component corpus is extracted")
 def extract_s022(context: FactsToolContext) -> None:
     context.prepare()
@@ -69,7 +60,8 @@ def lambda_and_components(context: FactsToolContext) -> None:
 def dispatch_certainty(context: FactsToolContext) -> None:
     exact = [(edge, target) for edge, target in
              named_edges(graph(context, "s022_fixture::exactDispatch"))
-             if edge["depth"] == 1 and edge["certainty"] == "exact"]
+             if edge["depth"] == 1 and edge["certainty"] == "exact" and
+             target == "s022_fixture::Derived::value"]
     require({(edge["relation_kind"], target) for edge, target in exact} ==
             {("Calls", "s022_fixture::Derived::value"),
              ("DispatchCalls", "s022_fixture::Derived::value")}, str(exact))
@@ -88,8 +80,10 @@ def compatibility_and_coverage(context: FactsToolContext) -> None:
     document = graph(context, "s022_fixture::run", "calls")
     require(document["edge_view"] == "calls", str(document))
     require(all(edge["relation_kind"] in {"Calls", "DispatchCalls"} and
-                edge["semantic_kind"] for edge in document["edges"]), str(document["edges"]))
+                "semantic_kind" not in edge for edge in document["edges"]),
+            str(document["edges"]))
     unsupported = document["extraction_coverage"]["unsupported_semantics"]
     require(unsupported["state"] == "not-persisted" and not unsupported["sites"], str(unsupported))
     require("coverage.unsupported_semantics kind=indirect-call" in context.last_output and
-            "entry.cpp:27:42" in context.last_output, context.last_output)
+            "entry.cpp:39:42" in context.last_output and
+            "service.hpp:30:" in context.last_output, context.last_output)

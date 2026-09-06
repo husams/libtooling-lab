@@ -20,7 +20,7 @@ std::string renderCallGraphJson(const QueryGraph &graph,
       nodeValues.push_back(detail::nodeJson(graph, *node, coverage));
   llvm::json::Array edgeValues;
   for (const auto &edge : traversal.edges)
-    edgeValues.push_back(detail::edgeJson(graph, edge, coverage));
+    edgeValues.push_back(detail::edgeJson(graph, edge, coverage, view));
   llvm::json::Array candidates;
   if (coverage)
     for (const auto &path : coverage->recoveryCandidates)

@@ -29,7 +29,9 @@ facts-tool analyse call-graph -f facts.db -c project.db --function app::run
 The default `--edges semantic` view classifies each stored edge as `function`,
 `constructor`, `destructor`, `lambda`, or `virtual_dispatch`. Use
 `--edges calls` for the compatibility view of the underlying `Calls` and
-`DispatchCalls` primitives. Both views keep the stored relation kind.
+`DispatchCalls` primitives without semantic classification. Both views keep
+the stored relation kind and traverse the same stored edge set; only their
+presentation differs.
 
 Or list every definition-backed root with calls:
 
@@ -60,18 +62,22 @@ object, outgoing-call presence, catalog `indexed`/`indexed_at` values,
 freshness, the reserved failure member, coverage state, recommended action,
 and candidate unindexed translation units. Coverage metadata follows the
 definition file when one exists. Edge
-evidence keeps `relation_kind`, `semantic_kind`, `implicit`, receiver name,
-`receiver_type_id`, certainty, source location, cycle, reuse,
+evidence keeps `relation_kind`, `implicit`, receiver name, `receiver_type_id`,
+certainty, source location, cycle, reuse,
 external-boundary, definition-boundary, and depth-truncation flags. Exact
 receiver sites have a concrete receiver identity and certainty `exact`;
 conservative sites use a null receiver identity and certainty `possible`.
+Semantic-view edges additionally include `semantic_kind`; calls-view edges
+omit that derived classification.
 
 Indirect calls or cleanup actions for which the frontend supplies no resolved
 callable target are printed during extraction as
-`coverage.unsupported_semantics` diagnostics with their source site. Schema v8
-has no persistence field for these diagnostics, so JSON reports the coverage
-member as `not-persisted` with an action to inspect extraction diagnostics; it
-does not claim an empty persisted list is complete.
+`coverage.unsupported_semantics` diagnostics with their registered project-file
+source site. These coverage diagnostics use the logging facility's always-on
+level and therefore remain visible at `--verbose 0`; unregistered system files
+are suppressed. Schema v8 has no persistence field for these diagnostics, so
+JSON reports the coverage member as `not-persisted` with an action to inspect
+extraction diagnostics; it does not claim an empty persisted list is complete.
 
 Emitted coverage states are `complete`, `incomplete`, `unknown`, `stale`, or
 `not-applicable`. Missing catalog evidence is reported as `unknown`; it is not

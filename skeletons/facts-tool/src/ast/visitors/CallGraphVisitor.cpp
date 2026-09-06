@@ -4,13 +4,38 @@
 #include "analysis/callgraph/DispatchResolver.h"
 #include "ast/StoreExtracted.h"
 #include "ast/extractors/CallSite.h"
+#include "ast/extractors/DestructorCalls.h"
 #include "ast/extractors/OverrideRelation.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Expr.h>
 #include <clang/Analysis/CallGraph.h>
 
+#include <iterator>
+
 namespace facts {
+namespace {
+
+IndexingResult collectDestructors(const clang::FunctionDecl &caller,
+                                  clang::ASTContext &context,
+                                  FileManager &files, FactStore &store,
+                                  callgraph::CallGraphFacts &facts) {
+  const auto *definition = caller.getDefinition();
+  if (!definition)
+    return {};
+  return extractDestructorCalls(*definition, context, files, store)
+      .transform([&](auto calls) {
+        facts.calls.insert(facts.calls.end(),
+                           std::make_move_iterator(calls.begin()),
+                           std::make_move_iterator(calls.end()));
+      })
+      .transform_error([](ExtractionError error) {
+        return IndexingError{"cannot extract destructor invocation: " +
+                             std::string{extractionErrorName(error)}};
+      });
+}
+
+} // namespace
 
 IndexingResult CallGraphVisitor::run() {
   clang::CallGraph graph;
@@ -34,6 +59,10 @@ IndexingResult CallGraphVisitor::run() {
       facts.overrides.insert(facts.overrides.end(), overrides->begin(),
                              overrides->end());
     }
+    auto destructors =
+        collectDestructors(*caller, context_, files_, store_, facts);
+    if (!destructors)
+      return destructors;
     for (const auto &[calleeNode, siteExpr] : node->callees()) {
       const auto *call = llvm::dyn_cast_or_null<clang::CallExpr>(siteExpr);
       const auto *callee = calleeNode

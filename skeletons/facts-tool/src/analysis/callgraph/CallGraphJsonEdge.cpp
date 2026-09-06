@@ -5,7 +5,7 @@
 namespace facts::callgraph::detail {
 
 llvm::json::Object edgeJson(const QueryGraph &graph, const TraversedEdge &value,
-                            const CoverageReport *coverage) {
+                            const CoverageReport *coverage, EdgeView view) {
   const auto *source = findNode(graph, value.edge.source);
   const auto *target = findNode(graph, value.edge.destination);
   const auto *file =
@@ -19,22 +19,22 @@ llvm::json::Object edgeJson(const QueryGraph &graph, const TraversedEdge &value,
                               {"offset", value.edge.offset}};
   location["path"] =
       file ? llvm::json::Value(file->path) : llvm::json::Value(nullptr);
-  llvm::json::Object edge{
-      {"depth", value.depth},
-      {"relation", relation},
-      {"relation_kind", relation},
-      {"semantic_kind", std::string{semanticKind(target, value.edge.kind)}},
-      {"source_id", stableId(value.edge.source)},
-      {"target_id", stableId(value.edge.destination)},
-      {"source_usr", source ? source->usr : ""},
-      {"target_usr", target ? target->usr : ""},
-      {"location", std::move(location)},
-      {"implicit", value.edge.implicit},
-      {"cycle", value.cycle},
-      {"reused", value.reused},
-      {"external_boundary", value.externalBoundary},
-      {"definition_boundary", value.definitionBoundary},
-      {"depth_truncated", value.depthTruncated}};
+  llvm::json::Object edge{{"depth", value.depth},
+                          {"relation", relation},
+                          {"relation_kind", relation},
+                          {"source_id", stableId(value.edge.source)},
+                          {"target_id", stableId(value.edge.destination)},
+                          {"source_usr", source ? source->usr : ""},
+                          {"target_usr", target ? target->usr : ""},
+                          {"location", std::move(location)},
+                          {"implicit", value.edge.implicit},
+                          {"cycle", value.cycle},
+                          {"reused", value.reused},
+                          {"external_boundary", value.externalBoundary},
+                          {"definition_boundary", value.definitionBoundary},
+                          {"depth_truncated", value.depthTruncated}};
+  if (view == EdgeView::Semantic)
+    edge["semantic_kind"] = std::string{semanticKind(target, value.edge.kind)};
   edge["receiver"] = value.edge.receiver
                          ? llvm::json::Value(*value.edge.receiver)
                          : llvm::json::Value(nullptr);
