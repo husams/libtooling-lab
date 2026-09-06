@@ -323,16 +323,16 @@ def prepare_b040(context: FactsToolContext, include_missing: bool,
                     *(str(path) for path in sources.values())])
     require(imported.returncode == 0, imported.stdout + imported.stderr)
     selected = list(sources.values()) if include_missing else [
-        sources["b040_root.cpp"], sources["b040_known.cpp"]]
+        sources["b040_root.cpp"], sources["b040_known.cpp"],
+        sources["b040_leaf.cpp"]]
     extracted = run([str(context.facts_tool), "extract", "-v", "0", "-o",
                      str(context.facts_database_path), "-c",
                      str(context.files_database_path), *(str(path) for path in selected)])
     require(extracted.returncode == 0, extracted.stdout + extracted.stderr)
     if metadata:
-        covered = ("b040_root.cpp", "b040_known.cpp", "b040_leaf.cpp",
-                   "b040_boundary.hpp")
+        covered = ("b040_root.cpp", "b040_known.cpp", "b040_boundary.hpp")
         if include_missing:
-            covered += ("b040_missing.cpp",)
+            covered += ("b040_leaf.cpp", "b040_missing.cpp")
         with sqlite3.connect(context.files_database_path) as database:
             database.executemany(
                 "UPDATE file SET indexed=1,indexed_at='2026-09-06T00:00:00Z' WHERE name=?",
@@ -375,12 +375,15 @@ def b040_stale_pair(context: FactsToolContext) -> None:
 def b040_reproduction(context: FactsToolContext) -> None:
     graph = b040_graph(context)
     missing = next(node for node in graph["nodes"] if node["name"] == "b040_fixture::missing")
+    leaf = next(node for node in graph["nodes"] if node["name"] == "b040_fixture::leaf_only")
     edge = next(edge for edge in graph["edges"] if edge["target_id"] == missing["id"])
     require(graph["complete"] and graph["truncated"] == 0, str(graph["traversal"]))
     require(graph["extraction_coverage"]["state"] == "incomplete", str(graph))
     require(missing["definition_availability"] == "project-missing" and
             missing["coverage"]["state"] == "incomplete", str(missing))
     require(not edge["external_boundary"] and edge["definition_boundary"], str(edge))
+    require(leaf["facts"]["definition"] and
+            leaf["coverage"]["catalog_indexed"] is False, str(leaf))
     candidates = graph["extraction_coverage"]["recovery_candidates"]
     require([Path(path).name for path in candidates] == ["b040_missing.cpp"],
             str(graph))
