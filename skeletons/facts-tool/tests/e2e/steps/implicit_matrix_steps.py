@@ -69,6 +69,12 @@ def matrix_calls(context, matrix):
             require(row[0] >> 32 == 0 and row[3:7] == (1, 1, 0, 0), str(row))
         else:
             require(row[0] >> 32 != 0, str(row))
+        if cell["target"] == "__builtin_memcpy":
+            properties = query(
+                context.facts_database_path,
+                "SELECT is_external,is_implicit,is_noexcept,is_variadic "
+                "FROM symbol WHERE id=?", (row[0],))
+            require(properties == [(1, 1, 1, 0)], str(properties))
         require(query(context.facts_database_path,
                       "SELECT COUNT(*) FROM symbol WHERE usr=?", (cell["usr"],)) == [(1,)], str(row))
         graph = run([str(context.facts_tool), "analyse", "call-graph", "--facts",

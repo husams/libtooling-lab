@@ -23,8 +23,9 @@ constexpr std::uint16_t invocationPosition(bool implicit) {
 ExtractionResult<std::optional<callgraph::CallFact>> extractCallableSite(
     const clang::FunctionDecl &caller, const clang::FunctionDecl &callee,
     clang::SourceLocation sourceLocation, ReceiverContext receiver,
-    bool implicit, const clang::SourceManager &sourceManager,
-    FileManager &files, FactStore &store) {
+    bool implicit, bool virtualDispatch,
+    const clang::SourceManager &sourceManager, FileManager &files,
+    FactStore &store) {
   const auto location = extractLocation(sourceManager, sourceLocation);
   if (!location)
     return std::nullopt;
@@ -69,7 +70,7 @@ ExtractionResult<std::optional<callgraph::CallFact>> extractCallableSite(
                   &sourceDecl,
                   &targetDecl,
                   receiver.declaration,
-                  method && method->isVirtual()};
+                  virtualDispatch && method && method->isVirtual()};
             });
       });
 }

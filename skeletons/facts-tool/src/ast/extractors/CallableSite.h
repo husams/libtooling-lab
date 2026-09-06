@@ -17,11 +17,10 @@ namespace facts {
 class FactStore;
 class FileManager;
 
-ExtractionResult<std::optional<callgraph::CallFact>>
-extractCallableSite(const clang::FunctionDecl &caller,
-                    const clang::FunctionDecl &callee,
-                    clang::SourceLocation location, ReceiverContext receiver,
-                    bool implicit, const clang::SourceManager &sourceManager,
-                    FileManager &files, FactStore &store);
+ExtractionResult<std::optional<callgraph::CallFact>> extractCallableSite(
+    const clang::FunctionDecl &caller, const clang::FunctionDecl &callee,
+    clang::SourceLocation location, ReceiverContext receiver, bool implicit,
+    bool virtualDispatch, const clang::SourceManager &sourceManager,
+    FileManager &files, FactStore &store);
 
 } // namespace facts

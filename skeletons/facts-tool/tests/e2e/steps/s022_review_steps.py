@@ -31,6 +31,12 @@ def mixed_and_subobjects(context: FactsToolContext) -> None:
             str(subobjects))
     require(all(edge["location"]["path"].endswith("service.cpp")
                 for edge, _ in subobjects), str(subobjects))
+    dispatches = [(edge, target) for edge, target in
+                  named_edges(graph(context, "s022_fixture::Derived::~Derived"))
+                  if edge["depth"] == 1 and
+                  edge["relation_kind"] == "DispatchCalls"]
+    require(all(target != "s022_fixture::Derived::~Derived"
+                for _, target in dispatches), str(dispatches))
 
 
 @then("lifecycle receiver evidence and destructor dispatch are preserved")

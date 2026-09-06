@@ -20,7 +20,7 @@ extractCallSite(const clang::FunctionDecl &caller,
   return extractReceiverContext(site, sourceManager, files, store)
       .and_then([&](ReceiverContext receiver) {
         return extractCallableSite(caller, callee, site.getExprLoc(), receiver,
-                                   false, sourceManager, files, store);
+                                   false, true, sourceManager, files, store);
       });
 }
 

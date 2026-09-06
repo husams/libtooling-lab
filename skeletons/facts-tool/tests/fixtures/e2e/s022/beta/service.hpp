@@ -14,7 +14,7 @@ struct Member {
   ~Member();
 };
 
-struct Derived final : Base {
+struct Derived : Base {
   Derived();
   ~Derived() override;
   int value() const override;

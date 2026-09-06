@@ -80,7 +80,8 @@ extractDestructorCalls(const clang::FunctionDecl &caller,
           return std::unexpected(receiver.error());
         auto fact = extractCallableSite(
             caller, *callee, site(element, caller), *receiver, true,
-            context.getSourceManager(), files, store);
+            subobjectRecord(element) == nullptr, context.getSourceManager(),
+            files, store);
         if (!fact)
           return std::unexpected(fact.error());
         if (*fact)

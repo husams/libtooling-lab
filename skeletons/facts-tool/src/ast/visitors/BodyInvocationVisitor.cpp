@@ -45,7 +45,7 @@ bool BodyVisitor::VisitCXXConstructExpr(clang::CXXConstructExpr *expression) {
           .and_then([&](ReceiverContext receiver) {
             return extractCallableSite(
                 owner_, *callee, expression->getExprLoc(), receiver, false,
-                context_.getSourceManager(), files_, store_);
+                false, context_.getSourceManager(), files_, store_);
           }));
   return true;
 }
