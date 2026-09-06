@@ -10,10 +10,12 @@ namespace facts::callgraph {
 namespace {
 
 auto loadNodes(storage::Database &database) {
+  // Include generic external rows using the stable stored callable kinds.
   return catalog::query(
       database,
       "SELECT id,qualified_name,usr,is_definition,is_external FROM symbol "
-      "WHERE node=1 ORDER BY qualified_name,usr,id",
+      "WHERE node=1 OR kind IN (13,17,18,19,23,24,25) "
+      "ORDER BY qualified_name,usr,id",
       [](const storage::Row &row) {
         const bool definition = row.get<bool>(3);
         return QueryNode{row.get<SymbolId>(0), row.string(1), row.string(2),

@@ -1,5 +1,6 @@
 #include "ast/extractors/TargetResolution.h"
 
+#include "ast/extractors/ExternalTarget.h"
 #include "ast/extractors/File.h"
 #include "model/AnySymbol.h"
 #include "model/Symbol.h"
@@ -14,35 +15,26 @@
 #include <utility>
 
 namespace facts {
-namespace {
-
-Symbol externalSymbol(const clang::NamedDecl &target, std::string usr) {
-  Symbol symbol{};
-  static_cast<clang::index::SymbolInfo &>(symbol) =
-      clang::index::getSymbolInfo(&target);
-  symbol.usr = std::move(usr);
-  symbol.qualifiedName = target.getQualifiedNameAsString();
-  symbol.flags = bit(ExternalBit);
-  return symbol;
-}
-
-} // namespace
-
 std::expected<SymbolId, std::error_code> findOrStoreSymbolTarget(
     const clang::NamedDecl &target, const clang::SourceManager &sourceManager,
     FileManager &files, FactStore &store, const std::string &usr) {
-  const auto &visibleTarget =
-      target.getLocation().isInvalid() ? *target.getMostRecentDecl() : target;
+  const auto &visible = visibleTarget(target, sourceManager);
   return store.findId(usr).and_then(
       [&](std::optional<SymbolId> destination)
           -> std::expected<SymbolId, std::error_code> {
         if (destination) {
           return *destination;
         }
-        return resolveFile(sourceManager, visibleTarget.getLocation(), files)
-            .and_then([&](FileId file) {
-              return store.save(file, externalSymbol(visibleTarget, usr));
-            });
+        const auto file =
+            compilerProvided(visible, sourceManager)
+                ? std::expected<FileId, std::error_code>{builtinFileId}
+                : resolveFile(sourceManager, visible.getLocation(), files);
+        return file.and_then([&](FileId id) {
+          return externalSymbol(visible, usr, id == builtinFileId)
+              .and_then([&](Symbol symbol) {
+                return store.save(id, std::move(symbol));
+              });
+        });
       });
 }
 

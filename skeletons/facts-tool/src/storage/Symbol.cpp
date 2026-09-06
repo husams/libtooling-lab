@@ -3,35 +3,14 @@
 #include "storage/ItlibGenerator.h"
 #include "storage/SemanticProperties.h"
 #include "storage/StorageQuery.h"
+#include "storage/SymbolAllocation.h"
 
 #include <array>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <utility>
 
 namespace facts {
-namespace {
-
-std::expected<SymbolId, std::error_code>
-allocateSymbolId(storage::Database &database, FileId file) {
-  auto ids = storage::detail::toItlibGenerator(database.query(
-      "INSERT INTO symbol_allocator(file_id,next_index) VALUES(?1,1) "
-      "ON CONFLICT(file_id) DO UPDATE SET next_index=next_index+1 "
-      "RETURNING next_index-1",
-      [](const storage::Row &row) { return row.get<std::int64_t>(0); }, file));
-  return storage::detail::collectOne(std::move(ids))
-      .and_then(
-          [file](std::int64_t raw) -> std::expected<SymbolId, std::error_code> {
-            if (raw < 0 || raw > std::numeric_limits<std::uint32_t>::max()) {
-              return std::unexpected(
-                  std::make_error_code(std::errc::value_too_large));
-            }
-            return SymbolId{file, static_cast<std::uint32_t>(raw)};
-          });
-}
-
-} // namespace
 
 std::expected<void, std::error_code>
 Storage::replaceSymbolRow(SymbolId id, SymbolNode node, const Symbol &symbol) {

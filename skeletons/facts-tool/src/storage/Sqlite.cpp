@@ -1,11 +1,11 @@
 #include "storage/Sqlite.h"
-
+#include "storage/SqliteError.h"
 #include <utility>
 
 namespace facts::storage {
 
 std::error_code sqliteError(sqlite3 *database) noexcept {
-  return {sqlite3_extended_errcode(database), std::generic_category()};
+  return {sqlite3_extended_errcode(database), sqliteCategory()};
 }
 
 std::expected<Statement, std::error_code> prepare(sqlite3 *database,

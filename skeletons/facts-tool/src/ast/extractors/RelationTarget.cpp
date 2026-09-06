@@ -34,7 +34,12 @@ resolveRelationTarget(const clang::NamedDecl &target,
                                        *usr)
             .transform(
                 [](SymbolId stored) { return std::optional<SymbolId>{stored}; })
-            .transform_error([](std::error_code) {
+            .transform_error([&](std::error_code error) {
+              cli::logVerbose(store.verbosity(), 0,
+                              "facts-tool: relation target name='{}' usr='{}' "
+                              "resolution/persistence failed: {}",
+                              target.getQualifiedNameAsString(), *usr,
+                              error.message());
               return ExtractionError::RelationTarget;
             });
       });
