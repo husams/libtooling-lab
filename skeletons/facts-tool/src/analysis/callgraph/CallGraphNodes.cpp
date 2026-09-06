@@ -21,15 +21,18 @@ loadCallGraphNodes(catalog::Database &database) {
                      definition,
                      row.integer(11),
                      row.get<bool>(12),
-                     static_cast<unsigned>(row.integer(7))};
+                     static_cast<unsigned>(row.integer(7)),
+                     row.get<bool>(13)};
   };
-  auto load = [&](std::string unresolved) {
+  auto load = [&](std::string unresolved, std::string evidence) {
     return catalog::query(
         database,
         "SELECT s.id,s.qualified_name,s.usr,s.is_definition,s.is_external,"
-        "s.line,s.col," +
+            "s.line,s.col," +
             unresolved +
-            ",d.file_id,d.offset,d.size,s.kind,s.is_implicit FROM symbol s "
+            ",d.file_id,d.offset,d.size,s.kind,s.is_implicit,"
+            + evidence + " "
+            "FROM symbol s "
             "LEFT JOIN definition d "
             "ON d.symbol_id=s.id WHERE s.node=1 OR "
             "s.kind IN (13,17,18,19,23,24,25) ORDER BY "
@@ -38,14 +41,22 @@ loadCallGraphNodes(catalog::Database &database) {
   };
   return catalog::query(
              database,
-             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND "
-             "name='callgraph_unresolved_site'",
-             [](const storage::Row &row) { return row.integer(0); })
+             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' "
+             "AND name='callgraph_unresolved_site'), EXISTS(SELECT 1 FROM "
+             "sqlite_master WHERE type='table' AND name='callgraph_entry')",
+             [](const storage::Row &row) {
+               return std::pair<bool, bool>{row.integer(0) != 0,
+                                            row.integer(1) != 0};
+             })
       .and_then([&](const auto &tables) {
-        return load(tables.front()
+    return load(tables.front().first
                         ? "(SELECT COUNT(*) FROM callgraph_unresolved_site u "
                           "WHERE u.source_id=s.id)"
-                        : "0");
+                        : "0",
+                tables.front().second
+                    ? "EXISTS(SELECT 1 FROM callgraph_entry e WHERE "
+                      "e.symbol_id=s.id)"
+                    : "0");
       });
 }
 } // namespace facts::callgraph

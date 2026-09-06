@@ -241,6 +241,8 @@ private:
                     "Maximum traversal depth")
         ->check(CLI::Range(1, std::numeric_limits<int>::max()))
         ->type_name("N");
+    command.add_flag("--recover-missing", callGraph_.recoverMissing,
+                     "Recover missing project graph evidence");
   }
 
   void configureCallGraphEntry(CLI::App &command) {

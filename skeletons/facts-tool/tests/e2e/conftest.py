@@ -7,6 +7,16 @@ import pytest
 from support.scenario import FactsToolContext
 
 pytest_plugins = (
+    "steps.recovery_steps",
+    "steps.recovery_failure_steps",
+    "steps.recovery_audit_steps",
+    "steps.recovery_schema_steps",
+    "steps.recovery_chain_steps",
+    "steps.recovery_query_steps",
+    "steps.recovery_header_steps",
+    "steps.recovery_attempt_steps",
+    "steps.recovery_partial_steps",
+    "steps.recovery_discovery_steps",
     "steps.entry_callable_integration_steps",
     "steps.entry_graph_steps",
     "steps.entry_coverage_steps",

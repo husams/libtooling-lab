@@ -1,5 +1,7 @@
 #pragma once
 
+#include "model/SymbolId.h"
+
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -25,6 +27,7 @@ struct StoredCompileFile {
   std::string driver;
   std::string workingDirectory;
   std::string options;
+  FileId id = 0;
 };
 
 using StoredCommandAliases = std::map<std::string, std::string>;
