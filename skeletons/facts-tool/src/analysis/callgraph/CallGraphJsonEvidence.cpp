@@ -23,9 +23,9 @@ llvm::json::Object nodeJson(const QueryGraph &graph, const QueryNode &node,
   const auto *file =
       coverage ? findCoverageEvidenceFile(*coverage, node) : nullptr;
   const auto availability = coverage ? definitionAvailability(*coverage, node)
-                            : node.definition ? "available"
-                            : node.external   ? "external-unavailable"
-                                              : "unknown";
+                            : hasDefinitionEvidence(node) ? "available"
+                            : node.external ? "external-unavailable"
+                                            : "unknown";
   llvm::json::Object source{
       {"file_id", node.id.file}, {"line", node.line}, {"column", node.column}};
   source["path"] = sourceFile ? llvm::json::Value(sourceFile->path)
@@ -55,46 +55,9 @@ llvm::json::Object nodeJson(const QueryGraph &graph, const QueryNode &node,
       {"source", std::move(source)},
       {"definition", definitionJson(node, coverage)},
       {"facts", llvm::json::Object{{"definition", node.definition},
+                                   {"implicit", node.implicit},
                                    {"outgoing_calls", outgoing}}},
       {"coverage", std::move(evidence)}};
 }
 
-llvm::json::Object edgeJson(const QueryGraph &graph, const TraversedEdge &value,
-                            const CoverageReport *coverage) {
-  const auto *source = findNode(graph, value.edge.source);
-  const auto *target = findNode(graph, value.edge.destination);
-  const auto *file =
-      coverage ? findCoverageFile(*coverage, value.edge.file) : nullptr;
-  const auto relation = value.edge.kind == RelationKind::DispatchCalls
-                            ? "DispatchCalls"
-                            : "Calls";
-  llvm::json::Object location{{"file_id", value.edge.file},
-                              {"line", value.edge.line},
-                              {"column", value.edge.column},
-                              {"offset", value.edge.offset}};
-  location["path"] =
-      file ? llvm::json::Value(file->path) : llvm::json::Value(nullptr);
-  llvm::json::Object edge{{"depth", value.depth},
-                          {"relation", relation},
-                          {"source_id", stableId(value.edge.source)},
-                          {"target_id", stableId(value.edge.destination)},
-                          {"source_usr", source ? source->usr : ""},
-                          {"target_usr", target ? target->usr : ""},
-                          {"location", std::move(location)},
-                          {"cycle", value.cycle},
-                          {"reused", value.reused},
-                          {"external_boundary", value.externalBoundary},
-                          {"definition_boundary", value.definitionBoundary},
-                          {"depth_truncated", value.depthTruncated}};
-  edge["receiver"] = value.edge.receiver
-                         ? llvm::json::Value(*value.edge.receiver)
-                         : llvm::json::Value(nullptr);
-  edge["certainty"] =
-      value.edge.certainty
-          ? llvm::json::Value(*value.edge.certainty == ReceiverCertainty::Exact
-                                  ? "exact"
-                                  : "possible")
-          : llvm::json::Value(nullptr);
-  return edge;
-}
 } // namespace facts::callgraph::detail

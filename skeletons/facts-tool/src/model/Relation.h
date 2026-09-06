@@ -98,7 +98,8 @@ struct Relation {
 
   // Where this edge sits when it is one of an ordered set — the n-th parameter
   // of a function type, the n-th template argument, the n-th base. Zero when
-  // the kind is not ordered, which is most of them.
+  // the kind is not ordered, except Calls reserves one for implicit sites so
+  // relation-level flags remain accurate for each relation_site partition.
   std::uint16_t position = 0;
 };
 

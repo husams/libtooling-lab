@@ -69,9 +69,9 @@ private:
 RenderedGraph renderCallGraph(const QueryGraph &graph,
                               const std::vector<const QueryNode *> &roots,
                               std::optional<int> maxDepth,
-                              const CoverageReport *coverage) {
+                              const CoverageReport *coverage, EdgeView view) {
   auto traversal = Traversal{graph, maxDepth, coverage}.run(roots);
-  traversal.text = renderCallGraphText(graph, roots, traversal, coverage);
+  traversal.text = renderCallGraphText(graph, roots, traversal, coverage, view);
   return traversal;
 }
 

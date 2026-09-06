@@ -29,6 +29,8 @@ pytest_plugins = (
     "steps.alias_steps",
     "steps.b019_extraction_completeness_steps",
     "steps.call_graph_steps",
+    "steps.s022_call_graph_steps",
+    "steps.s022_review_steps",
     "steps.call_graph_query_steps",
     "steps.common_steps",
     "steps.configuration_defaults_steps",

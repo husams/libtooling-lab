@@ -20,7 +20,9 @@ void emitDispatches(const CallFact &call,
                      call.relation.destination)) {
     const Relation relation{.source = call.relation.source,
                             .destination = target.symbol,
-                            .kind = RelationKind::DispatchCalls};
+                            .kind = RelationKind::DispatchCalls,
+                            .flags = call.relation.flags,
+                            .position = call.relation.position};
     auto site = call.site;
     site.destination = relation.destination;
     site.kind = RelationKind::DispatchCalls;
