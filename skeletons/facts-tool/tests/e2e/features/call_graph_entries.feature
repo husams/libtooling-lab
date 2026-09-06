@@ -20,6 +20,25 @@ Feature: Committed entries into the shared function graph
     Then S-027 indirect calls have no guessed external identity
     And S-027 freshness and graph truncation remain separate from entries
 
+  Scenario: Entry lookup reports paired complete coverage
+    Given an extracted S-027 application component
+    When S-027 catalog metadata marks the entry source complete
+    Then S-027 entry lookup reports validated complete coverage
+
+  Scenario: Entry aggregate coverage includes reachable missing definitions
+    Given an extracted S-027 application component
+    When S-027 catalog metadata marks the entry source complete
+    Then S-027 entry aggregate coverage reports the missing library definition
+
+  Scenario: Entry lookup reports stale paired coverage
+    Given an extracted S-027 application component
+    When S-027 catalog metadata marks the entry source stale
+    Then S-027 entry lookup reports stale coverage with a refresh action
+
+  Scenario: Entry lookup without a project keeps coverage unknown
+    Given an extracted S-027 application component
+    Then S-027 entry lookup without project configuration keeps coverage unknown
+
   Scenario: Entry publication failure rolls back and can be retried
     Given an extracted S-027 application component
     When S-027 entry publication is forced to fail

@@ -21,8 +21,7 @@ struct FactProvenance {
 // Insert the rows selected by file id while retaining the caller's active
 // transaction; an empty selection records no rows.
 std::expected<void, std::error_code>
-registerFactProvenance(Database &database,
-                       std::span<const FactProvenance> rows,
+registerFactProvenance(Database &database, std::span<const FactProvenance> rows,
                        std::span<const FileId> selected = {});
 
 } // namespace facts::storage

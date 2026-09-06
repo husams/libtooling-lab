@@ -44,7 +44,8 @@ class Retention:
     def run(self, family, cli=False, runtime=False):
         self.runtime = runtime
         if family == "import":
-            args = ["import", "--component", "fixture=.", "-p", str(self.d.cwd)]
+            args = ["import", "--component", "fixture=.", "-p", str(self.d.cwd),
+                    "--facts", str(self.d.root / "extract.db")]
         else:
             args = ["extract"] if family == "extract" else ["analyse", "dependency"]
             args += ["-o", str(self.d.root / (family + ".db")), *map(str, self.sources)]

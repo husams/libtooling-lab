@@ -87,9 +87,10 @@ struct ConfigOptions {
   std::string direct;
 };
 
-using Command = std::variant<ExtractOptions, ImportOptions, DependencyOptions,
-                             CallGraphOptions, CallGraphEntryOptions, MatchOptions, ConfigOptions,
-                             RepositoryOptions, ComponentOptions,
-                             DirectoryOptions, FileOptions, SymbolOptions>;
+using Command =
+    std::variant<ExtractOptions, ImportOptions, DependencyOptions,
+                 CallGraphOptions, CallGraphEntryOptions, MatchOptions,
+                 ConfigOptions, RepositoryOptions, ComponentOptions,
+                 DirectoryOptions, FileOptions, SymbolOptions>;
 
 } // namespace facts::cli

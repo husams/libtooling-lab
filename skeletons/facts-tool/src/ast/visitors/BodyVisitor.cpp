@@ -115,7 +115,8 @@ bool BodyVisitor::TraverseLambdaExpr(clang::LambdaExpr *expression) {
   schedule(*callOperator);
   if (const auto *generic = callOperator->getDescribedFunctionTemplate()) {
     for (auto *instance : generic->specializations()) {
-      status_.record(collectDeclaredSymbol(*instance, context_, files_, store_));
+      status_.record(
+          collectDeclaredSymbol(*instance, context_, files_, store_));
       schedule(*instance);
     }
   }

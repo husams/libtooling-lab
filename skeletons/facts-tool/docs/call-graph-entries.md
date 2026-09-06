@@ -18,22 +18,21 @@ facts-tool import --conf project.sqlite --facts facts.sqlite -p build
 ```
 
 Its entries are invalidated before the new project configuration commits; an
-invalidation error stops the import. Configured facts paths can also identify
-the pair. Use the same explicit pair for subsequent extraction and lookup.
-Catalog mutations accept the same `--facts` option, including file compile-option
+invalidation error stops the import. An existing nonempty project without an
+explicit facts path or facts template rejects mutations with an actionable
+error; initial empty-project setup remains allowed. Configured facts paths can also identify
+the pair. Catalog mutations accept the same `--facts` option, including file compile-option
 edits and repository, component, or directory changes. Listing and dry runs do
 not invalidate entries. A per-source facts template resolves existing stores
 from registered compile commands; a reimport invalidates all selected stores.
 Facts output paths must differ from the project database, including aliases.
 
-The selector accepts an exact qualified name or USR. Unknown selectors report
-`root-not-found`; ambiguous names report `ambiguous-root` with candidate USRs.
-Select an exact USR to disambiguate overloads. Both selector errors exit 2.
+Exact qualified names or USRs select entries; `root-not-found` and
+`ambiguous-root` errors exit 2, with candidate USRs for disambiguation.
 The lookup opens existing stores read-only and does not generate evidence.
 
 The JSON object includes `schema_version: 1`, decimal-string `symbol_id`, `usr`,
 `entry_available`, `graph_node_ref`, `is_leaf`, `external_targets`, and `coverage`.
-The graph reference is the same decimal-string symbol ID.
 
 | Stored evidence | `entry_available` | `graph_node_ref` | `is_leaf` |
 |---|---|---|---|
@@ -43,13 +42,12 @@ The graph reference is the same decimal-string symbol ID.
 
 A narrow symbol or call match does not certify the caller's entire body. A
 subsequent full extraction republishes completed entries, including leaves.
-Leaves have no fabricated relation to make them appear in the graph.
 
-Entry availability is separate from source freshness, transitive extraction
-coverage, and traversal truncation. Reopening a store cannot prove that source
-files or compiler arguments are still current. Freshness remains `unknown`
-until validated; an entry must never be interpreted as a fresh complete graph.
-The existing [coverage contract](call-graph.md) remains applicable.
+Entry availability is separate from freshness and transitive completeness.
+With a validated project pair, `coverage` reports the selected node's metadata,
+freshness and action; `extraction_coverage` summarizes its reachable graph.
+Without a project, both remain `unknown`. Entries do not imply fresh complete
+graphs; the existing [coverage contract](call-graph.md) remains applicable.
 
 A known declaration-only call target keeps its canonical symbol identity and
 exact call site in an external-reference record. Extracting its definition from
@@ -72,7 +70,8 @@ proved. A schema migration alone does not establish that pairing.
 
 ## Storage and lifecycle
 
-Facts schema 11 adds `callgraph_entry(symbol_id, graph_node_ref)` and
+Facts schema 11 declares `facts_project_provenance(file_id, path, universe_key)`
+in both fresh creation and migration, and adds `callgraph_entry(symbol_id, graph_node_ref)` and
 `callgraph_external_reference(source_id, destination_id, kind, position,
 file_id, offset, external_symbol_id)`. The entry fields reference `symbol(id)`
 and must be equal. The external ID equals `destination_id`; its other six
@@ -85,15 +84,17 @@ has no destination field and cannot invent an external target. Regeneration
 replaces prior call and unresolved-site evidence for the collected bodies.
 
 Migration from schema 10 preserves existing symbols, IDs, relations, and sites.
-Both new tables start empty, because historical facts alone do not prove a full
-generation event. Older supported stores follow their normal migrations first;
-unsupported newer facts versions reject writes.
+New evidence tables start empty; migration alone cannot prove generation or
+pairing. Unsupported newer facts versions reject writes.
 
 Generation and entry publication share the facts transaction. Failure restores
 the previous committed entry state and its provenance. Dependency facts use the
 same invalidation and rollback contract. Supported mutations conservatively
-invalidate entries and republish only fully collected callable bodies.
-Rebuilds regenerate references from the current store's symbols.
+invalidate every entry in the selected facts store and republish only fully
+collected callable bodies. Library-only extraction or a zero-match write also
+clears caller entries; extract all desired source files together to republish
+them. Provenance registration scans stored fact tables and external-reference
+registration scans call sites, so write cost grows with the shared store.
 
 The project matched-symbol index retains exactly its four columns. Only match
 populates it; full extraction and entry generation do not maintain that index.

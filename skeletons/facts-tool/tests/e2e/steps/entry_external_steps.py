@@ -26,6 +26,8 @@ def external(context):
 @when("the S-027 library component is extracted")
 def library(context):
     succeed(extract(context, library=True))
+    require(not lookup(context, "boundary")["entry_available"],
+            "library-only extraction must invalidate existing caller entries")
 
 
 @then("the S-027 external identity resolves without losing callers or sites")

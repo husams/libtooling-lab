@@ -11,7 +11,7 @@ namespace clang {
 class CXXMethodDecl;
 class CXXRecordDecl;
 class FunctionDecl;
-}
+} // namespace clang
 
 namespace facts::callgraph {
 

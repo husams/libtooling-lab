@@ -341,6 +341,11 @@ CREATE TABLE IF NOT EXISTS callgraph_unresolved_site (
   col       INTEGER NOT NULL,
   PRIMARY KEY (source_id, file_id, offset)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS facts_project_provenance (
+  file_id      INTEGER PRIMARY KEY,
+  path         TEXT NOT NULL,
+  universe_key TEXT NOT NULL
+);
 PRAGMA user_version=11;
 )sql";
 
@@ -352,89 +357,109 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
       return std::expected<void, std::error_code>{std::unexpected(
           std::make_error_code(std::errc::operation_not_supported))};
     }
-    return hasColumn(database, "symbol", "id").and_then([database](bool existing) {
-        if (!existing) {
-          return std::expected<void, std::error_code>{};
-        }
-        return hasColumn(database, "symbol", "flags")
-            .and_then([database](bool legacy) {
-              return legacy ? execute(database, migrationSql)
-                            : std::expected<void, std::error_code>{};
-            })
-            .and_then([database] {
-              return schemaVersion(database).and_then([database](int version) {
-                return version < 2 ? execute(database, initializerMigrationSql)
-                                   : std::expected<void, std::error_code>{};
-              });
-            })
-            .and_then([database] {
-              return schemaVersion(database).and_then([database](int version) {
-                return version < 3
-                           ? execute(database, parameterDefaultMigrationSql)
-                           : std::expected<void, std::error_code>{};
-              });
-            })
-            .and_then([database] {
-              return schemaVersion(database).and_then([database](int version) {
-                return version < 4 ? execute(database, enumerationMigrationSql)
-                                   : std::expected<void, std::error_code>{};
-              });
-            })
-            .and_then([database] {
-              return schemaVersion(database).and_then([database](int version) {
-                return version < 5
-                           ? execute(database, packedSymbolIdMigrationSql)
-                           : std::expected<void, std::error_code>{};
-              });
-            })
-            .and_then([database] {
-              return schemaVersion(database).and_then([database](int version) {
-                return version < 6 ? execute(database, usrIdentityMigrationSql)
-                                   : std::expected<void, std::error_code>{};
-              });
-            })
-            .and_then([database] {
-              return schemaVersion(database).and_then([database](int version) {
-                return version < 7 ? execute(database, relationSiteMigrationSql)
-                                   : std::expected<void, std::error_code>{};
-              });
-            })
-            .and_then([database] {
-              return schemaVersion(database).and_then([database](int version) {
-                return version < 8
-                           ? execute(database, relationSiteContextMigrationSql)
-                           : std::expected<void, std::error_code>{};
-              });
-            })
-            .and_then([database] {
-              return schemaVersion(database).and_then([database](int version) {
-                return version < 9
-                           ? execute(database, returnTypeMigrationSql)
-                           : std::expected<void, std::error_code>{};
-              });
-            })
-            .and_then([database] {
-              return hasColumn(database, "symbol", "is_volatile")
-                  .and_then([database](bool exists) {
-                    return exists ? std::expected<void, std::error_code>{}
-                        : execute(database, "ALTER TABLE symbol ADD COLUMN "
-                            "is_volatile INTEGER NOT NULL DEFAULT 0 "
-                            "CHECK(is_volatile IN (0,1));");
-                  })
-                  .and_then([database] {
-                    return schemaVersion(database).and_then([database](int version) {
-                      return version < 10 ? execute(database, "PRAGMA user_version=10;")
-                                          : std::expected<void, std::error_code>{};
+    return hasColumn(database, "symbol", "id")
+        .and_then([database](bool existing) {
+          if (!existing) {
+            return std::expected<void, std::error_code>{};
+          }
+          return hasColumn(database, "symbol", "flags")
+              .and_then([database](bool legacy) {
+                return legacy ? execute(database, migrationSql)
+                              : std::expected<void, std::error_code>{};
+              })
+              .and_then([database] {
+                return schemaVersion(database).and_then(
+                    [database](int version) {
+                      return version < 2
+                                 ? execute(database, initializerMigrationSql)
+                                 : std::expected<void, std::error_code>{};
                     });
-                  });
-            })
-            .and_then([database] {
-              return schemaVersion(database).and_then([database](int version) {
-                return version < 11 ? execute(database, callGraphEntryMigrationSql)
-                                    : std::expected<void, std::error_code>{};
+              })
+              .and_then([database] {
+                return schemaVersion(database).and_then([database](
+                                                            int version) {
+                  return version < 3
+                             ? execute(database, parameterDefaultMigrationSql)
+                             : std::expected<void, std::error_code>{};
+                });
+              })
+              .and_then([database] {
+                return schemaVersion(database).and_then(
+                    [database](int version) {
+                      return version < 4
+                                 ? execute(database, enumerationMigrationSql)
+                                 : std::expected<void, std::error_code>{};
+                    });
+              })
+              .and_then([database] {
+                return schemaVersion(database).and_then(
+                    [database](int version) {
+                      return version < 5
+                                 ? execute(database, packedSymbolIdMigrationSql)
+                                 : std::expected<void, std::error_code>{};
+                    });
+              })
+              .and_then([database] {
+                return schemaVersion(database).and_then(
+                    [database](int version) {
+                      return version < 6
+                                 ? execute(database, usrIdentityMigrationSql)
+                                 : std::expected<void, std::error_code>{};
+                    });
+              })
+              .and_then([database] {
+                return schemaVersion(database).and_then(
+                    [database](int version) {
+                      return version < 7
+                                 ? execute(database, relationSiteMigrationSql)
+                                 : std::expected<void, std::error_code>{};
+                    });
+              })
+              .and_then([database] {
+                return schemaVersion(database).and_then([database](
+                                                            int version) {
+                  return version < 8 ? execute(database,
+                                               relationSiteContextMigrationSql)
+                                     : std::expected<void, std::error_code>{};
+                });
+              })
+              .and_then([database] {
+                return schemaVersion(database).and_then([database](
+                                                            int version) {
+                  return version < 9 ? execute(database, returnTypeMigrationSql)
+                                     : std::expected<void, std::error_code>{};
+                });
+              })
+              .and_then([database] {
+                return hasColumn(database, "symbol", "is_volatile")
+                    .and_then([database](bool exists) {
+                      return exists
+                                 ? std::expected<void, std::error_code>{}
+                                 : execute(
+                                       database,
+                                       "ALTER TABLE symbol ADD COLUMN "
+                                       "is_volatile INTEGER NOT NULL DEFAULT 0 "
+                                       "CHECK(is_volatile IN (0,1));");
+                    })
+                    .and_then([database] {
+                      return schemaVersion(database).and_then(
+                          [database](int version) {
+                            return version < 10
+                                       ? execute(database,
+                                                 "PRAGMA user_version=10;")
+                                       : std::expected<void, std::error_code>{};
+                          });
+                    });
+              })
+              .and_then([database] {
+                return schemaVersion(database).and_then(
+                    [database](int version) {
+                      return version < 11
+                                 ? execute(database, callGraphEntryMigrationSql)
+                                 : std::expected<void, std::error_code>{};
+                    });
               });
-            });
-      });
+        });
   });
 }
 

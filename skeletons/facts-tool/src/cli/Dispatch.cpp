@@ -53,10 +53,10 @@ std::string commandDetails(const ExtractOptions &options) {
 
 std::string commandDetails(const ImportOptions &options) {
   return std::format(
-      "configuration='{}', facts='{}', compilation_database='{}', requested_sources={}, "
+      "configuration='{}', facts='{}', compilation_database='{}', "
+      "requested_sources={}, "
       "components={}",
-      options.configuration,
-      options.facts.empty() ? "none" : options.facts,
+      options.configuration, options.facts.empty() ? "none" : options.facts,
       options.compilationDatabase.empty() ? "fixed commands"
                                           : options.compilationDatabase,
       options.sources.size(), options.components.size());
@@ -75,9 +75,9 @@ std::string commandDetails(const CallGraphOptions &options) {
 }
 
 std::string commandDetails(const CallGraphEntryOptions &options) {
-  return std::format("facts='{}', configuration='{}', function='{}', format='{}'",
-                     options.facts, options.configuration, options.function,
-                     options.format);
+  return std::format(
+      "facts='{}', configuration='{}', function='{}', format='{}'",
+      options.facts, options.configuration, options.function, options.format);
 }
 
 std::string commandDetails(const MatchOptions &options) {
@@ -107,8 +107,7 @@ std::expected<int, std::string> execute(const CallGraphOptions &options) {
   return commands::runCallGraph(options);
 }
 
-std::expected<int, std::string>
-execute(const CallGraphEntryOptions &options) {
+std::expected<int, std::string> execute(const CallGraphEntryOptions &options) {
   return commands::runCallGraphEntry(options);
 }
 

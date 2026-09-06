@@ -8,10 +8,31 @@
 namespace facts::callgraph {
 namespace {
 std::string id(SymbolId value) { return std::to_string(value.packed()); }
+
+llvm::json::Object coverageJson(const QueryNode &node,
+                                const CoverageReport *coverage) {
+  const auto *file =
+      coverage ? findCoverageEvidenceFile(*coverage, node) : nullptr;
+  llvm::json::Object result{
+      {"state", coverage ? extractionCoverage(*coverage, node) : "unknown"},
+      {"freshness", coverage ? coverageFreshness(*coverage, node) : "unknown"},
+      {"action",
+       coverage ? coverageAction(*coverage, node) : "supply-project-conf"},
+      {"catalog_indexed",
+       file ? llvm::json::Value(file->indexed) : llvm::json::Value(nullptr)},
+      {"indexed_at", file && !file->indexedAt.empty()
+                         ? llvm::json::Value(file->indexedAt)
+                         : llvm::json::Value(nullptr)},
+      {"catalog_mtime", file && file->mtime ? llvm::json::Value(*file->mtime)
+                                            : llvm::json::Value(nullptr)},
+      {"failure", nullptr}};
+  return result;
+}
 } // namespace
 
 std::string renderCallGraphEntryJson(const QueryNode &node,
-                                     const EntryRecord &record) {
+                                     const EntryRecord &record,
+                                     const CoverageReport *coverage) {
   const auto available = record.entry.has_value();
   const auto leaf = available && record.leaf;
   llvm::json::Array targets;
@@ -31,9 +52,17 @@ std::string renderCallGraphEntryJson(const QueryNode &node,
                             {"line", target.line},
                             {"column", target.column}}}});
   }
-  llvm::json::Object coverage{{"freshness", "unknown"},
-                              {"state", "unknown"},
-                              {"unresolved_targets", node.unresolved}};
+  auto evidence = coverageJson(node, coverage);
+  evidence["unresolved_targets"] = node.unresolved;
+  const auto availability = coverage ? definitionAvailability(*coverage, node)
+                            : node.definition ? "available"
+                            : node.external   ? "external-unavailable"
+                                              : "unknown";
+  const auto extraction = record.aggregateCoverage;
+  llvm::json::Array candidates;
+  if (coverage)
+    for (const auto &path : coverage->recoveryCandidates)
+      candidates.push_back(path);
   llvm::json::Object output{
       {"schema_version", 1},
       {"symbol_id", id(node.id)},
@@ -45,7 +74,14 @@ std::string renderCallGraphEntryJson(const QueryNode &node,
       {"is_leaf",
        available ? llvm::json::Value(leaf) : llvm::json::Value(nullptr)},
       {"external_targets", std::move(targets)},
-      {"coverage", std::move(coverage)}};
+      {"pair",
+       llvm::json::Object{{"state", coverage ? "validated" : "unavailable"}}},
+      {"definition_availability", availability},
+      {"extraction_coverage",
+       llvm::json::Object{{"state", extraction},
+                          {"failure", nullptr},
+                          {"recovery_candidates", std::move(candidates)}}},
+      {"coverage", std::move(evidence)}};
   std::string text;
   llvm::raw_string_ostream stream(text);
   stream << llvm::json::Value(std::move(output)) << '\n';

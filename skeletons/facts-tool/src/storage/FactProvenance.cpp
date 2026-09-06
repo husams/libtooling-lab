@@ -50,12 +50,6 @@ registerFactProvenance(Database &database, std::span<const FactProvenance> rows,
   if (sqlite3_get_autocommit(database.nativeHandle()) != 0)
     return std::unexpected(
         std::make_error_code(std::errc::operation_not_permitted));
-  auto schema =
-      database.execute("CREATE TABLE IF NOT EXISTS facts_project_provenance ("
-                       "file_id INTEGER PRIMARY KEY,path TEXT NOT NULL,"
-                       "universe_key TEXT NOT NULL)");
-  if (!schema)
-    return std::unexpected(schema.error());
   auto relevant = relevantFiles(database, selected);
   if (!relevant)
     return std::unexpected(relevant.error());

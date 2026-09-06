@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 from pathlib import Path
 from pytest_bdd import given, parsers, then
@@ -44,8 +45,18 @@ def external_component(catalog: Catalog) -> None:
 
 @given(parsers.parse('the core component has version "{version}"'))
 def versioned_component(catalog: Catalog, version: str) -> None:
+    core = catalog.checkout / "core"
+    for directory in ("src", "src-neighbor"):
+        shutil.copytree(core / directory, core / version / directory)
     with sqlite3.connect(catalog.context.files_database_path) as connection:
         connection.execute("UPDATE component SET version=? WHERE id=?", (version, catalog.core_id))
+    # Establish the Given version's facts through the native writer; the old
+    # unversioned provenance must not be silently reused after changing roots.
+    catalog.context.facts_database = catalog.context.run_root_path / "versioned-facts.sqlite"
+    result = catalog.context._run(catalog.context._tool_command(
+        (core / version / "src/one.cpp",)))
+    require(result.returncode == 0, catalog.context.last_output)
+    catalog.facts_before = catalog.context.facts_database_path.read_bytes()
     catalog.remember()
 
 

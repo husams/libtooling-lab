@@ -44,15 +44,17 @@ Result execute(const cli::MatchOptions &options,
   std::optional<FactPairProvenanceSnapshot> pairing;
   if (!(options.factsProvided && options.facts == options.configuration)) {
     if (std::filesystem::exists(options.facts)) {
-      auto legacy = legacyFactsNeedRegistration(options.facts,
-                                                options.configuration);
-      if (!legacy) return std::unexpected(legacy.error());
+      auto legacy =
+          legacyFactsNeedRegistration(options.facts, options.configuration);
+      if (!legacy)
+        return std::unexpected(legacy.error());
       rejectLegacyWrites = *legacy;
     }
     if (!rejectLegacyWrites) {
-      auto prepared = prepareFactPairForWrite(options.facts,
-                                              options.configuration);
-      if (!prepared) return std::unexpected(prepared.error());
+      auto prepared =
+          prepareFactPairForWrite(options.facts, options.configuration);
+      if (!prepared)
+        return std::unexpected(prepared.error());
       pairing = std::move(*prepared);
     }
   }

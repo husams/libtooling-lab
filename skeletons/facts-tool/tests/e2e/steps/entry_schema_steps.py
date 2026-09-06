@@ -68,6 +68,9 @@ def schema(context):
         require(actual == [(name,) for name in columns], str(actual))
         foreign = query(database, f"SELECT on_delete FROM pragma_foreign_key_list('{table}')")
         require(foreign and all(row == ("CASCADE",) for row in foreign), str(foreign))
+    require(query(database, "SELECT name FROM pragma_table_info('facts_project_provenance')") ==
+            [(name,) for name in ["file_id", "path", "universe_key"]],
+            "provenance schema columns are incorrect")
     with sqlite3.connect(database) as connection:
         connection.execute("PRAGMA foreign_keys=ON")
         try:

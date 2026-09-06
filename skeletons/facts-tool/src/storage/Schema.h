@@ -286,6 +286,14 @@ CREATE TABLE IF NOT EXISTS callgraph_unresolved_site (
   PRIMARY KEY (source_id, file_id, offset)
 ) WITHOUT ROWID;
 
+-- Every persisted non-builtin file id is paired with its canonical source
+-- identity and semantic universe before facts are published.
+CREATE TABLE IF NOT EXISTS facts_project_provenance (
+  file_id     INTEGER PRIMARY KEY,
+  path        TEXT NOT NULL,
+  universe_key TEXT NOT NULL
+);
+
 PRAGMA user_version=11;
 
 )sql";

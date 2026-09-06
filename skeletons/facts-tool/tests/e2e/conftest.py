@@ -8,6 +8,7 @@ from support.scenario import FactsToolContext
 
 pytest_plugins = (
     "steps.entry_graph_steps",
+    "steps.entry_coverage_steps",
     "steps.entry_external_steps",
     "steps.entry_lifecycle_steps",
     "steps.entry_schema_steps",

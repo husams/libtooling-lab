@@ -65,15 +65,13 @@ extractCallSite(const clang::FunctionDecl &caller,
                                           .location = *location,
                                           .receiverType = receiver.type,
                                           .certainty = receiver.certainty},
-                                      &sourceDecl,
-                                      &targetDecl,
+                                      &sourceDecl, &targetDecl,
                                       receiver.declaration,
                                       method && method->isVirtual(), external}};
                             })
-                            .transform_error(
-                                [](std::error_code) {
-                                  return ExtractionError::RelationTarget;
-                                });
+                            .transform_error([](std::error_code) {
+                              return ExtractionError::RelationTarget;
+                            });
                       });
                 });
       });

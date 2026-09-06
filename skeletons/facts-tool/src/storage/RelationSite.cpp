@@ -117,9 +117,11 @@ Storage::addRelationFacts(std::span<const Relation> relations,
             "INSERT OR IGNORE INTO callgraph_external_reference("
             "source_id,destination_id,kind,position,file_id,offset,"
             "external_symbol_id) SELECT site.source_id,site.destination_id,"
-            "site.kind,site.position,site.file_id,site.offset,site.destination_id "
+            "site.kind,site.position,site.file_id,site.offset,site.destination_"
+            "id "
             "FROM relation_site site JOIN symbol target ON target.id="
-            "site.destination_id WHERE site.kind=1 AND (target.is_external=1 OR "
+            "site.destination_id WHERE site.kind=1 AND (target.is_external=1 "
+            "OR "
             "NOT EXISTS(SELECT 1 FROM definition WHERE symbol_id=target.id))");
       })
       .and_then([&] { return commit(*transaction); });

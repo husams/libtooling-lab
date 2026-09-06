@@ -65,22 +65,21 @@ Storage::replaceSymbolRow(SymbolId id, SymbolNode node, const Symbol &symbol) {
           storage::detail::typedBinder([id, node](auto bind,
                                                   const Symbol &value) {
             const auto properties = storage::symbolProperties(value.flags);
-            return bind(id, node, storage::storedSymbolKind(value.Kind),
-                        value.SubKind, value.Lang, value.Properties, value.usr,
-                        value.qualifiedName, value.loc.line, value.loc.column,
-                        value.loc.offset, properties.access,
-                        properties.isDefinition, properties.isImplicit,
-                        properties.isStatic, properties.isVirtual,
-                        properties.isConst, properties.isInline,
-                        properties.isPure, properties.refQualifier,
-                        properties.isOverride, properties.hasInternalLinkage,
-                        properties.isExternal, properties.isVariadic,
-                        properties.isDeleted, properties.isDefaulted,
-                        properties.isExplicit, properties.isFinal,
-                        properties.isAbstract, properties.isPolymorphic,
-                        properties.hasExternStorage,
-                        properties.constantEvaluation, properties.isNoexcept,
-                        properties.isVolatile);
+            return bind(
+                id, node, storage::storedSymbolKind(value.Kind), value.SubKind,
+                value.Lang, value.Properties, value.usr, value.qualifiedName,
+                value.loc.line, value.loc.column, value.loc.offset,
+                properties.access, properties.isDefinition,
+                properties.isImplicit, properties.isStatic,
+                properties.isVirtual, properties.isConst, properties.isInline,
+                properties.isPure, properties.refQualifier,
+                properties.isOverride, properties.hasInternalLinkage,
+                properties.isExternal, properties.isVariadic,
+                properties.isDeleted, properties.isDefaulted,
+                properties.isExplicit, properties.isFinal,
+                properties.isAbstract, properties.isPolymorphic,
+                properties.hasExternStorage, properties.constantEvaluation,
+                properties.isNoexcept, properties.isVolatile);
           }))
       .transform([](const storage::BulkResult &) {});
 }
@@ -213,19 +212,18 @@ Storage::saveSymbol(SymbolNode node, const Symbol &symbol, SymbolFacts facts) {
                           : std::span<const Parameter>{});
             })
             .and_then([&, id] {
-              if (!facts.definition ||
-                  (symbol.flags & bit(ExternalBit)) != 0) {
+              if (!facts.definition || (symbol.flags & bit(ExternalBit)) != 0) {
                 return std::expected<void, std::error_code>{};
               }
               const std::array ids{id};
               return database_
-                  .executeBulk(
-                      "DELETE FROM callgraph_external_reference WHERE "
-                      "external_symbol_id=?1",
-                      ids, storage::detail::typedBinder([](auto bind,
-                                                           const auto &value) {
-                        return bind(value);
-                      }))
+                  .executeBulk("DELETE FROM callgraph_external_reference WHERE "
+                               "external_symbol_id=?1",
+                               ids,
+                               storage::detail::typedBinder(
+                                   [](auto bind, const auto &value) {
+                                     return bind(value);
+                                   }))
                   .transform([](const storage::BulkResult &) {});
             })
             .transform([id] { return id; });

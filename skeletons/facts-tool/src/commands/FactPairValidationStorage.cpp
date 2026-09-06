@@ -55,7 +55,7 @@ validateFactsProvenance(storage::Database &database,
   if (known->empty() && !used->empty() && writing) {
     return std::unexpected(
         "incompatible-symbol-universe: facts store has no provenance: "
-        "rebuild required");
+        "write to a new facts file and extract every source");
   }
   for (const auto id : *used) {
     auto knownValue = known->find(id);

@@ -17,6 +17,4 @@ struct ExternalReference {
   SymbolId externalSymbol;
 };
 
-using CallGraphExternalReference = ExternalReference;
-
 } // namespace facts

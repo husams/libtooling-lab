@@ -4,9 +4,9 @@
 #include "cli/Options.h"
 #include "cli/Verbose.h"
 #include "commands/CompilationDatabase.h"
+#include "commands/ConfigurationSupport.h"
 #include "commands/DatabasePaths.h"
 #include "commands/ExtraArguments.h"
-#include "commands/ConfigurationSupport.h"
 #include "commands/FactPairValidation.h"
 #include "model/Dependency.h"
 #include "platform/PlatformFlags.h"
@@ -185,9 +185,10 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
                   "facts-tool: dependency: open project database");
   FileManager files(options.configuration);
   if (std::filesystem::exists(options.output)) {
-    auto pairing = validateFactPairForRead(options.output,
-                                           options.configuration);
-    if (!pairing) return std::unexpected(pairing.error());
+    auto pairing =
+        validateFactPairForRead(options.output, options.configuration);
+    if (!pairing)
+      return std::unexpected(pairing.error());
   }
   return runDependencyStage(
              options, "register files",
@@ -226,7 +227,9 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
                     // facts_template default never creates a directory
                     // ahead of a failure (B-030 C-3116).
                     if (options.outputFromTemplate) {
-                      if (auto created = materializeFactsDirectory(options.output); !created)
+                      if (auto created =
+                              materializeFactsDirectory(options.output);
+                          !created)
                         return std::expected<int, std::string>{
                             std::unexpected(created.error())};
                     }
@@ -258,11 +261,13 @@ std::expected<int, std::string>
 runDependency(const cli::DependencyOptions &options) {
   auto resolved = loadConfiguration(options.configuration,
                                     options.configurationFile, false, true);
-  if (!resolved) return std::unexpected(resolved.error());
+  if (!resolved)
+    return std::unexpected(resolved.error());
   auto configured = options;
   if (!configured.outputProvided) {
     auto output = resolveFactsOutput(*resolved, options.sources);
-    if (!output) return std::unexpected(output.error());
+    if (!output)
+      return std::unexpected(output.error());
     configured.output = output->string();
     configured.outputFromTemplate = true;
   }
@@ -275,7 +280,8 @@ runDependency(const cli::DependencyOptions &options) {
                             [&] { return validateSources(configured); })
       .and_then([&] {
         return runDependencyStage(configured, "validate database paths", [&] {
-          return validateDatabasePaths(configured.output, configured.configuration);
+          return validateDatabasePaths(configured.output,
+                                       configured.configuration);
         });
       })
       .and_then([&] {

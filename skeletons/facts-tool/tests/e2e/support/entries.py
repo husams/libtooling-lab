@@ -7,9 +7,9 @@ import subprocess
 from support.database import require
 
 
-def run(context, *arguments):
+def run(context, *arguments, env=None):
     return subprocess.run([str(context.facts_tool), *map(str, arguments)],
-                          capture_output=True, text=True, check=False)
+                          capture_output=True, text=True, check=False, env=env)
 
 
 def succeed(result):

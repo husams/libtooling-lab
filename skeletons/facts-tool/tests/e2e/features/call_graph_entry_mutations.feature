@@ -36,3 +36,7 @@ Feature: Entry lifecycle across native commands
   Scenario: Mutation facts paths cannot overwrite their project configuration
     Given an extracted S-027 application component
     Then S-027 mutations reject colliding or empty facts paths without writes
+
+  Scenario: Project mutations require an identifiable facts pair
+    Given an extracted S-027 application component
+    Then S-027 mutations without a known facts pair stop before changing either store

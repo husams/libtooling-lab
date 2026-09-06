@@ -333,6 +333,8 @@ add_library(facts-commands STATIC
   src/commands/catalog/Symbol.cpp
   src/commands/DatabasePaths.cpp
   src/commands/CallGraphInvalidation.cpp
+  src/commands/CallGraphFactPaths.cpp
+  src/commands/CallGraphProjectState.cpp
   src/commands/FactPairValidation.cpp
   src/commands/FactPairValidationLegacy.cpp
   src/commands/FactPairValidationProject.cpp

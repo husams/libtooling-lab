@@ -1,7 +1,7 @@
 #pragma once
 
-#include "commands/FactPairValidation.h"
 #include "cli/Options.h"
+#include "commands/FactPairValidation.h"
 #include "model/MatchedSymbol.h"
 
 #include <expected>

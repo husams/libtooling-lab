@@ -18,6 +18,12 @@ shape because their current schema has no `user_version` contract. Missing
 FileIds referenced by symbols, definitions, sites, or includes prove a pair
 mismatch and fail with `E_DATABASE_PAIR`.
 
+Fresh schema 11 and its migration declare
+`facts_project_provenance(file_id, path, universe_key)`. The native writer uses
+this identity evidence to reject incompatible pairs. Migrating historical facts
+does not establish provenance: write to a new facts file and extract every source
+when the native writer reports that pairing cannot be proved.
+
 Numeric overlap cannot prove that arbitrary databases came from the same
 indexing run. Successful pairs therefore report `pairing="unverifiable"`.
 Each result still carries canonical paths, file device/inode/size/mtime and

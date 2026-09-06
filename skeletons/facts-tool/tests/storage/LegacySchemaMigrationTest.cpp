@@ -256,6 +256,9 @@ bool verifyMigration(const std::filesystem::path &path) {
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'relation_site')") == 10,
               "relation-site schema was not migrated") &&
+      require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
+                               "'facts_project_provenance')") == 3,
+              "provenance schema was not migrated") &&
       require(scalar(database, "PRAGMA user_version") == 11,
               "migration version was not recorded");
   sqlite3_close(database);

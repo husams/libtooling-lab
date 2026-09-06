@@ -58,13 +58,14 @@ catalog::Result<int> runComponent(const cli::ComponentOptions &options) {
   if (options.action == Action::compileCommands) {
     auto resolved = loadConfiguration(options.configuration,
                                       options.configurationFile, false);
-    if (!resolved) return std::unexpected(resolved.error());
+    if (!resolved)
+      return std::unexpected(resolved.error());
     configured.configuration = resolved->database.string();
   }
   const bool writable =
-      !configured.dryRun &&
-      (configured.action == Action::add || configured.action == Action::remove ||
-       configured.action == Action::setVersion);
+      !configured.dryRun && (configured.action == Action::add ||
+                             configured.action == Action::remove ||
+                             configured.action == Action::setVersion);
   return runCatalog(
       configured.configuration, writable,
       [&](auto &database) { return operate(database, configured); },

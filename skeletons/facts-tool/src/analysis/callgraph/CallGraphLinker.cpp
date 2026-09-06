@@ -10,13 +10,14 @@ namespace facts::callgraph {
 namespace {
 
 auto relationKey(const Relation &value) {
-  return std::tuple{value.source, value.destination, value.kind, value.position};
+  return std::tuple{value.source, value.destination, value.kind,
+                    value.position};
 }
 
 auto siteKey(const RelationSite &value) {
-  return std::tuple{value.source, value.destination, value.kind, value.position,
-                    value.file, value.location.offset, value.receiverType,
-                    value.certainty};
+  return std::tuple{
+      value.source, value.destination,     value.kind,         value.position,
+      value.file,   value.location.offset, value.receiverType, value.certainty};
 }
 
 template <typename Fact>
@@ -41,14 +42,14 @@ IndexingResult linkCallGraphFacts(CallGraphFacts facts, FactStore &store) {
     if (!fact.externalTarget) {
       continue;
     }
-    externalReferences.push_back(ExternalReference{
-        .source = fact.site.source,
-        .destination = fact.site.destination,
-        .kind = fact.site.kind,
-        .position = fact.site.position,
-        .file = fact.site.file,
-        .offset = fact.site.location.offset,
-        .externalSymbol = fact.site.destination});
+    externalReferences.push_back(
+        ExternalReference{.source = fact.site.source,
+                          .destination = fact.site.destination,
+                          .kind = fact.site.kind,
+                          .position = fact.site.position,
+                          .file = fact.site.file,
+                          .offset = fact.site.location.offset,
+                          .externalSymbol = fact.site.destination});
   }
   std::ranges::sort(relations, {}, relationKey);
   relations.erase(std::ranges::unique(relations, {}, relationKey).begin(),
@@ -57,14 +58,14 @@ IndexingResult linkCallGraphFacts(CallGraphFacts facts, FactStore &store) {
   sites.erase(std::ranges::unique(sites, {}, siteKey).begin(), sites.end());
   if (relations.empty() && facts.entries.empty() && facts.unresolved.empty())
     return {};
-  const auto entries = facts.entries |
-                       std::views::transform([](SymbolId id) {
-                         return CallGraphEntry{.symbolId = id,
-                                               .graphNodeRef = id};
-                       }) |
-                       std::ranges::to<std::vector>();
-  return store.addCallGraphFacts(relations, sites, externalReferences, entries,
-                                 facts.unresolved)
+  const auto entries =
+      facts.entries | std::views::transform([](SymbolId id) {
+        return CallGraphEntry{.symbolId = id, .graphNodeRef = id};
+      }) |
+      std::ranges::to<std::vector>();
+  return store
+      .addCallGraphFacts(relations, sites, externalReferences, entries,
+                         facts.unresolved)
       .transform_error([](std::error_code error) {
         return IndexingError{"cannot persist call graph facts: " +
                              error.message()};

@@ -130,7 +130,8 @@ private:
               import_.facts = value;
               import_.factsProvided = true;
             },
-            "Existing facts database whose entries must be invalidated before a project mutation")
+            "Existing facts database whose entries must be invalidated before "
+            "a project mutation")
         ->trigger_on_parse()
         ->type_name("FILE");
     configurationOptions(command, import_.configuration,
@@ -239,18 +240,21 @@ private:
   void configureCallGraphEntry(CLI::App &command) {
     callGraphEntryCommand_ = &command;
     configureVerbosity(command, callGraphEntry_.verbosity);
-    command.add_option("-f,--facts", callGraphEntry_.facts,
-                       "SQLite facts database")
+    command
+        .add_option("-f,--facts", callGraphEntry_.facts,
+                    "SQLite facts database")
         ->required()
         ->type_name("FILE");
     configurationOptions(command, callGraphEntry_.configuration,
                          callGraphEntry_.configurationFile);
-    command.add_option("--function", callGraphEntry_.function,
-                       "Qualified function name or USR")
+    command
+        .add_option("--function", callGraphEntry_.function,
+                    "Qualified function name or USR")
         ->required()
         ->type_name("SELECTOR");
-    command.add_option("--format", callGraphEntry_.format,
-                       "Output representation: text or json")
+    command
+        .add_option("--format", callGraphEntry_.format,
+                    "Output representation: text or json")
         ->check(CLI::IsMember({"text", "json"}))
         ->type_name("FORMAT");
   }

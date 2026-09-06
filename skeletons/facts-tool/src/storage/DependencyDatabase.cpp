@@ -14,9 +14,8 @@
 namespace facts {
 namespace {
 
-std::vector<FileId>
-provenanceSelection(std::span<const FileId> visitedSources,
-                    std::span<const DependencyEdge> edges) {
+std::vector<FileId> provenanceSelection(std::span<const FileId> visitedSources,
+                                        std::span<const DependencyEdge> edges) {
   std::vector<FileId> selected(visitedSources.begin(), visitedSources.end());
   selected.reserve(selected.size() + edges.size() * 2);
   for (const auto &edge : edges) {
@@ -75,12 +74,14 @@ replace(storage::Database &database, std::span<const FileId> visitedSources,
   const auto selected = provenanceSelection(visitedSources, edges);
   return database.write().and_then([&](storage::Transaction transaction) {
     return database.execute("DELETE FROM callgraph_entry")
-        .and_then([&] { return deleteVisitedSources(database, visitedSources); })
+        .and_then(
+            [&] { return deleteVisitedSources(database, visitedSources); })
         .and_then([&] { return insertDependencies(database, edges); })
         .and_then([&] {
           if (provenance.empty())
             return std::expected<void, std::error_code>{};
-          return storage::registerFactProvenance(database, provenance, selected);
+          return storage::registerFactProvenance(database, provenance,
+                                                 selected);
         })
         .and_then([&] { return transaction.commit(); });
   });
@@ -95,8 +96,9 @@ replaceDependencies(const std::string &databasePath,
                     std::span<const storage::FactProvenance> provenance) {
   return storage::Database::open(databasePath, storage::Database::readWrite)
       .and_then([&](storage::Database database) {
-        return initializeFactsDatabase(database).and_then(
-            [&] { return replace(database, visitedSources, edges, provenance); });
+        return initializeFactsDatabase(database).and_then([&] {
+          return replace(database, visitedSources, edges, provenance);
+        });
       });
 }
 

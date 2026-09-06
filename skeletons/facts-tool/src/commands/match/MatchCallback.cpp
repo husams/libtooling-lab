@@ -23,7 +23,8 @@ void MatchCallback::run(
   if (error_)
     return;
   if (rejectLegacyWrites_) {
-    error_ = "incompatible-symbol-universe: facts store has no provenance: rebuild required";
+    error_ = "incompatible-symbol-universe: facts store has no provenance; "
+             "write to a new facts file and extract every source";
     return;
   }
   auto contract = classify(result.Nodes, options_.relationKind);
