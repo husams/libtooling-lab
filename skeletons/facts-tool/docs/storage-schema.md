@@ -76,7 +76,10 @@ Migration does not invent return spellings for previously indexed functions;
 re-extract the source to populate those facts. Symbol queries can read older
 databases without migrating or writing them, using existing target names when
 available. `FileSchemaMigration` belongs to the separate project configuration
-registry and is not involved in facts-schema upgrades.
+registry and is not involved in facts-schema upgrades. That registry has its
+own `project_registry.schema_version`; version 1 adds the match-only four-column
+discovery index without changing facts `user_version`. See the
+[matched-symbol index](matched-symbol-index.md).
 
 Readback composes the explicit columns into the original compact in-memory
 flags, preserving the public C++ model and extraction behavior.

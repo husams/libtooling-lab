@@ -1,5 +1,6 @@
 #include "storage/Storage.h"
 
+#include "storage/MatchedSymbolIndex.h"
 #include "storage/Schema.h"
 #include "storage/SchemaMigration.h"
 #include <sqlite3.h>
@@ -75,6 +76,11 @@ std::expected<void, std::error_code> Storage::rollback() {
     transaction_.reset();
     database_.setNestedBulkAtomic(true);
   });
+}
+
+std::expected<void, std::error_code>
+Storage::upsertMatchedSymbols(std::span<const MatchedSymbol> symbols) {
+  return storage::upsertMatchedSymbols(database_, symbols);
 }
 
 std::expected<Storage::OptionalTransaction, std::error_code>

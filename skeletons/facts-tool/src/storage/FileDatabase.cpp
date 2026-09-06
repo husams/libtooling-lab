@@ -4,6 +4,7 @@
 #include "storage/FilePersistence.h"
 #include "storage/FileSchemaMigration.h"
 #include "storage/ItlibGenerator.h"
+#include "storage/ProjectSchema.h"
 #include "storage/StorageQuery.h"
 
 #include <sqlite3.h>
@@ -112,15 +113,24 @@ storage::Database openWritableFileDatabase(const std::string &path) {
                              opened.error().message());
   }
   auto database = std::move(*opened);
-  auto initialized =
-      database.executeScript("PRAGMA foreign_keys=ON").and_then([&] {
-        return migrateFileSchema(database.nativeHandle());
-      });
-  if (!initialized) {
+  auto configured = database.executeScript("PRAGMA foreign_keys=ON");
+  if (!configured) {
     throw std::runtime_error(
         "cannot initialize file database: " +
         std::string{sqlite3_errmsg(database.nativeHandle())});
   }
+  auto supported = requireSupportedProjectSchema(database.nativeHandle());
+  if (!supported)
+    throw std::runtime_error("cannot initialize file database: " +
+                             supported.error());
+  auto normalized = migrateFileSchema(database.nativeHandle());
+  if (!normalized)
+    throw std::runtime_error("cannot initialize file database: " +
+                             normalized.error().message());
+  auto migrated = migrateProjectSchema(database.nativeHandle());
+  if (!migrated)
+    throw std::runtime_error("cannot initialize file database: " +
+                             migrated.error());
   return database;
 }
 
