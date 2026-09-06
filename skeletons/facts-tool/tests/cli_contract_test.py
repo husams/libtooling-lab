@@ -157,7 +157,8 @@ def main() -> None:
     call_graph_help = run(tool, "analyse", "call-graph", "--help")
     require(call_graph_help.returncode == 0 and
             all(option in output(call_graph_help) for option in
-                ("--facts", "--conf", "--format", "--max-depth")),
+                ("--facts", "--conf", "--format", "--max-depth",
+                 "--direction", "--to", "--path-mode")),
             output(call_graph_help))
     invalid_graph_format = run(tool, "analyse", "call-graph", "-f", "missing.sqlite",
                                "--all", "--format", "yaml")

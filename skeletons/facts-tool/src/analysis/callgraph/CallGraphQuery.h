@@ -37,6 +37,7 @@ struct QueryEdge {
   unsigned offset = 0;
   std::optional<std::string> receiver;
   std::optional<ReceiverCertainty> certainty;
+  unsigned position = 0;
 };
 
 struct QueryGraph {
