@@ -7,6 +7,7 @@ import pytest
 from support.scenario import FactsToolContext
 
 pytest_plugins = (
+    "steps.entry_callable_integration_steps",
     "steps.entry_graph_steps",
     "steps.entry_coverage_steps",
     "steps.entry_external_steps",
@@ -39,6 +40,8 @@ pytest_plugins = (
     "steps.alias_steps",
     "steps.b019_extraction_completeness_steps",
     "steps.call_graph_steps",
+    "steps.s022_call_graph_steps",
+    "steps.s022_review_steps",
     "steps.call_graph_query_steps",
     "steps.common_steps",
     "steps.configuration_defaults_steps",

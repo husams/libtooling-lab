@@ -4,20 +4,20 @@
 #include "analysis/callgraph/DispatchResolver.h"
 #include "ast/StoreExtracted.h"
 #include "ast/extractors/CallSite.h"
-#include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/OverrideRelation.h"
-#include "ast/extractors/Reference.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Expr.h>
 #include <clang/Analysis/CallGraph.h>
 
-namespace facts {
+#include <utility>
 
+namespace facts {
 IndexingResult CallGraphVisitor::run() {
   clang::CallGraph graph;
   graph.addToCallGraph(context_.getTranslationUnitDecl());
   callgraph::CallGraphFacts facts;
+  facts.calls = store_.takeCallableInvocations();
   facts.entries = store_.takeCallGraphEntries();
   facts.unresolved = store_.takeUnresolvedCallSites();
   for (const auto &entry : graph) {
@@ -38,6 +38,9 @@ IndexingResult CallGraphVisitor::run() {
       facts.overrides.insert(facts.overrides.end(), overrides->begin(),
                              overrides->end());
     }
+    auto destructors = collectDestructors(*caller, facts);
+    if (!destructors)
+      return destructors;
     for (const auto &[calleeNode, siteExpr] : node->callees()) {
       const auto *call = llvm::dyn_cast_or_null<clang::CallExpr>(siteExpr);
       const auto *callee = calleeNode

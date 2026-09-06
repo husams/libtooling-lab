@@ -1,4 +1,8 @@
 Feature: Committed entries into the shared function graph
+  Scenario: Callable semantics survive entry publication and repeated extraction
+    Given the S-022 multi-component corpus is extracted
+    Then S-027 entries preserve S-022 invocations and unresolved diagnostics
+
   Scenario: Shared callees, cycles and generated leaves retain one identity
     Given an extracted S-027 application component
     Then S-027 entries reuse shared nodes and preserve generated leaves

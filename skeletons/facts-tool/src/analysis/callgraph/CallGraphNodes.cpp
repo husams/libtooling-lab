@@ -19,6 +19,8 @@ loadCallGraphNodes(catalog::Database &database) {
                      static_cast<unsigned>(row.integer(5)),
                      static_cast<unsigned>(row.integer(6)),
                      definition,
+                     row.integer(11),
+                     row.get<bool>(12),
                      static_cast<unsigned>(row.integer(7))};
   };
   auto load = [&](std::string unresolved) {
@@ -27,7 +29,8 @@ loadCallGraphNodes(catalog::Database &database) {
         "SELECT s.id,s.qualified_name,s.usr,s.is_definition,s.is_external,"
         "s.line,s.col," +
             unresolved +
-            ",d.file_id,d.offset,d.size FROM symbol s LEFT JOIN definition d "
+            ",d.file_id,d.offset,d.size,s.kind,s.is_implicit FROM symbol s "
+            "LEFT JOIN definition d "
             "ON d.symbol_id=s.id WHERE s.node=1 OR "
             "s.kind IN (13,17,18,19,23,24,25) ORDER BY "
             "s.qualified_name,s.usr,s.id",

@@ -31,18 +31,25 @@ std::string location(const QueryEdge &edge, const CoverageReport *coverage) {
 std::string renderCallGraphText(const QueryGraph &graph,
                                 const std::vector<const QueryNode *> &roots,
                                 const RenderedGraph &traversal,
-                                const CoverageReport *coverage) {
+                                const CoverageReport *coverage, EdgeView view) {
   std::string text;
   for (const auto *root : roots)
     text += std::format("root={} usr={}\n", root->name, root->usr);
   for (const auto &value : traversal.edges) {
     const auto *source = detail::findSearchNode(graph, value.edge.source);
     const auto *target = detail::findSearchNode(graph, value.edge.destination);
+    const auto semantic =
+        view == EdgeView::Semantic
+            ? std::format(" semantic-kind={}",
+                          semanticKind(target, value.edge.kind))
+            : std::string{};
     text += std::format(
-        "  depth={} relation={} source={} target={} {} location={}:{}:{} "
-        "cycle={} reused={} external-boundary={} depth-truncated={}\n",
-        value.depth, kindName(value.edge.kind), source ? source->name : "",
-        target ? target->name : "", context(value.edge),
+        "  depth={} relation={}{} source={} target={} {} implicit={} "
+        "location={}:{}:{} cycle={} reused={} external-boundary={} "
+        "depth-truncated={}\n",
+        value.depth, kindName(value.edge.kind), semantic,
+        source ? source->name : "", target ? target->name : "",
+        context(value.edge), value.edge.implicit ? "true" : "false",
         location(value.edge, coverage), value.edge.line, value.edge.column,
         value.cycle ? "true" : "false", value.reused ? "true" : "false",
         value.externalBoundary ? "true" : "false",

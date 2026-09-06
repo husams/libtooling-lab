@@ -26,7 +26,8 @@ facts-tool config show --config ./team.yaml
 
 ```console
 facts-tool analyse dependency --conf project.sqlite --output deps.sqlite src/main.cpp
-facts-tool analyse call-graph --facts facts.sqlite --function app::run --max-depth 4
+facts-tool analyse call-graph --facts facts.sqlite --function app::run \
+  --edges semantic --max-depth 4
 facts-tool match --conf project.sqlite --facts facts.sqlite \
   --matcher 'functionDecl(isDefinition()).bind("symbol")' src/main.cpp
 facts-tool match --conf project.sqlite --facts facts.sqlite \
@@ -36,7 +37,11 @@ facts-tool match --conf project.sqlite --facts facts.sqlite \
 ```
 
 `analyse dependency` writes direct include facts. `analyse call-graph` reads a
-facts database. `match` runs a Clang dynamic matcher and persists its bound
+facts database; `--edges semantic` is the default classified callable view,
+while `--edges calls` preserves the raw `Calls`/`DispatchCalls` presentation of
+the same stored edge set. Text and JSON semantic edges expose `semantic_kind`;
+the raw view omits it.
+`match` runs a Clang dynamic matcher and persists its bound
 facts; `--conf` selects the project database, `--facts` selects the facts
 database (omitting `--facts` uses `facts_template`), and omitting `--conf`
 preserves the legacy combined-store form. Inspect `facts-tool match --help`

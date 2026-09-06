@@ -4,6 +4,7 @@
 #include "ast/extractors/File.h"
 #include "ast/extractors/Location.h"
 #include "ast/extractors/NamedDecl.h"
+#include "ast/extractors/UnsupportedSemantics.h"
 #include "storage/FactStore.h"
 
 #include <clang/AST/ASTContext.h>
@@ -15,6 +16,9 @@ bool BodyVisitor::VisitCallExpr(clang::CallExpr *expression) {
   if (expression == nullptr || expression->getDirectCallee() != nullptr) {
     return true;
   }
+  if (!expression->isTypeDependent() && !expression->isValueDependent())
+    reportUnsupportedSemantic("indirect-call", expression->getExprLoc(),
+                              context_.getSourceManager(), files_, store_);
   auto location =
       extractLocation(context_.getSourceManager(), expression->getExprLoc());
   if (!location) {

@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_AST_VISITORS_BODY_VISITOR_H
 #define FACTS_TOOL_AST_VISITORS_BODY_VISITOR_H
 
+#include "analysis/callgraph/CallGraphTypes.h"
 #include "ast/Indexing.h"
 #include "ast/extractors/Reference.h"
 
@@ -29,11 +30,13 @@ public:
   bool TraverseFunctionDecl(clang::FunctionDecl *decl);
   bool TraverseLambdaExpr(clang::LambdaExpr *expression);
 
+  bool VisitCallExpr(clang::CallExpr *expression);
+  bool VisitCXXConstructExpr(clang::CXXConstructExpr *expression);
   bool VisitDeclRefExpr(clang::DeclRefExpr *expression);
   bool VisitMemberExpr(clang::MemberExpr *expression);
-  bool VisitCallExpr(clang::CallExpr *expression);
   bool VisitNamedDecl(clang::NamedDecl *decl);
 
+  bool traverse(clang::Stmt *body);
   IndexingResult flush();
 
 private:
@@ -44,8 +47,11 @@ private:
   void capture(const clang::Expr &expression,
                const clang::NamedDecl &referenced,
                clang::SourceLocation location);
+  void
+  captureInvocation(ExtractionResult<std::optional<callgraph::CallFact>> fact);
   void schedule(const clang::FunctionDecl &decl);
   IndexingResult flushNestedBodies();
+  IndexingResult persistInvocations();
   IndexingResult persistUses();
   IndexingResult stageEvidence();
 
@@ -55,6 +61,7 @@ private:
   FactStore &store_;
   IndexingStatus &status_;
   std::vector<UseFact> facts_;
+  std::vector<callgraph::CallFact> invocationFacts_;
   std::vector<PendingBody> pendingBodies_;
   std::unordered_set<const clang::Stmt *> scheduledBodies_;
 };

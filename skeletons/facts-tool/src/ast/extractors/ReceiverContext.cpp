@@ -54,4 +54,21 @@ extractReceiverContext(const clang::Expr &site,
   });
 }
 
+ExtractionResult<ReceiverContext>
+extractReceiverContext(const clang::CXXRecordDecl &record,
+                       ReceiverCertainty certainty,
+                       const clang::SourceManager &sourceManager,
+                       FileManager &files, FactStore &store) {
+  if (certainty == ReceiverCertainty::Possible)
+    return ReceiverContext{&record, std::nullopt, certainty};
+  return extractUsr(record).and_then([&](std::string usr) {
+    return findOrStoreSymbolTarget(record, sourceManager, files, store, usr)
+        .transform_error(
+            [](std::error_code) { return ExtractionError::InvalidUsr; })
+        .transform([&](SymbolId id) {
+          return ReceiverContext{&record, id, certainty};
+        });
+  });
+}
+
 } // namespace facts

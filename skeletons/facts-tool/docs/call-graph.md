@@ -12,8 +12,11 @@ body extraction. `CallGraphVisitor` only orchestrates focused call-site,
 receiver, and override extractors. Symbols are joined by canonical USR, so a
 declaration-only callee can become the same definition-backed symbol when a
 later translation unit supplies its body. Constructor bodies contribute their
-calls, while constructor invocations remain represented only by the existing
-`Construct*` relations.
+calls. Constructor invocations and explicit or frontend-resolved cleanup
+actions also contribute `Calls` with their source sites; existing `Construct*`
+object/type relations remain unchanged. Cleanup edges are marked implicit for
+automatic, temporary, and delete-triggered destruction. Lambda invocations
+target the lambda's owned call-operator symbol.
 
 ## Querying
 
@@ -25,6 +28,13 @@ Select one root by qualified name or USR:
 ```text
 facts-tool analyse call-graph -f facts.db -c project.db --function app::run
 ```
+
+The default `--edges semantic` view classifies each stored edge as `function`,
+`constructor`, `destructor`, `lambda`, or `virtual_dispatch`. Use
+`--edges calls` for the compatibility view of the underlying `Calls` and
+`DispatchCalls` primitives without semantic classification. Both views keep
+the stored relation kind and traverse the same stored edge set; only their
+presentation differs.
 
 Or list every definition-backed root with calls:
 
@@ -66,7 +76,8 @@ third-party target remains an `external-boundary`.
 
 Use `--format json` for the stable `facts-tool.call-graph.v1` representation.
 It contains `complete`, `truncated`, `traversal`, `extraction_coverage`,
-`query`, `paths`, `path_result`, `roots`, `nodes`, and `edges`. `query.mode`
+`edge_view`, `query`, `paths`, `path_result`, `roots`, `nodes`, and `edges`.
+`query.mode`
 is `callees`, `callers`, or `path`; path results distinguish `found`,
 `not_found`, `unknown`, and `truncated`, and each path carries stable string
 node IDs and canonical relation-site edge keys. A `truncated` result can retain
@@ -80,8 +91,22 @@ object, outgoing-call presence, catalog `indexed`/`indexed_at` values,
 freshness, the reserved failure member, coverage state, recommended action,
 and candidate unindexed translation units. Coverage metadata follows the
 definition file when one exists. Edge
-evidence keeps relation kind, receiver certainty, source location, cycle,
-reuse, external-boundary, definition-boundary, and depth-truncation flags.
+evidence keeps `relation_kind`, `implicit`, receiver name, `receiver_type_id`,
+certainty, source location, cycle, reuse,
+external-boundary, definition-boundary, and depth-truncation flags. Exact
+receiver sites have a concrete receiver identity and certainty `exact`;
+conservative sites use a null receiver identity and certainty `possible`.
+Semantic-view edges additionally include `semantic_kind`; calls-view edges
+omit that derived classification.
+
+Indirect calls or cleanup actions for which the frontend supplies no resolved
+callable target are printed during extraction as
+`coverage.unsupported_semantics` diagnostics with their registered project-file
+source site. These coverage diagnostics use the logging facility's always-on
+level and therefore remain visible at `--verbose 0`; unregistered system files
+are suppressed. Schema v8 has no persistence field for these diagnostics, so
+JSON reports the coverage member as `not-persisted` with an action to inspect
+extraction diagnostics; it does not claim an empty persisted list is complete.
 
 Emitted coverage states are `complete`, `incomplete`, `unknown`, `stale`, or
 `not-applicable`. Missing catalog evidence is reported as `unknown`; it is not

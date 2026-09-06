@@ -46,9 +46,9 @@ orderedEdges(const QueryGraph &graph, SymbolId id, bool reverse = false) {
 inline std::pair<bool, bool> boundaries(const QueryNode &node,
                                         const CoverageReport *coverage) {
   if (!coverage)
-    return {node.external || !node.definition, false};
-  return {!node.definition && !isProjectLocal(*coverage, node),
-          !node.definition && isProjectLocal(*coverage, node)};
+    return {node.external || !hasDefinitionEvidence(node), false};
+  return {!hasDefinitionEvidence(node) && !isProjectLocal(*coverage, node),
+          !hasDefinitionEvidence(node) && isProjectLocal(*coverage, node)};
 }
 
 inline void recordNode(std::vector<SymbolId> &nodes, SymbolId id) {

@@ -10,6 +10,7 @@
 #include <clang/AST/DeclTemplate.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/ExprCXX.h>
+#include <clang/Basic/SourceManager.h>
 
 #include <algorithm>
 #include <ranges>
@@ -142,7 +143,7 @@ bool BodyVisitor::VisitNamedDecl(clang::NamedDecl *decl) {
 IndexingResult BodyVisitor::flushNestedBodies() {
   for (const auto &[owner, body] : pendingBodies_) {
     BodyVisitor visitor(*owner, context_, files_, store_, status_);
-    if (!visitor.TraverseStmt(body)) {
+    if (!visitor.traverse(body)) {
       return std::unexpected(
           IndexingError{"cannot traverse nested function body"});
     }
@@ -167,6 +168,7 @@ IndexingResult BodyVisitor::persistUses() {
 IndexingResult BodyVisitor::flush() {
   return flushNestedBodies()
       .and_then([&] { return persistUses(); })
+      .and_then([&] { return persistInvocations(); })
       .and_then([&] { return stageEvidence(); });
 }
 

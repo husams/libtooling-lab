@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_STORAGE_FACT_STORE_H
 #define FACTS_TOOL_STORAGE_FACT_STORE_H
 
+#include "analysis/callgraph/CallGraphTypes.h"
 #include "cli/Trace.h"
 #include "storage/Storage.h"
 
@@ -237,6 +238,14 @@ public:
     callGraphEntries_.push_back(symbol);
   }
 
+  void stageCallableInvocation(callgraph::CallFact fact) {
+    callableInvocations_.push_back(std::move(fact));
+  }
+
+  std::vector<callgraph::CallFact> takeCallableInvocations() {
+    return std::exchange(callableInvocations_, {});
+  }
+
   void stageUnresolvedCallSite(UnresolvedCallSite site) {
     unresolvedCallSites_.push_back(std::move(site));
   }
@@ -264,6 +273,7 @@ private:
   Storage storage_;
   std::unordered_map<std::string, SymbolId> idsByUsr_;
   std::vector<SymbolId> callGraphEntries_;
+  std::vector<callgraph::CallFact> callableInvocations_;
   std::vector<UnresolvedCallSite> unresolvedCallSites_;
   int verbosity_ = 0;
 };
