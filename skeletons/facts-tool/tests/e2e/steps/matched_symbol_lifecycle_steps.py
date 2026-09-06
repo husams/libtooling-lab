@@ -82,11 +82,13 @@ def combined_rollback(context: FactsToolContext) -> None:
 def clear_rematch_remove(context: FactsToolContext) -> None:
     match = find(context, "--name", "targeted_match::caller")["matches"][0]
     clear = run([str(context.facts_tool), "symbol", "index", "clear", "-v", "0", "--conf",
-                 str(context.files_database), "--file-id", str(match["file_id"])])
+                 str(context.files_database), "--facts", str(context.facts_database),
+                 "--file-id", str(match["file_id"])])
     require(clear.returncode == 0 and find(context, "--name", "targeted_match")["matches"] == [], clear.stdout + clear.stderr)
     require(match_caller(context).returncode == 0, "rematch failed")
     removed = run([str(context.facts_tool), "file", "remove", "-v", "0", "--conf",
-                   str(context.files_database), str(context.targeted_match_source)])
+                   str(context.files_database), "--facts", str(context.facts_database),
+                   str(context.targeted_match_source)])
     require(removed.returncode == 0, removed.stdout + removed.stderr)
 
 

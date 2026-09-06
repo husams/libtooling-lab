@@ -28,7 +28,8 @@ def clear_unknown_file(context: FactsToolContext) -> None:
     context.s026_before_unknown_clear = find(context, "--name", "targeted_match")["matches"]
     context.s026_unknown_clear = run([
         str(context.facts_tool), "symbol", "index", "clear", "--conf",
-        str(context.files_database), "--file-id", "999999",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--file-id", "999999",
     ])
 
 

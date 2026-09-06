@@ -61,7 +61,8 @@ def version_zero(context: FactsToolContext) -> None:
 @when("import reopens the S-026 version-zero project")
 def reopen_version_zero(context: FactsToolContext) -> None:
     context.s026_migration = run([str(context.facts_tool), "import", "-v", "0", "--conf",
-                                  str(context.files_database), "--compilation-database",
+                                  str(context.files_database), "--facts", str(context.facts_database),
+                                  "--compilation-database",
                                   str(context.run_root_path), str(context.targeted_match_source)])
 
 

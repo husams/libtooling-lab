@@ -150,6 +150,8 @@ def extract_fixture(context: FactsToolContext, source: Path) -> None:
             "import",
             "--conf",
             str(context.files_database_path),
+            "--facts",
+            str(context.facts_database_path),
             "--compilation-database",
             str(context.run_root_path),
             str(source),

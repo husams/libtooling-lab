@@ -11,10 +11,13 @@ def implicit_fixture(context):
     )
 
 
-def extract_implicit(context):
+def extract_implicit(context, before_extract=None):
     imported = run([str(context.facts_tool), "import", "--conf",
-                    str(context.files_database_path), "-p", str(context.run_root_path)])
+                    str(context.files_database_path), "--facts",
+                    str(context.facts_database_path), "-p", str(context.run_root_path)])
     require(imported.returncode == 0, imported.stdout + imported.stderr)
+    if before_extract:
+        before_extract()
     result = run([str(context.facts_tool), "extract", "--conf",
                   str(context.files_database_path), "--output",
                   str(context.facts_database_path), "--verbose", "3"])
