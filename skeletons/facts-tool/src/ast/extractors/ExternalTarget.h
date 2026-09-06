@@ -5,6 +5,9 @@
 #include <clang/Basic/SourceManager.h>
 #include <clang/Index/IndexSymbol.h>
 
+#include <expected>
+#include <system_error>
+
 namespace facts {
 
 inline const clang::NamedDecl &
