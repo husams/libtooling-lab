@@ -13,8 +13,11 @@ bool knownFile(const CoverageReport &report, FileId id) {
 
 std::set<FileId> referencedFiles(const QueryGraph &graph) {
   std::set<FileId> result;
-  for (const auto &node : graph.nodes)
+  for (const auto &node : graph.nodes) {
     result.insert(node.id.file);
+    if (node.definitionLocation)
+      result.insert(node.definitionLocation->file);
+  }
   for (const auto &edge : graph.edges)
     result.insert(edge.file);
   return result;
@@ -50,8 +53,14 @@ loadCoverage(const std::string &path, const QueryGraph &graph) {
               std::ranges::find_if(graph.edges, [&](const auto &edge) {
                 return !knownFile(report, edge.file);
               });
+          const auto missingDefinition =
+              std::ranges::find_if(graph.nodes, [&](const auto &node) {
+                return node.definitionLocation &&
+                       !knownFile(report, node.definitionLocation->file);
+              });
           if (missingNode != graph.nodes.end() ||
-              missingEdge != graph.edges.end())
+              missingEdge != graph.edges.end() ||
+              missingDefinition != graph.nodes.end())
             return std::unexpected(
                 "project/facts pair has unmatched file identities");
           for (const auto &file : report.files)

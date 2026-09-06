@@ -25,6 +25,8 @@ struct CoverageReport {
 std::expected<CoverageReport, std::string>
 loadCoverage(const std::string &path, const QueryGraph &graph);
 const CoverageFile *findCoverageFile(const CoverageReport &report, FileId id);
+const CoverageFile *findCoverageEvidenceFile(const CoverageReport &report,
+                                             const QueryNode &node);
 bool isProjectLocal(const CoverageReport &report, const QueryNode &node);
 std::string definitionAvailability(const CoverageReport &report,
                                    const QueryNode &node);
@@ -32,8 +34,7 @@ std::string extractionCoverage(const CoverageReport &report,
                                const QueryNode &node);
 std::string coverageFreshness(const CoverageReport &report,
                               const QueryNode &node);
-std::string coverageAction(const CoverageReport &report, const QueryNode &node,
-                           bool outgoingCalls);
+std::string coverageAction(const CoverageReport &report, const QueryNode &node);
 std::string summarizeCoverage(const CoverageReport &report,
                               const QueryGraph &graph,
                               std::span<const SymbolId> nodes);

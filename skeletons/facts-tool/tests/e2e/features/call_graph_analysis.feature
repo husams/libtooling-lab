@@ -69,7 +69,7 @@ Feature: Contextual function call graph analysis
     Given an isolated B-040 pair has a declaration-only project boundary
     Then B-040 reports complete traversal and incomplete extraction coverage separately
 
-  Scenario: reports a complete known graph through a validated project and facts pair
+  Scenario: reports simulated complete catalog metadata through a validated project and facts pair
     Given an isolated B-040 pair has complete known project coverage
     Then B-040 reports complete paired coverage with usable paths and stable identities
 
@@ -81,7 +81,7 @@ Feature: Contextual function call graph analysis
     Given an isolated B-040 pair has missing coverage metadata
     Then B-040 reports unknown coverage and metadata reconciliation
 
-  Scenario: reports stale catalog evidence independently from stored graph traversal
+  Scenario: reports simulated stale catalog evidence independently from stored graph traversal
     Given an isolated B-040 pair has stale coverage metadata
     Then B-040 reports stale coverage with a focused refresh action
 

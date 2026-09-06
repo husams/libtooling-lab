@@ -258,9 +258,11 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/CallGraphTraversal.cpp
   src/analysis/callgraph/CallGraphCoverage.cpp
   src/analysis/callgraph/CallGraphCatalog.cpp
+  src/analysis/callgraph/CallGraphNodes.cpp
   src/analysis/callgraph/CallGraphFreshness.cpp
   src/analysis/callgraph/CallGraphJson.cpp
   src/analysis/callgraph/CallGraphJsonEvidence.cpp
+  src/analysis/callgraph/CallGraphJsonLocation.cpp
   src/analysis/callgraph/CallGraphText.cpp
 )
 target_include_directories(facts-ast PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)

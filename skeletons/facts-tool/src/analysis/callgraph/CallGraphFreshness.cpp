@@ -8,7 +8,7 @@ namespace facts::callgraph {
 
 std::string coverageFreshness(const CoverageReport &report,
                               const QueryNode &node) {
-  const auto *file = findCoverageFile(report, node.id.file);
+  const auto *file = findCoverageEvidenceFile(report, node);
   if (!file || !file->indexed)
     return "unknown";
   if (file->mtime) {

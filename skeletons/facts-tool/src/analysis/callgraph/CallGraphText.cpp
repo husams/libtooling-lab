@@ -31,10 +31,6 @@ std::string location(const QueryEdge &edge, const CoverageReport *coverage) {
   return std::format("<file {}>", edge.file);
 }
 
-bool outgoing(const QueryGraph &graph, const QueryNode &node) {
-  return std::ranges::any_of(
-      graph.edges, [&](const auto &edge) { return edge.source == node.id; });
-}
 } // namespace
 
 std::string renderCallGraphText(const QueryGraph &graph,
@@ -63,7 +59,7 @@ std::string renderCallGraphText(const QueryGraph &graph,
           target->usr, definitionAvailability(*coverage, *target),
           extractionCoverage(*coverage, *target),
           coverageFreshness(*coverage, *target),
-          coverageAction(*coverage, *target, outgoing(graph, *target)));
+          coverageAction(*coverage, *target));
   }
   text += std::format("complete={} truncated={}",
                       traversal.truncated == 0 ? "true" : "false",
@@ -71,6 +67,8 @@ std::string renderCallGraphText(const QueryGraph &graph,
   if (coverage)
     text += " extraction-coverage=" +
             summarizeCoverage(*coverage, graph, traversal.nodes);
+  else
+    text += " extraction-coverage=unknown";
   return text + '\n';
 }
 } // namespace facts::callgraph

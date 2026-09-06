@@ -18,23 +18,26 @@ llvm::json::Object nodeJson(const QueryGraph &graph, const QueryNode &node,
                             const CoverageReport *coverage) {
   const auto outgoing = std::ranges::any_of(
       graph.edges, [&](const auto &edge) { return edge.source == node.id; });
-  const auto *file =
+  const auto *sourceFile =
       coverage ? findCoverageFile(*coverage, node.id.file) : nullptr;
+  const auto *file =
+      coverage ? findCoverageEvidenceFile(*coverage, node) : nullptr;
   const auto availability = coverage ? definitionAvailability(*coverage, node)
                             : node.definition ? "available"
                             : node.external   ? "external-unavailable"
                                               : "unknown";
   llvm::json::Object source{
       {"file_id", node.id.file}, {"line", node.line}, {"column", node.column}};
-  source["path"] =
-      file ? llvm::json::Value(file->path) : llvm::json::Value(nullptr);
-  source["project_local"] =
-      file ? llvm::json::Value(file->projectLocal) : llvm::json::Value(nullptr);
+  source["path"] = sourceFile ? llvm::json::Value(sourceFile->path)
+                              : llvm::json::Value(nullptr);
+  source["project_local"] = sourceFile
+                                ? llvm::json::Value(sourceFile->projectLocal)
+                                : llvm::json::Value(nullptr);
   llvm::json::Object evidence{
       {"state", coverage ? extractionCoverage(*coverage, node) : "unknown"},
       {"freshness", coverage ? coverageFreshness(*coverage, node) : "unknown"},
-      {"action", coverage ? coverageAction(*coverage, node, outgoing)
-                          : "supply-project-conf"}};
+      {"action",
+       coverage ? coverageAction(*coverage, node) : "supply-project-conf"}};
   evidence["catalog_indexed"] =
       file ? llvm::json::Value(file->indexed) : llvm::json::Value(nullptr);
   evidence["indexed_at"] = file && !file->indexedAt.empty()
@@ -50,6 +53,7 @@ llvm::json::Object nodeJson(const QueryGraph &graph, const QueryNode &node,
       {"usr", node.usr},
       {"definition_availability", availability},
       {"source", std::move(source)},
+      {"definition", definitionJson(node, coverage)},
       {"facts", llvm::json::Object{{"definition", node.definition},
                                    {"outgoing_calls", outgoing}}},
       {"coverage", std::move(evidence)}};

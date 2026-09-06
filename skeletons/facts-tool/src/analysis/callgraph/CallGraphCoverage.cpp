@@ -13,8 +13,15 @@ const QueryNode *findNode(const QueryGraph &graph, SymbolId id) {
 } // namespace
 
 bool isProjectLocal(const CoverageReport &report, const QueryNode &node) {
-  const auto *file = findCoverageFile(report, node.id.file);
+  const auto *file = findCoverageEvidenceFile(report, node);
   return file && file->projectLocal;
+}
+
+const CoverageFile *findCoverageEvidenceFile(const CoverageReport &report,
+                                             const QueryNode &node) {
+  return findCoverageFile(report, node.definitionLocation
+                                      ? node.definitionLocation->file
+                                      : node.id.file);
 }
 
 std::string definitionAvailability(const CoverageReport &report,
@@ -27,7 +34,7 @@ std::string definitionAvailability(const CoverageReport &report,
 
 std::string extractionCoverage(const CoverageReport &report,
                                const QueryNode &node) {
-  const auto *file = findCoverageFile(report, node.id.file);
+  const auto *file = findCoverageEvidenceFile(report, node);
   if (!file || !file->projectLocal)
     return "not-applicable";
   if (!node.definition)
@@ -37,18 +44,16 @@ std::string extractionCoverage(const CoverageReport &report,
   return file->indexed ? "complete" : "unknown";
 }
 
-std::string coverageAction(const CoverageReport &report, const QueryNode &node,
-                           bool outgoingCalls) {
+std::string coverageAction(const CoverageReport &report,
+                           const QueryNode &node) {
   const auto state = extractionCoverage(report, node);
   if (state == "incomplete")
     return report.recoveryCandidates.empty()
                ? "locate-definition-tu"
                : "extract-candidate-translation-unit";
-  if (state == "unknown" && (node.definition || outgoingCalls))
-    return "reconcile-coverage-metadata";
   if (state == "stale")
     return "refresh-source";
-  return state == "unknown" ? "extract-source" : "none";
+  return state == "unknown" ? "reconcile-coverage-metadata" : "none";
 }
 
 std::string summarizeCoverage(const CoverageReport &report,

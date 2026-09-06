@@ -1,4 +1,5 @@
 #include "analysis/callgraph/CallGraphQuery.h"
+#include "analysis/callgraph/CallGraphNodes.h"
 
 #include "storage/SqliteDatabase.h"
 #include "storage/catalog/Database.h"
@@ -8,24 +9,6 @@
 
 namespace facts::callgraph {
 namespace {
-auto loadNodes(storage::Database &database) {
-  // Include generic external rows using the stable stored callable kinds.
-  return catalog::query(
-      database,
-      "SELECT id,qualified_name,usr,is_definition,is_external,line,col FROM symbol "
-      "WHERE node=1 OR kind IN (13,17,18,19,23,24,25) "
-      "ORDER BY qualified_name,usr,id",
-      [](const storage::Row &row) {
-        const bool definition = row.get<bool>(3);
-        return QueryNode{row.get<SymbolId>(0),
-                         row.string(1),
-                         row.string(2),
-                         definition,
-                         row.get<bool>(4),
-                         static_cast<unsigned>(row.integer(5)),
-                         static_cast<unsigned>(row.integer(6))};
-      });
-}
 auto loadEdges(storage::Database &database) {
   return catalog::query(
       database,
@@ -54,6 +37,7 @@ auto loadEdges(storage::Database &database) {
       static_cast<int>(RelationKind::Calls),
       static_cast<int>(RelationKind::DispatchCalls));
 }
+
 bool validContext(const QueryEdge &edge) {
   if (!edge.certainty)
     return !edge.receiver;
@@ -69,7 +53,8 @@ QueryResult loadCallGraph(const std::string &path) {
         return "cannot open facts database '" + path + "': " + error.message();
       })
       .and_then([](auto database) -> QueryResult {
-        return loadNodes(database).and_then([&](auto nodes) -> QueryResult {
+        return loadCallGraphNodes(database).and_then([&](auto nodes)
+                                                         -> QueryResult {
           return loadEdges(database).and_then([&](auto edges) -> QueryResult {
             if (!std::ranges::all_of(edges, validContext))
               return std::unexpected("invalid relation-site receiver context");
