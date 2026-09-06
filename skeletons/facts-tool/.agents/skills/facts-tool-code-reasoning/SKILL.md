@@ -9,16 +9,22 @@ For every C++ reasoning task in this project, use facts-tool before drawing
 conclusions. If valid facts cannot be produced, state the evidence gap and do
 not present code-structure conclusions as confirmed.
 
-1. Confirm that the facts and project SQLite databases belong to the code under
-   investigation. Refresh them with the native CLI when they are missing or
-   stale.
-2. Query both databases through `facts_tool.open_codebase`; prefer a USR or an
-   exact qualified name, then traverse stored relations.
-3. Ground conclusions in returned names, kinds, locations, relations, sites,
-   and result provenance. Never treat truncated, partial, unknown, or
-   unsupported results as proof of absence.
-4. Read source at returned locations to add local detail; keep the facts
-   evidence visible in the explanation.
+1. Verify the executable and resolved configuration with `config show`; use
+   native `symbol`, `match`, and `analyse call-graph` commands first so the
+   project database and facts database remain an explicit pair.
+2. Reuse existing facts, identify missing evidence, and refresh only the
+   smallest required translation units with native `import`/`extract` or
+   `match`; do not use SQL, database drivers, or duplicate SDK callgraph
+   traversal.
+3. Use `match --matcher '...bind("symbol")'` for symbols and exact
+   `call`/`callee` bindings for direct Calls; `source`/`target`/`site` are
+   relation bindings and require `--relation-kind`.
+4. Ground conclusions in native names, kinds, locations, relations, sites, and
+   explicit boundary or failure diagnostics; symbol-only matching does not
+   establish outgoing call coverage.
+5. Use the Python SDK only when native output cannot answer the question, and
+   state that evidence boundary; read source at native locations for local
+   detail.
 
 Read only the guide needed for the task:
 

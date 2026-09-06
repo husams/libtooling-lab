@@ -73,7 +73,11 @@ classify(const clang::ast_matchers::BoundNodes &bound,
   const bool noSite = exactKeys(nodes, {"source", "target"});
   const bool withSite = exactKeys(nodes, {"source", "target", "site"});
   if (!noSite && !withSite)
-    return std::unexpected("bindings must exactly match a supported contract");
+    return std::unexpected(
+        "bindings must exactly match a supported contract: bind(\"symbol\"), "
+        "bind(\"call\")+bind(\"callee\"), or "
+        "bind(\"source\")+bind(\"target\")[+bind(\"site\")] with "
+        "--relation-kind");
   if (!relationKind)
     return std::unexpected(
         "source and target bindings require --relation-kind");

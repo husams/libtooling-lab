@@ -1,0 +1,40 @@
+Feature: Native matcher workflow
+  The native matcher keeps project metadata and extracted facts in explicit
+  paired databases while preserving source selector and binding contracts.
+
+  Scenario: Match uses separate project and facts databases
+    Given a separately stored native matcher fixture
+    When a symbol matcher runs with the explicit database pair
+    Then the paired native match succeeds
+
+  Scenario: Native matching writes callgraph facts without extraction
+    Given a separately stored native matcher fixture
+    When a direct-call matcher runs twice with the explicit database pair
+    Then the native call graph can traverse the matched facts twice
+
+  Scenario: Invalid binding fails before writing through the paired workflow
+    Given a separately stored native matcher fixture
+    When an invalid symbol binding runs with the explicit database pair
+    Then the paired native match fails with an actionable binding contract
+    And the matcher help lists the supported binding contracts
+
+  Scenario: Relative import selectors use the invocation directory
+    Given a separate-build native matcher fixture
+    When import runs with a relative source selector
+    Then the relative native import succeeds
+
+  Scenario: Relative and absolute import selectors select the same command
+    Given a separate-build native matcher fixture
+    When import runs with a relative source selector
+    And import runs with an absolute source selector
+    Then relative and absolute native imports select the same command
+
+  Scenario: Invalid relative import selectors explain their base
+    Given a separate-build native matcher fixture
+    When import runs with an invalid relative source selector
+    Then the invalid native selector reports its invocation base
+
+  Scenario: Match defaults create the configured facts template
+    Given a default-configured native matcher fixture
+    When a native matcher runs with configured defaults
+    Then the default native match succeeds and materializes facts_template

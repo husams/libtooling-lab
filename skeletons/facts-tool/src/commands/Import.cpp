@@ -205,6 +205,13 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
                     return 0;
                   });
             });
+      })
+      .transform_error([](std::string error) {
+        if (error.starts_with("cannot resolve source file"))
+          return error +
+                 " (relative selectors are resolved relative to the "
+                 "invocation directory)";
+        return error;
       });
 }
 
@@ -217,6 +224,7 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
   auto configured = options;
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = resolved->extraArguments;
+  configured.sources = normalizeSourceSelectors(options.sources);
   return cli::runStage(configured.verbosity, "import", "parse components",
                        [&] { return parseComponents(configured.components); })
       .and_then([&](std::vector<ProjectComponent> components) {

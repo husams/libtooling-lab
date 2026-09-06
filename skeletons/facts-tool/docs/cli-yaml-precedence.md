@@ -27,9 +27,13 @@ selector on commands accepting configuration options. That selected file
 still participates above project and user YAML. `FACTS_TOOL_CONF` remains
 below explicit `--conf` and above generated project DB naming.
 
-`match` and `analyse call-graph` require their own explicit `--facts` and do
-not consume YAML defaults. `config show` reports YAML extras but has no
-`--extra-arg` option. The override rule does not introduce new flags or keys.
+`match` accepts `--conf`/`--config` for the project database and uses an
+explicit `--facts` path or the configured `facts_template`; when neither
+`--conf` nor `FACTS_TOOL_CONF` is set, a supplied `--facts` retains the legacy
+combined-store behavior.
+`analyse call-graph` still reads its explicit facts database. `config show`
+reports YAML extras but has no `--extra-arg` option. The override rule does not
+introduce new flags or keys.
 
 ## Presence, lists, and persistence
 

@@ -1,5 +1,6 @@
 #include "cli/MatchCommandLine.h"
 
+#include "cli/ConfigurationOptions.h"
 #include "cli/Verbose.h"
 
 #include <CLI/CLI.hpp>
@@ -15,22 +16,32 @@ CLI::App *configureMatch(CLI::App &app, MatchOptions &options) {
       ->expected(0, 1)
       ->default_str("1")
       ->check(CLI::Range(0, maximumVerbosity));
-  command
-      ->add_option("-f,--facts", options.facts,
-                   "Imported SQLite project and facts database")
-      ->required()
+  configurationOptions(*command, options.configuration,
+                       options.configurationFile);
+  command->add_option_function<std::string>(
+      "-f,--facts",
+      [&options](const std::string &value) {
+        if (value.empty())
+          throw CLI::ValidationError("--facts must not be empty");
+        options.facts = value;
+        options.factsProvided = true;
+      },
+      "SQLite facts database; defaults to facts_template when omitted")
+      ->trigger_on_parse()
       ->type_name("FILE");
   command
       ->add_option("--matcher", options.matcher,
-                   "Clang dynamic matcher expression")
+                   "Clang dynamic matcher expression; bind symbol, "
+                   "call+callee, or source+target[+site]")
       ->required()
       ->type_name("EXPR");
   command
       ->add_option("--relation-kind", options.relationKind,
-                   "Relation kind for source/target bindings")
+                   "Relation kind for source/target bindings; required for "
+                   "relation contracts")
       ->type_name("KIND");
   command->add_option("sources", options.sources,
-                      "Translation units; defaults to imported order");
+                      "Translation units relative to the invocation directory; defaults to imported order");
   return command;
 }
 
