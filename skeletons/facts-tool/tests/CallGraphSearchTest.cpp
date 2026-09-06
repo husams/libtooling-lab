@@ -16,17 +16,20 @@ facts::callgraph::QueryGraph graph() {
   using namespace facts;
   using namespace facts::callgraph;
   const SymbolId a{1, 1}, b{2, 1}, c{3, 1}, target{4, 1}, absent{5, 1};
+  const SymbolId external{6, 1};
   return {{QueryNode{a, "source", "usr:a", true},
            QueryNode{b, "middle_b", "usr:b", true},
            QueryNode{c, "middle_c", "usr:c", true},
            QueryNode{target, "target", "usr:t", true},
-           QueryNode{absent, "absent", "usr:z", true}},
+           QueryNode{absent, "absent", "usr:z", true},
+           QueryNode{external, "external", "usr:x", false, true}},
           {QueryEdge{a, c, RelationKind::Calls, 1, 4, 1, 40},
            QueryEdge{c, target, RelationKind::DispatchCalls, 3, 5, 1, 50,
                      std::nullopt, ReceiverCertainty::Possible},
            QueryEdge{a, b, RelationKind::Calls, 1, 2, 1, 20},
            QueryEdge{b, target, RelationKind::Calls, 2, 3, 1, 30},
-           QueryEdge{b, a, RelationKind::Calls, 2, 6, 1, 60}}};
+           QueryEdge{b, a, RelationKind::Calls, 2, 6, 1, 60},
+           QueryEdge{a, external, RelationKind::Calls, 1, 7, 1, 70}}};
 }
 
 facts::callgraph::CoverageReport completeCoverage() {
@@ -77,7 +80,7 @@ int main() {
                  require(pathResult(value, capped, &coverage) == "truncated",
                          "explicit path cap was not reported") &&
                  require(pathResult(value, missing, &coverage) == "not_found",
-                         "complete negative evidence was not distinguished") &&
+                         "external boundary invalidated complete evidence") &&
                  require(callers.edges.size() == 5 &&
                              callers.edges.front().edge.destination ==
                                  (*target)->id,

@@ -1,7 +1,7 @@
 #include "analysis/callgraph/CallGraphTraversal.h"
 
 #include "analysis/callgraph/CallGraphContext.h"
-#include "analysis/callgraph/CallGraphCoverage.h"
+#include "analysis/callgraph/CallGraphOrder.h"
 #include "analysis/callgraph/CallGraphText.h"
 
 #include <ranges>
@@ -9,11 +9,6 @@
 
 namespace facts::callgraph {
 namespace {
-
-const QueryNode *findNode(const QueryGraph &graph, SymbolId id) {
-  const auto found = std::ranges::find(graph.nodes, id, &QueryNode::id);
-  return found == graph.nodes.end() ? nullptr : &*found;
-}
 
 class Traversal {
 public:
@@ -23,18 +18,13 @@ public:
 
   RenderedGraph run(const std::vector<const QueryNode *> &roots) {
     for (const auto *root : roots) {
-      recordNode(root->id);
+      detail::recordNode(nodes_, root->id);
       walk(*root, {root->id, {}, {}}, 0, {});
     }
     return {{}, truncated_, std::move(nodes_), std::move(edges_)};
   }
 
 private:
-  void recordNode(SymbolId id) {
-    if (std::ranges::find(nodes_, id) == nodes_.end())
-      nodes_.push_back(id);
-  }
-
   void walk(const QueryNode &source, const QueryContext &current, int depth,
             std::set<QueryContext> path) {
     path.insert(current);
@@ -42,7 +32,7 @@ private:
     for (const auto &edge : graph_.edges) {
       if (edge.source != source.id || !matchesContext(edge, current))
         continue;
-      const auto *target = findNode(graph_, edge.destination);
+      const auto *target = detail::findSearchNode(graph_, edge.destination);
       if (!target)
         continue;
       const auto child = descendContext(edge, current);
@@ -55,12 +45,9 @@ private:
           });
       if (capped)
         ++truncated_;
-      const bool external = coverage_ ? !target->definition &&
-                                            !isProjectLocal(*coverage_, *target)
-                                      : target->external || !target->definition;
-      const bool definitionBoundary = coverage_ && !target->definition &&
-                                      isProjectLocal(*coverage_, *target);
-      recordNode(target->id);
+      const auto [external, definitionBoundary] =
+          detail::boundaries(*target, coverage_);
+      detail::recordNode(nodes_, target->id);
       edges_.push_back({edge, depth + 1, cycle, reused, external,
                         definitionBoundary, capped});
       if (!cycle && !reused && !external && !definitionBoundary && !capped)

@@ -66,7 +66,9 @@ It contains `complete`, `truncated`, `traversal`, `extraction_coverage`,
 `query`, `paths`, `path_result`, `roots`, `nodes`, and `edges`. `query.mode`
 is `callees`, `callers`, or `path`; path results distinguish `found`,
 `not_found`, `unknown`, and `truncated`, and each path carries stable string
-node IDs and canonical relation-site edge keys. `not_found` is emitted only
+node IDs and canonical relation-site edge keys. A `truncated` result can retain
+paths found before the requested cap; it does not imply an empty path array.
+`not_found` is emitted only
 for complete relevant extraction evidence; missing metadata or unresolved
 boundaries remain `unknown`. All query state is request-local and creates no
 cache or schema. Node evidence includes the stable USR, resolved

@@ -31,7 +31,7 @@ std::string pathResult(const QueryGraph &graph, const QuerySearch &search,
     return "unknown";
   const auto boundary =
       std::ranges::any_of(search.traversal.edges, [](const auto &edge) {
-        return edge.externalBoundary || edge.definitionBoundary;
+        return edge.definitionBoundary;
       });
   const auto state =
       summarizeCoverage(*coverage, graph, search.traversal.nodes);
