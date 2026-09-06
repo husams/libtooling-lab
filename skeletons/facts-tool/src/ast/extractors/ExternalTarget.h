@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ast/extractors/CallableProperties.h"
+#include "model/Function.h"
 #include <clang/AST/Decl.h>
 #include <clang/Basic/SourceManager.h>
 #include <clang/Index/IndexSymbol.h>
@@ -31,19 +31,16 @@ inline bool compilerProvided(const clang::NamedDecl &target,
 }
 
 inline std::expected<Symbol, std::error_code>
-externalSymbol(const clang::NamedDecl &target, const std::string &usr) {
+externalSymbol(const clang::NamedDecl &target, const std::string &usr,
+               bool implicitCallable) {
   Function symbol{};
   static_cast<clang::index::SymbolInfo &>(symbol) =
       clang::index::getSymbolInfo(&target);
   symbol.usr = usr;
   symbol.qualifiedName = target.getQualifiedNameAsString();
   symbol.flags = bit(ExternalBit);
-  if (const auto *function = llvm::dyn_cast<clang::FunctionDecl>(&target))
-    return addCallableProperties(std::move(symbol), *function)
-        .transform([](Function value) { return Symbol{std::move(value)}; })
-        .transform_error([](ExtractionError) {
-          return std::make_error_code(std::errc::invalid_argument);
-        });
+  if (implicitCallable)
+    symbol.flags |= bit(ImplicitBit);
   return symbol;
 }
 

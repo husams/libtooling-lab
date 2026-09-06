@@ -30,9 +30,12 @@ std::expected<SymbolId, std::error_code> findOrStoreSymbolTarget(
                 ? std::expected<FileId, std::error_code>{builtinFileId}
                 : resolveFile(sourceManager, visible.getLocation(), files);
         return file.and_then([&](FileId id) {
-          return externalSymbol(visible, usr).and_then([&](Symbol symbol) {
-            return store.save(id, std::move(symbol));
-          });
+          const auto implicitCallable =
+              llvm::isa<clang::FunctionDecl>(visible) && visible.isImplicit();
+          return externalSymbol(visible, usr, implicitCallable)
+              .and_then([&](Symbol symbol) {
+                return store.save(id, std::move(symbol));
+              });
         });
       });
 }

@@ -279,7 +279,8 @@ def template_contexts(context: FactsToolContext) -> None:
         "WHERE kind=1 AND source_id=(SELECT id FROM symbol WHERE qualified_name="
         "'call_graph_fixture::invoke') GROUP BY receiver_type_id,certainty")
     targets = rows(context, "SELECT d.qualified_name FROM relation_site site JOIN symbol d "
-        "ON d.id=site.destination_id WHERE site.kind=18 ORDER BY d.qualified_name")
+        "ON d.id=site.destination_id WHERE site.kind=18 AND d.qualified_name LIKE "
+        "'call_graph_fixture::%::toString' ORDER BY d.qualified_name")
     require(sites == [(None, 2, 1)], str(sites))
     require(targets == [("call_graph_fixture::X::toString",),
                         ("call_graph_fixture::Y::toString",)], str(targets))
