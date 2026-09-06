@@ -35,11 +35,7 @@ void MatchCallback::run(
                 std::cout << "symbol kind=" << symbol.kind
                           << " name=" << symbol.name << '\n';
                 std::vector<MatchedSymbol> matched;
-                if (symbol.index)
-                  matched.push_back(std::move(*symbol.index));
-                else
-                  std::cerr << "facts-tool: match index skipped reason="
-                            << symbol.indexSkipReason << '\n';
+                appendMatchedIndex(matched, std::move(symbol));
                 return matched;
               });
         } else if constexpr (std::is_same_v<Value, RelationMatch>) {

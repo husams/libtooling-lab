@@ -50,8 +50,19 @@ Feature: Matched symbol index
   Scenario: Invalid clear file IDs are rejected without writes
     Given an S-026 matcher project pair
     And the S-026 caller symbol is already indexed
-    When the matched index is cleared with file ID zero
+    When the matched index is cleared with invalid file IDs
     Then the invalid file ID is rejected without changing candidates
+
+  Scenario: Empty name selectors are rejected
+    Given an S-026 matcher project pair
+    When matched-symbol lookup receives an empty name selector
+    Then the empty matched-symbol selector is rejected
+
+  Scenario: Unknown positive clear file IDs are no-ops
+    Given an S-026 matcher project pair
+    And the S-026 caller symbol is already indexed
+    When the matched index is cleared with an unknown positive file ID
+    Then the unknown clear succeeds without changing candidates
 
   Scenario: Extraction performs zero matched-index writes
     Given an S-026 matcher project pair

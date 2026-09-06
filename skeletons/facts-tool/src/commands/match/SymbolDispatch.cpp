@@ -12,6 +12,9 @@
 #include <clang/AST/DeclCXX.h>
 #include <clang/AST/DeclTemplate.h>
 
+#include <iostream>
+#include <utility>
+
 namespace facts::commands::match {
 namespace {
 std::expected<clang::NamedDecl *, std::string>
@@ -64,6 +67,15 @@ indexRecord(const clang::NamedDecl &node, std::string usr,
       });
 }
 } // namespace
+
+void appendMatchedIndex(std::vector<MatchedSymbol> &matched,
+                        PersistedSymbol symbol) {
+  if (symbol.index)
+    matched.push_back(std::move(*symbol.index));
+  else
+    std::cerr << "facts-tool: match index skipped reason="
+              << symbol.indexSkipReason << '\n';
+}
 
 std::expected<PersistedSymbol, std::string>
 persistSymbol(const clang::NamedDecl &bound, clang::ASTContext &context,

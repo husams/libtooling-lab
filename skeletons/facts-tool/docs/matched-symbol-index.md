@@ -19,7 +19,7 @@ facts-tool symbol find --conf project.sqlite --name '%' --format json
 ```
 
 Choose exactly one selector. `--usr` is exact; `--name` is a case-sensitive
-literal substring, so `%` and `_` are ordinary characters. All compatible
+non-empty literal substring, so `%` and `_` are ordinary characters. All compatible
 registered repositories and components are searched by default, and results
 are ordered by USR then file ID.
 
@@ -39,9 +39,13 @@ facts-tool match --conf project.sqlite --facts facts.sqlite \
 
 Ordinary matching is additive and never erases unrelated candidates. Use an
 explicit clear followed by a successful rematch when replacement semantics are
-required. Removing a file through the native catalog command cascades its
+required. Clearing an unknown positive file ID is a successful no-op. Removing
+a file through the native catalog command cascades its
 candidate rows; extraction does not remove file identities to maintain this
 index.
+
+Project databases created before schema version 1 need one `facts-tool import`
+run before extract, match, lookup, or clear; the import migrates in place.
 
 For separate stores, a successful match commits facts before one project-index
 transaction. An index write failure reports

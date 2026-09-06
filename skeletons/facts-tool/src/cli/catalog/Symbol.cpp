@@ -3,6 +3,8 @@
 #include "cli/catalog/Options.h"
 #include <CLI/CLI.hpp>
 
+#include <limits>
+
 namespace facts::cli {
 namespace {
 
@@ -49,8 +51,16 @@ CLI::App *configureSymbol(CLI::App &app, SymbolOptions &options) {
   auto &selector = *find.add_option_group("selector", "Select exactly one");
   selector.require_option(1, 1);
   selector.add_option("--usr", options.usr, "Exact USR");
-  selector.add_option("--name", options.name,
-                      "Literal qualified-name substring");
+  selector
+      .add_option_function<std::string>(
+          "--name",
+          [&options](const std::string &value) {
+            if (value.empty())
+              throw CLI::ValidationError("--name must not be empty");
+            options.name = value;
+          },
+          "Literal qualified-name substring")
+      ->trigger_on_parse();
   find.add_option("--kind", options.kind, "Raw Clang index symbol kind");
   find.add_option("--format", options.format, "Output: text or json")
       ->check(CLI::IsMember({"text", "json"}));
@@ -61,7 +71,8 @@ CLI::App *configureSymbol(CLI::App &app, SymbolOptions &options) {
              SymbolOptions::Action::clearIndex)
       .add_option("--file-id", options.fileId)
       ->required()
-      ->check(CLI::PositiveNumber);
+      ->check(CLI::Range(std::int64_t{1},
+                         std::numeric_limits<std::int64_t>::max()));
   return group;
 }
 

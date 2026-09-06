@@ -62,18 +62,19 @@ def unregistered_header_not_indexed(context: FactsToolContext) -> None:
             "unregistered row published")
 
 
-@when("the matched index is cleared with file ID zero")
+@when("the matched index is cleared with invalid file IDs")
 def clear_invalid_file(context: FactsToolContext) -> None:
     context.s026_before_invalid_clear = find(context, "--name", "targeted_match")["matches"]
-    context.s026_invalid_clear = run([
-        str(context.facts_tool), "symbol", "index", "clear", "-v", "0",
-        "--conf", str(context.files_database), "--file-id", "0",
-    ])
+    base = [str(context.facts_tool), "symbol", "index", "clear", "-v", "0",
+            "--conf", str(context.files_database), "--file-id"]
+    context.s026_invalid_clears = [run([*base, value]) for value in ("0", "-1")]
 
 
 @then("the invalid file ID is rejected without changing candidates")
 def invalid_file_rejected(context: FactsToolContext) -> None:
-    require(context.s026_invalid_clear.returncode == 2,
-            context.s026_invalid_clear.stdout + context.s026_invalid_clear.stderr)
+    require(all(result.returncode == 2 for result in context.s026_invalid_clears),
+            "\n".join(result.stdout + result.stderr for result in context.s026_invalid_clears))
+    require(all("2.22507" not in result.stderr for result in context.s026_invalid_clears),
+            "floating-point ID range reported")
     require(find(context, "--name", "targeted_match")["matches"] ==
             context.s026_before_invalid_clear, "invalid clear changed candidates")

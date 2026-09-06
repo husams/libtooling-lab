@@ -66,10 +66,8 @@ persistRelation(const RelationMatch &match, clang::ASTContext &context,
                           << " source=" << source.name
                           << " target=" << target.name << '\n';
                 std::vector<MatchedSymbol> matched;
-                if (source.index)
-                  matched.push_back(std::move(*source.index));
-                if (target.index)
-                  matched.push_back(std::move(*target.index));
+                appendMatchedIndex(matched, std::move(source));
+                appendMatchedIndex(matched, std::move(target));
                 return matched;
               });
             });

@@ -75,6 +75,7 @@ pytest_plugins = (
     "steps.native_matcher_workflow_steps",
     "steps.matched_symbol_index_steps",
     "steps.matched_symbol_identity_steps",
+    "steps.matched_symbol_cli_steps",
     "steps.matched_symbol_invalid_steps",
     "steps.matched_symbol_lifecycle_steps",
     "steps.matched_symbol_performance_steps",

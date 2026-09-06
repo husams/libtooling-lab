@@ -169,6 +169,7 @@ add_library(facts-storage STATIC
   src/storage/Parameter.cpp
   src/storage/ProjectConfiguration.cpp
   src/storage/ProjectSchema.cpp
+  src/storage/ProjectSchemaMigration.cpp
   src/storage/Record.cpp
   src/storage/RecordInstance.cpp
   src/storage/RecordTemplate.cpp

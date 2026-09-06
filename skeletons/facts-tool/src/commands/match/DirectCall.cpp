@@ -42,8 +42,7 @@ persistDirectCall(const DirectCallMatch &match, clang::ASTContext &context,
           return std::unexpected(linked.error().message);
         printArguments(match.call, context);
         std::vector<MatchedSymbol> matched;
-        if (persisted.second.index)
-          matched.push_back(std::move(*persisted.second.index));
+        appendMatchedIndex(matched, std::move(persisted.second));
         return matched;
       });
 }
