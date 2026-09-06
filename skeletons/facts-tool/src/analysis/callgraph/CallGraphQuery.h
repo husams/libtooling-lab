@@ -40,6 +40,7 @@ struct QueryEdge {
   unsigned offset = 0;
   std::optional<std::string> receiver;
   std::optional<ReceiverCertainty> certainty;
+  unsigned position = 0;
   bool implicit = false;
   std::optional<SymbolId> receiverId;
 };

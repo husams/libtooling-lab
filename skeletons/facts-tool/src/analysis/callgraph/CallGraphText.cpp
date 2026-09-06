@@ -1,16 +1,11 @@
 #include "analysis/callgraph/CallGraphText.h"
 
 #include "analysis/callgraph/CallGraphCoverage.h"
+#include "analysis/callgraph/CallGraphOrder.h"
 #include <format>
-#include <ranges>
 
 namespace facts::callgraph {
 namespace {
-const QueryNode *findNode(const QueryGraph &graph, SymbolId id) {
-  const auto found = std::ranges::find(graph.nodes, id, &QueryNode::id);
-  return found == graph.nodes.end() ? nullptr : &*found;
-}
-
 std::string_view kindName(RelationKind kind) {
   return kind == RelationKind::DispatchCalls ? "DispatchCalls" : "Calls";
 }
@@ -41,8 +36,8 @@ std::string renderCallGraphText(const QueryGraph &graph,
   for (const auto *root : roots)
     text += std::format("root={} usr={}\n", root->name, root->usr);
   for (const auto &value : traversal.edges) {
-    const auto *source = findNode(graph, value.edge.source);
-    const auto *target = findNode(graph, value.edge.destination);
+    const auto *source = detail::findSearchNode(graph, value.edge.source);
+    const auto *target = detail::findSearchNode(graph, value.edge.destination);
     const auto semantic =
         view == EdgeView::Semantic
             ? std::format(" semantic-kind={}",

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "storage/catalog/Requests.h"
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -35,7 +37,7 @@ struct FileOptions {
 };
 
 struct SymbolOptions {
-  enum class Action { list, show, browser };
+  enum class Action { list, show, browser, find, clearIndex };
   int verbosity = 0;
   std::string facts;
   bool factsProvided = false;
@@ -43,6 +45,11 @@ struct SymbolOptions {
   std::string configurationFile;
   Action action = Action::list;
   std::string qualifiedName;
+  std::optional<std::string> usr;
+  std::optional<std::string> name;
+  std::optional<std::int64_t> kind;
+  std::string format = "text";
+  std::int64_t fileId = 0;
 };
 
 struct ComponentOptions {

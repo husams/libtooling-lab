@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS project_registry (
   id          INTEGER PRIMARY KEY CHECK(id = 1),
   complete    INTEGER NOT NULL DEFAULT 0,
   fingerprint TEXT NOT NULL DEFAULT '',
-  file_count  INTEGER NOT NULL DEFAULT 0
+  file_count  INTEGER NOT NULL DEFAULT 0,
+  schema_version INTEGER NOT NULL DEFAULT 0
 );
 
 INSERT OR IGNORE INTO project_registry(id, complete, fingerprint, file_count)

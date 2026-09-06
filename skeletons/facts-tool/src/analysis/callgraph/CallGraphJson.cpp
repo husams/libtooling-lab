@@ -1,14 +1,17 @@
 #include "analysis/callgraph/CallGraphJson.h"
 #include "analysis/callgraph/CallGraphJsonDetail.h"
+#include "analysis/callgraph/CallGraphJsonQuery.h"
 
 #include <llvm/Support/raw_ostream.h>
 
 namespace facts::callgraph {
 
-std::string renderCallGraphJson(const QueryGraph &graph,
-                                const std::vector<const QueryNode *> &roots,
-                                const RenderedGraph &traversal,
-                                const CoverageReport *coverage, EdgeView view) {
+std::string renderCallGraphJson(
+    const QueryGraph &graph, const std::vector<const QueryNode *> &roots,
+    const RenderedGraph &traversal, const CoverageReport *coverage,
+    EdgeView view, QueryMode mode, std::optional<PathMode> pathMode,
+    const QueryNode *target, const std::vector<QueryPath> &paths,
+    std::string_view result) {
   llvm::json::Array rootValues;
   for (const auto *root : roots)
     rootValues.push_back(llvm::json::Object{{"id", detail::stableId(root->id)},
@@ -50,6 +53,7 @@ std::string renderCallGraphJson(const QueryGraph &graph,
       {"roots", std::move(rootValues)},
       {"nodes", std::move(nodeValues)},
       {"edges", std::move(edgeValues)}};
+  detail::addQueryJson(output, mode, pathMode, target, paths, result);
   std::string text;
   llvm::raw_string_ostream stream(text);
   stream << llvm::json::Value(std::move(output)) << '\n';

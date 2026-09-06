@@ -1,14 +1,19 @@
 #include "commands/match/SymbolDispatch.h"
 
+#include "ast/StoreExtracted.h"
+#include "ast/extractors/File.h"
 #include "ast/extractors/NamedDecl.h"
 #include "ast/extractors/RelationTarget.h"
-#include "ast/StoreExtracted.h"
 #include "ast/visitors/SymbolCollector.h"
 #include "storage/FactStore.h"
+#include "storage/SemanticProperties.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/DeclCXX.h>
 #include <clang/AST/DeclTemplate.h>
+
+#include <iostream>
+#include <utility>
 
 namespace facts::commands::match {
 namespace {
@@ -46,7 +51,31 @@ std::string kindName(const clang::NamedDecl &node) {
     return "enum";
   return "variable";
 }
+
+std::expected<MatchedSymbol, std::string>
+indexRecord(const clang::NamedDecl &node, std::string usr,
+            clang::ASTContext &context, FileManager &files) {
+  return resolveFile(context.getSourceManager(), node.getLocation(), files)
+      .transform_error([](auto) { return std::string{"unregistered-file"}; })
+      .and_then([&](FileId file) -> std::expected<MatchedSymbol, std::string> {
+        if (file == builtinFileId)
+          return std::unexpected("unregistered-file");
+        return MatchedSymbol{
+            std::move(usr),
+            extractQualifiedName(node, context.getSourceManager()), file,
+            storage::storedSymbolKind(clang::index::getSymbolInfo(&node).Kind)};
+      });
+}
 } // namespace
+
+void appendMatchedIndex(std::vector<MatchedSymbol> &matched,
+                        PersistedSymbol symbol) {
+  if (symbol.index)
+    matched.push_back(std::move(*symbol.index));
+  else
+    std::cerr << "facts-tool: match index skipped reason="
+              << symbol.indexSkipReason << '\n';
+}
 
 std::expected<PersistedSymbol, std::string>
 persistSymbol(const clang::NamedDecl &bound, clang::ASTContext &context,
@@ -58,41 +87,41 @@ persistSymbol(const clang::NamedDecl &bound, clang::ASTContext &context,
         if (!usr)
           return std::unexpected("cannot persist bound symbol '" +
                                  node->getQualifiedNameAsString() +
-                                 "': invalid USR");
+                                 "': invalid-usr");
+        auto indexed = indexRecord(*node, *usr, context, files);
         auto collected = collectDeclaredSymbol(*node, context, files, store);
         if (!collected)
           return std::unexpected("cannot persist bound symbol '" +
-                                 node->getQualifiedNameAsString() +
-                                 "' usr='" + *usr + "': " +
-                                 collected.error().message);
+                                 node->getQualifiedNameAsString() + "' usr='" +
+                                 *usr + "': " + collected.error().message);
         auto id = store.findId(*usr);
         if (!id)
           return std::unexpected("cannot persist bound symbol '" +
-                                 node->getQualifiedNameAsString() +
-                                 "' usr='" + *usr + "': " +
-                                 id.error().message());
+                                 node->getQualifiedNameAsString() + "' usr='" +
+                                 *usr + "': " + id.error().message());
         if (!*id) {
-          auto external = resolveRelationTarget(*node,
-                                                context.getSourceManager(),
-                                                files, store);
+          auto external = resolveRelationTarget(
+              *node, context.getSourceManager(), files, store);
           if (!external)
-            return std::unexpected("cannot persist bound symbol '" +
-                                   node->getQualifiedNameAsString() +
-                                   "' usr='" + *usr + "': " +
-                                   std::string{extractionErrorName(
-                                       external.error())});
+            return std::unexpected(
+                "cannot persist bound symbol '" +
+                node->getQualifiedNameAsString() + "' usr='" + *usr +
+                "': " + std::string{extractionErrorName(external.error())});
           if (!*external)
             return std::unexpected("bound symbol '" +
                                    node->getQualifiedNameAsString() +
-                                   "' usr='" + *usr +
-                                   "' was not persisted");
+                                   "' usr='" + *usr + "' was not persisted");
           return PersistedSymbol{
               **external, kindName(bound),
-              extractQualifiedName(*node, context.getSourceManager())};
+              extractQualifiedName(*node, context.getSourceManager()),
+              indexed ? std::optional{std::move(*indexed)} : std::nullopt,
+              indexed ? "" : indexed.error()};
         }
         return PersistedSymbol{
             **id, kindName(bound),
-            extractQualifiedName(*node, context.getSourceManager())};
+            extractQualifiedName(*node, context.getSourceManager()),
+            indexed ? std::optional{std::move(*indexed)} : std::nullopt,
+            indexed ? "" : indexed.error()};
       });
 }
 

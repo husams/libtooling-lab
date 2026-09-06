@@ -1,9 +1,12 @@
 #pragma once
 
+#include "model/MatchedSymbol.h"
 #include "model/SymbolId.h"
 
 #include <expected>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace clang {
 class ASTContext;
@@ -20,7 +23,12 @@ struct PersistedSymbol {
   SymbolId id;
   std::string kind;
   std::string name;
+  std::optional<MatchedSymbol> index;
+  std::string indexSkipReason;
 };
+
+void appendMatchedIndex(std::vector<MatchedSymbol> &matched,
+                        PersistedSymbol symbol);
 
 std::expected<PersistedSymbol, std::string>
 persistSymbol(const clang::NamedDecl &node, clang::ASTContext &context,

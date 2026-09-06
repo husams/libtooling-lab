@@ -1,6 +1,6 @@
 # S-014 command-level boundary assertions live in catalog_file_symbol.feature:
 # every file command preserves the facts database byte-for-byte, while every
-# symbol command preserves both the facts and project-configuration databases.
+# read-only symbol commands preserve both the facts and project databases.
 Feature: Facts and file storage boundaries
   The file registry remains independent from extracted semantic facts.
 
@@ -25,6 +25,7 @@ Feature: Facts and file storage boundaries
       | component         |
       | directory         |
       | file              |
+      | matched_symbol_index |
       | project_registry  |
       | repository        |
       | semantic_universe |

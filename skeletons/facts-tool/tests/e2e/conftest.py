@@ -31,6 +31,7 @@ pytest_plugins = (
     "steps.call_graph_steps",
     "steps.s022_call_graph_steps",
     "steps.s022_review_steps",
+    "steps.call_graph_query_steps",
     "steps.common_steps",
     "steps.configuration_defaults_steps",
     "steps.database_steps",
@@ -75,6 +76,12 @@ pytest_plugins = (
     "steps.template_steps",
     "steps.targeted_match_steps",
     "steps.native_matcher_workflow_steps",
+    "steps.matched_symbol_index_steps",
+    "steps.matched_symbol_identity_steps",
+    "steps.matched_symbol_cli_steps",
+    "steps.matched_symbol_invalid_steps",
+    "steps.matched_symbol_lifecycle_steps",
+    "steps.matched_symbol_performance_steps",
 )
 
 

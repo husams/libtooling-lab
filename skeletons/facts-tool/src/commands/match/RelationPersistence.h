@@ -1,9 +1,11 @@
 #pragma once
 
 #include "commands/match/MatchTypes.h"
+#include "model/MatchedSymbol.h"
 
 #include <expected>
 #include <string>
+#include <vector>
 
 namespace clang {
 class ASTContext;
@@ -15,8 +17,7 @@ class FileManager;
 } // namespace facts
 
 namespace facts::commands::match {
-std::expected<void, std::string> persistRelation(const RelationMatch &match,
-                                                 clang::ASTContext &context,
-                                                 FileManager &files,
-                                                 FactStore &store);
+std::expected<std::vector<MatchedSymbol>, std::string>
+persistRelation(const RelationMatch &match, clang::ASTContext &context,
+                FileManager &files, FactStore &store);
 }

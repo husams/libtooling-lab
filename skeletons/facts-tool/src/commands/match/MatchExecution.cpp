@@ -1,6 +1,7 @@
 #include "commands/match/MatchExecution.h"
 
 #include "commands/match/MatchCallback.h"
+#include "commands/match/MatchPublication.h"
 #include "platform/PlatformFlags.h"
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
@@ -10,24 +11,11 @@
 #include <clang/Tooling/Tooling.h>
 
 namespace facts::commands::match {
-namespace {
 using Result = std::expected<int, std::string>;
 
-Result finish(FactStore &store, int status, std::optional<std::string> error) {
-  auto finished = status == 0 && !error ? store.end() : store.rollback();
-  if (!finished)
-    return std::unexpected("cannot finish facts transaction: " +
-                           finished.error().message());
-  if (error)
-    return std::unexpected(*error);
-  return status == 0 ? Result{0}
-                     : Result{std::unexpected(
-                           "translation unit matching failed")};
-}
-} // namespace
-
-Result execute(const cli::MatchOptions &options, CompilationDatabasePtr database,
-               FileManager &files, const std::vector<std::string> &sources) {
+Result execute(const cli::MatchOptions &options,
+               CompilationDatabasePtr database, FileManager &files,
+               const std::vector<std::string> &sources) {
   auto configured = configurePlatformCompilationDatabase(*database, sources);
   if (!configured)
     return std::unexpected("cannot configure translation units: " +
@@ -46,10 +34,12 @@ Result execute(const cli::MatchOptions &options, CompilationDatabasePtr database
   MatchCallback callback(options, files, store);
   clang::ast_matchers::MatchFinder finder;
   if (!finder.addDynamicMatcher(*matcher, &callback))
-    return finish(store, 1, "matcher cannot run at the top level");
+    return finishMatch(store, options, 1, "matcher cannot run at the top level",
+                       {});
   const auto status =
       tool.run(clang::tooling::newFrontendActionFactory(&finder).get());
-  return finish(store, status, callback.error());
+  return finishMatch(store, options, status, callback.error(),
+                     callback.matchedSymbols());
 }
 
 } // namespace facts::commands::match
