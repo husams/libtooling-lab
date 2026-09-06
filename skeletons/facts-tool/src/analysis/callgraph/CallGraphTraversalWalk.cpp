@@ -64,8 +64,12 @@ TraversalEngine::run(const std::vector<const QueryNode *> &roots) {
           {root->id, exclusionReason(*root, request_.scope, coverage_)});
       continue;
     }
-    if (stopRequested(root->id) || !admitNode(root->id))
-      break;
+    if (stopRequested(root->id)) {
+      truncate(root->id, result_.reason);
+      continue;
+    }
+    if (!admitNode(root->id))
+      continue;
     walk(*root, {root->id, {}, {}}, 0, {});
   }
   return std::move(result_);

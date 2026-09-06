@@ -23,7 +23,7 @@ Select one root by qualified name or USR:
 facts-tool analyse call-graph -f facts.db -c project.db --function app::run
 ```
 
-Or list every definition-backed root with calls:
+Or list every definition-backed root:
 
 ```text
 facts-tool analyse call-graph -f facts.db -c project.db --all
@@ -40,16 +40,23 @@ or external symbol provides a semantic stop. Optional request-only controls are:
 
 Component and project/library filters require the matching project catalog.
 They cut at excluded endpoints, report observed boundary identities, and never
-walk through an excluded node to reconnect a permitted one. Node budgets count
-canonical symbol identities, edge budgets count canonical relation keys, depth
-counts call-edge hops, and time uses a monotonic clock. The root counts as one
-node. An exact-depth leaf with no qualifying outgoing edge is complete.
+walk through an excluded node to reconnect a permitted one. Selected roots are
+subject to the same endpoint filters, so an out-of-scope root is reported as
+excluded and `--calls-scope library` needs a library-side root. Node budgets
+count canonical symbol identities, edge budgets count canonical relation keys,
+depth counts call-edge hops, and time uses a monotonic clock. The root counts
+as one node. An exact-depth leaf with no qualifying outgoing edge is complete.
 
 Every reached budget reports its exact reason and discovered-but-unexpanded
 frontier while setting traversal coverage incomplete. SIGINT emits a coherent
 partial result when possible, reports `cancelled`, and exits 130. Filters,
 counters, timers, and cancellation state are released at process exit; neither
 the facts database nor project catalog is used as a result cache.
+
+Structural-budget frontier entries are discovered endpoints that were not
+admitted or expanded. For time limits and cancellation, the frontier also
+includes the admitted node whose expansion stopped and every remaining eligible
+selected root; filtered roots remain in `excluded_scope` instead.
 
 `-c/--conf` supplies the matching project catalog. When present, the command
 validates the project/facts file identities, resolves source paths, and reports

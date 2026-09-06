@@ -23,6 +23,20 @@ def structural_budgets(context: FactsToolContext) -> None:
                 not value["coverage"]["traversal_complete"], str(value))
 
 
+@then("a bounded all-root traversal preserves every skipped root")
+def all_root_frontier(context: FactsToolContext) -> None:
+    output = run([str(context.facts_tool), "analyse", "call-graph", "-v", "0",
+                  "-f", str(context.facts_database_path), "-c",
+                  str(context.files_database_path), "--format", "json", "--all",
+                  "--max-nodes", "1"])
+    require(output.returncode == 0, output.stdout + output.stderr)
+    value = json.loads(output.stdout)
+    frontier = {item["name"] for item in value["truncation"]["frontier"]}
+    require(frontier == {"scope_fixture::b", "scope_fixture::c",
+                         "scope_fixture::leaf"} and
+            value["truncation"]["reason"] == "max_nodes", str(value))
+
+
 @then("an exact-depth leaf is complete and cycles terminate without a cap")
 def leaf_and_cycle(context: FactsToolContext) -> None:
     leaf = run([str(context.facts_tool), "analyse", "call-graph", "-v", "0",

@@ -404,6 +404,11 @@ if(BUILD_TESTING)
   add_executable(call-graph-budget-test tests/CallGraphBudgetTest.cpp)
   target_link_libraries(call-graph-budget-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph-budget COMMAND call-graph-budget-test)
+  add_executable(call-graph-root-budget-test
+                 tests/CallGraphRootBudgetTest.cpp)
+  target_link_libraries(call-graph-root-budget-test PRIVATE facts-ast
+                                                            facts-storage)
+  add_test(NAME call-graph-root-budget COMMAND call-graph-root-budget-test)
   add_executable(file-manager-test tests/FileManagerTest.cpp)
   target_link_libraries(file-manager-test PRIVATE facts-storage facts-model
                                                 facts-clang facts-sqlite)

@@ -16,6 +16,9 @@ Feature: Optional call graph filters and traversal budgets
   Scenario: Structural budgets report exact partial frontiers
     Then each explicit structural budget reports its exact frontier
 
+  Scenario: All-root traversal reports every root skipped by a budget
+    Then a bounded all-root traversal preserves every skipped root
+
   Scenario: Exact-depth leaves and cycles terminate honestly
     Then an exact-depth leaf is complete and cycles terminate without a cap
 
