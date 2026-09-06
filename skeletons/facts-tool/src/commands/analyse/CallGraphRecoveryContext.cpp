@@ -22,6 +22,7 @@ loadRecoveryContext(const cli::CallGraphOptions &options) {
     return std::unexpected(snapshot.error());
   RecoveryContext context;
   context.project = resolved->database.string();
+  context.verbosity = options.verbosity;
   context.aliases = std::move(snapshot->labels);
   for (auto &file : *files)
     context.files.emplace(file.id, std::move(file));

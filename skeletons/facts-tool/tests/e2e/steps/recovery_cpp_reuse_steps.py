@@ -54,6 +54,8 @@ def recover_and_repeat(context):
         assert data["recovery"]["attempted"] == [], data["recovery"]
         assert data["recovery"]["reused"], data["recovery"]
         assert result.stderr.count("warning: S021_FRONTEND") == 1, result.stderr
+        assert "symbol(s) recorded" not in result.stderr, result.stderr
+        assert "coverage.unsupported_semantics" not in result.stderr, result.stderr
     with sqlite3.connect(context.facts_database_path) as db:
         names = [row[0] for row in db.execute("SELECT name FROM s021_generation")]
     assert names.count("bridge") == 1, names

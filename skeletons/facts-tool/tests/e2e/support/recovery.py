@@ -60,8 +60,8 @@ def extract(context, position):
                "--output", context.facts_database_path, context.recovery_sources[position])
 
 
-def graph(context, recover=True):
-    result = run(context, "analyse", "call-graph", "-v", "0", "--conf",
+def graph(context, recover=True, verbosity=0):
+    result = run(context, "analyse", "call-graph", "-v", verbosity, "--conf",
                  context.files_database_path, "--facts", context.facts_database_path,
                  "--function", "root", "--format", "json",
                  *(["--recover-missing"] if recover else []))

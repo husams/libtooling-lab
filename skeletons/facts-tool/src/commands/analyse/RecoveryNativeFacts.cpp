@@ -1,5 +1,6 @@
 #include "ast/Indexing.h"
 #include "ast/visitors/Traversal.h"
+#include "cli/Verbose.h"
 #include "commands/analyse/CallGraphRecoveryInternal.h"
 #include "commands/analyse/RecoveryScan.h"
 #include "storage/FactStore.h"
@@ -35,7 +36,12 @@ collectRecoveryNativeFacts(const RecoveryContext &context,
   if (!files)
     return std::unexpected(files.error());
   try {
-    FactStore store(path);
+    cli::logVerbose(context.verbosity, 1,
+                    "facts-tool: recovery-validation: temporary facts only; "
+                    "user facts unchanged");
+    // Coverage notices use level zero in ordinary extraction. A scratch
+    // validation exposes them only when verbose output was requested.
+    FactStore store(path, context.verbosity == 0 ? -1 : context.verbosity);
     if (auto begun = store.begin(); !begun)
       return std::unexpected(begun.error().message());
     IndexingStatus status;
@@ -45,7 +51,7 @@ collectRecoveryNativeFacts(const RecoveryContext &context,
       (void)store.rollback();
       return std::unexpected("native body evidence collection incomplete");
     }
-    if (auto ended = store.end(); !ended)
+    if (auto ended = store.end(false); !ended)
       return std::unexpected(ended.error().message());
     return callgraph::loadCallGraph(path);
   } catch (const std::exception &error) {

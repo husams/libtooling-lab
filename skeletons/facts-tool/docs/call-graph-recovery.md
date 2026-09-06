@@ -24,6 +24,10 @@ canonical graph evidence; it shares the extractor's handling of implicit range
 loops, iterator operators, initializer lists, constructors and destructor calls.
 The temporary store is removed after collection and never replaces the user's
 facts. Its evidence is cached for the candidate within the invocation.
+At default verbosity, temporary validation emits no extractor progress or
+coverage notices and never reports symbols as recorded into the user's facts.
+With `-v 1` or higher, validation identifies its temporary scope and enables
+extractor diagnostics at their usual levels; compiler errors remain visible.
 Existing non-stale body entries support reuse of
 derived virtual-dispatch evidence; unresolved call boundaries remain explicit.
 A missing entry alone does not force extraction, while incomplete or changed

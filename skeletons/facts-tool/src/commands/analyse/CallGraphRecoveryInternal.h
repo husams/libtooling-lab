@@ -24,6 +24,7 @@ struct RecoveryScan;
 
 struct RecoveryContext {
   std::string project;
+  int verbosity = 0;
   std::map<FileId, catalog::File> files;
   std::map<FileId, StoredCompileFile> commands;
   StoredCommandAliases aliases;

@@ -14,9 +14,11 @@ std::expected<void, std::error_code> FactStore::begin() {
   return storage_.begin();
 }
 
-std::expected<void, std::error_code> FactStore::end() {
-  return storage_.commit().transform([this] {
+std::expected<void, std::error_code> FactStore::end(bool reportSummary) {
+  return storage_.commit().transform([this, reportSummary] {
     callableInvocations_.clear();
+    if (!reportSummary)
+      return;
     const auto files = idsByUsr_ | std::views::values |
                        std::views::transform(&SymbolId::file) |
                        std::ranges::to<std::unordered_set>();
