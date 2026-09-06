@@ -29,11 +29,27 @@ Or list every definition-backed root with calls:
 facts-tool analyse call-graph -f facts.db -c project.db --all
 ```
 
-`--max-depth N` adds a positive traversal cap. Without it, traversal continues
-until a cycle, a reused context, or an external symbol. External boundaries are
-complete stops and are not reported as truncation. Output ordering is canonical
-and each edge reports relation kind, receiver context, source location, cycle
-reuse, external-boundary, and depth-truncation state.
+Traversal has no application cap by default: it continues across every
+registered component and available library edge until a cycle, reused context,
+or external symbol provides a semantic stop. Optional request-only controls are:
+
+- repeatable `--component NAME`, selecting the named component union;
+- `--calls-scope all|project|library`, defaulting to `all`;
+- positive `--max-depth`, `--max-nodes`, `--max-edges`, and
+  `--time-limit-ms` budgets.
+
+Component and project/library filters require the matching project catalog.
+They cut at excluded endpoints, report observed boundary identities, and never
+walk through an excluded node to reconnect a permitted one. Node budgets count
+canonical symbol identities, edge budgets count canonical relation keys, depth
+counts call-edge hops, and time uses a monotonic clock. The root counts as one
+node. An exact-depth leaf with no qualifying outgoing edge is complete.
+
+Every reached budget reports its exact reason and discovered-but-unexpanded
+frontier while setting traversal coverage incomplete. SIGINT emits a coherent
+partial result when possible, reports `cancelled`, and exits 130. Filters,
+counters, timers, and cancellation state are released at process exit; neither
+the facts database nor project catalog is used as a result cache.
 
 `-c/--conf` supplies the matching project catalog. When present, the command
 validates the project/facts file identities, resolves source paths, and reports
@@ -44,8 +60,11 @@ project-local declaration without a stored definition is
 third-party target remains an `external-boundary`.
 
 Use `--format json` for the stable `facts-tool.call-graph.v1` representation.
-It contains `complete`, `truncated`, `traversal`, `extraction_coverage`,
-`roots`, `nodes`, and `edges`. Node evidence includes the stable USR, resolved
+It contains `complete`, `query`, `coverage`, `truncation`, `excluded_scope`,
+`recovery`, `errors`, `traversal`, `extraction_coverage`, `roots`, `nodes`, and
+`edges`. `query` echoes explicit scope and nullable limits; `truncation` names
+the reason and frontier; `excluded_scope` reports filters plus observed node
+and edge identities/counts. Node evidence includes the stable USR, resolved
 declaration path, definition availability, a separate defining path/file/offset
 object, outgoing-call presence, catalog `indexed`/`indexed_at` values,
 freshness, the reserved failure member, coverage state, recommended action,

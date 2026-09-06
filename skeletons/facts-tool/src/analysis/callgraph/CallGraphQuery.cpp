@@ -13,7 +13,8 @@ auto loadEdges(storage::Database &database) {
   return catalog::query(
       database,
       "SELECT site.source_id,site.destination_id,site.kind,site.file_id,"
-      "site.line,site.col,site.offset,receiver.qualified_name,site.certainty "
+      "site.line,site.col,site.offset,receiver.qualified_name,site.certainty,"
+      "site.position "
       "FROM relation_site site LEFT JOIN symbol receiver ON receiver.id="
       "site.receiver_type_id JOIN symbol source ON source.id=site.source_id "
       "JOIN symbol destination ON destination.id=site.destination_id WHERE "
@@ -32,6 +33,7 @@ auto loadEdges(storage::Database &database) {
           edge.receiver = row.string(7);
         if (!row.isNull(8))
           edge.certainty = row.get<ReceiverCertainty>(8);
+        edge.position = static_cast<int>(row.integer(9));
         return edge;
       },
       static_cast<int>(RelationKind::Calls),

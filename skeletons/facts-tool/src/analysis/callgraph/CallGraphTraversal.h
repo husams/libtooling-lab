@@ -1,6 +1,7 @@
 #pragma once
 
 #include "analysis/callgraph/CallGraphQuery.h"
+#include "analysis/callgraph/CallGraphRequest.h"
 
 #include <optional>
 #include <string>
@@ -23,13 +24,19 @@ struct TraversedEdge {
 struct RenderedGraph {
   std::string text;
   unsigned truncated = 0;
+  std::string reason;
   std::vector<SymbolId> nodes;
   std::vector<TraversedEdge> edges;
+  std::vector<FrontierNode> frontier;
+  std::vector<FrontierNode> excludedNodes;
+  std::vector<ExcludedBoundary> excluded;
+  ScopeSelection scope;
+  TraversalLimits limits;
 };
 
 RenderedGraph renderCallGraph(const QueryGraph &graph,
                               const std::vector<const QueryNode *> &roots,
-                              std::optional<int> maxDepth,
+                              TraversalRequest request,
                               const CoverageReport *coverage = nullptr);
 
 } // namespace facts::callgraph

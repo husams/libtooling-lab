@@ -1,7 +1,9 @@
 #include "analysis/callgraph/CallGraphJson.h"
 #include "analysis/callgraph/CallGraphJsonDetail.h"
+#include "analysis/callgraph/CallGraphJsonRequest.h"
 
 #include <llvm/Support/raw_ostream.h>
+#include <ranges>
 
 namespace facts::callgraph {
 
@@ -11,9 +13,11 @@ std::string renderCallGraphJson(const QueryGraph &graph,
                                 const CoverageReport *coverage) {
   llvm::json::Array rootValues;
   for (const auto *root : roots)
-    rootValues.push_back(llvm::json::Object{{"id", detail::stableId(root->id)},
-                                            {"name", root->name},
-                                            {"usr", root->usr}});
+    if (std::ranges::find(traversal.nodes, root->id) != traversal.nodes.end())
+      rootValues.push_back(
+          llvm::json::Object{{"id", detail::stableId(root->id)},
+                             {"name", root->name},
+                             {"usr", root->usr}});
   llvm::json::Array nodeValues;
   for (const auto id : traversal.nodes)
     if (const auto *node = detail::findNode(graph, id))
@@ -32,9 +36,18 @@ std::string renderCallGraphJson(const QueryGraph &graph,
       {"schema", "facts-tool.call-graph.v1"},
       {"complete", traversal.truncated == 0},
       {"truncated", traversal.truncated},
+      {"query", queryJson(traversal)},
+      {"coverage",
+       llvm::json::Object{{"traversal_complete", traversal.truncated == 0}}},
+      {"truncation", truncationJson(graph, traversal)},
+      {"excluded_scope", excludedScopeJson(graph, traversal)},
+      {"recovery", llvm::json::Object{}},
+      {"errors", llvm::json::Array{}},
       {"traversal",
        llvm::json::Object{{"complete", traversal.truncated == 0},
-                          {"depth_truncated", traversal.truncated}}},
+                          {"depth_truncated", traversal.reason == "max_depth"
+                                                  ? traversal.truncated
+                                                  : 0}}},
       {"pair",
        llvm::json::Object{{"state", coverage ? "validated" : "unavailable"}}},
       {"extraction_coverage",

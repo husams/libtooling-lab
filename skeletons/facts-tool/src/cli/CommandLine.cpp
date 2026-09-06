@@ -1,4 +1,5 @@
 #include "cli/CommandLine.h"
+#include "cli/CallGraphCommandLine.h"
 #include "cli/ConfigurationOptions.h"
 #include "cli/Dispatch.h"
 #include "cli/MatchCommandLine.h"
@@ -6,7 +7,6 @@
 #include "cli/catalog/Configure.h"
 #include <CLI/CLI.hpp>
 #include <expected>
-#include <limits>
 #include <utility>
 
 namespace facts::cli {
@@ -199,11 +199,7 @@ private:
     scope->add_flag("--all", callGraph_.all,
                     "All definition-backed functions with calls");
     scope->require_option(1, 1);
-    command
-        .add_option("--max-depth", callGraph_.maxDepth,
-                    "Maximum traversal depth")
-        ->check(CLI::Range(1, std::numeric_limits<int>::max()))
-        ->type_name("N");
+    configureCallGraphOptions(command, callGraph_);
   }
 
   CLI::App app_;

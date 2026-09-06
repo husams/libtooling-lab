@@ -1,5 +1,6 @@
 #pragma once
 #include "cli/catalog/Options.h"
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <variant>
@@ -53,6 +54,11 @@ struct CallGraphOptions {
   std::optional<std::string> function;
   bool all = false;
   std::optional<int> maxDepth;
+  std::vector<std::string> components;
+  std::string callsScope = "all";
+  std::optional<std::uint64_t> maxNodes;
+  std::optional<std::uint64_t> maxEdges;
+  std::optional<std::uint64_t> timeLimitMs;
 };
 
 struct MatchOptions {

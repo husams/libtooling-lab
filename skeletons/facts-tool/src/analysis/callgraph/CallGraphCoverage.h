@@ -7,9 +7,20 @@
 
 namespace facts::callgraph {
 
+struct CoverageComponent {
+  std::int64_t id = 0;
+  std::string name;
+  std::string path;
+  std::string kind;
+};
+
 struct CoverageFile {
   FileId id;
   std::string path;
+  std::int64_t componentId = 0;
+  std::string componentName;
+  std::string componentPath;
+  std::string componentKind;
   bool projectLocal = false;
   bool indexed = false;
   std::optional<double> mtime;
@@ -18,6 +29,7 @@ struct CoverageFile {
 };
 
 struct CoverageReport {
+  std::vector<CoverageComponent> components;
   std::vector<CoverageFile> files;
   std::vector<std::string> recoveryCandidates;
 };
