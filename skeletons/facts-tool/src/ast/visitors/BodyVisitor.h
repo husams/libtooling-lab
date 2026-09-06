@@ -11,6 +11,10 @@
 #include <utility>
 #include <vector>
 
+namespace clang {
+class CallExpr;
+}
+
 namespace facts {
 class FactStore;
 class FileManager;
@@ -49,6 +53,7 @@ private:
   IndexingResult flushNestedBodies();
   IndexingResult persistInvocations();
   IndexingResult persistUses();
+  IndexingResult stageEvidence();
 
   const clang::FunctionDecl &owner_;
   clang::ASTContext &context_;

@@ -72,6 +72,19 @@ ExtractionResult<std::optional<callgraph::CallFact>> extractCallableSite(
                   receiver.declaration,
                   virtualDispatch && method && method->isVirtual()};
             });
+      })
+      .and_then([&](std::optional<callgraph::CallFact> fact)
+                    -> ExtractionResult<std::optional<callgraph::CallFact>> {
+        if (!fact)
+          return std::nullopt;
+        return store.isExternal(fact->relation.destination)
+            .transform([&](bool external) {
+              fact->externalTarget = external;
+              return fact;
+            })
+            .transform_error([](std::error_code) {
+              return ExtractionError::RelationTarget;
+            });
       });
 }
 

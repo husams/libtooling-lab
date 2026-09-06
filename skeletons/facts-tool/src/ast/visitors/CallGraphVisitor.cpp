@@ -4,43 +4,22 @@
 #include "analysis/callgraph/DispatchResolver.h"
 #include "ast/StoreExtracted.h"
 #include "ast/extractors/CallSite.h"
-#include "ast/extractors/DestructorCalls.h"
 #include "ast/extractors/OverrideRelation.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Expr.h>
 #include <clang/Analysis/CallGraph.h>
 
-#include <iterator>
+#include <utility>
 
 namespace facts {
-namespace {
-
-IndexingResult collectDestructors(const clang::FunctionDecl &caller,
-                                  clang::ASTContext &context,
-                                  FileManager &files, FactStore &store,
-                                  callgraph::CallGraphFacts &facts) {
-  const auto *definition = caller.getDefinition();
-  if (!definition)
-    return {};
-  return extractDestructorCalls(*definition, context, files, store)
-      .transform([&](auto calls) {
-        facts.calls.insert(facts.calls.end(),
-                           std::make_move_iterator(calls.begin()),
-                           std::make_move_iterator(calls.end()));
-      })
-      .transform_error([](ExtractionError error) {
-        return IndexingError{"cannot extract destructor invocation: " +
-                             std::string{extractionErrorName(error)}};
-      });
-}
-
-} // namespace
-
 IndexingResult CallGraphVisitor::run() {
   clang::CallGraph graph;
   graph.addToCallGraph(context_.getTranslationUnitDecl());
   callgraph::CallGraphFacts facts;
+  facts.calls = store_.takeCallableInvocations();
+  facts.entries = store_.takeCallGraphEntries();
+  facts.unresolved = store_.takeUnresolvedCallSites();
   for (const auto &entry : graph) {
     const auto *node = entry.second.get();
     if (node == graph.getRoot())
@@ -59,8 +38,7 @@ IndexingResult CallGraphVisitor::run() {
       facts.overrides.insert(facts.overrides.end(), overrides->begin(),
                              overrides->end());
     }
-    auto destructors =
-        collectDestructors(*caller, context_, files_, store_, facts);
+    auto destructors = collectDestructors(*caller, facts);
     if (!destructors)
       return destructors;
     for (const auto &[calleeNode, siteExpr] : node->callees()) {
@@ -70,8 +48,11 @@ IndexingResult CallGraphVisitor::run() {
                                      calleeNode->getDecl())
                            : call ? call->getDirectCallee()
                                   : nullptr;
-      if (!callee || !call)
+      if (!call)
         continue;
+      if (!callee) {
+        continue;
+      }
       auto fact = extractCallSite(*caller, *callee, *call,
                                   context_.getSourceManager(), files_, store_);
       if (!fact)

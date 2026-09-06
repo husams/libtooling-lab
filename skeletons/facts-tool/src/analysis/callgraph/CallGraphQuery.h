@@ -28,6 +28,7 @@ struct QueryNode {
   std::optional<QueryDefinition> definitionLocation;
   std::int64_t kind = 0;
   bool implicit = false;
+  unsigned unresolved = 0;
 };
 
 struct QueryEdge {

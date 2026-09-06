@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_STORAGE_FACT_STORE_H
 #define FACTS_TOOL_STORAGE_FACT_STORE_H
 
+#include "analysis/callgraph/CallGraphTypes.h"
 #include "cli/Trace.h"
 #include "storage/Storage.h"
 
@@ -13,6 +14,7 @@
 #include <unordered_map>
 #include <utility>
 #include <variant>
+#include <vector>
 
 namespace facts {
 
@@ -25,8 +27,72 @@ public:
   std::expected<void, std::error_code> rollback();
 
   std::expected<void, std::error_code>
+  registerFactProvenance(std::span<const storage::FactProvenance> rows,
+                         std::span<const FileId> selected = {}) {
+    return storage_.registerFactProvenance(rows, selected);
+  }
+
+  std::expected<void, std::error_code>
   upsertMatchedSymbols(std::span<const MatchedSymbol> symbols) {
     return storage_.upsertMatchedSymbols(symbols);
+  }
+
+  std::expected<void, std::error_code>
+  addCallGraphEntries(std::span<const CallGraphEntry> entries) {
+    return storage_.addCallGraphEntries(entries);
+  }
+
+  std::expected<void, std::error_code>
+  invalidateCallGraphEntries(std::span<const SymbolId> symbols) {
+    return storage_.invalidateCallGraphEntries(symbols);
+  }
+
+  std::expected<void, std::error_code>
+  invalidateCallGraphEntries(std::span<const FileId> files) {
+    return storage_.invalidateCallGraphEntries(files);
+  }
+
+  std::expected<void, std::error_code> invalidateCallGraphEntries(FileId file) {
+    return storage_.invalidateCallGraphEntries(file);
+  }
+
+  std::expected<std::optional<CallGraphEntry>, std::error_code>
+  findCallGraphEntry(SymbolId symbol) {
+    return storage_.findCallGraphEntry(symbol);
+  }
+
+  std::expected<bool, std::error_code> isExternal(SymbolId symbol) {
+    return storage_.isExternal(symbol);
+  }
+
+  std::expected<void, std::error_code> addCallGraphExternalReferences(
+      std::span<const ExternalReference> references) {
+    return storage_.addCallGraphExternalReferences(references);
+  }
+
+  std::expected<void, std::error_code>
+  addCallGraphFacts(std::span<const Relation> relations,
+                    std::span<const RelationSite> sites,
+                    std::span<const ExternalReference> references,
+                    std::span<const CallGraphEntry> entries,
+                    std::span<const UnresolvedCallSite> unresolved = {}) {
+    return storage_.addCallGraphFacts(relations, sites, references, entries,
+                                      unresolved);
+  }
+
+  std::expected<void, std::error_code>
+  addUnresolvedCallSites(std::span<const UnresolvedCallSite> sites) {
+    return storage_.addUnresolvedCallSites(sites);
+  }
+
+  std::expected<void, std::error_code>
+  clearUnresolvedCallSites(std::span<const SymbolId> callers) {
+    return storage_.clearUnresolvedCallSites(callers);
+  }
+
+  std::expected<void, std::error_code>
+  clearCallGraphFacts(std::span<const SymbolId> callers) {
+    return storage_.clearCallGraphFacts(callers);
   }
 
   template <typename Model>
@@ -168,11 +234,47 @@ public:
 
   int verbosity() const { return verbosity_; }
 
+  void stageCallGraphEntry(SymbolId symbol) {
+    callGraphEntries_.push_back(symbol);
+  }
+
+  void stageCallableInvocation(callgraph::CallFact fact) {
+    callableInvocations_.push_back(std::move(fact));
+  }
+
+  std::vector<callgraph::CallFact> takeCallableInvocations() {
+    return std::exchange(callableInvocations_, {});
+  }
+
+  void stageUnresolvedCallSite(UnresolvedCallSite site) {
+    unresolvedCallSites_.push_back(std::move(site));
+  }
+
+  const std::vector<SymbolId> &callGraphEntries() const {
+    return callGraphEntries_;
+  }
+
+  const std::vector<UnresolvedCallSite> &unresolvedCallSites() const {
+    return unresolvedCallSites_;
+  }
+
+  std::vector<SymbolId> takeCallGraphEntries() {
+    return std::exchange(callGraphEntries_, std::vector<SymbolId>{});
+  }
+
+  std::vector<UnresolvedCallSite> takeUnresolvedCallSites() {
+    return std::exchange(unresolvedCallSites_,
+                         std::vector<UnresolvedCallSite>{});
+  }
+
 private:
   void remember(std::string_view usr, SymbolId id);
 
   Storage storage_;
   std::unordered_map<std::string, SymbolId> idsByUsr_;
+  std::vector<SymbolId> callGraphEntries_;
+  std::vector<callgraph::CallFact> callableInvocations_;
+  std::vector<UnresolvedCallSite> unresolvedCallSites_;
   int verbosity_ = 0;
 };
 

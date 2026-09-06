@@ -4,6 +4,8 @@
 
 #include <llvm/Support/raw_ostream.h>
 
+#include <ranges>
+
 namespace facts::callgraph {
 
 std::string renderCallGraphJson(
@@ -24,6 +26,11 @@ std::string renderCallGraphJson(
   llvm::json::Array edgeValues;
   for (const auto &edge : traversal.edges)
     edgeValues.push_back(detail::edgeJson(graph, edge, coverage, view));
+  const auto unresolved = std::ranges::fold_left(
+      traversal.nodes, 0U, [&](unsigned count, SymbolId id) {
+        const auto *node = detail::findNode(graph, id);
+        return count + (node ? node->unresolved : 0U);
+      });
   llvm::json::Array candidates;
   if (coverage)
     for (const auto &path : coverage->recoveryCandidates)
@@ -44,6 +51,7 @@ std::string renderCallGraphJson(
       {"edge_view", std::string{edgeViewName(view)}},
       {"complete", traversal.truncated == 0},
       {"truncated", traversal.truncated},
+      {"unresolved", unresolved},
       {"traversal",
        llvm::json::Object{{"complete", traversal.truncated == 0},
                           {"depth_truncated", traversal.truncated}}},

@@ -513,6 +513,8 @@ class FactsToolContext:
             "import",
             "--conf",
             str(self.files_database_path),
+            "--facts",
+            str(self.facts_database_path),
             "--compilation-database",
             str(self.run_root_path),
             *(str(source) for source in requested_sources),

@@ -4,11 +4,16 @@
 
 namespace clang {
 class ASTContext;
-}
+class FunctionDecl;
+} // namespace clang
 
 namespace facts {
 class FactStore;
 class FileManager;
+
+namespace callgraph {
+struct CallGraphFacts;
+}
 
 class CallGraphVisitor final {
 public:
@@ -19,6 +24,8 @@ public:
   IndexingResult run();
 
 private:
+  IndexingResult collectDestructors(const clang::FunctionDecl &caller,
+                                    callgraph::CallGraphFacts &facts);
   clang::ASTContext &context_;
   FileManager &files_;
   FactStore &store_;

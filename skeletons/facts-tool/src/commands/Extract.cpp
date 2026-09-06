@@ -1,10 +1,11 @@
 #include "commands/Extract.h"
 
 #include "commands/CompilationDatabase.h"
+#include "commands/ConfigurationSupport.h"
 #include "commands/DatabasePaths.h"
 #include "commands/ExtraArguments.h"
 #include "commands/ExtractionSetup.h"
-#include "commands/ConfigurationSupport.h"
+#include "commands/FactPairValidation.h"
 
 #include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
@@ -112,9 +113,16 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         // facts_template default never creates a directory ahead of a
         // failure (B-030 C-3116).
         if (options.outputFromTemplate) {
-          if (auto created = materializeFactsDirectory(options.output); !created)
-            return std::expected<int, std::string>{std::unexpected(created.error())};
+          if (auto created = materializeFactsDirectory(options.output);
+              !created)
+            return std::expected<int, std::string>{
+                std::unexpected(created.error())};
         }
+        auto pairing =
+            prepareFactPairForWrite(options.output, options.configuration);
+        if (!pairing)
+          return std::expected<int, std::string>{
+              std::unexpected(pairing.error())};
         cli::logVerbose(options.verbosity, 1,
                         "facts-tool: extract: open output database");
         const auto openOutputStarted = TimingClock::now();
@@ -135,6 +143,26 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         const auto result = toolResult != 0       ? toolResult
                             : indexing.complete() ? 0
                                                   : 1;
+        if (result == 0) {
+          std::vector<FileId> selected;
+          selected.reserve(sources.size());
+          for (const auto &source : sources) {
+            auto id = files.getId(source);
+            if (!id) {
+              (void)store.rollback();
+              return std::expected<int, std::string>{std::unexpected(
+                  "cannot resolve extracted source: " + id.error().message())};
+            }
+            selected.push_back(*id);
+          }
+          auto registered =
+              registerFactPairProvenance(store, *pairing, selected);
+          if (!registered) {
+            (void)store.rollback();
+            return std::expected<int, std::string>{
+                std::unexpected(registered.error())};
+          }
+        }
         auto finished =
             result == 0
                 ? runExtractStage(options, "commit output transaction",
@@ -152,7 +180,8 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
 
 } // namespace
 
-std::expected<int, std::string> runExtractResolved(const cli::ExtractOptions &options) {
+std::expected<int, std::string>
+runExtractResolved(const cli::ExtractOptions &options) {
   return runExtractStage(options, "validate database paths",
                          [&] {
                            return validateDatabasePaths(options.output,
@@ -190,11 +219,13 @@ std::expected<int, std::string> runExtractResolved(const cli::ExtractOptions &op
 std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
   auto resolved = loadConfiguration(options.configuration,
                                     options.configurationFile, false, true);
-  if (!resolved) return std::unexpected(resolved.error());
+  if (!resolved)
+    return std::unexpected(resolved.error());
   auto configured = options;
   if (!configured.outputProvided) {
     auto output = resolveFactsOutput(*resolved, options.sources);
-    if (!output) return std::unexpected(output.error());
+    if (!output)
+      return std::unexpected(output.error());
     configured.output = output->string();
     configured.outputFromTemplate = true;
   }

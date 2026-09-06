@@ -23,6 +23,8 @@ struct ImportOptions {
   int verbosity = 0;
   std::string configuration;
   std::string configurationFile;
+  std::string facts;
+  bool factsProvided = false;
   std::vector<std::string> defaultExtraArguments;
   std::string compilationDatabase;
   std::vector<std::string> components;
@@ -59,6 +61,15 @@ struct CallGraphOptions {
   std::optional<std::string> pathMode;
 };
 
+struct CallGraphEntryOptions {
+  int verbosity = 0;
+  std::string facts;
+  std::string configuration;
+  std::string configurationFile;
+  std::string format = "text";
+  std::string function;
+};
+
 struct MatchOptions {
   int verbosity = 0;
   std::string facts;
@@ -77,9 +88,10 @@ struct ConfigOptions {
   std::string direct;
 };
 
-using Command = std::variant<ExtractOptions, ImportOptions, DependencyOptions,
-                             CallGraphOptions, MatchOptions, ConfigOptions,
-                             RepositoryOptions, ComponentOptions,
-                             DirectoryOptions, FileOptions, SymbolOptions>;
+using Command =
+    std::variant<ExtractOptions, ImportOptions, DependencyOptions,
+                 CallGraphOptions, CallGraphEntryOptions, MatchOptions,
+                 ConfigOptions, RepositoryOptions, ComponentOptions,
+                 DirectoryOptions, FileOptions, SymbolOptions>;
 
 } // namespace facts::cli

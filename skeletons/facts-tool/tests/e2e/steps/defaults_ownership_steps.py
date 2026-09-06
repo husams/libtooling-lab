@@ -7,7 +7,9 @@ def projects(defaults):
     defaults.other = defaults.root / "other"
     defaults.other.mkdir()
     (defaults.other / ".git").mkdir()
-    defaults.write(conf_root=str(defaults.root / "shared"), conf_template="same.db")
+    defaults.write(conf_root=str(defaults.root / "shared"),
+                   conf_template="same.db",
+                   facts_template=str(defaults.root / "shared-facts.db"))
     (defaults.other / ".facts-tool.yaml").write_bytes(defaults.files["project"].read_bytes())
     defaults.owned_db = defaults.root / "shared/same.db"
 

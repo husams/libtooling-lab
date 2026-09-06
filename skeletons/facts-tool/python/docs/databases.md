@@ -11,12 +11,18 @@ changes. The SDK creates no path, table, migration, backfill, journal setting,
 or persistent side file. Context exit and exceptional construction close both
 connections.
 
-Facts schema `user_version=10` is supported. A facts-shaped database with an
+Facts schemas `user_version=10` and `11` are supported. A facts-shaped database with an
 older version fails `E_SCHEMA` before missing new tables are considered.
 Required tables validate roles independently. Project schemas use required table
 shape because their current schema has no `user_version` contract. Missing
 FileIds referenced by symbols, definitions, sites, or includes prove a pair
 mismatch and fail with `E_DATABASE_PAIR`.
+
+Fresh schema 11 and its migration declare
+`facts_project_provenance(file_id, path, universe_key)`. The native writer uses
+this identity evidence to reject incompatible pairs. Migrating historical facts
+does not establish provenance: write to a new facts file and extract every source
+when the native writer reports that pairing cannot be proved.
 
 Numeric overlap cannot prove that arbitrary databases came from the same
 indexing run. Successful pairs therefore report `pairing="unverifiable"`.

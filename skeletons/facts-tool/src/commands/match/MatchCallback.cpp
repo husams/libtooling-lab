@@ -13,13 +13,20 @@
 namespace facts::commands::match {
 
 MatchCallback::MatchCallback(const cli::MatchOptions &options,
-                             FileManager &files, FactStore &store)
-    : options_(options), files_(files), store_(store) {}
+                             FileManager &files, FactStore &store,
+                             bool rejectLegacyWrites)
+    : options_(options), files_(files), store_(store),
+      rejectLegacyWrites_(rejectLegacyWrites) {}
 
 void MatchCallback::run(
     const clang::ast_matchers::MatchFinder::MatchResult &result) {
   if (error_)
     return;
+  if (rejectLegacyWrites_) {
+    error_ = "incompatible-symbol-universe: facts store has no provenance; "
+             "write to a new facts file and extract every source";
+    return;
+  }
   auto contract = classify(result.Nodes, options_.relationKind);
   if (!contract) {
     error_ = contract.error();

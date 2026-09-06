@@ -20,6 +20,9 @@ target the lambda's owned call-operator symbol.
 
 ## Querying
 
+Use [function entries](call-graph-entries.md) to distinguish committed body
+generation, missing entries, generated leaves, and retained external targets.
+
 Select one root by qualified name or USR:
 
 ```text

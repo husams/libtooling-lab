@@ -168,7 +168,8 @@ IndexingResult BodyVisitor::persistUses() {
 IndexingResult BodyVisitor::flush() {
   return flushNestedBodies()
       .and_then([&] { return persistUses(); })
-      .and_then([&] { return persistInvocations(); });
+      .and_then([&] { return persistInvocations(); })
+      .and_then([&] { return stageEvidence(); });
 }
 
 } // namespace facts

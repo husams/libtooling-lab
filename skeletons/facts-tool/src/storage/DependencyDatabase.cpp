@@ -7,8 +7,25 @@
 
 #include <sqlite3.h>
 
+#include <algorithm>
+#include <ranges>
+#include <vector>
+
 namespace facts {
 namespace {
+
+std::vector<FileId> provenanceSelection(std::span<const FileId> visitedSources,
+                                        std::span<const DependencyEdge> edges) {
+  std::vector<FileId> selected(visitedSources.begin(), visitedSources.end());
+  selected.reserve(selected.size() + edges.size() * 2);
+  for (const auto &edge : edges) {
+    selected.push_back(edge.source);
+    selected.push_back(edge.destination);
+  }
+  std::ranges::sort(selected);
+  selected.erase(std::ranges::unique(selected).begin(), selected.end());
+  return selected;
+}
 
 std::expected<void, std::error_code>
 initializeFactsDatabase(storage::Database &database) {
@@ -52,10 +69,20 @@ insertDependencies(storage::Database &database,
 
 std::expected<void, std::error_code>
 replace(storage::Database &database, std::span<const FileId> visitedSources,
-        std::span<const DependencyEdge> edges) {
+        std::span<const DependencyEdge> edges,
+        std::span<const storage::FactProvenance> provenance) {
+  const auto selected = provenanceSelection(visitedSources, edges);
   return database.write().and_then([&](storage::Transaction transaction) {
-    return deleteVisitedSources(database, visitedSources)
+    return database.execute("DELETE FROM callgraph_entry")
+        .and_then(
+            [&] { return deleteVisitedSources(database, visitedSources); })
         .and_then([&] { return insertDependencies(database, edges); })
+        .and_then([&] {
+          if (provenance.empty())
+            return std::expected<void, std::error_code>{};
+          return storage::registerFactProvenance(database, provenance,
+                                                 selected);
+        })
         .and_then([&] { return transaction.commit(); });
   });
 }
@@ -65,11 +92,13 @@ replace(storage::Database &database, std::span<const FileId> visitedSources,
 std::expected<void, std::error_code>
 replaceDependencies(const std::string &databasePath,
                     std::span<const FileId> visitedSources,
-                    std::span<const DependencyEdge> edges) {
+                    std::span<const DependencyEdge> edges,
+                    std::span<const storage::FactProvenance> provenance) {
   return storage::Database::open(databasePath, storage::Database::readWrite)
       .and_then([&](storage::Database database) {
-        return initializeFactsDatabase(database).and_then(
-            [&] { return replace(database, visitedSources, edges); });
+        return initializeFactsDatabase(database).and_then([&] {
+          return replace(database, visitedSources, edges, provenance);
+        });
       });
 }
 

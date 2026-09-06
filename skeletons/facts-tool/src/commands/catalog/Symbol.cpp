@@ -35,7 +35,7 @@ catalog::Result<int> runMatchedIndex(const cli::SymbolOptions &options) {
                          : renderMatchedSymbolsText(values);
             });
       },
-      false, options.configurationFile);
+      false, options.configurationFile, options.facts);
 }
 
 catalog::Result<int> renderScriptOutput(const cli::SymbolOptions &options,

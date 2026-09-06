@@ -3,7 +3,6 @@
 #include "analysis/callgraph/CallGraphLinker.h"
 #include "ast/StoreExtracted.h"
 #include "ast/extractors/CallableSite.h"
-#include "ast/extractors/UnsupportedSemantics.h"
 #include "storage/FactStore.h"
 
 #include <clang/AST/ASTContext.h>
@@ -26,15 +25,6 @@ void BodyVisitor::captureInvocation(
   } else if (*fact) {
     invocationFacts_.push_back(std::move(**fact));
   }
-}
-
-bool BodyVisitor::VisitCallExpr(clang::CallExpr *expression) {
-  const auto &sources = context_.getSourceManager();
-  if (!expression->getDirectCallee() && !expression->isTypeDependent() &&
-      !expression->isValueDependent())
-    reportUnsupportedSemantic("indirect-call", expression->getExprLoc(),
-                              sources, files_, store_);
-  return true;
 }
 
 bool BodyVisitor::VisitCXXConstructExpr(clang::CXXConstructExpr *expression) {
@@ -62,6 +52,8 @@ bool BodyVisitor::traverse(clang::Stmt *body) {
 }
 
 IndexingResult BodyVisitor::persistInvocations() {
+  for (const auto &fact : invocationFacts_)
+    store_.stageCallableInvocation(fact);
   return callgraph::linkCallGraphFacts(
       callgraph::CallGraphFacts{std::move(invocationFacts_), {}, {}}, store_);
 }
