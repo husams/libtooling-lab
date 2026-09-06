@@ -6,8 +6,31 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <llvm/ADT/SmallString.h>
+#include <llvm/Support/FileSystem.h>
 
 namespace {
+class RunDirectory {
+public:
+  explicit RunDirectory(const std::string &root) {
+    llvm::SmallString<256> directory;
+    if (auto error =
+            llvm::sys::fs::createUniqueDirectory(root + "/run", directory))
+      throw std::system_error(error);
+    path_ = directory.str().str();
+  }
+
+  ~RunDirectory() {
+    std::error_code error;
+    std::filesystem::remove_all(path_, error);
+  }
+
+  const std::filesystem::path &path() const { return path_; }
+
+private:
+  std::filesystem::path path_;
+};
+
 void require(bool valid) {
   if (!valid)
     throw std::runtime_error("declaration resolution invariant failed");
@@ -15,8 +38,8 @@ void require(bool valid) {
 
 void check(const std::string &root) {
   std::filesystem::create_directories(root);
-  const auto file =
-      std::filesystem::absolute(root + "/declarations.cpp").string();
+  const RunDirectory directory(std::filesystem::absolute(root).string());
+  const auto file = (directory.path() / "declarations.cpp").string();
   const std::string code = "int* seed() { return new int; }\n"
                            "void* operator new(decltype(sizeof(0)));\n"
                            "void ordinary();\n";
@@ -25,7 +48,7 @@ void check(const std::string &root) {
       clang::tooling::buildASTFromCodeWithArgs(code, {"-std=c++23"}, file);
   require(ast && !ast->getDiagnostics().hasErrorOccurred());
   auto &sm = ast->getASTContext().getSourceManager();
-  facts::FileManager files(":memory:");
+  facts::FileManager files((directory.path() / "registry.sqlite").string());
   facts::FactStore store(":memory:");
   unsigned checked = 0;
   for (auto *decl : ast->getASTContext().getTranslationUnitDecl()->decls()) {
