@@ -31,12 +31,14 @@ CLI::App *configureMatch(CLI::App &app, MatchOptions &options) {
       ->type_name("FILE");
   command
       ->add_option("--matcher", options.matcher,
-                   "Clang dynamic matcher expression")
+                   "Clang dynamic matcher expression; bind symbol, "
+                   "call+callee, or source+target[+site]")
       ->required()
       ->type_name("EXPR");
   command
       ->add_option("--relation-kind", options.relationKind,
-                   "Relation kind for source/target bindings")
+                   "Relation kind for source/target bindings; required for "
+                   "relation contracts")
       ->type_name("KIND");
   command->add_option("sources", options.sources,
                       "Translation units relative to the invocation directory; defaults to imported order");

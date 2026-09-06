@@ -41,7 +41,7 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
   }
   if (configured.facts.empty())
     return std::unexpected("facts-tool: usage error: --facts must not be empty");
-  if (explicitConfiguration &&
+  if (!(configured.factsProvided && !explicitConfiguration) &&
       std::filesystem::absolute(configured.facts).lexically_normal() ==
       std::filesystem::absolute(configured.configuration).lexically_normal())
     return std::unexpected(
@@ -49,8 +49,12 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
   auto loaded =
       loadStoredCompilationDatabase(configured.configuration, configured.sources);
   if (!loaded)
-    return std::unexpected("cannot load project configuration: " +
-                           loaded.error());
+    return std::unexpected(
+        "cannot load project configuration: " + loaded.error() +
+        (configured.factsProvided && !explicitConfiguration
+             ? "; pass --conf <project db> for a separate project database, "
+               "or omit --facts to use facts_template"
+             : ""));
   auto commands = requireStoredCommands(std::move(*loaded));
   if (!commands)
     return std::unexpected(commands.error());
@@ -66,6 +70,9 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
       requireRegisteredSources(**opened, **commands, sources, *registry);
   if (!registered)
     return std::unexpected(registered.error());
+  auto factsDirectory = materializeFactsDirectory(configured.facts);
+  if (!factsDirectory)
+    return std::unexpected(factsDirectory.error());
   return match::execute(configured, std::move(*commands), **opened, sources);
 }
 

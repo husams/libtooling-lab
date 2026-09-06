@@ -205,6 +205,13 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
                     return 0;
                   });
             });
+      })
+      .transform_error([](std::string error) {
+        if (error.starts_with("cannot resolve source file"))
+          return error +
+                 " (relative selectors are resolved relative to the "
+                 "invocation directory)";
+        return error;
       });
 }
 

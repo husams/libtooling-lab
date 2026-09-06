@@ -28,8 +28,9 @@ still participates above project and user YAML. `FACTS_TOOL_CONF` remains
 below explicit `--conf` and above generated project DB naming.
 
 `match` accepts `--conf`/`--config` for the project database and uses an
-explicit `--facts` path or the configured `facts_template`; when `--conf` is
-omitted, a supplied `--facts` retains the legacy combined-store behavior.
+explicit `--facts` path or the configured `facts_template`; when neither
+`--conf` nor `FACTS_TOOL_CONF` is set, a supplied `--facts` retains the legacy
+combined-store behavior.
 `analyse call-graph` still reads its explicit facts database. `config show`
 reports YAML extras but has no `--extra-arg` option. The override rule does not
 introduce new flags or keys.
