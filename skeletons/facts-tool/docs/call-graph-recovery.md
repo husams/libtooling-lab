@@ -18,9 +18,11 @@ remain discovery candidates. A symbol-only match establishes identity and a
 location, while full extraction supplies body and call evidence. Existing usable
 facts are reused, and extraction does not maintain the match-only index.
 Unknown freshness triggers read-only validation of current definition extents
-and complete direct-call occurrences against the stored graph; a missing entry
-alone does not force extraction. Unsupported or incomplete evidence falls back
-to recovery. Validated entry evidence is retained across recovery writes.
+and complete call occurrences against the stored graph, including constructors
+and implicit destructor calls. Existing non-stale body entries support reuse of
+derived virtual-dispatch evidence; unresolved call boundaries remain explicit.
+A missing entry alone does not force extraction, while incomplete or changed
+evidence requires recovery. Validated entry evidence survives recovery writes.
 External-unavailable targets remain coverage gaps without becoming project TU
 probes, and `--max-depth` limits both recovery and reused reporting.
 Recovery adds no graph analysis or maintenance to ordinary `extract`; its new
@@ -44,11 +46,13 @@ proof of complete source coverage.
 
 Retry tracking exists only during one invocation. Its identity includes the
 canonical store pair, TU, driver, working directory, effective ordered argv,
-registry fingerprint, and SHA-256 input contents. A successful preprocessing
-pass establishes the TU's current registered transitive input closure; only
+registry fingerprint, and SHA-256 input contents. The candidate's single front-end run supplies its matching definitions, body evidence and
+registered transitive input closure; only
 incomplete dependency coverage requires the full registered compiler-input set
-conservatively. Dependency discovery is refreshed before key construction;
-unchanged content hashes are reused after checking file identity and timestamps.
+conservatively. If extraction is needed it consumes that same parsed AST.
+Within the invocation, parsed candidates and content hashes are reused after
+checking the registry, registered-file availability, file identity and timestamps;
+changed inputs invalidate the candidate and its include closure.
 Unchanged failed attempts and no-match searches covering the current wanted-USR
 subset are suppressed. Changed input, configuration, or added wanted USRs can permit
 a new attempt; facts writes alone do not. A new process starts with no previous

@@ -1,5 +1,5 @@
 #include "commands/analyse/CallGraphRecoveryState.h"
-#include "commands/analyse/CallGraphRecoverySelection.h"
+#include "commands/analyse/RecoveryScan.h"
 #include <algorithm>
 #include <queue>
 
@@ -45,18 +45,16 @@ bool retainRecoveryInputs(RecoveryContext &before, RecoveryContext &after) {
   bool unchanged =
       recoveryRegistryFingerprint(before) == recoveryRegistryFingerprint(after);
   after.digests = std::move(before.digests);
-  for (const auto &[id, inputs] : before.inputClosures) {
-    const auto command = after.commands.find(id);
-    if (command == after.commands.end()) {
+  for (const auto &[id, scan] : before.scans) {
+    if (!recoveryScanCurrent(after, *scan)) {
       unchanged = false;
       continue;
     }
-    const RecoveryCandidate candidate{makeEntry(after, id, {}, ""),
-                                      command->second.path};
-    const auto currentInputs = recoveryRegisteredInputs(after, candidate);
-    const auto current = after.digests.digest(currentInputs);
-    if (!current || *current != before.closureDigests[id])
-      unchanged = false;
+    after.scans[id] = scan;
+    if (scan->completeInputs) {
+      after.inputClosures[id] = scan->inputs;
+      after.closureDigests[id] = scan->digest;
+    }
   }
   if (unchanged) {
     after.preservedUsrs = std::move(before.preservedUsrs);

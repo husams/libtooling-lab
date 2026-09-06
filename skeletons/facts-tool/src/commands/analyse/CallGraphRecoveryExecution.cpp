@@ -1,26 +1,23 @@
 #include "commands/analyse/CallGraphRecoveryInternal.h"
-#include "commands/analyse/RecoveryCompilation.h"
+#include "commands/analyse/RecoveryScan.h"
 
-#include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
-#include "commands/ExtractionSetup.h"
+#include "ast/visitors/Traversal.h"
 #include "commands/FactPairValidation.h"
-#include "platform/PlatformFlags.h"
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
-#include "tooling/StoredCompilationDatabase.h"
-
-#include <clang/Tooling/Tooling.h>
 
 namespace facts::commands {
 
 std::expected<RecoveryAttemptResult, std::string> extractRecoveryCandidate(
     const RecoveryContext &context, const cli::CallGraphOptions &options,
     const RecoveryCandidate &candidate, const RecoveryEvidence *retained) {
-  const std::vector<std::string> sources{candidate.source.string()};
   if (candidate.entry.arguments.empty())
     return std::unexpected(candidate.entry.reason);
-  RecoveryCompilation database(candidate);
+  const auto scan = context.scans.find(candidate.entry.tuFileId);
+  if (scan == context.scans.end() || scan->second->status != 0 ||
+      scan->second->units.empty())
+    return std::unexpected("missing parsed recovery translation unit");
   auto files = FileManager::openReadOnly(context.project, options.verbosity);
   if (!files)
     return std::unexpected(files.error());
@@ -32,15 +29,11 @@ std::expected<RecoveryAttemptResult, std::string> extractRecoveryCandidate(
     return std::unexpected("cannot begin recovery transaction: " +
                            begun.error().message());
   IndexingStatus status;
-  clang::tooling::ClangTool tool(database, sources);
-  tool.clearArgumentsAdjusters();
-  const int result =
-      tool.run(createFactExtractorFactory(**files, store, status).get());
-  if (result != 0 || !status.complete()) {
+  for (const auto &unit : scan->second->units)
+    traverse(unit->getASTContext(), **files, store, status);
+  if (!status.complete()) {
     (void)store.rollback();
-    return RecoveryAttemptResult{false, result != 0 ? "compiler returned " +
-                                                          std::to_string(result)
-                                                    : "indexing incomplete"};
+    return RecoveryAttemptResult{false, "indexing incomplete"};
   }
   auto id = (*files)->getId(candidate.source.string());
   if (!id) {

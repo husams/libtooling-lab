@@ -7,6 +7,7 @@
 
 namespace facts::commands {
 struct RecoveryCandidate;
+struct RecoveryContext;
 
 struct RecoveryDefinitionProof {
   std::string path;
@@ -20,14 +21,17 @@ struct RecoveryCallSite {
   unsigned offset = 0;
   unsigned line = 0;
   unsigned column = 0;
+  bool implicit = false;
 };
 
 struct RecoveryBodyFacts {
   std::map<std::string, std::vector<RecoveryCallSite>> calls;
   std::map<std::string, RecoveryDefinitionProof> definitions;
+  std::map<std::string, unsigned> unresolved;
   bool unsupported = false;
 };
 
 std::expected<RecoveryBodyFacts, std::string>
-scanRecoveryBody(const RecoveryCandidate &candidate);
+scanRecoveryBody(const RecoveryContext &context,
+                 const RecoveryCandidate &candidate);
 } // namespace facts::commands

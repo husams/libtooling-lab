@@ -1,43 +1,31 @@
 #include "commands/analyse/RecoveryEvidenceScanner.h"
-
 #include "commands/analyse/CallGraphRecoveryInternal.h"
-#include "commands/analyse/RecoveryCompilation.h"
 #include "commands/analyse/RecoveryEvidenceScannerCallback.h"
-#include "clang/ASTMatchers/ASTMatchFinder.h"
-#include "clang/Tooling/Tooling.h"
-
-#include <set>
-#include <vector>
+#include "commands/analyse/RecoveryScan.h"
+#include <clang/ASTMatchers/ASTMatchFinder.h>
 
 namespace facts::commands {
-std::expected<RecoveryBodyFacts, std::string>
-scanRecoveryBody(const RecoveryCandidate &candidate) {
-  if (candidate.entry.arguments.empty())
-    return std::unexpected("missing effective recovery command");
-  RecoveryBodyFacts facts;
+void collectRecoveryScanBodies(const RecoveryCandidate &candidate,
+                               RecoveryScan &scan) {
+  scan.facts = {};
   const std::set<std::string> wanted(candidate.entry.relatedUsrs.begin(),
                                      candidate.entry.relatedUsrs.end());
-  RecoveryCompilation database(candidate);
-  const std::vector<std::string> sources{candidate.source.string()};
-  clang::tooling::ClangTool tool(database, sources);
-  tool.clearArgumentsAdjusters();
-  RecoveryEvidenceCallback callback(facts, wanted);
-  using namespace clang::ast_matchers;
-  MatchFinder finder;
+  RecoveryEvidenceCallback callback(scan.facts, wanted);
+  clang::ast_matchers::MatchFinder finder;
   finder.addMatcher(
-      functionDecl(isDefinition(), forEachDescendant(callExpr().bind("site")))
-          .bind("owner"),
+      clang::ast_matchers::functionDecl(clang::ast_matchers::isDefinition())
+          .bind("definition"),
       &callback);
-  finder.addMatcher(functionDecl(isDefinition()).bind("definition"), &callback);
-  finder.addMatcher(
-      functionDecl(isDefinition(),
-                   forEachDescendant(stmt(anyOf(cxxConstructExpr(),
-                                                cxxNewExpr(), cxxDeleteExpr()))
-                                         .bind("unsupported")))
-          .bind("owner"),
-      &callback);
-  if (tool.run(clang::tooling::newFrontendActionFactory(&finder).get()) != 0)
+  for (const auto &unit : scan.units)
+    finder.matchAST(unit->getASTContext());
+}
+
+std::expected<RecoveryBodyFacts, std::string>
+scanRecoveryBody(const RecoveryContext &context,
+                 const RecoveryCandidate &candidate) {
+  const auto found = context.scans.find(candidate.entry.tuFileId);
+  if (found == context.scans.end() || found->second->status != 0)
     return std::unexpected("evidence validation compiler failure");
-  return facts;
+  return found->second->facts;
 }
 } // namespace facts::commands

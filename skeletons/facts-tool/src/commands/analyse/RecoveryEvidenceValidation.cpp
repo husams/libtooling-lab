@@ -1,4 +1,5 @@
 #include "commands/analyse/RecoveryEvidence.h"
+#include "commands/analyse/RecoveryEvidenceDefinition.h"
 
 #include "commands/analyse/CallGraphRecoveryInternal.h"
 #include "commands/analyse/RecoveryEvidenceScanner.h"
@@ -6,50 +7,38 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <ranges>
+#include <set>
 #include <tuple>
 #include <vector>
 
 namespace facts::commands {
-namespace {
 using CallKey =
-    std::tuple<std::string, std::string, unsigned, unsigned, unsigned>;
+    std::tuple<std::string, std::string, unsigned, unsigned, unsigned, bool>;
 
-std::expected<void, std::string>
-validateDefinition(const RecoveryContext &context,
-                   const callgraph::QueryNode &node,
-                   const RecoveryBodyFacts &facts) {
-  if (!node.definition || !node.definitionLocation || node.unresolved)
-    return std::unexpected("incomplete persisted body evidence");
-  const auto file = context.files.find(node.definitionLocation->file);
-  if (file == context.files.end())
-    return std::unexpected("definition file is not registered");
-  const auto path = catalog::filePath(file->second);
-  const auto proof = facts.definitions.find(node.usr);
-  if (!path || proof == facts.definitions.end() ||
-      std::filesystem::path(proof->second.path).lexically_normal() !=
-          path->lexically_normal() ||
-      node.definitionLocation->offset != proof->second.offset ||
-      node.definitionLocation->size != proof->second.size)
-    return std::unexpected("definition extent changed");
-  return {};
-}
-
-std::expected<void, std::string> validateCalls(
+static std::expected<void, std::string> validateCalls(
     const RecoveryContext &context, const callgraph::QueryGraph &graph,
     const callgraph::QueryNode &node, const RecoveryBodyFacts &facts) {
-  std::map<CallKey, unsigned> expected, persisted;
-  for (const auto &call : facts.calls.at(node.usr))
-    ++expected[{call.destination,
-                std::filesystem::path(call.path).lexically_normal().string(),
-                call.offset, call.line, call.column}];
+  std::set<CallKey> expected, persisted;
+  const auto calls = facts.calls.find(node.usr);
+  if (calls == facts.calls.end())
+    return std::unexpected("body call evidence is absent");
+  for (const auto &call : calls->second)
+    expected.insert(
+        {call.destination,
+         std::filesystem::path(call.path).lexically_normal().string(),
+         call.offset, call.line, call.column, call.implicit});
+  const auto unresolved = facts.unresolved.find(node.usr);
+  if ((unresolved == facts.unresolved.end() ? 0U : unresolved->second) !=
+      node.unresolved)
+    return std::unexpected("unresolved call evidence changed");
+  bool hasDispatch = false;
   for (const auto &edge : graph.edges) {
     if (edge.source != node.id)
       continue;
-    if (edge.implicit)
-      return std::unexpected("implicit call evidence is unsupported");
-    if (edge.kind == RelationKind::DispatchCalls)
-      return std::unexpected("dispatch call evidence is unsupported");
+    if (edge.kind == RelationKind::DispatchCalls) {
+      hasDispatch = true;
+      continue;
+    }
     if (edge.kind != RelationKind::Calls)
       continue;
     const auto target = std::ranges::find(graph.nodes, edge.destination,
@@ -60,19 +49,20 @@ std::expected<void, std::string> validateCalls(
     const auto path = catalog::filePath(file->second);
     if (!path)
       return std::unexpected(path.error());
-    ++persisted[{target->usr, path->lexically_normal().string(), edge.offset,
-                 edge.line, edge.column}];
+    persisted.insert({target->usr, path->lexically_normal().string(),
+                      edge.offset, edge.line, edge.column, edge.implicit});
   }
+  if (hasDispatch && !node.bodyEvidence)
+    return std::unexpected("dispatch evidence lacks persisted body proof");
   return expected == persisted
              ? std::expected<void, std::string>{}
              : std::unexpected("persisted call evidence is incomplete");
 }
-} // namespace
 
 std::expected<RecoveryEvidence, std::string> validateRecoveryEvidence(
     const RecoveryContext &context, const cli::CallGraphOptions &,
     const callgraph::QueryGraph &graph, const RecoveryCandidate &candidate) {
-  auto facts = scanRecoveryBody(candidate);
+  auto facts = scanRecoveryBody(context, candidate);
   if (!facts || facts->unsupported)
     return std::unexpected(facts ? "unsupported call evidence" : facts.error());
   std::vector<SymbolId> valid;
@@ -81,7 +71,8 @@ std::expected<RecoveryEvidence, std::string> validateRecoveryEvidence(
         std::ranges::find(graph.nodes, usr, &callgraph::QueryNode::usr);
     if (node == graph.nodes.end())
       return std::unexpected("requested evidence symbol is absent");
-    if (auto checked = validateDefinition(context, *node, *facts); !checked)
+    if (auto checked = validateRecoveryDefinition(context, *node, *facts);
+        !checked)
       return std::unexpected(checked.error());
     if (auto checked = validateCalls(context, graph, *node, *facts); !checked)
       return std::unexpected(checked.error());

@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <map>
+#include <memory>
 #include <set>
 #include <span>
 #include <vector>
@@ -18,6 +19,8 @@ struct RecoveryCandidate {
   RecoveryEntry entry;
   std::filesystem::path source;
 };
+
+struct RecoveryScan;
 
 struct RecoveryContext {
   std::string project;
@@ -32,6 +35,7 @@ struct RecoveryContext {
   std::map<FileId, std::vector<recovery::RegisteredInput>> inputClosures;
   std::map<FileId, std::string> closureDigests;
   recovery::InputDigestCache digests;
+  std::map<FileId, std::shared_ptr<RecoveryScan>> scans;
 };
 
 std::expected<RecoveryContext, std::string>

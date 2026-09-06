@@ -1,3 +1,4 @@
+#include "cli/Trace.h"
 #include "commands/analyse/CallGraphRecoveryInternal.h"
 #include "commands/analyse/CallGraphRecoveryPassHelpers.h"
 #include <algorithm>
@@ -38,8 +39,9 @@ std::expected<bool, std::string> processRecoveryCandidates(
     if (!processRecoveryProbe(context, candidate, *key, input.requested_usrs,
                               report, cache))
       continue;
-    if (auto valid =
-            validateRecoveryEvidence(context, options, graph, candidate)) {
+    const auto valid =
+        validateRecoveryEvidence(context, options, graph, candidate);
+    if (valid) {
       for (auto &node : graph.nodes)
         if (std::ranges::contains(candidate.entry.relatedUsrs, node.usr)) {
           node.bodyEvidence = true;
@@ -49,6 +51,9 @@ std::expected<bool, std::string> processRecoveryCandidates(
         }
       continue;
     }
+    cli::logVerbose(options.verbosity, 3,
+                    "facts-tool: recovery validation tu={} reason={}",
+                    candidate.entry.tuFileId, valid.error());
     std::vector<SymbolId> retainedIds;
     for (const auto &node : graph.nodes)
       if (preservedUsrs.contains(node.usr) && node.bodyEvidence)
