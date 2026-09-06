@@ -1,5 +1,4 @@
 #include "commands/analyse/CallGraphRecoverySelection.h"
-#include "tooling/CompilationCommandCodec.h"
 #include <algorithm>
 #include <queue>
 #include <ranges>
@@ -33,15 +32,12 @@ std::vector<FileId> indexedFiles(const RecoveryContext &context,
       }
     }
   }
-  if (result.empty())
-    return fallbackFiles(context, 0);
   std::ranges::sort(result);
   result.erase(std::ranges::unique(result).begin(), result.end());
   return result;
 }
 
-std::vector<FileId> fallbackFiles(const RecoveryContext &context,
-                                  FileId declarationFile) {
+std::vector<FileId> fallbackFiles(const RecoveryContext &context) {
   std::vector<FileId> result;
   for (const auto &[id, command] : context.commands)
     result.push_back(id);

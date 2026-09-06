@@ -14,10 +14,9 @@
 
 namespace facts::commands {
 
-std::expected<RecoveryAttemptResult, std::string>
-extractRecoveryCandidate(const RecoveryContext &context,
-                         const cli::CallGraphOptions &options,
-                         const RecoveryCandidate &candidate) {
+std::expected<RecoveryAttemptResult, std::string> extractRecoveryCandidate(
+    const RecoveryContext &context, const cli::CallGraphOptions &options,
+    const RecoveryCandidate &candidate, const RecoveryEvidence *retained) {
   const std::vector<std::string> sources{candidate.source.string()};
   if (candidate.entry.arguments.empty())
     return std::unexpected(candidate.entry.reason);
@@ -39,10 +38,9 @@ extractRecoveryCandidate(const RecoveryContext &context,
       tool.run(createFactExtractorFactory(**files, store, status).get());
   if (result != 0 || !status.complete()) {
     (void)store.rollback();
-    return RecoveryAttemptResult{false, result != 0
-                                          ? "compiler returned " +
-                                                std::to_string(result)
-                                          : "indexing incomplete"};
+    return RecoveryAttemptResult{false, result != 0 ? "compiler returned " +
+                                                          std::to_string(result)
+                                                    : "indexing incomplete"};
   }
   auto id = (*files)->getId(candidate.source.string());
   if (!id) {
@@ -55,6 +53,14 @@ extractRecoveryCandidate(const RecoveryContext &context,
       !registered) {
     (void)store.rollback();
     return std::unexpected(registered.error());
+  }
+  if (retained && !retained->entries.empty()) {
+    if (auto published = publishRecoveryEvidence(store, *retained);
+        !published) {
+      (void)store.rollback();
+      return std::unexpected("cannot republish recovery evidence: " +
+                             published.error().message());
+    }
   }
   if (auto ended = store.end(); !ended)
     return std::unexpected("cannot commit recovery transaction: " +

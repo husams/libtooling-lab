@@ -2,6 +2,7 @@
 
 #include "commands/analyse/CallGraphRecovery.h"
 #include "commands/analyse/RecoveryAttempts.h"
+#include "commands/analyse/RecoveryEvidence.h"
 #include "storage/catalog/Records.h"
 #include "tooling/StoredCompilationReader.h"
 
@@ -26,6 +27,11 @@ struct RecoveryContext {
   std::map<std::string, std::vector<FileId>> index;
   std::map<FileId, std::vector<FileId>> includes;
   std::set<std::string> preservedUsrs;
+  std::set<std::string> reusedUsrs;
+  std::map<std::string, FileId> reusedOwners;
+  std::map<FileId, std::vector<recovery::RegisteredInput>> inputClosures;
+  std::map<FileId, std::string> closureDigests;
+  recovery::InputDigestCache digests;
 };
 
 std::expected<RecoveryContext, std::string>
@@ -47,9 +53,14 @@ struct RecoveryProbeResult {
   std::set<std::string> matched;
 };
 
+std::vector<RecoveryEntry>
+collectRecoveryReuseReport(RecoveryContext &context,
+                           const callgraph::QueryGraph &graph);
+
 std::string recoveryRegistryFingerprint(const RecoveryContext &context);
-std::vector<recovery::RegisteredInput> recoveryRegisteredInputs(
-    const RecoveryContext &context, const RecoveryCandidate &candidate);
+std::vector<recovery::RegisteredInput>
+recoveryRegisteredInputs(RecoveryContext &context,
+                         const RecoveryCandidate &candidate);
 
 std::expected<RecoveryProbeResult, std::string>
 probeRecoveryCandidate(const RecoveryContext &context,
@@ -58,11 +69,12 @@ probeRecoveryCandidate(const RecoveryContext &context,
 std::expected<RecoveryAttemptResult, std::string>
 extractRecoveryCandidate(const RecoveryContext &context,
                          const cli::CallGraphOptions &options,
-                         const RecoveryCandidate &candidate);
+                         const RecoveryCandidate &candidate,
+                         const RecoveryEvidence *retained = nullptr);
 
 std::expected<bool, std::string> processRecoveryCandidates(
-    const RecoveryContext &context, const cli::CallGraphOptions &options,
+    RecoveryContext &context, const cli::CallGraphOptions &options,
     std::vector<RecoveryCandidate> candidates, RecoveryReport &report,
-    recovery::AttemptCache &cache, std::set<std::string> &preservedUsrs);
+    recovery::AttemptCache &cache, callgraph::QueryGraph &graph);
 
 } // namespace facts::commands

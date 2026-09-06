@@ -28,10 +28,10 @@ loadCallGraphNodes(catalog::Database &database) {
     return catalog::query(
         database,
         "SELECT s.id,s.qualified_name,s.usr,s.is_definition,s.is_external,"
-            "s.line,s.col," +
-            unresolved +
-            ",d.file_id,d.offset,d.size,s.kind,s.is_implicit,"
-            + evidence + " "
+        "s.line,s.col," +
+            unresolved + ",d.file_id,d.offset,d.size,s.kind,s.is_implicit," +
+            evidence +
+            " "
             "FROM symbol s "
             "LEFT JOIN definition d "
             "ON d.symbol_id=s.id WHERE s.node=1 OR "
@@ -49,14 +49,14 @@ loadCallGraphNodes(catalog::Database &database) {
                                             row.integer(1) != 0};
              })
       .and_then([&](const auto &tables) {
-    return load(tables.front().first
+        return load(tables.front().first
                         ? "(SELECT COUNT(*) FROM callgraph_unresolved_site u "
                           "WHERE u.source_id=s.id)"
                         : "0",
-                tables.front().second
-                    ? "EXISTS(SELECT 1 FROM callgraph_entry e WHERE "
-                      "e.symbol_id=s.id)"
-                    : "0");
+                    tables.front().second
+                        ? "EXISTS(SELECT 1 FROM callgraph_entry e WHERE "
+                          "e.symbol_id=s.id)"
+                        : "0");
       });
 }
 } // namespace facts::callgraph

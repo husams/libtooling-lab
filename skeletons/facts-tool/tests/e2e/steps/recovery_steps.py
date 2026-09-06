@@ -1,6 +1,6 @@
 """Recovery behavior exercised exclusively through the native command."""
 from pytest_bdd import given, when, then
-from support.recovery import prepare, graph, edge_names, extract, seed_match, success, mark_complete
+from support.recovery import prepare, graph, edge_names, extract, seed_match, success
 
 
 @given("an S-021 app calls an unextracted registered library")
@@ -16,7 +16,6 @@ def symbol_only(context):
 @given("the S-021 library already has valid call facts")
 def complete(context):
     success(extract(context, 1))
-    mark_complete(context, "library.cpp")
 
 
 @when("S-021 missing recovery is requested")

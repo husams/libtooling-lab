@@ -16,8 +16,8 @@ llvm::json::Array entries(const std::vector<RecoveryEntry> &entries) {
       usrs.push_back(usr);
     llvm::json::Object value{
         {"tu_file_id", entry.tuFileId == 0
-                            ? llvm::json::Value(nullptr)
-                            : llvm::json::Value(std::to_string(entry.tuFileId))},
+                           ? llvm::json::Value(nullptr)
+                           : llvm::json::Value(std::to_string(entry.tuFileId))},
         {"component", entry.component},
         {"driver", entry.driver},
         {"working_directory", entry.workingDirectory},
@@ -74,12 +74,11 @@ RecoverySections recoverySections(const QueryGraph &graph,
 }
 
 llvm::json::Object recoveryObject(const RecoveryReport &report) {
-  return llvm::json::Object{
-      {"requested", report.requested},
-      {"attempted", entries(report.attempted)},
-      {"reused", entries(report.reused)},
-      {"failed", entries(report.failed)},
-      {"suppressed", entries(report.suppressed)}};
+  return llvm::json::Object{{"requested", report.requested},
+                            {"attempted", entries(report.attempted)},
+                            {"reused", entries(report.reused)},
+                            {"failed", entries(report.failed)},
+                            {"suppressed", entries(report.suppressed)}};
 }
 
 llvm::json::Array recoveryErrors(const RecoveryReport *report) {

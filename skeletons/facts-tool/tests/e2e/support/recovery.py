@@ -52,7 +52,6 @@ def prepare(context):
                 "--component", f"app={root / 'app'}",
                 "--component", f"library={root / 'library'}"))
     success(extract(context, 0))
-    mark_complete(context, "app.cpp")
     context.recovery_library_body = bodies[1]
 
 
@@ -80,10 +79,3 @@ def seed_match(context):
 def edge_names(graph):
     names = {node["id"]: node["name"] for node in graph["nodes"]}
     return {(names[e["source_id"]], names[e["target_id"]]) for e in graph["edges"]}
-
-
-def mark_complete(context, filename):
-    source = next(path for path in context.recovery_sources if path.name == filename)
-    with sqlite3.connect(context.files_database_path) as db:
-        db.execute("UPDATE file SET indexed=1,indexed_at=datetime('now'),mtime=? WHERE name=?",
-                   (source.stat().st_mtime, filename))

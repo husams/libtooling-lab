@@ -22,6 +22,8 @@ target the lambda's owned call-operator symbol.
 
 Use [function entries](call-graph-entries.md) to distinguish committed body
 generation, missing entries, generated leaves, and retained external targets.
+Use [missing-evidence recovery](call-graph-recovery.md) for the explicit
+`--recover-missing` request across registered components.
 
 Select one root by qualified name or USR:
 

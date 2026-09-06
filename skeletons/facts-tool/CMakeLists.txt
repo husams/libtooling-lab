@@ -374,6 +374,8 @@ add_library(facts-commands STATIC
   src/commands/analyse/CallGraphRecoveryState.cpp
   src/commands/analyse/CallGraphRecovery.cpp
   src/commands/analyse/CallGraphRecoveryPass.cpp
+  src/commands/analyse/CallGraphRecoveryPassHelpers.cpp
+  src/commands/analyse/CallGraphRecoveryReuse.cpp
   src/commands/analyse/CallGraphRecoveryInputs.cpp
   src/commands/analyse/CallGraphRecoveryRegistry.cpp
   src/commands/analyse/CallGraphRecoveryContext.cpp
@@ -382,8 +384,15 @@ add_library(facts-commands STATIC
   src/commands/analyse/CallGraphRecoverySelection.cpp
   src/commands/analyse/CallGraphRecoveryExecution.cpp
   src/commands/analyse/CallGraphRecoveryProbe.cpp
+  src/commands/analyse/RecoveryAttemptsCache.cpp
+  src/commands/analyse/RecoveryAttemptsFile.cpp
   src/commands/analyse/RecoveryAttempts.cpp
   src/commands/analyse/RecoveryAttemptsDigest.cpp
+  src/commands/analyse/RecoveryEvidence.cpp
+  src/commands/analyse/RecoveryEvidenceValidation.cpp
+  src/commands/analyse/RecoveryReuseReport.cpp
+  src/commands/analyse/RecoveryEvidenceScanner.cpp
+  src/commands/analyse/RecoveryEvidenceScannerCallback.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-commands PRIVATE
@@ -451,6 +460,9 @@ if(BUILD_TESTING)
   add_executable(
     recovery-attempts-test
     tests/recovery_attempts_test.cpp
+    src/commands/analyse/RecoveryAttemptsCache.cpp
+    src/commands/analyse/RecoveryAttemptsFile.cpp
+    tests/recovery_attempts_test_cache.cpp
     src/commands/analyse/RecoveryAttempts.cpp
     src/commands/analyse/RecoveryAttemptsDigest.cpp)
   target_link_libraries(recovery-attempts-test PRIVATE facts-clang facts-model)

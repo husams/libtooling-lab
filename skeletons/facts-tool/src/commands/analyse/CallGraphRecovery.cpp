@@ -17,19 +17,12 @@ recoverCallGraph(const cli::CallGraphOptions &options,
     std::cerr << "facts-tool: recovery-complete\n";
     return result;
   }
-  preserveRecoveryEvidence(*context, result, roots);
-  for (const auto &node : result.graph.nodes)
-    if (context->preservedUsrs.contains(node.usr)) {
-      const auto file = node.definitionLocation ? node.definitionLocation->file
-                                                : node.id.file;
-      result.report.reused.push_back(makeEntry(
-          *context, file, {node.usr}, "existing valid body and calls"));
-    }
+  preserveRecoveryEvidence(*context, result, roots, false, options.maxDepth);
+  context->reusedUsrs = context->preservedUsrs;
   recovery::AttemptCache cache;
-  recovery::InputDigestCache digests;
-  auto inputVersion = recoveryInputVersion(*context, digests);
   while (true) {
-    const auto reachable = recoveryReachable(result.graph, roots);
+    const auto reachable =
+        recoveryReachable(result.graph, roots, options.maxDepth);
     auto candidates = selectRecoveryCandidates(
         *context, result.graph, result.coverage ? &*result.coverage : nullptr,
         reachable);
@@ -39,7 +32,7 @@ recoverCallGraph(const cli::CallGraphOptions &options,
     }
     auto extracted =
         processRecoveryCandidates(*context, options, std::move(*candidates),
-                                  result.report, cache, context->preservedUsrs);
+                                  result.report, cache, result.graph);
     if (!extracted) {
       recoveryFailure(result.report, extracted.error());
       break;
@@ -54,17 +47,12 @@ recoverCallGraph(const cli::CallGraphOptions &options,
       break;
     }
     result.graph = std::move(*refreshed);
-    auto preserved = std::move(context->preservedUsrs);
-    *context = std::move(*currentContext);
-    auto currentVersion = recoveryInputVersion(*context, digests);
-    if (inputVersion && currentVersion && *inputVersion == *currentVersion)
-      context->preservedUsrs = std::move(preserved);
-    else {
+    if (!retainRecoveryInputs(*context, *currentContext)) {
       for (auto &node : result.graph.nodes)
         node.bodyEvidence = false;
       result.coverage.reset();
     }
-    inputVersion = std::move(currentVersion);
+    *context = std::move(*currentContext);
     if (result.coverage) {
       auto updated = callgraph::loadCoverage(context->project, result.graph);
       if (!updated) {
@@ -73,8 +61,9 @@ recoverCallGraph(const cli::CallGraphOptions &options,
       }
       result.coverage = std::move(*updated);
     }
-    preserveRecoveryEvidence(*context, result, roots, true);
+    preserveRecoveryEvidence(*context, result, roots, true, options.maxDepth);
   }
+  result.report.reused = collectRecoveryReuseReport(*context, result.graph);
   std::cerr << "facts-tool: recovery-complete\n";
   return result;
 }

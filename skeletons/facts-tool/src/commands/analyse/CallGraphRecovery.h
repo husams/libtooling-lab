@@ -4,8 +4,8 @@
 #include "analysis/callgraph/CallGraphQuery.h"
 #include "analysis/callgraph/CallGraphRecoveryTypes.h"
 
-#include <span>
 #include "cli/Options.h"
+#include <span>
 
 #include <expected>
 #include <optional>

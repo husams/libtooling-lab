@@ -1,20 +1,24 @@
 #include "commands/analyse/CallGraphRecoveryState.h"
+#include "commands/analyse/CallGraphRecoverySelection.h"
 #include <algorithm>
 #include <queue>
 
 namespace facts::commands {
 std::vector<SymbolId> recoveryReachable(const callgraph::QueryGraph &graph,
-                                        std::span<const SymbolId> roots) {
+                                        std::span<const SymbolId> roots,
+                                        std::optional<unsigned> maxDepth) {
   std::set<SymbolId> seen(roots.begin(), roots.end());
-  std::queue<SymbolId> pending;
+  std::queue<std::pair<SymbolId, unsigned>> pending;
   for (const auto id : roots)
-    pending.push(id);
+    pending.emplace(id, 0);
   while (!pending.empty()) {
-    const auto source = pending.front();
+    const auto [source, depth] = pending.front();
     pending.pop();
+    if (maxDepth && depth >= *maxDepth)
+      continue;
     for (const auto &edge : graph.edges)
       if (edge.source == source && seen.insert(edge.destination).second)
-        pending.push(edge.destination);
+        pending.emplace(edge.destination, depth + 1);
   }
   return {seen.begin(), seen.end()};
 }
@@ -22,8 +26,9 @@ std::vector<SymbolId> recoveryReachable(const callgraph::QueryGraph &graph,
 void preserveRecoveryEvidence(RecoveryContext &context,
                               const RecoveryResult &result,
                               std::span<const SymbolId> roots,
-                              bool freshlyPublished) {
-  const auto reachable = recoveryReachable(result.graph, roots);
+                              bool freshlyPublished,
+                              std::optional<unsigned> maxDepth) {
+  const auto reachable = recoveryReachable(result.graph, roots, maxDepth);
   for (const auto &node : result.graph.nodes) {
     if (!std::ranges::contains(reachable, node.id))
       continue;
@@ -31,26 +36,34 @@ void preserveRecoveryEvidence(RecoveryContext &context,
         result.coverage ? callgraph::extractionCoverage(*result.coverage, node)
                         : "unknown";
     if ((freshlyPublished && node.bodyEvidence) ||
-        (state != "stale" &&
-         (node.bodyEvidence || node.implicit || state == "complete")))
+        (state != "stale" && (node.implicit || state == "complete")))
       context.preservedUsrs.insert(node.usr);
   }
 }
 
-std::expected<std::string, std::string>
-recoveryInputVersion(const RecoveryContext &context,
-                     recovery::InputDigestCache &digests) {
-  if (context.commands.empty())
-    return recoveryRegistryFingerprint(context);
-  const auto &[id, command] = *context.commands.begin();
-  RecoveryCandidate candidate;
-  candidate.entry.tuFileId = id;
-  candidate.source = command.path;
-  return digests.digest(recoveryRegisteredInputs(context, candidate))
-      .transform([&](const auto &digest) {
-        return recoveryRegistryFingerprint(context) + ":" + digest;
-      })
-      .transform_error([](const auto &error) { return error.message; });
+bool retainRecoveryInputs(RecoveryContext &before, RecoveryContext &after) {
+  bool unchanged =
+      recoveryRegistryFingerprint(before) == recoveryRegistryFingerprint(after);
+  after.digests = std::move(before.digests);
+  for (const auto &[id, inputs] : before.inputClosures) {
+    const auto command = after.commands.find(id);
+    if (command == after.commands.end()) {
+      unchanged = false;
+      continue;
+    }
+    const RecoveryCandidate candidate{makeEntry(after, id, {}, ""),
+                                      command->second.path};
+    const auto currentInputs = recoveryRegisteredInputs(after, candidate);
+    const auto current = after.digests.digest(currentInputs);
+    if (!current || *current != before.closureDigests[id])
+      unchanged = false;
+  }
+  if (unchanged) {
+    after.preservedUsrs = std::move(before.preservedUsrs);
+    after.reusedUsrs = std::move(before.reusedUsrs);
+    after.reusedOwners = std::move(before.reusedOwners);
+  }
+  return unchanged;
 }
 
 void recoveryFailure(RecoveryReport &report, std::string reason) {

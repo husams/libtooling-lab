@@ -47,11 +47,11 @@ std::string renderCallGraphJson(
       {"pair",
        llvm::json::Object{{"state", coverage ? "validated" : "unavailable"}}},
       {"extraction_coverage", std::move(recoverySections.extractionCoverage)},
-      {"coverage", llvm::json::Object{
-                        {"missing_definitions",
-                         std::move(recoverySections.missingDefinitions)},
-                        {"unresolved_targets",
-                         std::move(recoverySections.unresolvedTargets)}}},
+      {"coverage",
+       llvm::json::Object{{"missing_definitions",
+                           std::move(recoverySections.missingDefinitions)},
+                          {"unresolved_targets",
+                           std::move(recoverySections.unresolvedTargets)}}},
       {"roots", std::move(rootValues)},
       {"nodes", std::move(nodeValues)},
       {"edges", std::move(edgeValues)}};

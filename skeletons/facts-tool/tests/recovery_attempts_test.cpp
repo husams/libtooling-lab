@@ -19,14 +19,21 @@ int main() {
   input.requested_usrs.insert("usr:other");
   assert(miss(cache, input));
   input.requested_usrs = {"usr:target"};
+  runDigestCacheTests(fixture);
   const auto source_time = std::filesystem::last_write_time(fixture.source);
   std::ofstream(fixture.source) << "int source = 2;\n";
   std::filesystem::last_write_time(fixture.source, source_time);
   assert(miss(cache, input));
   key = cache.build(input);
-  assert(key && cache.record(*key, input.requested_usrs, AttemptOutcome::no_match,
-                             {"no-match", "none"}));
+  input.requested_usrs.insert("usr:other");
+  assert(key && cache.record(*key, input.requested_usrs,
+                             AttemptOutcome::no_match, {"no-match", "none"}));
   expectHit(cache, input, AttemptOutcome::no_match);
+  input.requested_usrs = {"usr:target"};
+  expectHit(cache, input, AttemptOutcome::no_match);
+  input.requested_usrs.insert("usr:new");
+  assert(miss(cache, input));
+  input.requested_usrs = {"usr:target"};
   input.translation_unit = 8;
   assert(miss(cache, input));
   input.translation_unit = 7;
@@ -57,8 +64,8 @@ int main() {
   assert(miss(cache, input));
   std::ofstream(fixture.header) << "int header = 1;\n";
   key = cache.build(input);
-  assert(key && cache.record(*key, input.requested_usrs, AttemptOutcome::succeeded,
-                             {"ok", "done"}));
+  assert(key && cache.record(*key, input.requested_usrs,
+                             AttemptOutcome::succeeded, {"ok", "done"}));
   expectHit(cache, input, AttemptOutcome::succeeded);
   auto missing = input;
   missing.inputs.back().path = fixture.root / "missing.hpp";
@@ -67,7 +74,8 @@ int main() {
   auto unreadable = input;
   unreadable.inputs.back().path = fixture.other;
   failure = cache.lookup(unreadable);
-  assert(!failure && failure.error().code == AttemptErrorCode::unreadable_input);
+  assert(!failure &&
+         failure.error().code == AttemptErrorCode::unreadable_input);
   auto empty = input;
   empty.inputs.clear();
   failure = cache.lookup(empty);
@@ -85,11 +93,6 @@ int main() {
   std::ofstream(fixture.header) << "bc";
   auto second = cache.build(input);
   assert(first && second && first->input_digest != second->input_digest);
-  auto pre_attempt = cache.build(input);
-  std::ofstream(fixture.source) << "z";
-  assert(pre_attempt && cache.record(*pre_attempt, input.requested_usrs,
-                                     AttemptOutcome::failed,
-                                     {"compile", "changed during attempt"}));
-  assert(miss(cache, input));
+  runPreAttemptTest(cache, input, fixture);
   return 0;
 }

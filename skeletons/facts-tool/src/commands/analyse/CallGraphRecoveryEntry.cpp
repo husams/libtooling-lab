@@ -4,8 +4,6 @@
 #include "tooling/CompilationCommandCodec.h"
 #include <algorithm>
 #include <clang/Tooling/ArgumentsAdjusters.h>
-#include <queue>
-#include <ranges>
 
 namespace facts::commands {
 RecoveryEntry makeEntry(const RecoveryContext &context, FileId id,

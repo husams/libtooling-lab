@@ -1,16 +1,17 @@
 """Observe committed body generation, rather than trusting progress counters."""
 import sqlite3
 from pytest_bdd import given, then
-from support.recovery import extract, success, mark_complete
+from support.recovery import extract, success
 
 
 @given("S-021 body generation is recorded by the fixture")
 def audit(context):
     with sqlite3.connect(context.facts_database_path) as db:
         db.execute("CREATE TABLE s021_generation (name TEXT)")
-        db.execute("CREATE TRIGGER s021_generated AFTER INSERT ON callgraph_entry "
-                   "BEGIN INSERT INTO s021_generation SELECT qualified_name FROM "
-                   "symbol WHERE id=NEW.symbol_id; END")
+        for event in ("INSERT", "UPDATE"):
+            db.execute(f"CREATE TRIGGER s021_generated_{event} AFTER {event} ON definition "
+                       "BEGIN INSERT INTO s021_generation SELECT qualified_name FROM "
+                       "symbol WHERE id=NEW.symbol_id; END")
 
 
 @then("S-021 generates the library once and never regenerates the app")
@@ -51,7 +52,6 @@ def two_targets(context):
     context.recovery_sources[1].write_text(
         context.recovery_library_body + "int second() { return leaf(); }\n")
     success(extract(context, 0))
-    mark_complete(context, "app.cpp")
 
 
 @given("the S-021 missing definition is in another TU of the app component")
@@ -78,8 +78,3 @@ def unrelated_root(context):
         "int absent(); int unused() { return absent(); }\n")
     success(run(context, "extract", "-v", "0", "--conf", context.files_database_path,
                 "--output", context.facts_database_path, context.recovery_alternative))
-    # These two TUs were fully extracted above; retain explicit complete coverage
-    # after S-027 invalidates their entries while writing the unrelated source.
-    with sqlite3.connect(context.files_database_path) as db:
-        db.execute("UPDATE file SET indexed=1,indexed_at=datetime('now') "
-                   "WHERE name IN ('app.cpp','library.cpp')")

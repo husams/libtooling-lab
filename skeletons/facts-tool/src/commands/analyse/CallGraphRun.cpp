@@ -41,10 +41,10 @@ void printOutput(const cli::CallGraphOptions &options,
 
 std::expected<int, std::string>
 runCallGraphQuery(const cli::CallGraphOptions &options,
-                     const CallGraphRequest &request,
-                     const callgraph::QueryGraph &graph,
-                     const callgraph::CoverageReport *coverage,
-                     const callgraph::RecoveryReport *recovery) {
+                  const CallGraphRequest &request,
+                  const callgraph::QueryGraph &graph,
+                  const callgraph::CoverageReport *coverage,
+                  const callgraph::RecoveryReport *recovery) {
   auto roots = callgraph::selectRoots(graph, options.function, options.all);
   if (!roots)
     return usage(roots.error());
@@ -54,42 +54,35 @@ runCallGraphQuery(const cli::CallGraphOptions &options,
       return std::unexpected("facts database contains no call facts");
     const auto traversal = callgraph::renderCallGraph(
         graph, *roots, options.maxDepth, coverage, view);
-    printOutput(options, graph, *roots, traversal, coverage, view,
-                request.mode, std::nullopt, nullptr, {}, {},
-                recovery);
+    printOutput(options, graph, *roots, traversal, coverage, view, request.mode,
+                std::nullopt, nullptr, {}, {}, recovery);
     return 0;
   }
   if (request.mode == callgraph::QueryMode::Callers) {
     auto traversal =
-        callgraph::searchCallers(graph, *roots, options.maxDepth,
-                                 coverage);
+        callgraph::searchCallers(graph, *roots, options.maxDepth, coverage);
     traversal.text = "query=callers\n" +
-                     callgraph::renderCallGraphText(graph, *roots,
-                                                    traversal, coverage,
-                                                    view);
-    printOutput(options, graph, *roots, traversal, coverage, view,
-                request.mode, std::nullopt, nullptr, {}, {},
-                recovery);
+                     callgraph::renderCallGraphText(graph, *roots, traversal,
+                                                    coverage, view);
+    printOutput(options, graph, *roots, traversal, coverage, view, request.mode,
+                std::nullopt, nullptr, {}, {}, recovery);
     return 0;
   }
   auto target = callgraph::selectOne(graph, *options.target, "target");
   if (!target)
     return usage(target.error());
   auto search =
-      callgraph::searchPaths(graph, *roots->front(), **target,
-                             request.pathMode, options.maxDepth,
-                             coverage);
-  const auto result = callgraph::pathResult(graph, search,
-                                            coverage);
+      callgraph::searchPaths(graph, *roots->front(), **target, request.pathMode,
+                             options.maxDepth, coverage);
+  const auto result = callgraph::pathResult(graph, search, coverage);
   search.traversal.text =
       std::format("query=path path-mode={} path-result={}\n{}",
                   callgraph::pathModeName(request.pathMode), result,
                   callgraph::renderCallGraphText(
-                      graph, *roots, search.traversal,
-                      coverage, view));
-  printOutput(options, graph, *roots, search.traversal, coverage,
-              view, request.mode, request.pathMode, *target, search.paths,
-              result, recovery);
+                      graph, *roots, search.traversal, coverage, view));
+  printOutput(options, graph, *roots, search.traversal, coverage, view,
+              request.mode, request.pathMode, *target, search.paths, result,
+              recovery);
   return 0;
 }
 

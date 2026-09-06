@@ -17,13 +17,17 @@ public:
   ProbeCallback(const std::set<std::string> &wanted,
                 std::set<std::string> &matched)
       : wanted_(wanted), matched_(matched) {}
-  void run(const clang::ast_matchers::MatchFinder::MatchResult &result) override {
-    const auto *function = result.Nodes.getNodeAs<clang::FunctionDecl>("symbol");
+
+  void
+  run(const clang::ast_matchers::MatchFinder::MatchResult &result) override {
+    const auto *function =
+        result.Nodes.getNodeAs<clang::FunctionDecl>("symbol");
     if (!function)
       return;
     if (auto usr = extractUsr(*function); usr && wanted_.contains(*usr))
       matched_.insert(*usr);
   }
+
 private:
   const std::set<std::string> &wanted_;
   std::set<std::string> &matched_;
@@ -45,10 +49,10 @@ probeRecoveryCandidate(const RecoveryContext &context,
   tool.clearArgumentsAdjusters();
   ProbeCallback callback(wanted, matched);
   clang::ast_matchers::MatchFinder finder;
-  finder.addMatcher(clang::ast_matchers::functionDecl(
-                        clang::ast_matchers::isDefinition())
-                        .bind("symbol"),
-                    &callback);
+  finder.addMatcher(
+      clang::ast_matchers::functionDecl(clang::ast_matchers::isDefinition())
+          .bind("symbol"),
+      &callback);
   const int status =
       tool.run(clang::tooling::newFrontendActionFactory(&finder).get());
   return RecoveryProbeResult{status, std::move(matched)};
