@@ -42,8 +42,10 @@ struct File {
   std::string compileOptions;
   std::string driver;
   std::string workingDirectory;
+  std::optional<double> mtime;
   bool argsOverridden = false;
   bool indexed = false;
+  std::string indexedAt;
 };
 
 Result<std::filesystem::path> componentRoot(const Component &component);

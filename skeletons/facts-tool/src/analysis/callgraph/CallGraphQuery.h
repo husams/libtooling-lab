@@ -1,7 +1,7 @@
 #pragma once
 
-#include "model/Relation.h"
 #include "model/ReceiverCertainty.h"
+#include "model/Relation.h"
 
 #include <expected>
 #include <optional>
@@ -16,6 +16,8 @@ struct QueryNode {
   std::string usr;
   bool definition = false;
   bool external = false;
+  unsigned line = 0;
+  unsigned column = 0;
 };
 
 struct QueryEdge {

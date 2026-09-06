@@ -4,6 +4,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+
 namespace facts::cli {
 struct ExtractOptions {
   int verbosity = 0;
@@ -17,6 +18,7 @@ struct ExtractOptions {
   bool extraArgumentsProvided = false;
   std::vector<std::string> sources;
 };
+
 struct ImportOptions {
   int verbosity = 0;
   std::string configuration;
@@ -28,6 +30,7 @@ struct ImportOptions {
   bool extraArgumentsProvided = false;
   std::vector<std::string> sources;
 };
+
 struct DependencyOptions {
   int verbosity = 0;
   std::string output;
@@ -40,13 +43,18 @@ struct DependencyOptions {
   bool extraArgumentsProvided = false;
   std::vector<std::string> sources;
 };
+
 struct CallGraphOptions {
   int verbosity = 0;
   std::string facts;
+  std::string configuration;
+  std::string configurationFile;
+  std::string format = "text";
   std::optional<std::string> function;
   bool all = false;
   std::optional<int> maxDepth;
 };
+
 struct MatchOptions {
   int verbosity = 0;
   std::string facts;
@@ -58,6 +66,7 @@ struct MatchOptions {
   std::optional<std::string> relationKind;
   std::vector<std::string> sources;
 };
+
 struct ConfigOptions {
   int verbosity = 0;
   std::string configurationFile;
@@ -65,8 +74,8 @@ struct ConfigOptions {
 };
 
 using Command = std::variant<ExtractOptions, ImportOptions, DependencyOptions,
-                             CallGraphOptions, MatchOptions, ConfigOptions, RepositoryOptions,
-                             ComponentOptions, DirectoryOptions, FileOptions,
-                             SymbolOptions>;
+                             CallGraphOptions, MatchOptions, ConfigOptions,
+                             RepositoryOptions, ComponentOptions,
+                             DirectoryOptions, FileOptions, SymbolOptions>;
 
 } // namespace facts::cli

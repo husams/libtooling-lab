@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import subprocess
 import shutil
@@ -297,3 +298,148 @@ def depth_boundary(context: FactsToolContext) -> None:
     require(output.returncode == 0 and "depth-truncated=true" in output.stdout and
             "external-boundary=false" in output.stdout and "complete=false" in output.stdout,
             output.stdout + output.stderr)
+
+
+def b040_sources(context: FactsToolContext) -> dict[str, Path]:
+    root = context.fixture_root.parents[1] / "e2e" / "fixtures"
+    names = ("b040_root.cpp", "b040_known.cpp", "b040_missing.cpp")
+    return {name: (root / name).resolve(strict=True) for name in names}
+
+
+def prepare_b040(context: FactsToolContext, include_missing: bool,
+                 metadata: bool) -> None:
+    context.prepare()
+    sources = b040_sources(context)
+    imported = run([str(context.facts_tool), "import", "-v", "0", "-c",
+                    str(context.files_database_path), "--extra-arg=-std=c++23",
+                    *(str(path) for path in sources.values())])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+    external_root = context.fixture_root.parents[1] / "e2e" / "fixtures" / "external"
+    with sqlite3.connect(context.files_database_path) as database:
+        component = database.execute(
+            "INSERT INTO component(name,path,kind,repository_id,semantic_universe_id) "
+            "VALUES('b040-external',?,'external',NULL,1) RETURNING id",
+            (str(external_root),),
+        ).fetchone()[0]
+        directory = database.execute(
+            "INSERT INTO directory(component_id,path) VALUES(?,'') RETURNING id",
+            (component,),
+        ).fetchone()[0]
+        database.execute(
+            "UPDATE file SET directory_id=? WHERE name='b040_external.hpp'",
+            (directory,),
+        )
+    selected = list(sources.values()) if include_missing else [
+        sources["b040_root.cpp"], sources["b040_known.cpp"]]
+    extracted = run([str(context.facts_tool), "extract", "-v", "0", "-o",
+                     str(context.facts_database_path), "-c",
+                     str(context.files_database_path), *(str(path) for path in selected)])
+    require(extracted.returncode == 0, extracted.stdout + extracted.stderr)
+    if metadata:
+        covered = ("b040_root.cpp", "b040_known.cpp", "b040_boundary.hpp")
+        if include_missing:
+            covered += ("b040_missing.cpp",)
+        with sqlite3.connect(context.files_database_path) as database:
+            database.executemany(
+                "UPDATE file SET indexed=1,indexed_at='2026-09-06T00:00:00Z' WHERE name=?",
+                ((name,) for name in covered),
+            )
+
+
+def b040_graph(context: FactsToolContext, *extra: str) -> dict:
+    output = run([str(context.facts_tool), "analyse", "call-graph", "-v", "0",
+                  "-f", str(context.facts_database_path), "-c",
+                  str(context.files_database_path), "--format", "json",
+                  "--function", "b040_fixture::root", *extra])
+    require(output.returncode == 0, output.stdout + output.stderr)
+    return json.loads(output.stdout)
+
+
+@given("an isolated B-040 pair has a declaration-only project boundary")
+def b040_partial_pair(context: FactsToolContext) -> None:
+    prepare_b040(context, include_missing=False, metadata=True)
+
+
+@given("an isolated B-040 pair has complete known project coverage")
+def b040_complete_pair(context: FactsToolContext) -> None:
+    prepare_b040(context, include_missing=True, metadata=True)
+
+
+@given("an isolated B-040 pair has missing coverage metadata")
+def b040_unknown_pair(context: FactsToolContext) -> None:
+    prepare_b040(context, include_missing=True, metadata=False)
+
+
+@given("an isolated B-040 pair has stale coverage metadata")
+def b040_stale_pair(context: FactsToolContext) -> None:
+    prepare_b040(context, include_missing=True, metadata=True)
+    with sqlite3.connect(context.files_database_path) as database:
+        database.execute("UPDATE file SET mtime=0 WHERE name='b040_boundary.hpp'")
+
+
+@then("B-040 reports complete traversal and incomplete extraction coverage separately")
+def b040_reproduction(context: FactsToolContext) -> None:
+    graph = b040_graph(context)
+    missing = next(node for node in graph["nodes"] if node["name"] == "b040_fixture::missing")
+    edge = next(edge for edge in graph["edges"] if edge["target_id"] == missing["id"])
+    require(graph["complete"] and graph["truncated"] == 0, str(graph["traversal"]))
+    require(graph["extraction_coverage"]["state"] == "incomplete", str(graph))
+    require(missing["definition_availability"] == "project-missing" and
+            missing["coverage"]["state"] == "incomplete", str(missing))
+    require(not edge["external_boundary"] and edge["definition_boundary"], str(edge))
+    require(any(path.endswith("b040_missing.cpp") for path in
+                graph["extraction_coverage"]["recovery_candidates"]), str(graph))
+
+
+@then("B-040 reports complete paired coverage with usable paths and stable identities")
+def b040_complete(context: FactsToolContext) -> None:
+    graph = b040_graph(context)
+    project = [node for node in graph["nodes"]
+               if node["source"]["project_local"] is True]
+    require(graph["schema"] == "facts-tool.call-graph.v1", str(graph))
+    require(graph["extraction_coverage"]["state"] == "complete", str(graph))
+    require(all(node["usr"] and node["source"]["path"] and
+                node["coverage"]["state"] == "complete" for node in project), str(project))
+
+
+@then("B-040 reports the genuine external definition boundary separately")
+def b040_external(context: FactsToolContext) -> None:
+    graph = b040_graph(context)
+    external = next(node for node in graph["nodes"]
+                    if node["name"] == "b040_external::unavailable")
+    edge = next(edge for edge in graph["edges"] if edge["target_id"] == external["id"])
+    require(external["definition_availability"] == "external-unavailable", str(external))
+    require(external["coverage"]["state"] == "not-applicable", str(external))
+    require(edge["external_boundary"] and not edge["definition_boundary"], str(edge))
+
+
+@then("B-040 reports unknown coverage and metadata reconciliation")
+def b040_unknown(context: FactsToolContext) -> None:
+    graph = b040_graph(context)
+    project = [node for node in graph["nodes"]
+               if node["source"]["project_local"] is True]
+    require(graph["extraction_coverage"]["state"] == "unknown", str(graph))
+    require(all(node["coverage"]["freshness"] == "unknown" and
+                node["coverage"]["failure"] is None for node in project), str(project))
+    require(all(node["coverage"]["action"] == "reconcile-coverage-metadata"
+                for node in project), str(project))
+
+
+@then("B-040 reports stale coverage with a focused refresh action")
+def b040_stale(context: FactsToolContext) -> None:
+    graph = b040_graph(context)
+    stale = [node for node in graph["nodes"]
+             if node["coverage"]["state"] == "stale"]
+    require(graph["complete"] and graph["extraction_coverage"]["state"] == "stale",
+            str(graph))
+    require(stale and all(node["coverage"]["freshness"] == "stale" and
+                          node["coverage"]["action"] == "refresh-source" and
+                          node["coverage"]["failure"] is None for node in stale), str(stale))
+
+
+@then("B-040 reports depth truncation independently in structured output")
+def b040_depth(context: FactsToolContext) -> None:
+    graph = b040_graph(context, "--max-depth", "1")
+    require(not graph["complete"] and graph["truncated"] > 0, str(graph))
+    require(any(edge["depth_truncated"] for edge in graph["edges"]), str(graph))
+    require(graph["extraction_coverage"]["state"] == "incomplete", str(graph))

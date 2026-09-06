@@ -40,7 +40,8 @@ public:
         "and ownership");
     configCommand_->require_subcommand(1, 1);
     auto &show = *configCommand_->add_subcommand(
-        "show", "Show resolved YAML defaults (yaml-cpp 0.9.0) and ordered discovery");
+        "show",
+        "Show resolved YAML defaults (yaml-cpp 0.9.0) and ordered discovery");
     configurationOptions(show, config_.direct, config_.configurationFile);
   }
 
@@ -66,7 +67,8 @@ public:
       return Command{std::move(file_)};
     if (symbolCommand_->parsed())
       return Command{std::move(symbol_)};
-    if (configCommand_->parsed()) return Command{std::move(config_)};
+    if (configCommand_->parsed())
+      return Command{std::move(config_)};
     if (callGraphCommand_->parsed())
       return Command{std::move(callGraph_)};
     return importCommand_->parsed() ? Command{std::move(import_)}
@@ -94,7 +96,8 @@ private:
         "when omitted");
     output->each([this](std::string) { extract_.outputProvided = true; });
     output->type_name("FILE");
-    configurationOptions(command, extract_.configuration, extract_.configurationFile);
+    configurationOptions(command, extract_.configuration,
+                         extract_.configurationFile);
     command
         .add_option_function<std::string>(
             "--extra-arg",
@@ -114,7 +117,8 @@ private:
   void configureImport(CLI::App &command) {
     importCommand_ = &command;
     configureVerbosity(command, import_.verbosity);
-    configurationOptions(command, import_.configuration, import_.configurationFile);
+    configurationOptions(command, import_.configuration,
+                         import_.configurationFile);
     command
         .add_option("-p,--compilation-database", import_.compilationDatabase,
                     "Directory containing compile_commands.json")
@@ -155,7 +159,8 @@ private:
         "facts_template when omitted");
     output->each([this](std::string) { dependency_.outputProvided = true; });
     output->type_name("FILE");
-    configurationOptions(command, dependency_.configuration, dependency_.configurationFile);
+    configurationOptions(command, dependency_.configuration,
+                         dependency_.configurationFile);
     command
         .add_option_function<std::string>(
             "--extra-arg",
@@ -179,6 +184,13 @@ private:
     command.add_option("-f,--facts", callGraph_.facts, "SQLite facts database")
         ->required()
         ->type_name("FILE");
+    configurationOptions(command, callGraph_.configuration,
+                         callGraph_.configurationFile);
+    command
+        .add_option("--format", callGraph_.format,
+                    "Output representation: text or json")
+        ->check(CLI::IsMember({"text", "json"}))
+        ->type_name("FORMAT");
     auto *scope = command.add_option_group("scope", "Select graph roots");
     scope
         ->add_option("--function", callGraph_.function,
