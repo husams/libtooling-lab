@@ -217,6 +217,7 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
   auto configured = options;
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = resolved->extraArguments;
+  configured.sources = normalizeSourceSelectors(options.sources);
   return cli::runStage(configured.verbosity, "import", "parse components",
                        [&] { return parseComponents(configured.components); })
       .and_then([&](std::vector<ProjectComponent> components) {

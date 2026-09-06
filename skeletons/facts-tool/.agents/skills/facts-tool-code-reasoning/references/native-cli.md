@@ -27,12 +27,21 @@ facts-tool config show --config ./team.yaml
 ```console
 facts-tool analyse dependency --conf project.sqlite --output deps.sqlite src/main.cpp
 facts-tool analyse call-graph --facts facts.sqlite --function app::run --max-depth 4
-facts-tool match --facts project-and-facts.sqlite --matcher 'functionDecl().bind("source")'
+facts-tool match --conf project.sqlite --facts facts.sqlite \
+  --matcher 'functionDecl(isDefinition()).bind("symbol")' src/main.cpp
+facts-tool match --conf project.sqlite --facts facts.sqlite \
+  --relation-kind Calls \
+  --matcher 'callExpr(callee(functionDecl().bind("callee"))).bind("call")' \
+  src/main.cpp
 ```
 
 `analyse dependency` writes direct include facts. `analyse call-graph` reads a
 facts database. `match` runs a Clang dynamic matcher and persists its bound
-facts; inspect `facts-tool match --help` for binding and relation options.
+facts; `--conf` selects the project database, `--facts` selects the facts
+database (omitting `--facts` uses `facts_template`), and omitting `--conf`
+preserves the legacy combined-store form. Inspect `facts-tool match --help`
+for supported bindings and relation options; invalid binding sets fail before
+facts are committed.
 
 ## Inspect and manage the project catalog
 

@@ -50,6 +50,10 @@ struct CallGraphOptions {
 struct MatchOptions {
   int verbosity = 0;
   std::string facts;
+  bool factsProvided = false;
+  std::string configuration;
+  std::string configurationFile;
+  std::vector<std::string> defaultExtraArguments;
   std::string matcher;
   std::optional<std::string> relationKind;
   std::vector<std::string> sources;

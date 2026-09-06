@@ -1,58 +1,14 @@
 #include "commands/Match.h"
 
 #include "commands/ExtractionSetup.h"
-#include "commands/match/MatchCallback.h"
+#include "commands/ConfigurationSupport.h"
+#include "commands/match/MatchExecution.h"
 #include "commands/match/RelationKinds.h"
-#include "platform/PlatformFlags.h"
-#include "storage/FactStore.h"
 #include "storage/FileManager.h"
 #include "tooling/StoredCompilationDatabase.h"
 
-#include <clang/ASTMatchers/Dynamic/Diagnostics.h>
-#include <clang/ASTMatchers/Dynamic/Parser.h>
-#include <clang/Tooling/Tooling.h>
-
 namespace facts::commands {
 namespace {
-using Result = std::expected<int, std::string>;
-
-Result finish(FactStore &store, int status, std::optional<std::string> error) {
-  auto finished = status == 0 && !error ? store.end() : store.rollback();
-  if (!finished)
-    return std::unexpected("cannot finish facts transaction: " +
-                           finished.error().message());
-  if (error)
-    return std::unexpected(*error);
-  return status == 0 ? Result{0}
-                     : Result{std::unexpected(
-                           "translation unit matching failed")};
-}
-
-Result run(const cli::MatchOptions &options, CompilationDatabasePtr database,
-           FileManager &files, const std::vector<std::string> &sources) {
-  auto configured = configurePlatformCompilationDatabase(*database, sources);
-  if (!configured)
-    return std::unexpected("cannot configure translation units: " +
-                           configured.error());
-  clang::tooling::ClangTool tool(**configured, sources);
-  clang::ast_matchers::dynamic::Diagnostics diagnostics;
-  llvm::StringRef expression(options.matcher);
-  auto matcher = clang::ast_matchers::dynamic::Parser::parseMatcherExpression(
-      expression, &diagnostics);
-  if (!matcher)
-    return std::unexpected("invalid matcher: " + diagnostics.toString());
-  FactStore store(options.facts, options.verbosity);
-  if (auto begun = store.begin(); !begun)
-    return std::unexpected("cannot begin facts transaction: " +
-                           begun.error().message());
-  match::MatchCallback callback(options, files, store);
-  clang::ast_matchers::MatchFinder finder;
-  if (!finder.addDynamicMatcher(*matcher, &callback))
-    return finish(store, 1, "matcher cannot run at the top level");
-  const auto status =
-      tool.run(clang::tooling::newFrontendActionFactory(&finder).get());
-  return finish(store, status, callback.error());
-}
 } // namespace
 
 std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
@@ -61,25 +17,56 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
     if (!kind)
       return std::unexpected(kind.error());
   }
-  auto loaded = loadStoredCompilationDatabase(options.facts, options.sources);
+  auto configured = options;
+  configured.sources = normalizeSourceSelectors(options.sources);
+  const bool explicitConfiguration =
+      !options.configuration.empty() || !options.configurationFile.empty() ||
+      config::detail::present("FACTS_TOOL_CONF");
+  if (configured.factsProvided && !explicitConfiguration) {
+    // A supplied --facts path historically names the combined imported
+    // project/facts database; preserve that contract when --conf is omitted.
+    configured.configuration = configured.facts;
+  } else {
+    auto resolved = loadConfiguration(options.configuration,
+                                      options.configurationFile, false, true);
+    if (!resolved)
+      return std::unexpected(resolved.error());
+    configured.configuration = resolved->database.string();
+    if (!configured.factsProvided) {
+      auto facts = resolveFactsOutput(*resolved, configured.sources);
+      if (!facts)
+        return std::unexpected(facts.error());
+      configured.facts = facts->string();
+    }
+  }
+  if (configured.facts.empty())
+    return std::unexpected("facts-tool: usage error: --facts must not be empty");
+  if (explicitConfiguration &&
+      std::filesystem::absolute(configured.facts).lexically_normal() ==
+      std::filesystem::absolute(configured.configuration).lexically_normal())
+    return std::unexpected(
+        "facts-tool: configuration error: --facts and --conf require separate databases");
+  auto loaded =
+      loadStoredCompilationDatabase(configured.configuration, configured.sources);
   if (!loaded)
     return std::unexpected("cannot load project configuration: " +
                            loaded.error());
   auto commands = requireStoredCommands(std::move(*loaded));
   if (!commands)
     return std::unexpected(commands.error());
-  auto opened = FileManager::openReadOnly(options.facts, options.verbosity);
+  auto opened =
+      FileManager::openReadOnly(configured.configuration, configured.verbosity);
   if (!opened)
     return std::unexpected(opened.error());
   auto registry = requireCompletedRegistry(**opened);
   if (!registry)
     return std::unexpected(registry.error());
-  auto sources = selectSources(**commands, options.sources);
+  auto sources = selectSources(**commands, configured.sources);
   auto registered =
       requireRegisteredSources(**opened, **commands, sources, *registry);
   if (!registered)
     return std::unexpected(registered.error());
-  return run(options, std::move(*commands), **opened, sources);
+  return match::execute(configured, std::move(*commands), **opened, sources);
 }
 
 } // namespace facts::commands

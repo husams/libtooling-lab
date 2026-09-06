@@ -67,6 +67,7 @@ pytest_plugins = (
     "steps.symbol_stability_steps",
     "steps.template_steps",
     "steps.targeted_match_steps",
+    "steps.native_matcher_workflow_steps",
 )
 
 
