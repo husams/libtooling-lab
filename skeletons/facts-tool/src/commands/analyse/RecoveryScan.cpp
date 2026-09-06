@@ -19,7 +19,6 @@ prepareRecoveryScan(RecoveryContext &context,
   if (const auto found = context.scans.find(id);
       found != context.scans.end() &&
       recoveryScanCurrent(context, *found->second)) {
-    collectRecoveryScanBodies(candidate, *found->second);
     return found->second;
   }
   auto scan = std::make_shared<RecoveryScan>();
@@ -42,7 +41,7 @@ prepareRecoveryScan(RecoveryContext &context,
   collectRecoveryScanInputs(context, candidate, *scan);
   if (const auto digest = context.digests.digest(scan->inputs))
     scan->digest = *digest;
-  collectRecoveryScanBodies(candidate, *scan);
+  collectRecoveryScanBodies(context, *scan);
   context.scans[id] = scan;
   return scan;
 }

@@ -19,6 +19,7 @@ pytest_plugins = (
     "steps.recovery_discovery_steps",
     "steps.recovery_review_steps",
     "steps.recovery_cpp_reuse_steps",
+    "steps.recovery_loop_reuse_steps",
     "steps.recovery_freshness_steps",
     "steps.entry_callable_integration_steps",
     "steps.entry_graph_steps",

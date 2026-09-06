@@ -1,4 +1,5 @@
 #pragma once
+#include "analysis/callgraph/CallGraphQuery.h"
 #include "commands/analyse/RecoveryAttempts.h"
 #include "commands/analyse/RecoveryEvidenceScanner.h"
 #include <clang/Frontend/ASTUnit.h>
@@ -24,7 +25,9 @@ std::string recoveryInputAvailability(const RecoveryContext &context);
 bool recoveryScanCurrent(RecoveryContext &context, const RecoveryScan &scan);
 void collectRecoveryScanInputs(const RecoveryContext &,
                                const RecoveryCandidate &, RecoveryScan &);
-void collectRecoveryScanBodies(const RecoveryCandidate &, RecoveryScan &);
+void collectRecoveryScanBodies(const RecoveryContext &, RecoveryScan &);
+callgraph::QueryResult collectRecoveryNativeFacts(const RecoveryContext &,
+                                                  const RecoveryScan &);
 std::shared_ptr<RecoveryScan> prepareRecoveryScan(RecoveryContext &,
                                                   const RecoveryCandidate &);
 } // namespace facts::commands

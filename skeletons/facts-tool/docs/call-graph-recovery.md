@@ -17,9 +17,14 @@ does not prove that a definition is unavailable: registered compiler commands
 remain discovery candidates. A symbol-only match establishes identity and a
 location, while full extraction supplies body and call evidence. Existing usable
 facts are reused, and extraction does not maintain the match-only index.
-Unknown freshness triggers read-only validation of current definition extents
-and complete call occurrences against the stored graph, including constructors
-and implicit destructor calls. Existing non-stale body entries support reuse of
+Unknown freshness triggers validation of current definition extents and complete
+call occurrences against the stored graph. Validation runs the native extractor
+on the retained AST into an isolated temporary facts store, then compares its
+canonical graph evidence; it shares the extractor's handling of implicit range
+loops, iterator operators, initializer lists, constructors and destructor calls.
+The temporary store is removed after collection and never replaces the user's
+facts. Its evidence is cached for the candidate within the invocation.
+Existing non-stale body entries support reuse of
 derived virtual-dispatch evidence; unresolved call boundaries remain explicit.
 A missing entry alone does not force extraction, while incomplete or changed
 evidence requires recovery. Validated entry evidence survives recovery writes.

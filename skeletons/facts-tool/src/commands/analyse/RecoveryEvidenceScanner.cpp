@@ -1,23 +1,52 @@
 #include "commands/analyse/RecoveryEvidenceScanner.h"
 #include "commands/analyse/CallGraphRecoveryInternal.h"
-#include "commands/analyse/RecoveryEvidenceScannerCallback.h"
 #include "commands/analyse/RecoveryScan.h"
-#include <clang/ASTMatchers/ASTMatchFinder.h>
+#include "storage/catalog/File.h"
 
 namespace facts::commands {
-void collectRecoveryScanBodies(const RecoveryCandidate &candidate,
+void collectRecoveryScanBodies(const RecoveryContext &context,
                                RecoveryScan &scan) {
-  scan.facts = {};
-  const std::set<std::string> wanted(candidate.entry.relatedUsrs.begin(),
-                                     candidate.entry.relatedUsrs.end());
-  RecoveryEvidenceCallback callback(scan.facts, wanted);
-  clang::ast_matchers::MatchFinder finder;
-  finder.addMatcher(
-      clang::ast_matchers::functionDecl(clang::ast_matchers::isDefinition())
-          .bind("definition"),
-      &callback);
-  for (const auto &unit : scan.units)
-    finder.matchAST(unit->getASTContext());
+  auto graph = collectRecoveryNativeFacts(context, scan);
+  if (!graph) {
+    scan.facts.unsupported = true;
+    scan.error = graph.error();
+    return;
+  }
+  std::map<SymbolId, std::string> usrs;
+  for (const auto &node : graph->nodes) {
+    usrs[node.id] = node.usr;
+    if (!node.definitionLocation)
+      continue;
+    const auto &location = *node.definitionLocation;
+    const auto file = context.files.find(location.file);
+    if (file == context.files.end())
+      continue;
+    const auto path = catalog::filePath(file->second);
+    if (!path)
+      continue;
+    scan.facts.definitions[node.usr] = {path->string(), location.offset,
+                                        location.size};
+    scan.facts.calls.try_emplace(node.usr);
+    scan.facts.unresolved[node.usr] = node.unresolved;
+  }
+  for (const auto &edge : graph->edges) {
+    if (edge.kind != RelationKind::Calls)
+      continue;
+    const auto file = context.files.find(edge.file);
+    if (file == context.files.end()) {
+      scan.facts.unsupported = true;
+      continue;
+    }
+    const auto path = catalog::filePath(file->second);
+    if (!path || !usrs.contains(edge.source) ||
+        !usrs.contains(edge.destination)) {
+      scan.facts.unsupported = true;
+      continue;
+    }
+    scan.facts.calls[usrs.at(edge.source)].push_back(
+        {usrs.at(edge.destination), path->string(), edge.offset, edge.line,
+         edge.column, edge.implicit});
+  }
 }
 
 std::expected<RecoveryBodyFacts, std::string>

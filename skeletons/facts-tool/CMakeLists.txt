@@ -395,9 +395,7 @@ add_library(facts-commands STATIC
   src/commands/analyse/RecoveryScan.cpp
   src/commands/analyse/RecoveryScanInputs.cpp
   src/commands/analyse/RecoveryEvidenceScanner.cpp
-  src/commands/analyse/RecoveryEvidenceScannerCallback.cpp
-  src/commands/analyse/RecoveryEvidenceBody.cpp
-  src/commands/analyse/RecoveryEvidenceDestructors.cpp
+  src/commands/analyse/RecoveryNativeFacts.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-commands PRIVATE
