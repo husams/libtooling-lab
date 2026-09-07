@@ -34,12 +34,14 @@ facts::callgraph::QueryGraph graph() {
 
 facts::callgraph::CoverageReport completeCoverage() {
   using facts::callgraph::CoverageFile;
-  return {{{CoverageFile{1, "a.cpp", true, true, {}, "now", true},
-            CoverageFile{2, "b.cpp", true, true, {}, "now", true},
-            CoverageFile{3, "c.cpp", true, true, {}, "now", true},
-            CoverageFile{4, "t.cpp", true, true, {}, "now", true},
-            CoverageFile{5, "z.cpp", true, true, {}, "now", true}}},
-          {}};
+  return {
+      {},
+      {{CoverageFile{1, "a.cpp", 0, {}, {}, {}, true, true, {}, "now", true},
+        CoverageFile{2, "b.cpp", 0, {}, {}, {}, true, true, {}, "now", true},
+        CoverageFile{3, "c.cpp", 0, {}, {}, {}, true, true, {}, "now", true},
+        CoverageFile{4, "t.cpp", 0, {}, {}, {}, true, true, {}, "now", true},
+        CoverageFile{5, "z.cpp", 0, {}, {}, {}, true, true, {}, "now", true}}},
+      {}};
 }
 } // namespace
 

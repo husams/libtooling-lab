@@ -1,4 +1,5 @@
 #include "cli/CommandLine.h"
+#include "cli/CallGraphCommandLine.h"
 #include "cli/ConfigurationOptions.h"
 #include "cli/Dispatch.h"
 #include "cli/MatchCommandLine.h"
@@ -6,7 +7,6 @@
 #include "cli/catalog/Configure.h"
 #include <CLI/CLI.hpp>
 #include <expected>
-#include <limits>
 #include <utility>
 
 namespace facts::cli {
@@ -236,11 +236,7 @@ private:
                     "Path selection: shortest or all-simple")
         ->check(CLI::IsMember({"shortest", "all-simple"}))
         ->type_name("MODE");
-    command
-        .add_option("--max-depth", callGraph_.maxDepth,
-                    "Maximum traversal depth")
-        ->check(CLI::Range(1, std::numeric_limits<int>::max()))
-        ->type_name("N");
+    configureCallGraphOptions(command, callGraph_);
     command.add_flag("--recover-missing", callGraph_.recoverMissing,
                      "Recover missing project graph evidence");
   }

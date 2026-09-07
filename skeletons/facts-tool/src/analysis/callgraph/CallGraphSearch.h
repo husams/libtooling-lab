@@ -29,6 +29,14 @@ QuerySearch searchPaths(const QueryGraph &graph, const QueryNode &source,
                         const QueryNode &target, PathMode mode,
                         std::optional<int> maxDepth,
                         const CoverageReport *coverage = nullptr);
+RenderedGraph searchCallersWithRequest(
+    const QueryGraph &graph, const std::vector<const QueryNode *> &roots,
+    TraversalRequest request, const CoverageReport *coverage = nullptr);
+QuerySearch searchPathsWithRequest(const QueryGraph &graph,
+                                   const QueryNode &source,
+                                   const QueryNode &target, PathMode mode,
+                                   TraversalRequest request,
+                                   const CoverageReport *coverage = nullptr);
 std::string pathResult(const QueryGraph &graph, const QuerySearch &search,
                        const CoverageReport *coverage);
 

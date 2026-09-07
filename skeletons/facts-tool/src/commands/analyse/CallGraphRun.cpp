@@ -48,32 +48,34 @@ runCallGraphQuery(const cli::CallGraphOptions &options,
   auto roots = callgraph::selectRoots(graph, options.function, options.all);
   if (!roots)
     return usage(roots.error());
+  auto controls = makeCallGraphRequest(options, coverage, request.cancelled);
+  if (!controls)
+    return std::unexpected(controls.error());
   const auto view = edgeView(options);
   if (request.mode == callgraph::QueryMode::Callees) {
     if (graph.edges.empty() && !recovery)
       return std::unexpected("facts database contains no call facts");
-    const auto traversal = callgraph::renderCallGraph(
-        graph, *roots, options.maxDepth, coverage, view);
+    const auto traversal =
+        callgraph::renderCallGraph(graph, *roots, *controls, coverage, view);
     printOutput(options, graph, *roots, traversal, coverage, view, request.mode,
                 std::nullopt, nullptr, {}, {}, recovery);
-    return 0;
+    return traversal.reason == "cancelled" ? 130 : 0;
   }
   if (request.mode == callgraph::QueryMode::Callers) {
     auto traversal =
-        callgraph::searchCallers(graph, *roots, options.maxDepth, coverage);
+        callgraph::searchCallersWithRequest(graph, *roots, *controls, coverage);
     traversal.text = "query=callers\n" +
                      callgraph::renderCallGraphText(graph, *roots, traversal,
                                                     coverage, view);
     printOutput(options, graph, *roots, traversal, coverage, view, request.mode,
                 std::nullopt, nullptr, {}, {}, recovery);
-    return 0;
+    return traversal.reason == "cancelled" ? 130 : 0;
   }
   auto target = callgraph::selectOne(graph, *options.target, "target");
   if (!target)
     return usage(target.error());
-  auto search =
-      callgraph::searchPaths(graph, *roots->front(), **target, request.pathMode,
-                             options.maxDepth, coverage);
+  auto search = callgraph::searchPathsWithRequest(
+      graph, *roots->front(), **target, request.pathMode, *controls, coverage);
   const auto result = callgraph::pathResult(graph, search, coverage);
   search.traversal.text =
       std::format("query=path path-mode={} path-result={}\n{}",
@@ -83,7 +85,7 @@ runCallGraphQuery(const cli::CallGraphOptions &options,
   printOutput(options, graph, *roots, search.traversal, coverage, view,
               request.mode, request.pathMode, *target, search.paths, result,
               recovery);
-  return 0;
+  return search.traversal.reason == "cancelled" ? 130 : 0;
 }
 
 } // namespace facts::commands

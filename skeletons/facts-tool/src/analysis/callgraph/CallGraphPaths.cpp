@@ -7,14 +7,15 @@
 namespace facts::callgraph::detail {
 
 PathSearch::PathSearch(const QueryGraph &graph, const QueryNode &target,
-                       std::optional<int> maxDepth,
-                       const CoverageReport *coverage)
-    : graph_(graph), target_(target), maxDepth_(maxDepth), coverage_(coverage) {
-}
+                       TraversalRequest request, const CoverageReport *coverage)
+    : graph_(graph), target_(target), maxDepth_(request.limits.depth),
+      coverage_(coverage),
+      budget_(std::move(request), coverage, result_.traversal) {}
 
 QuerySearch PathSearch::run(const QueryNode &source, PathMode mode) {
   PathState initial{{{source.id}, {}}, {source.id, {}, {}}};
-  recordNode(result_.traversal.nodes, source.id);
+  if (!budget_.root(source))
+    return std::move(result_);
   if (source.id == target_.id)
     result_.paths.push_back(initial.path);
   else if (mode == PathMode::Shortest)
@@ -31,19 +32,22 @@ bool PathSearch::capped(const PathState &state) const {
          state.path.edges.size() >= static_cast<std::size_t>(*maxDepth_);
 }
 
-void PathSearch::visit(const PathState &state, const QueryEdge &edge,
+bool PathSearch::visit(const PathState &state, const QueryEdge &edge,
                        const QueryNode &node, bool reused) {
-  recordNode(result_.traversal.nodes, node.id);
+  if (!budget_.admit(node, &edge))
+    return false;
   recordEdge(result_.traversal.edges, edge, state.path.edges.size() + 1, false,
              reused, false, boundaries(node, coverage_));
+  return true;
 }
 
-std::vector<const QueryEdge *>
-PathSearch::eligible(const PathState &state) const {
+std::vector<const QueryEdge *> PathSearch::eligible(const PathState &state) {
   auto edges = orderedEdges(graph_, state.context.node);
   std::erase_if(edges, [&](const auto *edge) {
+    const auto *node = findSearchNode(graph_, edge->destination);
     return !matchesContext(*edge, state.context) ||
-           std::ranges::contains(state.path.nodes, edge->destination);
+           std::ranges::contains(state.path.nodes, edge->destination) ||
+           !node || !budget_.include(*node, edge);
   });
   return edges;
 }
@@ -58,9 +62,8 @@ PathState PathSearch::descend(const PathState &state,
 }
 
 void PathSearch::retainPaths() {
-  const auto truncated = result_.traversal.truncated;
-  result_.traversal = {};
-  result_.traversal.truncated = truncated;
+  result_.traversal.nodes.clear();
+  result_.traversal.edges.clear();
   for (const auto &path : result_.paths) {
     for (const auto id : path.nodes)
       recordNode(result_.traversal.nodes, id);
@@ -76,11 +79,13 @@ void PathSearch::retainPaths() {
 } // namespace facts::callgraph::detail
 
 namespace facts::callgraph {
-QuerySearch searchPaths(const QueryGraph &graph, const QueryNode &source,
-                        const QueryNode &target, PathMode mode,
-                        std::optional<int> maxDepth,
-                        const CoverageReport *coverage) {
-  return detail::PathSearch{graph, target, maxDepth, coverage}.run(source,
-                                                                   mode);
+QuerySearch searchPathsWithRequest(const QueryGraph &graph,
+                                   const QueryNode &source,
+                                   const QueryNode &target, PathMode mode,
+                                   TraversalRequest request,
+                                   const CoverageReport *coverage) {
+  return detail::PathSearch{graph, target, std::move(request), coverage}.run(
+      source, mode);
 }
+
 } // namespace facts::callgraph

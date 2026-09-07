@@ -52,7 +52,8 @@ int main() {
                "name and USR selectors disagree") ||
       !require(all && all->size() == 3, "all roots omit call-free definitions"))
     return 1;
-  const auto complete = facts::callgraph::renderCallGraph(value, *byName, {});
+  const auto complete = facts::callgraph::renderCallGraph(
+      value, *byName, facts::callgraph::TraversalRequest{});
   if (!require(complete.text.find("cycle=true") != std::string::npos,
                "recursive cycle was not reported") ||
       !require(complete.text.find("external-boundary=true") !=
@@ -60,12 +61,15 @@ int main() {
                "external boundary was not reported") ||
       !require(complete.truncated == 0, "default traversal was truncated"))
     return 1;
-  const auto bounded = facts::callgraph::renderCallGraph(value, *byName, 1);
+  facts::callgraph::TraversalRequest boundedRequest;
+  boundedRequest.limits.depth = 1;
+  const auto bounded =
+      facts::callgraph::renderCallGraph(value, *byName, boundedRequest);
   auto contextual = contextualGraph();
   auto contextualRoot =
       facts::callgraph::selectRoots(contextual, "entry", false);
   const auto rendered = facts::callgraph::renderCallGraph(
-      contextual, *contextualRoot, std::nullopt);
+      contextual, *contextualRoot, facts::callgraph::TraversalRequest{});
   return require(bounded.truncated == 1 &&
                      bounded.text.find("depth-truncated=true") !=
                          std::string::npos &&

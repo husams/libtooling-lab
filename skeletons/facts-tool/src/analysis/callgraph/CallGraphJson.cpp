@@ -2,9 +2,9 @@
 #include "analysis/callgraph/CallGraphJsonDetail.h"
 #include "analysis/callgraph/CallGraphJsonQuery.h"
 #include "analysis/callgraph/CallGraphJsonRecovery.h"
+#include "analysis/callgraph/CallGraphJsonRequest.h"
 
 #include <llvm/Support/raw_ostream.h>
-
 #include <ranges>
 
 namespace facts::callgraph {
@@ -17,9 +17,11 @@ std::string renderCallGraphJson(
     std::string_view result, const RecoveryReport *recovery) {
   llvm::json::Array rootValues;
   for (const auto *root : roots)
-    rootValues.push_back(llvm::json::Object{{"id", detail::stableId(root->id)},
-                                            {"name", root->name},
-                                            {"usr", root->usr}});
+    if (std::ranges::find(traversal.nodes, root->id) != traversal.nodes.end())
+      rootValues.push_back(
+          llvm::json::Object{{"id", detail::stableId(root->id)},
+                             {"name", root->name},
+                             {"usr", root->usr}});
   llvm::json::Array nodeValues;
   for (const auto id : traversal.nodes)
     if (const auto *node = detail::findNode(graph, id))
@@ -40,15 +42,22 @@ std::string renderCallGraphJson(
       {"edge_view", std::string{edgeViewName(view)}},
       {"complete", traversal.truncated == 0},
       {"truncated", traversal.truncated},
+      {"query", queryJson(traversal)},
+      {"truncation", truncationJson(graph, traversal)},
+      {"excluded_scope", excludedScopeJson(graph, traversal)},
+      {"errors", llvm::json::Array{}},
       {"unresolved", unresolved},
       {"traversal",
        llvm::json::Object{{"complete", traversal.truncated == 0},
-                          {"depth_truncated", traversal.truncated}}},
+                          {"depth_truncated", traversal.reason == "max_depth"
+                                                  ? traversal.truncated
+                                                  : 0}}},
       {"pair",
        llvm::json::Object{{"state", coverage ? "validated" : "unavailable"}}},
       {"extraction_coverage", std::move(recoverySections.extractionCoverage)},
       {"coverage",
-       llvm::json::Object{{"missing_definitions",
+       llvm::json::Object{{"traversal_complete", traversal.truncated == 0},
+                          {"missing_definitions",
                            std::move(recoverySections.missingDefinitions)},
                           {"unresolved_targets",
                            std::move(recoverySections.unresolvedTargets)}}},
@@ -56,8 +65,8 @@ std::string renderCallGraphJson(
       {"nodes", std::move(nodeValues)},
       {"edges", std::move(edgeValues)}};
   detail::addQueryJson(output, mode, pathMode, target, paths, result);
-  if (recovery)
-    output["recovery"] = json::recoveryObject(*recovery);
+  output["recovery"] =
+      recovery ? json::recoveryObject(*recovery) : llvm::json::Object{};
   output["errors"] = json::recoveryErrors(recovery);
   std::string text;
   llvm::raw_string_ostream stream(text);

@@ -268,12 +268,18 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/ReceiverPropagation.cpp
   src/analysis/callgraph/DispatchResolver.cpp
   src/analysis/callgraph/CallGraphContext.cpp
+  src/analysis/callgraph/CallGraphError.cpp
+  src/analysis/callgraph/CallGraphRequest.cpp
   src/analysis/callgraph/CallGraphQuery.cpp
+  src/analysis/callgraph/CallGraphScope.cpp
+  src/analysis/callgraph/CallGraphTraversal.cpp
+  src/analysis/callgraph/CallGraphTraversalEngine.cpp
+  src/analysis/callgraph/CallGraphTraversalWalk.cpp
   src/analysis/callgraph/CallGraphEntryQuery.cpp
   src/analysis/callgraph/CallGraphEntryQueryText.cpp
   src/analysis/callgraph/CallGraphEntryQueryJson.cpp
   src/analysis/callgraph/CallGraphSelection.cpp
-  src/analysis/callgraph/CallGraphTraversal.cpp
+  src/analysis/callgraph/CallGraphSearchBudget.cpp
   src/analysis/callgraph/CallGraphSearch.cpp
   src/analysis/callgraph/CallGraphCallers.cpp
   src/analysis/callgraph/CallGraphPaths.cpp
@@ -283,6 +289,7 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/CallGraphNodes.cpp
   src/analysis/callgraph/CallGraphFreshness.cpp
   src/analysis/callgraph/CallGraphJson.cpp
+  src/analysis/callgraph/CallGraphJsonRequest.cpp
   src/analysis/callgraph/CallGraphJsonRecovery.cpp
   src/analysis/callgraph/CallGraphJsonEdge.cpp
   src/analysis/callgraph/CallGraphJsonEvidence.cpp
@@ -367,6 +374,7 @@ add_library(facts-commands STATIC
   src/commands/match/RelationValidation.cpp
   src/commands/match/SymbolDispatch.cpp
   src/commands/analyse/CallGraphCommand.cpp
+  src/commands/analyse/CallGraphCancellation.cpp
   src/commands/analyse/CallGraphEntryCommand.cpp
   src/commands/analyse/CallGraphRequest.cpp
   src/commands/analyse/CallGraphRecoveryRun.cpp
@@ -412,6 +420,7 @@ target_link_libraries(facts-commands PRIVATE
 # CLI parsing is isolated so command behavior can be reused without parser state.
 add_library(facts-cli STATIC
   src/cli/CommandLine.cpp
+  src/cli/CallGraphCommandLine.cpp
   src/cli/Dispatch.cpp
   src/cli/MatchCommandLine.cpp
   src/cli/catalog/Repository.cpp
@@ -457,6 +466,17 @@ if(BUILD_TESTING)
   add_executable(call-graph-test tests/CallGraphTest.cpp)
   target_link_libraries(call-graph-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph COMMAND call-graph-test)
+  add_executable(call-graph-budget-test tests/CallGraphBudgetTest.cpp)
+  target_link_libraries(call-graph-budget-test PRIVATE facts-ast facts-storage)
+  add_test(NAME call-graph-budget COMMAND call-graph-budget-test)
+  add_executable(call-graph-root-budget-test
+                 tests/CallGraphRootBudgetTest.cpp)
+  target_link_libraries(call-graph-root-budget-test PRIVATE facts-ast
+                                                            facts-storage)
+  add_test(NAME call-graph-root-budget COMMAND call-graph-root-budget-test)
+  add_executable(call-graph-search-budget-test tests/CallGraphSearchBudgetTest.cpp)
+  target_link_libraries(call-graph-search-budget-test PRIVATE facts-ast facts-storage)
+  add_test(NAME call-graph-search-budget COMMAND call-graph-search-budget-test)
   add_executable(call-graph-search-test tests/CallGraphSearchTest.cpp)
   target_link_libraries(call-graph-search-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph-search COMMAND call-graph-search-test)

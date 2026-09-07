@@ -44,6 +44,36 @@ Or list every definition-backed root with calls:
 facts-tool analyse call-graph -f facts.db -c project.db --all
 ```
 
+Traversal has no application cap by default: it continues across every
+registered component and available library edge until a cycle, reused context,
+or external symbol provides a semantic stop. Optional request-only controls are:
+
+- repeatable `--component NAME`, selecting the named component union;
+- `--calls-scope all|project|library`, defaulting to `all`;
+- positive `--max-depth`, `--max-nodes`, `--max-edges`, and
+  `--time-limit-ms` budgets.
+
+Component and project/library filters require the matching project catalog.
+They cut at excluded endpoints, report observed boundary identities, and never
+walk through an excluded node to reconnect a permitted one. Selected roots are
+subject to the same endpoint filters, so an out-of-scope root is reported as
+excluded and `--calls-scope library` needs a library-side root. Node budgets
+count canonical symbol identities, edge budgets count canonical relation keys,
+depth counts call-edge hops, and time uses a monotonic clock. The root counts
+as one node. An exact-depth leaf with no qualifying outgoing edge is complete.
+
+Every reached budget reports its exact reason and discovered-but-unexpanded
+frontier while setting traversal coverage incomplete. SIGINT emits a coherent
+partial result when possible, reports `cancelled`, and exits 130. Filters,
+counters, timers, and cancellation state are released at process exit; neither
+the facts database nor project catalog is used as a result cache.
+
+Structural-budget frontier entries are discovered endpoints that were not
+admitted or expanded. For time limits and cancellation, the frontier also
+includes the admitted node whose expansion stopped and every remaining eligible
+selected root; filtered roots remain in `excluded_scope` instead.
+These controls also apply to reverse callers and path queries.
+
 Reverse callers and between-symbol paths are opt-in:
 
 ```text
@@ -77,10 +107,13 @@ project-local declaration without a stored definition is
 third-party target remains an `external-boundary`.
 
 Use `--format json` for the stable `facts-tool.call-graph.v1` representation.
-It contains `complete`, `truncated`, `traversal`, `extraction_coverage`,
-`edge_view`, `query`, `paths`, `path_result`, `roots`, `nodes`, and `edges`.
-`query.mode`
-is `callees`, `callers`, or `path`; path results distinguish `found`,
+It contains `complete`, `query`, `coverage`, `truncation`, `excluded_scope`,
+`recovery`, `errors`, `traversal`, `extraction_coverage`, `roots`, `nodes`, and
+`edges`, `edge_view`, `paths`, and `path_result`.
+`query` echoes explicit scope and nullable limits; `truncation` names
+the reason and frontier; `excluded_scope` reports filters plus observed node
+and edge identities/counts.
+`query.mode` is `callees`, `callers`, or `path`; path results distinguish `found`,
 `not_found`, `unknown`, and `truncated`, and each path carries stable string
 node IDs and canonical relation-site edge keys. A `truncated` result can retain
 paths found before the requested cap; it does not imply an empty path array.

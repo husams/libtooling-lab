@@ -20,7 +20,9 @@ void addQueryJson(llvm::json::Object &output, QueryMode mode,
                   std::optional<PathMode> pathMode, const QueryNode *target,
                   const std::vector<QueryPath> &paths,
                   std::string_view result) {
-  llvm::json::Object query{{"mode", std::string(queryModeName(mode))}};
+  auto query = output.getObject("query") ? std::move(*output.getObject("query"))
+                                         : llvm::json::Object{};
+  query["mode"] = std::string(queryModeName(mode));
   query["path_mode"] =
       pathMode ? llvm::json::Value(std::string(pathModeName(*pathMode)))
                : llvm::json::Value(nullptr);

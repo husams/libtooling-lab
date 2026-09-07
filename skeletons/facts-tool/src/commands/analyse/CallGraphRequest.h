@@ -1,5 +1,7 @@
 #pragma once
 
+#include "analysis/callgraph/CallGraphCoverage.h"
+#include "analysis/callgraph/CallGraphRequest.h"
 #include "analysis/callgraph/CallGraphSearch.h"
 #include "cli/Options.h"
 
@@ -7,7 +9,13 @@
 
 namespace facts::commands {
 
+std::expected<callgraph::TraversalRequest, std::string>
+makeCallGraphRequest(const cli::CallGraphOptions &options,
+                     const callgraph::CoverageReport *coverage,
+                     std::function<bool()> cancelled);
+
 struct CallGraphRequest {
+  std::function<bool()> cancelled;
   callgraph::QueryMode mode = callgraph::QueryMode::Callees;
   callgraph::PathMode pathMode = callgraph::PathMode::Shortest;
 };

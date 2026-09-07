@@ -13,9 +13,12 @@ void PathSearch::shortest(PathState initial) {
   while (!queue.empty() && result_.paths.empty()) {
     auto state = std::move(queue.front());
     queue.pop_front();
+    if (budget_.stopped(state.context.node))
+      continue;
     const auto edges = eligible(state);
     if (capped(state)) {
-      result_.traversal.truncated += !edges.empty();
+      if (!edges.empty())
+        budget_.truncate(state.context.node, "max_depth");
       continue;
     }
     for (const auto *edge : edges) {
@@ -24,7 +27,9 @@ void PathSearch::shortest(PathState initial) {
         continue;
       auto next = descend(state, *edge);
       const auto reused = seen.contains(next.context);
-      visit(state, *edge, *node, reused);
+      if (budget_.stopped(state.context.node) ||
+          !visit(state, *edge, *node, reused))
+        break;
       if (node->id == target_.id) {
         result_.paths.push_back(std::move(next.path));
         break;
@@ -39,9 +44,12 @@ void PathSearch::shortest(PathState initial) {
 }
 
 void PathSearch::allSimple(PathState state) {
+  if (budget_.stopped(state.context.node))
+    return;
   const auto edges = eligible(state);
   if (capped(state)) {
-    result_.traversal.truncated += !edges.empty();
+    if (!edges.empty())
+      budget_.truncate(state.context.node, "max_depth");
     return;
   }
   for (const auto *edge : edges) {
@@ -49,7 +57,8 @@ void PathSearch::allSimple(PathState state) {
     if (!node)
       continue;
     auto next = descend(state, *edge);
-    visit(state, *edge, *node);
+    if (budget_.stopped(state.context.node) || !visit(state, *edge, *node))
+      return;
     if (node->id == target_.id) {
       result_.paths.push_back(std::move(next.path));
       continue;

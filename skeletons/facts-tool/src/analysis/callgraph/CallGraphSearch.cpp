@@ -38,4 +38,22 @@ std::string pathResult(const QueryGraph &graph, const QuerySearch &search,
   return !boundary && state == "complete" ? "not_found" : "unknown";
 }
 
+RenderedGraph searchCallers(const QueryGraph &graph,
+                            const std::vector<const QueryNode *> &roots,
+                            std::optional<int> maxDepth,
+                            const CoverageReport *coverage) {
+  TraversalRequest request;
+  request.limits.depth = maxDepth;
+  return searchCallersWithRequest(graph, roots, std::move(request), coverage);
+}
+
+QuerySearch searchPaths(const QueryGraph &graph, const QueryNode &source,
+                        const QueryNode &target, PathMode mode,
+                        std::optional<int> maxDepth,
+                        const CoverageReport *coverage) {
+  TraversalRequest request;
+  request.limits.depth = maxDepth;
+  return searchPathsWithRequest(graph, source, target, mode, std::move(request),
+                                coverage);
+}
 } // namespace facts::callgraph
