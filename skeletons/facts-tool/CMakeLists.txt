@@ -283,6 +283,7 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/CallGraphNodes.cpp
   src/analysis/callgraph/CallGraphFreshness.cpp
   src/analysis/callgraph/CallGraphJson.cpp
+  src/analysis/callgraph/CallGraphJsonRecovery.cpp
   src/analysis/callgraph/CallGraphJsonEdge.cpp
   src/analysis/callgraph/CallGraphJsonEvidence.cpp
   src/analysis/callgraph/CallGraphJsonLocation.cpp
@@ -368,7 +369,33 @@ add_library(facts-commands STATIC
   src/commands/analyse/CallGraphCommand.cpp
   src/commands/analyse/CallGraphEntryCommand.cpp
   src/commands/analyse/CallGraphRequest.cpp
+  src/commands/analyse/CallGraphRecoveryRun.cpp
   src/commands/analyse/CallGraphRun.cpp
+  src/commands/analyse/CallGraphRecoveryState.cpp
+  src/commands/analyse/CallGraphRecovery.cpp
+  src/commands/analyse/CallGraphRecoveryPass.cpp
+  src/commands/analyse/CallGraphRecoveryPassHelpers.cpp
+  src/commands/analyse/CallGraphRecoveryReuse.cpp
+  src/commands/analyse/CallGraphRecoveryInputs.cpp
+  src/commands/analyse/CallGraphRecoveryRegistry.cpp
+  src/commands/analyse/CallGraphRecoveryContext.cpp
+  src/commands/analyse/CallGraphRecoveryDiscovery.cpp
+  src/commands/analyse/CallGraphRecoveryEntry.cpp
+  src/commands/analyse/CallGraphRecoverySelection.cpp
+  src/commands/analyse/CallGraphRecoveryExecution.cpp
+  src/commands/analyse/CallGraphRecoveryProbe.cpp
+  src/commands/analyse/RecoveryAttemptsCache.cpp
+  src/commands/analyse/RecoveryAttemptsFile.cpp
+  src/commands/analyse/RecoveryAttempts.cpp
+  src/commands/analyse/RecoveryAttemptsDigest.cpp
+  src/commands/analyse/RecoveryEvidence.cpp
+  src/commands/analyse/RecoveryEvidenceValidation.cpp
+  src/commands/analyse/RecoveryEvidenceDefinition.cpp
+  src/commands/analyse/RecoveryReuseReport.cpp
+  src/commands/analyse/RecoveryScan.cpp
+  src/commands/analyse/RecoveryScanInputs.cpp
+  src/commands/analyse/RecoveryEvidenceScanner.cpp
+  src/commands/analyse/RecoveryNativeFacts.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-commands PRIVATE
@@ -433,6 +460,16 @@ if(BUILD_TESTING)
   add_executable(call-graph-search-test tests/CallGraphSearchTest.cpp)
   target_link_libraries(call-graph-search-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph-search COMMAND call-graph-search-test)
+  add_executable(
+    recovery-attempts-test
+    tests/recovery_attempts_test.cpp
+    src/commands/analyse/RecoveryAttemptsCache.cpp
+    src/commands/analyse/RecoveryAttemptsFile.cpp
+    tests/recovery_attempts_test_cache.cpp
+    src/commands/analyse/RecoveryAttempts.cpp
+    src/commands/analyse/RecoveryAttemptsDigest.cpp)
+  target_link_libraries(recovery-attempts-test PRIVATE facts-clang facts-model)
+  add_test(NAME recovery-attempts COMMAND recovery-attempts-test)
   add_executable(file-manager-test tests/FileManagerTest.cpp)
   target_link_libraries(file-manager-test PRIVATE facts-storage facts-model
                                                 facts-clang facts-sqlite)

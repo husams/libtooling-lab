@@ -59,6 +59,7 @@ struct CallGraphOptions {
   std::string direction = "callees";
   std::optional<std::string> target;
   std::optional<std::string> pathMode;
+  bool recoverMissing = false;
 };
 
 struct CallGraphEntryOptions {

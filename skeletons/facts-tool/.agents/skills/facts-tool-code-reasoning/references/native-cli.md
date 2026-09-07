@@ -37,7 +37,19 @@ facts-tool match --conf project.sqlite --facts facts.sqlite \
 ```
 
 `analyse dependency` writes direct include facts. `analyse call-graph` reads a
-facts database; `--edges semantic` is the default classified callable view,
+facts database unless `--recover-missing` is explicitly requested:
+
+```console
+facts-tool analyse call-graph --conf project.sqlite --facts facts.sqlite \
+  --function app::run --recover-missing --format json
+```
+
+Recovery can extract missing registered TUs; inspect JSON `recovery` and
+`coverage` even on exit 0. A recovery failure exits 1 with the partial graph.
+Text output has no recovery summary; progress is on stderr. See the
+[recovery guide](../../../../docs/call-graph-recovery.md).
+
+`--edges semantic` is the default classified callable view,
 while `--edges calls` preserves the raw `Calls`/`DispatchCalls` presentation of
 the same stored edge set. Text and JSON semantic edges expose `semantic_kind`;
 the raw view omits it.

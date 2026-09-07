@@ -29,6 +29,7 @@ struct QueryNode {
   std::int64_t kind = 0;
   bool implicit = false;
   unsigned unresolved = 0;
+  bool bodyEvidence = false;
 };
 
 struct QueryEdge {

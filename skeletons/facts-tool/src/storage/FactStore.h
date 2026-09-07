@@ -23,7 +23,7 @@ public:
   explicit FactStore(std::string path, int verbosity = 0);
 
   std::expected<void, std::error_code> begin();
-  std::expected<void, std::error_code> end();
+  std::expected<void, std::error_code> end(bool reportSummary = true);
   std::expected<void, std::error_code> rollback();
 
   std::expected<void, std::error_code>

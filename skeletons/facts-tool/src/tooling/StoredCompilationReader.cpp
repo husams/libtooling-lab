@@ -54,7 +54,8 @@ StoredCompileFile storedCompileFile(sqlite3_stmt *statement) {
           storage::columnText(statement, 1),
           storage::columnText(statement, 8),
           storage::columnText(statement, 9),
-          storage::columnText(statement, 10)};
+          storage::columnText(statement, 10),
+          static_cast<FileId>(sqlite3_column_int64(statement, 11))};
 }
 
 std::expected<std::vector<StoredCompilationComponent>, std::string>
@@ -92,7 +93,7 @@ readStoredFiles(sqlite3 *database) {
       "SELECT component.id, component.name, component.path, "
       "component.version, component.repository_id, clone.path, "
       "directory.path, file.name, file.driver, file.working_directory, "
-      "file.compile_options "
+      "file.compile_options, file.id "
       "FROM file JOIN directory ON directory.id=file.directory_id "
       "JOIN component ON component.id=directory.component_id "
       "LEFT JOIN repository ON repository.id=component.repository_id "
@@ -269,7 +270,7 @@ readRequestedFiles(sqlite3 *database,
       "SELECT component.id, component.name, component.path, "
       "component.version, component.repository_id, clone.path, "
       "directory.path, file.name, file.driver, file.working_directory, "
-      "file.compile_options "
+      "file.compile_options, file.id "
       "FROM file JOIN directory ON directory.id=file.directory_id "
       "JOIN component ON component.id=directory.component_id "
       "LEFT JOIN repository ON repository.id=component.repository_id "

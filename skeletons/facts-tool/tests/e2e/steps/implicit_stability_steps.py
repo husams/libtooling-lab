@@ -67,8 +67,7 @@ def failure(context, implicit_source):
         db.execute("CREATE TRIGGER fail_implicit BEFORE INSERT ON symbol "
                    "WHEN NEW.qualified_name='operator new[]' BEGIN "
                    "SELECT RAISE(ABORT,'forced compiler symbol failure'); END")
-    context.first_identities = snapshot(context)
-    extract_implicit(context)
+    extract_implicit(context, lambda: setattr(context, "first_identities", snapshot(context)))
 
 
 @then("the target failure reports its identity and rolls back every facts table")

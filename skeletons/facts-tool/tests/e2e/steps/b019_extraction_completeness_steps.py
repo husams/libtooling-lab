@@ -114,6 +114,8 @@ def extract_once(context: FactsToolContext, source: Path, verbosity: int = 1) ->
             "import",
             "--conf",
             str(context.files_database_path),
+            "--facts",
+            str(context.facts_database_path),
             "--compilation-database",
             str(context.run_root_path),
             str(source),
