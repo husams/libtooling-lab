@@ -1,9 +1,9 @@
 Feature: Contextual function call graph analysis
   Call sites retain canonical ownership and conservative receiver context.
 
-  Scenario: records direct function method and lambda Calls plus calls from constructor bodies without duplicating constructor invocations
+  Scenario: records direct function method lambda constructor-body and constructor-invocation Calls once
     Given the exact contextual call graph corpus is extracted
-    Then direct method lambda and constructor-body Calls are recorded once
+    Then direct method lambda constructor-body and constructor-invocation Calls are recorded once
 
   Scenario: links a declaration-only CallRecord callee in one TU to its definition in another
     Given the exact contextual call graph corpus is extracted

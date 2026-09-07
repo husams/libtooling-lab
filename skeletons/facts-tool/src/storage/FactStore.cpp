@@ -10,11 +10,15 @@ FactStore::FactStore(std::string path, int verbosity)
     : storage_(std::move(path)), verbosity_(verbosity) {}
 
 std::expected<void, std::error_code> FactStore::begin() {
+  callableInvocations_.clear();
   return storage_.begin();
 }
 
-std::expected<void, std::error_code> FactStore::end() {
-  return storage_.commit().transform([this] {
+std::expected<void, std::error_code> FactStore::end(bool reportSummary) {
+  return storage_.commit().transform([this, reportSummary] {
+    callableInvocations_.clear();
+    if (!reportSummary)
+      return;
     const auto files = idsByUsr_ | std::views::values |
                        std::views::transform(&SymbolId::file) |
                        std::ranges::to<std::unordered_set>();
@@ -24,7 +28,10 @@ std::expected<void, std::error_code> FactStore::end() {
 }
 
 std::expected<void, std::error_code> FactStore::rollback() {
-  return storage_.rollback().transform([this] { idsByUsr_.clear(); });
+  return storage_.rollback().transform([this] {
+    idsByUsr_.clear();
+    callableInvocations_.clear();
+  });
 }
 
 void FactStore::remember(std::string_view usr, SymbolId id) {

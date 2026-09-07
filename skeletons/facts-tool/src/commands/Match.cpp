@@ -1,15 +1,16 @@
 #include "commands/Match.h"
 
-#include "commands/ExtractionSetup.h"
 #include "commands/ConfigurationSupport.h"
+#include "commands/DatabasePaths.h"
+#include "commands/ExtractionSetup.h"
+#include "commands/FactPairValidation.h"
 #include "commands/match/MatchExecution.h"
 #include "commands/match/RelationKinds.h"
 #include "storage/FileManager.h"
 #include "tooling/StoredCompilationDatabase.h"
 
 namespace facts::commands {
-namespace {
-} // namespace
+namespace {} // namespace
 
 std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
   if (options.relationKind) {
@@ -19,9 +20,9 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
   }
   auto configured = options;
   configured.sources = normalizeSourceSelectors(options.sources);
-  const bool explicitConfiguration =
-      !options.configuration.empty() || !options.configurationFile.empty() ||
-      config::detail::present("FACTS_TOOL_CONF");
+  const bool explicitConfiguration = !options.configuration.empty() ||
+                                     !options.configurationFile.empty() ||
+                                     config::detail::present("FACTS_TOOL_CONF");
   if (configured.factsProvided && !explicitConfiguration) {
     // A supplied --facts path historically names the combined imported
     // project/facts database; preserve that contract when --conf is omitted.
@@ -40,14 +41,24 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
     }
   }
   if (configured.facts.empty())
-    return std::unexpected("facts-tool: usage error: --facts must not be empty");
-  if (!(configured.factsProvided && !explicitConfiguration) &&
-      std::filesystem::absolute(configured.facts).lexically_normal() ==
-      std::filesystem::absolute(configured.configuration).lexically_normal())
     return std::unexpected(
-        "facts-tool: configuration error: --facts and --conf require separate databases");
-  auto loaded =
-      loadStoredCompilationDatabase(configured.configuration, configured.sources);
+        "facts-tool: usage error: --facts must not be empty");
+  if (!(configured.factsProvided && !explicitConfiguration)) {
+    auto paths =
+        validateDatabasePaths(configured.facts, configured.configuration);
+    if (!paths)
+      return std::unexpected("facts-tool: configuration error: " +
+                             paths.error());
+  }
+  if (!(configured.factsProvided && !explicitConfiguration) &&
+      std::filesystem::exists(configured.facts)) {
+    auto pairing =
+        validateFactPairForRead(configured.facts, configured.configuration);
+    if (!pairing)
+      return std::unexpected(pairing.error());
+  }
+  auto loaded = loadStoredCompilationDatabase(configured.configuration,
+                                              configured.sources);
   if (!loaded)
     return std::unexpected(
         "cannot load project configuration: " + loaded.error() +

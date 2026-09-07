@@ -77,8 +77,15 @@ def overridden_manual(catalog: Catalog) -> None:
     # the shared catalog fixture deliberately rewrites ownership to exercise
     # multi-repository management commands.
     catalog.context.files_database_path.unlink()
+    # Reset both stores: the new registry allocates a new file identity mapping.
+    catalog.context.facts_database_path.unlink()
     manual_path(catalog).unlink()
     write_import(catalog, False)
+    extracted = catalog.context._run([
+        str(catalog.context.facts_tool), "extract", "--conf",
+        str(catalog.context.files_database_path), "--output",
+        str(catalog.context.facts_database_path)])
+    require(extracted.returncode == 0, catalog.context.last_output)
     manual_source(catalog)
     catalog.run("file add {manual-file} --driver {compiler} "
                 "--arg=-DMANUAL --arg=-I --arg=manual/include")
@@ -176,7 +183,8 @@ def write_import(catalog: Catalog, include_manual: bool) -> None:
         json.dumps(commands), encoding="utf-8")
     result = catalog.context._run([
         str(catalog.context.facts_tool), "import", "--conf",
-        str(catalog.context.files_database_path), "--compilation-database",
+        str(catalog.context.files_database_path), "--facts",
+        str(catalog.context.facts_database_path), "--compilation-database",
         str(catalog.context.run_root_path), "--component",
         f"core={catalog.checkout / 'core'}", "--component",
         f"neighbor={catalog.checkout / 'neighbor'}"])

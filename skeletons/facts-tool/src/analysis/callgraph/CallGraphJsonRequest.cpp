@@ -65,7 +65,7 @@ llvm::json::Object excludedScopeJson(const QueryGraph &graph,
                                        {"reason", item.reason}});
   }
   for (const auto &item : traversal.excluded) {
-    unique.insert(item.target);
+    unique.insert(item.excludedNode.value_or(item.target));
     edges.push_back(
         llvm::json::Object{{"source_id", detail::stableId(item.source)},
                            {"target_id", detail::stableId(item.target)},

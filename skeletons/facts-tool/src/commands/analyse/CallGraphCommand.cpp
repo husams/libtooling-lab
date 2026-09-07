@@ -1,13 +1,12 @@
 #include "commands/analyse/CallGraphCommand.h"
+#include "analysis/callgraph/CallGraphError.h"
 #include "commands/analyse/CallGraphCancellation.h"
-#include "commands/analyse/CallGraphRequest.h"
 
 #include "analysis/callgraph/CallGraphCoverage.h"
-#include "analysis/callgraph/CallGraphError.h"
-#include "analysis/callgraph/CallGraphJson.h"
 #include "analysis/callgraph/CallGraphQuery.h"
-#include "analysis/callgraph/CallGraphTraversal.h"
 #include "commands/ConfigurationSupport.h"
+#include "commands/analyse/CallGraphRequest.h"
+#include "commands/analyse/CallGraphRun.h"
 
 #include <iostream>
 
@@ -38,37 +37,24 @@ loadOptionalCoverage(const cli::CallGraphOptions &options,
 std::expected<int, std::string>
 runCallGraph(const cli::CallGraphOptions &options) {
   CallGraphCancellation cancellation;
-  auto result =
-      callgraph::loadCallGraph(options.facts).and_then([&](const auto &graph) {
-        if (graph.edges.empty())
-          return std::expected<int, std::string>{
-              std::unexpected("facts database contains no call facts")};
-        return loadOptionalCoverage(options, graph)
-            .and_then([&](const auto &coverage) {
-              return callgraph::selectRoots(graph, options.function,
-                                            options.all)
-                  .transform_error([](const auto &reason) {
-                    return "facts-tool: usage error: " + reason;
-                  })
-                  .and_then([&](const auto &roots)
-                                -> std::expected<int, std::string> {
-                    const auto *evidence = coverage ? &*coverage : nullptr;
-                    auto request = makeCallGraphRequest(options, evidence, [&] {
-                      return cancellation.cancelled();
+  auto result = validateCallGraphRequest(options).and_then([&](auto request) {
+    request.cancelled = [&] { return cancellation.cancelled(); };
+    return callgraph::loadCallGraph(options.facts)
+        .and_then([&](const auto &graph) {
+          return loadOptionalCoverage(options, graph)
+              .and_then([&](const auto &coverage) {
+                const auto *evidence = coverage ? &*coverage : nullptr;
+                return makeCallGraphRequest(options, evidence,
+                                            request.cancelled)
+                    .and_then([&](const auto &) {
+                      return runSelectedCallGraph(options, request, graph,
+                                                  evidence);
                     });
-                    if (!request)
-                      return std::unexpected(request.error());
-                    const auto traversal = callgraph::renderCallGraph(
-                        graph, roots, std::move(*request), evidence);
-                    std::cout << (options.format == "json"
-                                      ? callgraph::renderCallGraphJson(
-                                            graph, roots, traversal, evidence)
-                                      : traversal.text);
-                    return traversal.reason == "cancelled" ? 130 : 0;
-                  });
-            });
-      });
+              });
+        });
+  });
   if (!result && options.format == "json" &&
+      result.error() != "recovery-failed" &&
       !result.error().starts_with("facts-tool: usage error:") &&
       !result.error().starts_with("facts-tool: configuration error:")) {
     std::cout << callgraph::renderCallGraphErrorJson(result.error());

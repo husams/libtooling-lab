@@ -1,6 +1,8 @@
 #pragma once
 
 #include "storage/catalog/Requests.h"
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -11,6 +13,8 @@ using CatalogSelector = catalog::Selector;
 struct RepositoryOptions {
   enum class Action { list, show, addClone, switchClone, removeClone, remove };
   int verbosity = 0;
+  std::string facts;
+  bool factsProvided = false;
   std::string configuration;
   std::string configurationFile;
   Action action = Action::list;
@@ -24,6 +28,8 @@ struct RepositoryOptions {
 struct FileOptions {
   enum class Action { add, remove, list, show, setOption, clearOption };
   int verbosity = 0;
+  std::string facts;
+  bool factsProvided = false;
   std::string configuration;
   std::string configurationFile;
   Action action = Action::list;
@@ -35,7 +41,7 @@ struct FileOptions {
 };
 
 struct SymbolOptions {
-  enum class Action { list, show, browser };
+  enum class Action { list, show, browser, find, clearIndex };
   int verbosity = 0;
   std::string facts;
   bool factsProvided = false;
@@ -43,11 +49,18 @@ struct SymbolOptions {
   std::string configurationFile;
   Action action = Action::list;
   std::string qualifiedName;
+  std::optional<std::string> usr;
+  std::optional<std::string> name;
+  std::optional<std::int64_t> kind;
+  std::string format = "text";
+  std::int64_t fileId = 0;
 };
 
 struct ComponentOptions {
   enum class Action { list, show, add, setVersion, compileCommands, remove };
   int verbosity = 0;
+  std::string facts;
+  bool factsProvided = false;
   std::string configuration;
   std::string configurationFile;
   Action action = Action::list;
@@ -62,6 +75,8 @@ struct ComponentOptions {
 struct DirectoryOptions {
   enum class Action { list, remove };
   int verbosity = 0;
+  std::string facts;
+  bool factsProvided = false;
   std::string configuration;
   std::string configurationFile;
   Action action = Action::list;

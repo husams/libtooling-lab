@@ -3,6 +3,7 @@
 #include "storage/FileIdentity.h"
 #include "storage/FilePersistence.h"
 #include "storage/FileSchema.h"
+#include "storage/ProjectSchema.h"
 #include "storage/Sqlite.h"
 
 #include <sqlite3.h>
@@ -264,12 +265,12 @@ std::expected<void, std::string> requireCurrentFileSchema(sqlite3 *database) {
           return "cannot inspect the project configuration schema: " +
                  error.message();
         })
-        .and_then([](bool outdated) {
+        .and_then([&](bool outdated) {
           return outdated ? std::unexpected(std::string(
                                 "project configuration uses an outdated "
                                 "file registry; re-run 'facts-tool "
                                 "import' to migrate it"))
-                          : std::expected<void, std::string>{};
+                          : requireCurrentProjectSchema(database);
         });
   });
 }

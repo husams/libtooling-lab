@@ -1,6 +1,7 @@
 #include "analysis/callgraph/CallGraphTraversalEngine.h"
 
 #include "analysis/callgraph/CallGraphCoverage.h"
+#include "analysis/callgraph/CallGraphOrder.h"
 #include "analysis/callgraph/CallGraphScope.h"
 
 namespace facts::callgraph {
@@ -42,11 +43,7 @@ void TraversalEngine::walk(const QueryNode &source, const QueryContext &current,
                         hasOutgoing(*target, child);
     if (capped)
       truncate(target->id, "max_depth");
-    const bool external =
-        coverage_ ? !target->definition && !isProjectLocal(*coverage_, *target)
-                  : target->external || !target->definition;
-    const bool definition =
-        coverage_ && !target->definition && isProjectLocal(*coverage_, *target);
+    const auto [external, definition] = detail::boundaries(*target, coverage_);
     result_.edges.push_back(
         {edge, depth + 1, cycle, reused, external, definition, capped});
     if (!cycle && !reused && !external && !definition && !capped)

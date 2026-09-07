@@ -10,6 +10,9 @@ Feature: Canonical source file registry
       | fixture   |
       | dependent_base.cpp |
       | dependent_template_types.cpp |
+      | entries/api.h |
+      | entries/app.cpp |
+      | entries/library.cpp |
       | b027_std_string_external_callee.cpp |
       | b027_stream_temporary_external_callee.cpp |
       | call_graph.hpp |
@@ -50,6 +53,9 @@ Feature: Canonical source file registry
       | relation_resolution.cpp |
       | relation_resolution.hpp |
       | return_types.cpp                     |
+      | s022/alpha/entry.cpp |
+      | s022/beta/service.cpp |
+      | s022/beta/service.hpp |
       | shared.hpp |
       | system/external_base.hpp |
       | system/external_string |

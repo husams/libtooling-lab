@@ -2,11 +2,16 @@
 #define FACTS_TOOL_STORAGE_STORAGE_H
 
 #include "model/AnySymbol.h"
+#include "model/CallGraphEntry.h"
+#include "model/ExternalReference.h"
+#include "model/MatchedSymbol.h"
 #include "model/Relation.h"
-#include "model/ReturnType.h"
 #include "model/RelationSite.h"
+#include "model/ReturnType.h"
 #include "model/TemplateArgument.h"
 #include "model/TemplateParameter.h"
+#include "model/UnresolvedCallSite.h"
+#include "storage/FactProvenance.h"
 #include "storage/SqliteDatabase.h"
 
 #include <concepts>
@@ -37,6 +42,12 @@ public:
   std::expected<void, std::error_code> commit();
   std::expected<void, std::error_code> rollback();
 
+  // Records only files used by facts, plus explicitly selected inputs, in the
+  // caller's active transaction.
+  std::expected<void, std::error_code>
+  registerFactProvenance(std::span<const storage::FactProvenance> rows,
+                         std::span<const FileId> selected = {});
+
   template <typename Model>
   std::expected<SymbolId, std::error_code> save(const Model &object);
 
@@ -52,8 +63,8 @@ public:
 
   std::expected<void, std::error_code>
   addRelations(std::span<const Relation> relations);
-  std::expected<void, std::error_code>
-  saveReturnType(SymbolId callable, const ReturnType &type);
+  std::expected<void, std::error_code> saveReturnType(SymbolId callable,
+                                                      const ReturnType &type);
   std::expected<void, std::error_code>
   addRelationSites(std::span<const RelationSite> sites);
   std::expected<void, std::error_code>
@@ -65,6 +76,33 @@ public:
   std::expected<void, std::error_code>
   addTemplateArguments(SymbolId id,
                        std::span<const TemplateArgument> arguments);
+  std::expected<void, std::error_code>
+  upsertMatchedSymbols(std::span<const MatchedSymbol> symbols);
+
+  std::expected<void, std::error_code>
+  addCallGraphEntries(std::span<const CallGraphEntry> entries);
+  std::expected<void, std::error_code>
+  invalidateCallGraphEntries(std::span<const SymbolId> symbols);
+  std::expected<void, std::error_code>
+  invalidateCallGraphEntries(std::span<const FileId> files);
+  std::expected<void, std::error_code> invalidateCallGraphEntries(FileId file);
+  std::expected<std::optional<CallGraphEntry>, std::error_code>
+  findCallGraphEntry(SymbolId symbol);
+  std::expected<bool, std::error_code> isExternal(SymbolId symbol);
+  std::expected<void, std::error_code>
+  addCallGraphExternalReferences(std::span<const ExternalReference> references);
+  std::expected<void, std::error_code>
+  addCallGraphFacts(std::span<const Relation> relations,
+                    std::span<const RelationSite> sites,
+                    std::span<const ExternalReference> references,
+                    std::span<const CallGraphEntry> entries,
+                    std::span<const UnresolvedCallSite> unresolved = {});
+  std::expected<void, std::error_code>
+  addUnresolvedCallSites(std::span<const UnresolvedCallSite> sites);
+  std::expected<void, std::error_code>
+  clearUnresolvedCallSites(std::span<const SymbolId> callers);
+  std::expected<void, std::error_code>
+  clearCallGraphFacts(std::span<const SymbolId> callers);
 
   template <typename Model>
     requires std::derived_from<Model, Symbol>

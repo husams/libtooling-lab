@@ -17,6 +17,10 @@ bool isProjectLocal(const CoverageReport &report, const QueryNode &node) {
   return file && file->projectLocal;
 }
 
+bool hasDefinitionEvidence(const QueryNode &node) {
+  return node.definition || node.implicit;
+}
+
 const CoverageFile *findCoverageEvidenceFile(const CoverageReport &report,
                                              const QueryNode &node) {
   return findCoverageFile(report, node.definitionLocation
@@ -26,7 +30,7 @@ const CoverageFile *findCoverageEvidenceFile(const CoverageReport &report,
 
 std::string definitionAvailability(const CoverageReport &report,
                                    const QueryNode &node) {
-  if (node.definition)
+  if (hasDefinitionEvidence(node))
     return "available";
   return isProjectLocal(report, node) ? "project-missing"
                                       : "external-unavailable";
@@ -37,8 +41,10 @@ std::string extractionCoverage(const CoverageReport &report,
   const auto *file = findCoverageEvidenceFile(report, node);
   if (!file || !file->projectLocal)
     return "not-applicable";
-  if (!node.definition)
+  if (!hasDefinitionEvidence(node))
     return "incomplete";
+  if (node.implicit)
+    return "complete";
   if (coverageFreshness(report, node) == "stale")
     return "stale";
   return file->indexed ? "complete" : "unknown";

@@ -27,6 +27,8 @@ public:
         "dependency", "Build the direct include dependency graph"));
     configureCallGraph(*analyseCommand_->add_subcommand(
         "call-graph", "Query contextual function call graphs"));
+    configureCallGraphEntry(*analyseCommand_->add_subcommand(
+        "call-graph-entry", "Inspect one collected function entry"));
     repositoryCommand_ = configureRepository(app_, repository_);
     componentCommand_ = configureComponent(app_, component_);
     directoryCommand_ = configureDirectory(app_, directory_);
@@ -71,6 +73,8 @@ public:
       return Command{std::move(config_)};
     if (callGraphCommand_->parsed())
       return Command{std::move(callGraph_)};
+    if (callGraphEntryCommand_->parsed())
+      return Command{std::move(callGraphEntry_)};
     return importCommand_->parsed() ? Command{std::move(import_)}
                                     : Command{std::move(dependency_)};
   }
@@ -117,6 +121,19 @@ private:
   void configureImport(CLI::App &command) {
     importCommand_ = &command;
     configureVerbosity(command, import_.verbosity);
+    command
+        .add_option_function<std::string>(
+            "-f,--facts",
+            [this](const std::string &value) {
+              if (value.empty())
+                throw CLI::ValidationError("--facts must not be empty");
+              import_.facts = value;
+              import_.factsProvided = true;
+            },
+            "Existing facts database whose entries must be invalidated before "
+            "a project mutation")
+        ->trigger_on_parse()
+        ->type_name("FILE");
     configurationOptions(command, import_.configuration,
                          import_.configurationFile);
     command
@@ -191,6 +208,12 @@ private:
                     "Output representation: text or json")
         ->check(CLI::IsMember({"text", "json"}))
         ->type_name("FORMAT");
+    command
+        .add_option("--edges", callGraph_.edges,
+                    "Presentation of the same stored edges: semantic callable "
+                    "kinds or raw Calls/DispatchCalls")
+        ->check(CLI::IsMember({"semantic", "calls"}))
+        ->type_name("VIEW");
     auto *scope = command.add_option_group("scope", "Select graph roots");
     scope
         ->add_option("--function", callGraph_.function,
@@ -199,7 +222,45 @@ private:
     scope->add_flag("--all", callGraph_.all,
                     "All definition-backed functions with calls");
     scope->require_option(1, 1);
+    command
+        .add_option("--direction", callGraph_.direction,
+                    "Traversal direction: callees or callers")
+        ->check(CLI::IsMember({"callees", "callers"}))
+        ->type_name("DIRECTION");
+    command
+        .add_option("--to", callGraph_.target,
+                    "Exact qualified name or USR path target")
+        ->type_name("TARGET");
+    command
+        .add_option("--path-mode", callGraph_.pathMode,
+                    "Path selection: shortest or all-simple")
+        ->check(CLI::IsMember({"shortest", "all-simple"}))
+        ->type_name("MODE");
     configureCallGraphOptions(command, callGraph_);
+    command.add_flag("--recover-missing", callGraph_.recoverMissing,
+                     "Recover missing project graph evidence");
+  }
+
+  void configureCallGraphEntry(CLI::App &command) {
+    callGraphEntryCommand_ = &command;
+    configureVerbosity(command, callGraphEntry_.verbosity);
+    command
+        .add_option("-f,--facts", callGraphEntry_.facts,
+                    "SQLite facts database")
+        ->required()
+        ->type_name("FILE");
+    configurationOptions(command, callGraphEntry_.configuration,
+                         callGraphEntry_.configurationFile);
+    command
+        .add_option("--function", callGraphEntry_.function,
+                    "Qualified function name or USR")
+        ->required()
+        ->type_name("SELECTOR");
+    command
+        .add_option("--format", callGraphEntry_.format,
+                    "Output representation: text or json")
+        ->check(CLI::IsMember({"text", "json"}))
+        ->type_name("FORMAT");
   }
 
   CLI::App app_;
@@ -208,11 +269,13 @@ private:
   CLI::App *analyseCommand_ = nullptr;
   CLI::App *dependencyCommand_ = nullptr;
   CLI::App *callGraphCommand_ = nullptr;
+  CLI::App *callGraphEntryCommand_ = nullptr;
   CLI::App *matchCommand_ = nullptr;
   ExtractOptions extract_;
   ImportOptions import_;
   DependencyOptions dependency_;
   CallGraphOptions callGraph_;
+  CallGraphEntryOptions callGraphEntry_;
   MatchOptions match_;
   CLI::App *repositoryCommand_ = nullptr;
   CLI::App *componentCommand_ = nullptr;

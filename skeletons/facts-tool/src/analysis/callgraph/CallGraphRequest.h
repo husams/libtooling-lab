@@ -46,6 +46,7 @@ struct ExcludedBoundary {
   SymbolId source;
   SymbolId target;
   std::string reason;
+  std::optional<SymbolId> excludedNode;
 };
 
 std::string_view scopeName(CallsScope scope);

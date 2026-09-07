@@ -54,8 +54,11 @@ class ForcedIncludeFixture:
             capture_output=True, text=True, check=False))
 
     def extract(self, context: FactsToolContext) -> None:
+        assert self.conf is not None
+        # Each independently imported catalog owns its own numeric file IDs.
+        facts = self.conf.with_suffix(".facts.sqlite")
         result = subprocess.run([str(context.facts_tool), "extract", "--output",
-                                 str(self.root / "facts.sqlite"), "--conf", str(self.conf),
+                                 str(facts), "--conf", str(self.conf),
                                  str(self.source)], capture_output=True, text=True, check=False)
         self._record(context, result)
 

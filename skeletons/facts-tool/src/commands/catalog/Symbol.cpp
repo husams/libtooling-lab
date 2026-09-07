@@ -1,7 +1,10 @@
+#include "commands/ConfigurationSupport.h"
 #include "commands/catalog/Commands.h"
+#include "commands/catalog/MatchedSymbolFormat.h"
+#include "commands/catalog/MatchedSymbolQuery.h"
+#include "commands/catalog/Run.h"
 #include "commands/catalog/SymbolData.h"
 #include "commands/catalog/SymbolFormat.h"
-#include "commands/ConfigurationSupport.h"
 #include "ui/symbol/SymbolBrowser.h"
 
 #include <iostream>
@@ -10,6 +13,30 @@
 
 namespace facts::commands {
 namespace {
+
+catalog::Result<int> runMatchedIndex(const cli::SymbolOptions &options) {
+  using Action = cli::SymbolOptions::Action;
+  const bool clear = options.action == Action::clearIndex;
+  return runCatalog(
+      options.configuration, clear,
+      [&](catalog::Database &database) -> catalog::Result<std::string> {
+        if (clear)
+          return clearMatchedSymbols(database,
+                                     static_cast<FileId>(options.fileId))
+              .transform([](std::size_t count) {
+                return "Cleared " + std::to_string(count) +
+                       " matched symbol candidate(s)\n";
+              });
+        return findMatchedSymbols(database, options.usr, options.name,
+                                  options.kind)
+            .transform([&](const auto &values) {
+              return options.format == "json"
+                         ? renderMatchedSymbolsJson(values)
+                         : renderMatchedSymbolsText(values);
+            });
+      },
+      false, options.configurationFile, options.facts);
+}
 
 catalog::Result<int> renderScriptOutput(const cli::SymbolOptions &options,
                                         const std::vector<SymbolFact> &values) {
@@ -27,6 +54,9 @@ catalog::Result<int> renderScriptOutput(const cli::SymbolOptions &options,
 } // namespace
 
 catalog::Result<int> runSymbol(const cli::SymbolOptions &options) {
+  if (options.action == cli::SymbolOptions::Action::find ||
+      options.action == cli::SymbolOptions::Action::clearIndex)
+    return runMatchedIndex(options);
   auto configured = options;
   // An explicit --facts with no configuration flags stays independent of
   // configuration (S-019): no discovery happens at all. Otherwise resolve,
@@ -37,10 +67,11 @@ catalog::Result<int> runSymbol(const cli::SymbolOptions &options) {
                                   !options.configurationFile.empty() ||
                                   config::detail::present("FACTS_TOOL_CONF");
   if (needsConfiguration) {
-    auto resolved = loadConfiguration(options.configuration,
-                                      options.configurationFile, false,
-                                      !options.factsProvided);
-    if (!resolved) return std::unexpected(resolved.error());
+    auto resolved =
+        loadConfiguration(options.configuration, options.configurationFile,
+                          false, !options.factsProvided);
+    if (!resolved)
+      return std::unexpected(resolved.error());
     if (!options.configuration.empty() || !options.configurationFile.empty() ||
         config::detail::present("FACTS_TOOL_CONF")) {
       configured.configuration = resolved->database.string();
@@ -50,7 +81,8 @@ catalog::Result<int> runSymbol(const cli::SymbolOptions &options) {
     }
     if (!options.factsProvided) {
       auto facts = resolveFactsOutput(*resolved, {});
-      if (!facts) return std::unexpected(facts.error());
+      if (!facts)
+        return std::unexpected(facts.error());
       configured.facts = facts->string();
     }
   }

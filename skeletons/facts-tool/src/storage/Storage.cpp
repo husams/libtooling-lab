@@ -1,5 +1,6 @@
 #include "storage/Storage.h"
 
+#include "storage/MatchedSymbolIndex.h"
 #include "storage/Schema.h"
 #include "storage/SchemaMigration.h"
 #include <sqlite3.h>
@@ -44,15 +45,30 @@ Storage::Storage(std::string path) : database_(openDatabase(path)) {}
 
 Storage::~Storage() = default;
 
+std::expected<void, std::error_code>
+Storage::registerFactProvenance(std::span<const storage::FactProvenance> rows,
+                                std::span<const FileId> selected) {
+  return storage::registerFactProvenance(database_, rows, selected);
+}
+
 std::expected<void, std::error_code> Storage::begin() {
   if (transaction_) {
     return std::unexpected(
         std::make_error_code(std::errc::operation_in_progress));
   }
-  return database_.write().transform([this](storage::Transaction transaction) {
-    transaction_.emplace(std::move(transaction));
-    database_.setNestedBulkAtomic(false);
-  });
+  auto transaction = database_.write();
+  if (!transaction)
+    return std::unexpected(transaction.error());
+  transaction_.emplace(std::move(*transaction));
+  database_.setNestedBulkAtomic(false);
+  auto invalidated = database_.execute("DELETE FROM callgraph_entry");
+  if (!invalidated) {
+    (void)transaction_->rollback();
+    transaction_.reset();
+    database_.setNestedBulkAtomic(true);
+    return std::unexpected(invalidated.error());
+  }
+  return {};
 }
 
 std::expected<void, std::error_code> Storage::commit() {
@@ -77,9 +93,14 @@ std::expected<void, std::error_code> Storage::rollback() {
   });
 }
 
+std::expected<void, std::error_code>
+Storage::upsertMatchedSymbols(std::span<const MatchedSymbol> symbols) {
+  return storage::upsertMatchedSymbols(database_, symbols);
+}
+
 std::expected<Storage::OptionalTransaction, std::error_code>
 Storage::readTransaction() {
-  if (transaction_) {
+  if (transaction_ || sqlite3_get_autocommit(database_.nativeHandle()) == 0) {
     return OptionalTransaction{};
   }
   return database_.read().transform([](storage::Transaction transaction) {
@@ -89,11 +110,18 @@ Storage::readTransaction() {
 
 std::expected<Storage::OptionalTransaction, std::error_code>
 Storage::writeTransaction() {
-  if (transaction_) {
+  if (transaction_ || sqlite3_get_autocommit(database_.nativeHandle()) == 0) {
     return OptionalTransaction{};
   }
-  return database_.write().transform([](storage::Transaction transaction) {
-    return OptionalTransaction{std::move(transaction)};
+  return database_.write().and_then([this](storage::Transaction transaction) {
+    auto invalidated = database_.execute("DELETE FROM callgraph_entry");
+    if (!invalidated) {
+      (void)transaction.rollback();
+      return std::expected<OptionalTransaction, std::error_code>{
+          std::unexpected(invalidated.error())};
+    }
+    return std::expected<OptionalTransaction, std::error_code>{
+        OptionalTransaction{std::move(transaction)}};
   });
 }
 

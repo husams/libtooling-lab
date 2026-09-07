@@ -20,7 +20,13 @@ def main() -> None:
         *sorted((root / "src/ast/visitors").glob("CallGraphVisitor.*")),
         *sorted((root / "src/commands/analyse").glob("CallGraphCommand.*")),
     ]
-    for path in owned:
+    additions = [
+        *sorted((root / "src/ast/extractors").glob("CallableSite.*")),
+        *sorted((root / "src/ast/extractors").glob("DestructorCalls.*")),
+        *sorted((root / "src/ast/extractors").glob("UnsupportedSemantics.*")),
+        root / "src/ast/visitors/BodyInvocationVisitor.cpp",
+    ]
+    for path in owned + additions:
         require(len(path.read_text(encoding="utf-8").splitlines()) <= 100,
                 f"{path.relative_to(root)} exceeds 100 physical lines")
     visitor = root / "src/ast/visitors/CallGraphVisitor.cpp"

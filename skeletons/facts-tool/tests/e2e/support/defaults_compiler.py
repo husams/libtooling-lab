@@ -13,6 +13,7 @@ class CompileDefaults:
         defaults.write("user", extra_args=["-DVALUE=0", "-DUSER_SEEN=1"])
         defaults.write(conf_root=str(defaults.root / "store"),
                        conf_template="{filename}.db",
+                       facts_template=str(defaults.root / "compiler-facts.db"),
                        extra_args=["-DVALUE=2", "-include", str(self.header),
                                    "-DSPACE=value with spaces"])
         self.db = defaults.root / "direct.db" if override != "generated" else (

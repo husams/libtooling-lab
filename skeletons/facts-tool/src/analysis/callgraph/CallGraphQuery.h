@@ -3,6 +3,7 @@
 #include "model/ReceiverCertainty.h"
 #include "model/Relation.h"
 
+#include <cstdint>
 #include <expected>
 #include <optional>
 #include <string>
@@ -25,6 +26,10 @@ struct QueryNode {
   unsigned line = 0;
   unsigned column = 0;
   std::optional<QueryDefinition> definitionLocation;
+  std::int64_t kind = 0;
+  bool implicit = false;
+  unsigned unresolved = 0;
+  bool bodyEvidence = false;
 };
 
 struct QueryEdge {
@@ -37,7 +42,9 @@ struct QueryEdge {
   unsigned offset = 0;
   std::optional<std::string> receiver;
   std::optional<ReceiverCertainty> certainty;
-  int position = 0;
+  unsigned position = 0;
+  bool implicit = false;
+  std::optional<SymbolId> receiverId;
 };
 
 struct QueryGraph {

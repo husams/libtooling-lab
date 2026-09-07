@@ -142,6 +142,10 @@ target_include_directories(facts-model INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src
 target_link_libraries(facts-model INTERFACE facts-clang)
 
 add_library(facts-storage STATIC
+  src/storage/CallGraphEntry.cpp
+  src/storage/FactProvenance.cpp
+  src/storage/ExternalReference.cpp
+  src/storage/UnresolvedCallSite.cpp
   src/storage/catalog/Database.cpp
   src/storage/catalog/Repository.cpp
   src/storage/catalog/Component.cpp
@@ -164,9 +168,12 @@ add_library(facts-storage STATIC
   src/storage/FunctionInstance.cpp
   src/storage/FunctionTemplate.cpp
   src/storage/Initializer.cpp
+  src/storage/MatchedSymbolIndex.cpp
   src/storage/ReturnType.cpp
   src/storage/Parameter.cpp
   src/storage/ProjectConfiguration.cpp
+  src/storage/ProjectSchema.cpp
+  src/storage/ProjectSchemaMigration.cpp
   src/storage/Record.cpp
   src/storage/RecordInstance.cpp
   src/storage/RecordTemplate.cpp
@@ -231,7 +238,10 @@ add_library(facts-ast STATIC
   src/ast/extractors/RecordDecl.cpp
   src/ast/extractors/RecordInstance.cpp
   src/ast/extractors/Reference.cpp
+  src/ast/extractors/CallableSite.cpp
   src/ast/extractors/CallSite.cpp
+  src/ast/extractors/DestructorCalls.cpp
+  src/ast/extractors/UnsupportedSemantics.cpp
   src/ast/extractors/ReceiverContext.cpp
   src/ast/extractors/OverrideRelation.cpp
   src/ast/extractors/RelationTarget.cpp
@@ -245,10 +255,14 @@ add_library(facts-ast STATIC
   src/ast/visitors/SymbolCollector.cpp
   src/ast/visitors/IncludeVisitor.cpp
   src/ast/visitors/BodyVisitor.cpp
+  src/ast/visitors/BodyCallEvidence.cpp
+  src/ast/visitors/BodyInvocationVisitor.cpp
   src/ast/visitors/CallGraphVisitor.cpp
+  src/ast/visitors/CallGraphDestructors.cpp
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
   src/analysis/callgraph/CallGraphTypes.cpp
+  src/analysis/callgraph/CallGraphSemantics.cpp
   src/analysis/callgraph/CallGraphLinker.cpp
   src/analysis/callgraph/OverrideIndex.cpp
   src/analysis/callgraph/ReceiverPropagation.cpp
@@ -261,14 +275,26 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/CallGraphTraversal.cpp
   src/analysis/callgraph/CallGraphTraversalEngine.cpp
   src/analysis/callgraph/CallGraphTraversalWalk.cpp
+  src/analysis/callgraph/CallGraphEntryQuery.cpp
+  src/analysis/callgraph/CallGraphEntryQueryText.cpp
+  src/analysis/callgraph/CallGraphEntryQueryJson.cpp
+  src/analysis/callgraph/CallGraphSelection.cpp
+  src/analysis/callgraph/CallGraphSearchBudget.cpp
+  src/analysis/callgraph/CallGraphSearch.cpp
+  src/analysis/callgraph/CallGraphCallers.cpp
+  src/analysis/callgraph/CallGraphPaths.cpp
+  src/analysis/callgraph/CallGraphPathModes.cpp
   src/analysis/callgraph/CallGraphCoverage.cpp
   src/analysis/callgraph/CallGraphCatalog.cpp
   src/analysis/callgraph/CallGraphNodes.cpp
   src/analysis/callgraph/CallGraphFreshness.cpp
   src/analysis/callgraph/CallGraphJson.cpp
   src/analysis/callgraph/CallGraphJsonRequest.cpp
+  src/analysis/callgraph/CallGraphJsonRecovery.cpp
+  src/analysis/callgraph/CallGraphJsonEdge.cpp
   src/analysis/callgraph/CallGraphJsonEvidence.cpp
   src/analysis/callgraph/CallGraphJsonLocation.cpp
+  src/analysis/callgraph/CallGraphJsonQuery.cpp
   src/analysis/callgraph/CallGraphText.cpp
 )
 target_include_directories(facts-ast PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -317,8 +343,18 @@ add_library(facts-commands STATIC
   src/commands/catalog/Display.cpp
   src/commands/catalog/Export.cpp
   src/commands/catalog/File.cpp
+  src/commands/catalog/MatchedSymbolFormat.cpp
+  src/commands/catalog/MatchedSymbolQuery.cpp
   src/commands/catalog/Symbol.cpp
   src/commands/DatabasePaths.cpp
+  src/commands/CallGraphInvalidation.cpp
+  src/commands/CallGraphFactPaths.cpp
+  src/commands/CallGraphProjectState.cpp
+  src/commands/FactPairValidation.cpp
+  src/commands/FactPairValidationLegacy.cpp
+  src/commands/FactPairValidationProject.cpp
+  src/commands/FactPairValidationFacts.cpp
+  src/commands/FactPairValidationStorage.cpp
   src/commands/Configuration.cpp
   src/commands/Dependency.cpp
   src/commands/Extract.cpp
@@ -331,6 +367,7 @@ add_library(facts-commands STATIC
   src/commands/match/MatchCallback.cpp
   src/commands/match/MatchContract.cpp
   src/commands/match/MatchExecution.cpp
+  src/commands/match/MatchPublication.cpp
   src/commands/match/NearestCaller.cpp
   src/commands/match/RelationKinds.cpp
   src/commands/match/RelationPersistence.cpp
@@ -338,7 +375,35 @@ add_library(facts-commands STATIC
   src/commands/match/SymbolDispatch.cpp
   src/commands/analyse/CallGraphCommand.cpp
   src/commands/analyse/CallGraphCancellation.cpp
+  src/commands/analyse/CallGraphEntryCommand.cpp
   src/commands/analyse/CallGraphRequest.cpp
+  src/commands/analyse/CallGraphRecoveryRun.cpp
+  src/commands/analyse/CallGraphRun.cpp
+  src/commands/analyse/CallGraphRecoveryState.cpp
+  src/commands/analyse/CallGraphRecovery.cpp
+  src/commands/analyse/CallGraphRecoveryPass.cpp
+  src/commands/analyse/CallGraphRecoveryPassHelpers.cpp
+  src/commands/analyse/CallGraphRecoveryReuse.cpp
+  src/commands/analyse/CallGraphRecoveryInputs.cpp
+  src/commands/analyse/CallGraphRecoveryRegistry.cpp
+  src/commands/analyse/CallGraphRecoveryContext.cpp
+  src/commands/analyse/CallGraphRecoveryDiscovery.cpp
+  src/commands/analyse/CallGraphRecoveryEntry.cpp
+  src/commands/analyse/CallGraphRecoverySelection.cpp
+  src/commands/analyse/CallGraphRecoveryExecution.cpp
+  src/commands/analyse/CallGraphRecoveryProbe.cpp
+  src/commands/analyse/RecoveryAttemptsCache.cpp
+  src/commands/analyse/RecoveryAttemptsFile.cpp
+  src/commands/analyse/RecoveryAttempts.cpp
+  src/commands/analyse/RecoveryAttemptsDigest.cpp
+  src/commands/analyse/RecoveryEvidence.cpp
+  src/commands/analyse/RecoveryEvidenceValidation.cpp
+  src/commands/analyse/RecoveryEvidenceDefinition.cpp
+  src/commands/analyse/RecoveryReuseReport.cpp
+  src/commands/analyse/RecoveryScan.cpp
+  src/commands/analyse/RecoveryScanInputs.cpp
+  src/commands/analyse/RecoveryEvidenceScanner.cpp
+  src/commands/analyse/RecoveryNativeFacts.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-commands PRIVATE
@@ -409,6 +474,22 @@ if(BUILD_TESTING)
   target_link_libraries(call-graph-root-budget-test PRIVATE facts-ast
                                                             facts-storage)
   add_test(NAME call-graph-root-budget COMMAND call-graph-root-budget-test)
+  add_executable(call-graph-search-budget-test tests/CallGraphSearchBudgetTest.cpp)
+  target_link_libraries(call-graph-search-budget-test PRIVATE facts-ast facts-storage)
+  add_test(NAME call-graph-search-budget COMMAND call-graph-search-budget-test)
+  add_executable(call-graph-search-test tests/CallGraphSearchTest.cpp)
+  target_link_libraries(call-graph-search-test PRIVATE facts-ast facts-storage)
+  add_test(NAME call-graph-search COMMAND call-graph-search-test)
+  add_executable(
+    recovery-attempts-test
+    tests/recovery_attempts_test.cpp
+    src/commands/analyse/RecoveryAttemptsCache.cpp
+    src/commands/analyse/RecoveryAttemptsFile.cpp
+    tests/recovery_attempts_test_cache.cpp
+    src/commands/analyse/RecoveryAttempts.cpp
+    src/commands/analyse/RecoveryAttemptsDigest.cpp)
+  target_link_libraries(recovery-attempts-test PRIVATE facts-clang facts-model)
+  add_test(NAME recovery-attempts COMMAND recovery-attempts-test)
   add_executable(file-manager-test tests/FileManagerTest.cpp)
   target_link_libraries(file-manager-test PRIVATE facts-storage facts-model
                                                 facts-clang facts-sqlite)

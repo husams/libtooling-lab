@@ -24,6 +24,8 @@ struct ImportOptions {
   int verbosity = 0;
   std::string configuration;
   std::string configurationFile;
+  std::string facts;
+  bool factsProvided = false;
   std::vector<std::string> defaultExtraArguments;
   std::string compilationDatabase;
   std::vector<std::string> components;
@@ -51,6 +53,7 @@ struct CallGraphOptions {
   std::string configuration;
   std::string configurationFile;
   std::string format = "text";
+  std::string edges = "semantic";
   std::optional<std::string> function;
   bool all = false;
   std::optional<int> maxDepth;
@@ -59,6 +62,19 @@ struct CallGraphOptions {
   std::optional<std::uint64_t> maxNodes;
   std::optional<std::uint64_t> maxEdges;
   std::optional<std::uint64_t> timeLimitMs;
+  std::string direction = "callees";
+  std::optional<std::string> target;
+  std::optional<std::string> pathMode;
+  bool recoverMissing = false;
+};
+
+struct CallGraphEntryOptions {
+  int verbosity = 0;
+  std::string facts;
+  std::string configuration;
+  std::string configurationFile;
+  std::string format = "text";
+  std::string function;
 };
 
 struct MatchOptions {
@@ -79,9 +95,10 @@ struct ConfigOptions {
   std::string direct;
 };
 
-using Command = std::variant<ExtractOptions, ImportOptions, DependencyOptions,
-                             CallGraphOptions, MatchOptions, ConfigOptions,
-                             RepositoryOptions, ComponentOptions,
-                             DirectoryOptions, FileOptions, SymbolOptions>;
+using Command =
+    std::variant<ExtractOptions, ImportOptions, DependencyOptions,
+                 CallGraphOptions, CallGraphEntryOptions, MatchOptions,
+                 ConfigOptions, RepositoryOptions, ComponentOptions,
+                 DirectoryOptions, FileOptions, SymbolOptions>;
 
 } // namespace facts::cli

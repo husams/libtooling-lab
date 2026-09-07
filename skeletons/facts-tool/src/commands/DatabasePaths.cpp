@@ -13,6 +13,11 @@ validateDatabasePaths(std::string_view output, std::string_view configuration) {
     return std::unexpected(
         "output and project configuration require separate databases");
   }
+  std::error_code error;
+  if (std::filesystem::equivalent(outputPath, configurationPath, error)) {
+    return std::unexpected(
+        "output and project configuration require separate databases");
+  }
   return {};
 }
 

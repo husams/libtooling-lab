@@ -39,6 +39,14 @@ class Catalog:
         self.resolved_before = file_snapshot(self.context.files_database_path)
         self.configuration_before = self.context.files_database_path.read_bytes()
 
+    def facts_snapshot(self):
+        with sqlite3.connect(self.context.facts_database_path) as connection:
+            tables = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name != 'callgraph_entry' ORDER BY name").fetchall()
+            return {name: sorted(connection.execute(f'SELECT * FROM "{name}"').fetchall(),
+                                 key=repr) for (name,) in tables}
+
     def run(self, command: str) -> None:
         replacements = {
             "{second-clone}": str(self.second),
@@ -58,16 +66,19 @@ class Catalog:
         }
         # Split before substitution so a path containing spaces stays one argv.
         arguments = [replacements.get(token, token) for token in shlex.split(command)]
+        facts_before = self.facts_snapshot()
         result = self.context._run(
             [str(self.context.facts_tool), *arguments,
-             "--conf", str(self.context.files_database_path)]
+             "--conf", str(self.context.files_database_path),
+             "--facts", str(self.context.facts_database_path)]
         )
         self.stdout = result.stdout
         with (self.context.run_root_path / "catalog-commands.log").open("a") as log:
             log.write(f"{shlex.join(arguments)}\nexit={result.returncode}\n"
                       f"{result.stdout}{result.stderr}\n")
-        require(self.context.facts_database_path.read_bytes() == self.facts_before,
-                "a catalog command modified the separate extracted-facts database")
+        require(self.facts_snapshot() == facts_before,
+                "a catalog command changed facts beyond call-graph entry invalidation")
+        self.facts_before = self.context.facts_database_path.read_bytes()
         for source, content in self.sources.items():
             require(source.is_file() and source.read_bytes() == content,
                     f"a catalog command changed or deleted checkout source {source}")

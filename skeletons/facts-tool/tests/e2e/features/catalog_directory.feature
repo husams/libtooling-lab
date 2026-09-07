@@ -1,6 +1,6 @@
 Feature: Manage exact indexed directories
   Commands use the real executable, imported SQLite rows, and independent readback.
-  Checkout sources and the separate facts database must remain unchanged.
+  Checkout sources and graph facts remain unchanged; writes may invalidate entries.
 
   Background:
     Given an imported catalog with two repositories and independent components

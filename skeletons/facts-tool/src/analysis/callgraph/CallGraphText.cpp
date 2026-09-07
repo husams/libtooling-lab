@@ -1,16 +1,11 @@
 #include "analysis/callgraph/CallGraphText.h"
 
 #include "analysis/callgraph/CallGraphCoverage.h"
+#include "analysis/callgraph/CallGraphOrder.h"
 #include <format>
-#include <ranges>
 
 namespace facts::callgraph {
 namespace {
-const QueryNode *findNode(const QueryGraph &graph, SymbolId id) {
-  const auto found = std::ranges::find(graph.nodes, id, &QueryNode::id);
-  return found == graph.nodes.end() ? nullptr : &*found;
-}
-
 std::string_view kindName(RelationKind kind) {
   return kind == RelationKind::DispatchCalls ? "DispatchCalls" : "Calls";
 }
@@ -36,19 +31,26 @@ std::string location(const QueryEdge &edge, const CoverageReport *coverage) {
 std::string renderCallGraphText(const QueryGraph &graph,
                                 const std::vector<const QueryNode *> &roots,
                                 const RenderedGraph &traversal,
-                                const CoverageReport *coverage) {
+                                const CoverageReport *coverage, EdgeView view) {
   std::string text;
   for (const auto *root : roots)
     if (std::ranges::find(traversal.nodes, root->id) != traversal.nodes.end())
       text += std::format("root={} usr={}\n", root->name, root->usr);
   for (const auto &value : traversal.edges) {
-    const auto *source = findNode(graph, value.edge.source);
-    const auto *target = findNode(graph, value.edge.destination);
+    const auto *source = detail::findSearchNode(graph, value.edge.source);
+    const auto *target = detail::findSearchNode(graph, value.edge.destination);
+    const auto semantic =
+        view == EdgeView::Semantic
+            ? std::format(" semantic-kind={}",
+                          semanticKind(target, value.edge.kind))
+            : std::string{};
     text += std::format(
-        "  depth={} relation={} source={} target={} {} location={}:{}:{} "
-        "cycle={} reused={} external-boundary={} depth-truncated={}\n",
-        value.depth, kindName(value.edge.kind), source ? source->name : "",
-        target ? target->name : "", context(value.edge),
+        "  depth={} relation={}{} source={} target={} {} implicit={} "
+        "location={}:{}:{} cycle={} reused={} external-boundary={} "
+        "depth-truncated={}\n",
+        value.depth, kindName(value.edge.kind), semantic,
+        source ? source->name : "", target ? target->name : "",
+        context(value.edge), value.edge.implicit ? "true" : "false",
         location(value.edge, coverage), value.edge.line, value.edge.column,
         value.cycle ? "true" : "false", value.reused ? "true" : "false",
         value.externalBoundary ? "true" : "false",
@@ -63,14 +65,14 @@ std::string renderCallGraphText(const QueryGraph &graph,
           coverageAction(*coverage, *target));
   }
   for (const auto &value : traversal.excluded) {
-    const auto *source = findNode(graph, value.source);
-    const auto *target = findNode(graph, value.target);
+    const auto *source = detail::findSearchNode(graph, value.source);
+    const auto *target = detail::findSearchNode(graph, value.target);
     text += std::format("excluded source={} target={} reason={}\n",
                         source ? source->name : "", target ? target->name : "",
                         value.reason);
   }
   for (const auto &value : traversal.excludedNodes) {
-    const auto *node = findNode(graph, value.id);
+    const auto *node = detail::findSearchNode(graph, value.id);
     text +=
         std::format("excluded-node id={} name={} reason={}\n",
                     value.id.packed(), node ? node->name : "", value.reason);

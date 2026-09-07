@@ -80,7 +80,7 @@ IndexingResult SymbolVisitor::flushBodies() {
       continue;
     }
     BodyVisitor visitor(*owner, context_, files_, store_, status_);
-    if (!visitor.TraverseStmt(body)) {
+    if (!visitor.traverse(body)) {
       return std::unexpected(IndexingError{"cannot traverse function body"});
     }
     auto flushed = visitor.flush();
