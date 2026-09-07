@@ -1,6 +1,6 @@
 # B-042 scenario inventory (base b763c55 -> head)
 
-Collected pytest-bdd scenarios (`pytest tests/e2e --collect-only`): base 766, head 888.
+Collected pytest-bdd scenarios (`pytest tests/e2e --collect-only`): base 766, head 796.
 Removal rule: a scenario was removed only when its sole subject was intentionally deleted
 behaviour (renderer formatting, the JSON document, the Mermaid artifact lifecycle, `--output`
 safety, coverage/freshness prose in output). Every graph, scope, budget, recovery, entry and
