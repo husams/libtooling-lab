@@ -69,10 +69,12 @@ recoverCallGraph(const cli::CallGraphOptions &options,
       result.coverage = std::move(*updated);
     }
     preserveRecoveryEvidence(*context, result, roots, true, options.maxDepth);
-    reachable =
-        observe ? observe(result)
-                : std::expected<std::vector<SymbolId>, std::string>{
-                      recoveryReachable(result.graph, roots, options.maxDepth)};
+    // Assign each branch separately: GCC misreads the ternary's temporary
+    // std::expected as a freed non-heap object.
+    if (observe)
+      reachable = observe(result);
+    else
+      reachable = recoveryReachable(result.graph, roots, options.maxDepth);
     if (!reachable)
       return std::unexpected(reachable.error());
   }

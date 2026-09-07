@@ -9,11 +9,18 @@ Append `--conf /path/to/project.sqlite` to each command.
 
 | Group | Subcommands |
 | --- | --- |
-| `repo` | `list` / `ls`, `show NAME`, `add-clone NAME PATH [--label LABEL]`, `switch NAME LABEL_OR_PATH`, `rm-clone` / `remove-clone NAME LABEL_OR_PATH`, `rm NAME [--delete-components] [--dry-run]` |
+| `repo` | `list` / `ls`, `show NAME`, `add NAME PATH [--label LABEL] [--remote URL]`, `add-clone NAME PATH [--label LABEL]`, `switch NAME LABEL_OR_PATH`, `rm-clone` / `remove-clone NAME LABEL_OR_PATH`, `rm NAME [--delete-components] [--dry-run]` |
 | `component` | `list` / `ls`, `show NAME`, `add --path PATH [--name NAME] [--repo REPO] [--kind repo\|external] [--version VERSION] [--no-git]`, `set-version NAME [VERSION]`, `compile-commands NAME`, `rm SELECTOR [--dry-run]` |
 | `dir` | `list` / `ls` `[--component COMPONENT]`, `rm SELECTOR [--component COMPONENT] [--dry-run]` |
 | `file` | `list` / `ls`, `show PATH`, `add PATH --driver DRIVER [--working-directory DIR] [--arg TOKEN]...`, `rm` / `remove PATH`, `set-option --match REGEX --arg TOKEN...`, `clear-option --match REGEX --arg TOKEN...` |
 | `symbol` | `list` / `ls --facts FACTS.sqlite [--conf PROJECT.sqlite]`, `show QUALIFIED_NAME --facts FACTS.sqlite [--conf PROJECT.sqlite]` |
+
+`repo add NAME PATH [--label LABEL] [--remote URL]` registers a repository
+together with its first checkout, which becomes the active clone. The name
+must be new and the checkout must be an existing directory not already
+registered as a clone; a rejected registration leaves no repository row
+behind. Like `component add`, it creates a fresh configuration when the
+`--conf` path does not exist yet.
 
 `repo rm-clone NAME LABEL_OR_PATH` (alias `remove-clone`) removes only a
 non-active clone registration and never deletes a checkout. The active clone,

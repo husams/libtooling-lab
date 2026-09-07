@@ -4,6 +4,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <system_error>
 using namespace facts::commands::recovery;
@@ -56,6 +57,13 @@ struct Fixture {
   ~Fixture() { std::filesystem::remove_all(root); }
 };
 
+// Rewrites a file and returns once stat() reports a different identity.
+// Linux stamps mtime/ctime from a coarse clock, so a same-size rewrite in the
+// same tick as the previous write would be invisible to the identity check.
+// With keep_mtime the original mtime is restored so only ctime can differ.
+void rewriteUntilIdentityChanges(
+    const std::filesystem::path &path, const char *content,
+    std::optional<std::filesystem::file_time_type> keep_mtime = std::nullopt);
 void runDigestCacheTests(const Fixture &fixture);
 void runPreAttemptTest(AttemptCache &cache, const AttemptInput &input,
                        const Fixture &fixture);

@@ -1,11 +1,14 @@
 #pragma once
 #include "storage/catalog/Records.h"
+#include "storage/catalog/Requests.h"
 
 namespace facts::catalog {
 Result<std::vector<Repository>> repositories(Database &database);
 Result<Repository> repository(Database &database, const std::string &name);
 Result<std::vector<ProjectClone>> clones(Database &database,
                                          std::int64_t repositoryId);
+Result<Repository> addRepository(Database &database,
+                                 const RepositoryRegistration &options);
 Result<void> addClone(Database &database, const Repository &repository,
                       const std::string &path, const std::string &label);
 Result<void> switchClone(Database &database, const Repository &repository,

@@ -1,4 +1,6 @@
 """Invalid graph output never replaces its inputs or existing artifacts."""
+import os
+
 from pytest_bdd import when, then, parsers
 from support.recovery import run, success
 from support.graph_artifact import command, invoke, metadata
@@ -35,7 +37,8 @@ def overlap(context, input):
     context.protected_bytes = context.protected_input.read_bytes()
     if input == "alias":
         alias = context.run_root_path / "facts-alias"
-        alias.hardlink_to(context.protected_input)
+        # os.link: Path.hardlink_to needs Python 3.10, RHEL 9 ships 3.9.
+        os.link(context.protected_input, alias)
         context.graph_artifact = alias
     else:
         context.graph_artifact = context.protected_input
