@@ -74,6 +74,7 @@ def test_schema12_run_reader_is_bounded_and_read_only(paired_databases):
         assert [run.run_id for run in cb.callgraphs.list(limit=1)] == [1]
         run = cb.callgraphs.get(1, limit=1)
         assert run.status == "complete" and run.path_found
+        assert run.target_reached and run.self_path
         assert run.path_outcome == "found" and run.edges.total == 4
         assert run.edges.next_cursor == 1 and run.edges.total == 4
         assert run.edges[0].site and run.edges[0].site.offset == 120

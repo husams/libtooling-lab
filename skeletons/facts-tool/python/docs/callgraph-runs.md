@@ -27,6 +27,8 @@ runs without hydrating unbounded child collections.
 target from a zero-edge self path. `edges` are exact persisted graph evidence;
 ordinary `cb.graph.callees()` and `cb.graph.callers()` remain independent
 relation navigation and are never relabelled as a graph run.
+`path_outcome` reports `found`, `unreachable`, `not-applicable`, or the native
+status for `truncated`, `cancelled`, `recovery-failed`, and `failed` runs.
 
 Schemas 10 and 11 retain the existing query API. Calling `cb.callgraphs` on
 those stores raises `E_CAPABILITY`; malformed or future schema layouts raise
