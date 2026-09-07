@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from support.callgraph_data import schema12_pair
+
 ROOT = Path(__file__).parents[1]
 
 
@@ -52,6 +54,16 @@ def test_wheel_and_sdist_install_and_query(
             "install",
             "--no-deps",
             str(artifact),
+            cwd=tmp_path,
+        )
+        graph_root = tmp_path / f"graph-{index}"
+        graph_root.mkdir()
+        graph_pair = schema12_pair(*paired_databases, graph_root)
+        _run(
+            str(python),
+            str(ROOT / "scripts" / "installed_smoke.py"),
+            *map(str, graph_pair),
+            "graph",
             cwd=tmp_path,
         )
         _run(
