@@ -15,8 +15,8 @@ factsSchemaVersion(storage::Database &database) {
       });
   try {
     for (auto version : rows) {
-      // Version 12 adds the append-only callgraph_run tables.
-      if (version > 12) {
+      // Version 13 adds opt-in expression/source evidence tables.
+      if (version > 13) {
         return std::unexpected(
             "incompatible-symbol-universe: unsupported facts schema version");
       }

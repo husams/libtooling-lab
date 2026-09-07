@@ -12,6 +12,13 @@ Feature: Native matcher workflow
     When a direct-call matcher runs twice with the explicit database pair
     Then the native call graph can traverse the matched facts twice
 
+  Scenario: Opt-in expression matching persists field effects and source evidence
+    Given a separately stored expression evidence fixture
+    When an expression matcher captures field evidence
+    Then the expression evidence rows record direct field effects and a source fingerprint
+    When a symbol matcher captures source regions
+    Then the source region rows retain definition ranges and freshness
+
   Scenario: Invalid binding fails before writing through the paired workflow
     Given a separately stored native matcher fixture
     When an invalid symbol binding runs with the explicit database pair

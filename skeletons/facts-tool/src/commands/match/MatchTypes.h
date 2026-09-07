@@ -6,6 +6,7 @@
 
 namespace clang {
 class CallExpr;
+class Expr;
 class FunctionDecl;
 class NamedDecl;
 class Stmt;
@@ -15,6 +16,10 @@ namespace facts::commands::match {
 
 struct SymbolMatch {
   const clang::NamedDecl &symbol;
+};
+
+struct ExpressionMatch {
+  const clang::Expr &expression;
 };
 
 struct RelationMatch {
@@ -30,6 +35,7 @@ struct DirectCallMatch {
   const clang::FunctionDecl &callee;
 };
 
-using Contract = std::variant<SymbolMatch, RelationMatch, DirectCallMatch>;
+using Contract =
+    std::variant<SymbolMatch, ExpressionMatch, RelationMatch, DirectCallMatch>;
 
 } // namespace facts::commands::match

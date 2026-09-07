@@ -84,6 +84,7 @@ struct MatchOptions {
   std::vector<std::string> defaultExtraArguments;
   std::string matcher;
   std::optional<std::string> relationKind;
+  bool captureSource = false;
   std::vector<std::string> sources;
 };
 

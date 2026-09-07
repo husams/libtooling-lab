@@ -2,6 +2,7 @@
 
 #include "cli/Options.h"
 #include "model/MatchedSymbol.h"
+#include "commands/match/ExpressionEvidence.h"
 
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 
@@ -35,6 +36,7 @@ private:
   bool rejectLegacyWrites_ = false;
   std::optional<std::string> error_;
   std::vector<MatchedSymbol> matches_;
+  SourceFingerprintCache fingerprints_;
 };
 
 } // namespace facts::commands::match

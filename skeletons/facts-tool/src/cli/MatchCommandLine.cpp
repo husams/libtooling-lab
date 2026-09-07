@@ -32,9 +32,12 @@ CLI::App *configureMatch(CLI::App &app, MatchOptions &options) {
   command
       ->add_option("--matcher", options.matcher,
                    "Clang dynamic matcher expression; bind symbol, "
-                   "call+callee, or source+target[+site]")
+                   "expression, call+callee, or source+target[+site]")
       ->required()
       ->type_name("EXPR");
+  command->add_flag(
+      "--capture-source", options.captureSource,
+      "Persist the exact source region for each matched function, method, or record definition");
   command
       ->add_option("--relation-kind", options.relationKind,
                    "Relation kind for source/target bindings; required for "

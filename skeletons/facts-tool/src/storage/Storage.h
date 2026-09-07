@@ -4,6 +4,7 @@
 #include "model/AnySymbol.h"
 #include "model/CallGraphEntry.h"
 #include "model/ExternalReference.h"
+#include "model/ExpressionEvidence.h"
 #include "model/MatchedSymbol.h"
 #include "model/Relation.h"
 #include "model/RelationSite.h"
@@ -78,6 +79,11 @@ public:
                        std::span<const TemplateArgument> arguments);
   std::expected<void, std::error_code>
   upsertMatchedSymbols(std::span<const MatchedSymbol> symbols);
+
+  std::expected<void, std::error_code>
+  addExpressionOccurrences(std::span<const ExpressionOccurrence> occurrences);
+  std::expected<void, std::error_code>
+  addSourceRegions(std::span<const SourceRegion> regions);
 
   std::expected<void, std::error_code>
   addCallGraphEntries(std::span<const CallGraphEntry> entries);

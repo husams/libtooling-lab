@@ -38,6 +38,16 @@ public:
   }
 
   std::expected<void, std::error_code>
+  addExpressionOccurrences(std::span<const ExpressionOccurrence> occurrences) {
+    return storage_.addExpressionOccurrences(occurrences);
+  }
+
+  std::expected<void, std::error_code>
+  addSourceRegions(std::span<const SourceRegion> regions) {
+    return storage_.addSourceRegions(regions);
+  }
+
+  std::expected<void, std::error_code>
   addCallGraphEntries(std::span<const CallGraphEntry> entries) {
     return storage_.addCallGraphEntries(entries);
   }

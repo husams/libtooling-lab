@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sqlite3
 
 from pytest_bdd import given, then, when
 
@@ -67,6 +68,68 @@ def paired_direct_call(context: FactsToolContext) -> None:
     require(first.returncode == 0, first.stdout + first.stderr)
     second = run(command)
     require(second.returncode == 0, second.stdout + second.stderr)
+
+
+@given("a separately stored expression evidence fixture")
+def expression_fixture(context: FactsToolContext) -> None:
+    context.prepare()
+    context.expression_source = (
+        context.fixture_root / "expression_evidence.cpp").resolve(strict=True)
+    context._write_compilation_database((context.expression_source,))
+    context.files_database = context.run_root_path / "expression-project.sqlite"
+    context.facts_database = context.run_root_path / "expression-facts.sqlite"
+    imported = run([
+        str(context.facts_tool), "import", "-v", "0", "--conf",
+        str(context.files_database), "--compilation-database",
+        str(context.run_root_path), str(context.expression_source),
+    ])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+
+
+@when("an expression matcher captures field evidence")
+def expression_match(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher",
+        'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(context.expression_source),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("the expression evidence rows record direct field effects and a source fingerprint")
+def expression_rows(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT access,source_sha256,freshness FROM expression_occurrence "
+            "WHERE target_id IS NOT NULL").fetchall()
+    require(rows, "no expression evidence rows")
+    require({row[0] for row in rows} >= {"read", "write", "read_write"}, str(rows))
+    require(all(len(row[1]) == 64 and row[2] == "current" for row in rows), str(rows))
+
+
+@when("a symbol matcher captures source regions")
+def source_region_match(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--capture-source",
+        "--conf", str(context.files_database), "--facts",
+        str(context.facts_database), "--matcher",
+        'cxxRecordDecl(isDefinition()).bind("symbol")',
+        str(context.expression_source),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("the source region rows retain definition ranges and freshness")
+def source_region_rows(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT offset,size,source_sha256,freshness FROM source_region "
+            "WHERE symbol_kind='record'").fetchall()
+    require(rows, "no source region rows")
+    require(all(row[0] >= 0 and row[1] > 0 and len(row[2]) == 64 and
+                row[3] == "current" for row in rows), str(rows))
 
 
 @then("the native call graph can traverse the matched facts twice")
