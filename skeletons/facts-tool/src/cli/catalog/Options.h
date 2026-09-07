@@ -11,7 +11,15 @@ namespace facts::cli {
 using CatalogSelector = catalog::Selector;
 
 struct RepositoryOptions {
-  enum class Action { list, show, addClone, switchClone, removeClone, remove };
+  enum class Action {
+    list,
+    show,
+    add,
+    addClone,
+    switchClone,
+    removeClone,
+    remove
+  };
   int verbosity = 0;
   std::string facts;
   bool factsProvided = false;
@@ -21,6 +29,7 @@ struct RepositoryOptions {
   std::string name;
   std::string path;
   std::string label;
+  std::string remote;
   bool deleteComponents = false;
   bool dryRun = false;
 };

@@ -5,6 +5,47 @@ Feature: Manage repository clones and ownership
   Background:
     Given an imported catalog with two repositories and independent components
 
+  Scenario: Register a new repository with its first checkout
+    When I run the catalog command "repo add vendor {external-root} --label main --remote https://example.invalid/vendor.git"
+    Then the catalog command succeeds
+    And the vendor repository is registered with its checkout active
+    And only the vendor repository and its clone were added
+    And the catalog database is consistent
+    When I run the catalog command "repo show vendor"
+    Then the catalog command succeeds
+    And the catalog output shows the vendor checkout as the active clone
+
+  Scenario: A registered repository without a label or remote accepts components
+    When I run the catalog command "repo add vendor {external-root}"
+    Then the catalog command succeeds
+    And the vendor repository has no label and no remote
+    When I run the catalog command "component add --path {external-root} --name vendor-lib --repo vendor --no-git"
+    Then the catalog command succeeds
+    And the vendor-lib component belongs to the vendor repository
+    And the original file rows are unchanged
+    And the catalog database is consistent
+
+  Scenario: Register a repository into a fresh configuration
+    When I register the vendor repository against a new configuration
+    Then the new configuration holds the vendor repository with its active clone and no files
+
+  Scenario Outline: Rejected repository registrations leave the catalog unchanged
+    When I run the catalog command "repo add <name> <path>"
+    Then the catalog command fails with "<diagnostic>"
+    And the entire catalog is unchanged
+    And the catalog database is consistent
+
+    Examples:
+      | name   | path            | diagnostic                              |
+      | demo   | {external-root} | repository 'demo' already registered    |
+      | vendor | {missing-path}  | directory not found                     |
+      | vendor | {checkout}      | clone path or label already registered  |
+
+  Scenario: Registering a repository without a checkout path is rejected by the parser
+    When I run the catalog command "repo add vendor"
+    Then the catalog parser rejects the invalid arguments
+    And the entire catalog is unchanged
+
   Scenario: Register another clone without changing the active checkout
     When I run the catalog command "repo add-clone demo {second-clone} --label second"
     Then the catalog command succeeds

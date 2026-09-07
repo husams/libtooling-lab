@@ -12,6 +12,13 @@ struct Selector {
   std::string path;
 };
 
+struct RepositoryRegistration {
+  std::string name;
+  std::string remote;
+  std::string path;
+  std::string label;
+};
+
 struct ComponentRegistration {
   std::string name;
   std::string path;

@@ -15,6 +15,7 @@ std::string_view queryModeName(QueryMode mode) {
   case QueryMode::Callees:
     return "callees";
   }
+  return {};
 }
 
 std::string_view pathModeName(PathMode mode) {

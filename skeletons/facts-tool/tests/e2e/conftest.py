@@ -94,6 +94,7 @@ pytest_plugins = (
     "steps.return_type_steps",
     "steps.catalog_common_steps",
     "steps.catalog_repository_steps",
+    "steps.catalog_repository_add_steps",
     "steps.catalog_component_steps",
     "steps.catalog_directory_steps",
     "steps.catalog_failure_steps",

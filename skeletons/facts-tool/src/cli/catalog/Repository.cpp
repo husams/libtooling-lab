@@ -13,11 +13,19 @@ CLI::App *configureRepository(CLI::App &app, RepositoryOptions &options) {
               Action::show)
       .add_option("name", options.name)
       ->required();
-  auto &add = catalogLeaf(*group, "add-clone", "Register a checkout", options,
-                          Action::addClone);
+  auto &add = catalogLeaf(*group, "add",
+                          "Register a repository with its first checkout",
+                          options, Action::add);
   add.add_option("name", options.name)->required();
-  add.add_option("path", options.path)->required();
-  add.add_option("--label", options.label);
+  add.add_option("path", options.path, "Checkout directory; becomes active")
+      ->required();
+  add.add_option("--label", options.label, "Label for the checkout");
+  add.add_option("--remote", options.remote, "Remote URL");
+  auto &addClone = catalogLeaf(*group, "add-clone", "Register a checkout",
+                               options, Action::addClone);
+  addClone.add_option("name", options.name)->required();
+  addClone.add_option("path", options.path)->required();
+  addClone.add_option("--label", options.label);
   auto &change = catalogLeaf(*group, "switch", "Switch the active checkout",
                              options, Action::switchClone);
   change.add_option("name", options.name)->required();
