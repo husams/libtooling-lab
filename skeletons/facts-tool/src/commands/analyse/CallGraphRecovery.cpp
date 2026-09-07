@@ -1,3 +1,4 @@
+#include "commands/analyse/CallGraphCancellation.h"
 #include "commands/analyse/CallGraphRecoverySelection.h"
 #include "commands/analyse/CallGraphRecoveryState.h"
 #include <iostream>
@@ -7,9 +8,17 @@ std::expected<RecoveryResult, std::string>
 recoverCallGraph(const cli::CallGraphOptions &options,
                  callgraph::QueryGraph graph,
                  std::optional<callgraph::CoverageReport> coverage,
-                 std::span<const SymbolId> roots) {
+                 std::span<const SymbolId> roots, RecoveryObserver observe) {
   RecoveryResult result{std::move(graph), std::move(coverage), {}};
   result.report.requested = true;
+  auto reachable =
+      observe ? observe(result)
+              : std::expected<std::vector<SymbolId>, std::string>{
+                    recoveryReachable(result.graph, roots, options.maxDepth)};
+  if (!reachable)
+    return std::unexpected(reachable.error());
+  if (CallGraphCancellation::cancelled())
+    return result;
   std::cerr << "facts-tool: recovery-start\n";
   auto context = loadRecoveryContext(options);
   if (!context) {
@@ -20,12 +29,10 @@ recoverCallGraph(const cli::CallGraphOptions &options,
   preserveRecoveryEvidence(*context, result, roots, false, options.maxDepth);
   context->reusedUsrs = context->preservedUsrs;
   recovery::AttemptCache cache;
-  while (true) {
-    const auto reachable =
-        recoveryReachable(result.graph, roots, options.maxDepth);
+  while (!CallGraphCancellation::cancelled()) {
     auto candidates = selectRecoveryCandidates(
         *context, result.graph, result.coverage ? &*result.coverage : nullptr,
-        reachable);
+        *reachable);
     if (!candidates) {
       recoveryFailure(result.report, candidates.error());
       break;
@@ -62,6 +69,12 @@ recoverCallGraph(const cli::CallGraphOptions &options,
       result.coverage = std::move(*updated);
     }
     preserveRecoveryEvidence(*context, result, roots, true, options.maxDepth);
+    reachable =
+        observe ? observe(result)
+                : std::expected<std::vector<SymbolId>, std::string>{
+                      recoveryReachable(result.graph, roots, options.maxDepth)};
+    if (!reachable)
+      return std::unexpected(reachable.error());
   }
   result.report.reused = collectRecoveryReuseReport(*context, result.graph);
   std::cerr << "facts-tool: recovery-complete\n";

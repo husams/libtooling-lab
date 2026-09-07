@@ -5,13 +5,9 @@
 namespace facts::commands {
 std::expected<RecoveryContext, std::string>
 loadRecoveryContext(const cli::CallGraphOptions &options) {
-  if (options.configuration.empty() && options.configurationFile.empty())
+  if (options.configuration.empty())
     return std::unexpected("recovery requires a project configuration");
-  auto resolved = loadConfiguration(options.configuration,
-                                    options.configurationFile, false);
-  if (!resolved)
-    return std::unexpected(resolved.error());
-  auto opened = catalog::open(resolved->database.string(), false);
+  auto opened = catalog::open(options.configuration, false);
   if (!opened)
     return std::unexpected(opened.error());
   auto files = catalog::files(*opened);
@@ -21,7 +17,7 @@ loadRecoveryContext(const cli::CallGraphOptions &options) {
   if (!snapshot)
     return std::unexpected(snapshot.error());
   RecoveryContext context;
-  context.project = resolved->database.string();
+  context.project = options.configuration;
   context.verbosity = options.verbosity;
   context.aliases = std::move(snapshot->labels);
   for (auto &file : *files)

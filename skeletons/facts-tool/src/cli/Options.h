@@ -66,6 +66,7 @@ struct CallGraphOptions {
   std::optional<std::string> target;
   std::optional<std::string> pathMode;
   bool recoverMissing = false;
+  std::string output;
 };
 
 struct CallGraphEntryOptions {

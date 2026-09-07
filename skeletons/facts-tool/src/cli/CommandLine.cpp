@@ -199,14 +199,13 @@ private:
     callGraphCommand_ = &command;
     configureVerbosity(command, callGraph_.verbosity);
     command.add_option("-f,--facts", callGraph_.facts, "SQLite facts database")
-        ->required()
         ->type_name("FILE");
     configurationOptions(command, callGraph_.configuration,
                          callGraph_.configurationFile);
     command
         .add_option("--format", callGraph_.format,
-                    "Output representation: text or json")
-        ->check(CLI::IsMember({"text", "json"}))
+                    "Output representation: text, json, or mermaid")
+        ->check(CLI::IsMember({"text", "json", "mermaid"}))
         ->type_name("FORMAT");
     command
         .add_option("--edges", callGraph_.edges,
@@ -236,6 +235,9 @@ private:
                     "Path selection: shortest or all-simple")
         ->check(CLI::IsMember({"shortest", "all-simple"}))
         ->type_name("MODE");
+    command.add_option(
+        "-o,--output", callGraph_.output,
+        "Atomically replace an output artifact; stdout otherwise");
     configureCallGraphOptions(command, callGraph_);
     command.add_flag("--recover-missing", callGraph_.recoverMissing,
                      "Recover missing project graph evidence");

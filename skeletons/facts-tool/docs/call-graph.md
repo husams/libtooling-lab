@@ -158,3 +158,42 @@ output retains opaque file identifiers and reports extraction coverage as
 Version 8 extends `relation_site` in place with nullable `receiver_type_id` and
 `certainty` columns. The migration does not rebuild the table or add a context
 table, and it preserves the existing primary and foreign keys.
+
+## Portable output and recovery lifecycle
+
+```sh
+facts-tool analyse call-graph --conf project.db --facts facts.db \
+  --function main --recover-missing --format mermaid --output main-callgraph.mmd
+```
+
+`--format text|json|mermaid` defaults to text. An omitted `--output` writes
+stdout; an explicit file is replaced atomically with a sibling temporary file.
+Input database and registered source aliases are rejected as output targets.
+If `--facts` is omitted, the validated configuration must provide a
+project-scoped `facts_template`; configuration selection is resolved once and
+passed to recovery as a concrete project path.
+
+For Mermaid file output with recovery, an initial diagram with a visible
+partial/pending label is published before recovery begins. Changed graph
+generations replace that diagram; the final publication reports recovery
+results. There is one native traversal per graph generation, shared by
+recovery selection and rendering. Text and JSON emit one final document.
+Progress uses stderr. A recovery failure leaves a valid diagram labelled
+partial and returns exit 1. Invalid configuration or selectors do not replace
+an existing artifact. A successful stored traversal does not imply complete
+extraction or fresh source evidence.
+
+If recovery is interrupted, the final artifact retains the last usable graph
+generation and marks it cancelled and incomplete (exit 130). Newly extracted
+facts can remain in the database even when cancellation prevents their graph
+from being traversed; the artifact does not claim to include that later evidence.
+Operational errors in JSON stdout mode produce one JSON error document and
+exit 1 without a duplicate stderr diagnostic.
+
+Mermaid uses pair-scoped stable node IDs and escaped labels. Native edges,
+shared nodes, cycles, callable semantics, and call sites survive rendering.
+Its JSON header comment preserves root USRs, source/facts provenance, coverage,
+selected query controls, frontiers, excluded identities and recovery errors.
+The [runnable skill recipe](../.agents/skills/facts-tool-code-reasoning/references/how-to-build-call-graph.md)
+uses a checked-in fixture; [symbol search](../.agents/skills/facts-tool-code-reasoning/references/how-to-search-symbol.md)
+explains exact selection and match-only index evidence.
