@@ -25,6 +25,18 @@ Feature: One native call graph invocation produces a portable artifact
     When S-025 observes the artifact during recovery
     Then S-025 observed a labelled initial graph and its final replacement
 
+  Scenario Outline: Interrupting recovery retains the usable graph
+    When S-025 interrupts <format> recovery during extraction
+    Then S-025 retains a useful cancelled <format> result
+    Examples:
+      | format  |
+      | mermaid |
+      | json    |
+
+  Scenario: JSON operational errors retain a single diagnostic channel
+    When S-025 requests JSON from an empty facts database
+    Then S-025 emits one JSON error without a duplicate stderr diagnostic
+
   Scenario Outline: Invalid requests preserve an existing artifact
     When S-025 requests an invalid <kind> graph artifact
     Then S-025 rejects the request without replacing the artifact

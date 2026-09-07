@@ -40,9 +40,11 @@ runCallGraph(const cli::CallGraphOptions &options) {
   if (!result && options.format == "json" && options.output.empty() &&
       result.error() != "recovery-failed" &&
       !result.error().starts_with("facts-tool: usage error:") &&
-      !result.error().starts_with("facts-tool: configuration error:"))
-    (void)writeGraphOutput({},
-                           callgraph::renderCallGraphErrorJson(result.error()));
+      !result.error().starts_with("facts-tool: configuration error:")) {
+    return writeGraphOutput({},
+                            callgraph::renderCallGraphErrorJson(result.error()))
+        .transform([] { return 1; });
+  }
   return result;
 }
 } // namespace facts::commands

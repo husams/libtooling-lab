@@ -183,6 +183,13 @@ partial and returns exit 1. Invalid configuration or selectors do not replace
 an existing artifact. A successful stored traversal does not imply complete
 extraction or fresh source evidence.
 
+If recovery is interrupted, the final artifact retains the last usable graph
+generation and marks it cancelled and incomplete (exit 130). Newly extracted
+facts can remain in the database even when cancellation prevents their graph
+from being traversed; the artifact does not claim to include that later evidence.
+Operational errors in JSON stdout mode produce one JSON error document and
+exit 1 without a duplicate stderr diagnostic.
+
 Mermaid uses pair-scoped stable node IDs and escaped labels. Native edges,
 shared nodes, cycles, callable semantics, and call sites survive rendering.
 Its JSON header comment preserves root USRs, source/facts provenance, coverage,

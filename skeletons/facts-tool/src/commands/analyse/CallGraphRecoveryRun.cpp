@@ -3,6 +3,7 @@
 #include "commands/analyse/CallGraphRecovery.h"
 #include "commands/analyse/CallGraphResult.h"
 #include "commands/analyse/CallGraphRun.h"
+#include "commands/analyse/CallGraphSnapshot.h"
 #include <iostream>
 
 namespace facts::commands {
@@ -27,23 +28,26 @@ runSelectedCallGraph(const cli::CallGraphOptions &options,
   auto controls = makeCallGraphRequest(options, coverage, {});
   if (!controls)
     return std::unexpected(controls.error());
-  std::optional<CallGraphResult> initial;
+  std::unique_ptr<CallGraphSnapshot> snapshot;
   auto observe = [&](const RecoveryResult &current)
       -> std::expected<std::vector<SymbolId>, std::string> {
-    auto *evidence = current.coverage ? &*current.coverage : nullptr;
-    auto queried = queryCallGraph(options, request, current.graph, evidence);
+    if (snapshot && CallGraphCancellation::cancelled())
+      return snapshot->result.traversal.nodes;
+    auto queried = snapshotCallGraph(options, request, current);
     if (!queried)
       return std::unexpected(queried.error());
-    initial = std::move(*queried);
+    if (snapshot && (*queried)->result.traversal.reason == "cancelled")
+      return snapshot->result.traversal.nodes;
+    snapshot = std::move(*queried);
     if (options.format == "mermaid" && !options.output.empty()) {
-      auto published =
-          publishCallGraph(options, request, current.graph, evidence, *initial,
-                           &current.report, true);
+      auto published = publishCallGraph(options, request, snapshot->graph,
+                                        snapshot->evidence(), snapshot->result,
+                                        &current.report, true);
       if (!published)
         return std::unexpected(published.error());
       std::cerr << "facts-tool: initial graph published\n";
     }
-    return initial->traversal.nodes;
+    return snapshot->result.traversal.nodes;
   };
   std::vector<SymbolId> rootIds;
   for (const auto *root : *roots)
@@ -53,15 +57,19 @@ runSelectedCallGraph(const cli::CallGraphOptions &options,
       rootIds, observe);
   if (!recovered)
     return std::unexpected(recovered.error());
-  auto *evidence = recovered->coverage ? &*recovered->coverage : nullptr;
+  auto &initial = snapshot->result;
   if (CallGraphCancellation::cancelled()) {
-    initial->traversal.reason = "cancelled";
-    initial->traversal.truncated = std::max(1U, initial->traversal.truncated);
-    for (const auto *root : initial->roots)
-      initial->traversal.frontier.push_back({root->id, "cancelled"});
+    initial.traversal.reason = "cancelled";
+    initial.traversal.truncated = std::max(1U, initial.traversal.truncated);
+    initial.traversal.text += "traversal-truncated=true reason=cancelled\n";
+    if (request.mode == callgraph::QueryMode::Path)
+      initial.pathResult = "truncated";
+    for (const auto *root : initial.roots)
+      initial.traversal.frontier.push_back({root->id, "cancelled"});
   }
-  auto published = publishCallGraph(options, request, recovered->graph,
-                                    evidence, *initial, &recovered->report);
+  auto published =
+      publishCallGraph(options, request, snapshot->graph, snapshot->evidence(),
+                       initial, &recovered->report);
   if (!published)
     return published;
   if (*published == 130)

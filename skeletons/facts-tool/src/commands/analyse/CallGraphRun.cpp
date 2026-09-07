@@ -39,8 +39,9 @@ queryCallGraph(const cli::CallGraphOptions &options,
     if (!target)
       return std::unexpected("facts-tool: usage error: " + target.error());
     result.target = *target;
-    auto search = callgraph::searchPathsWithRequest(graph, *roots->front(), **target,
-                                         request.pathMode, *controls, coverage);
+    auto search = callgraph::searchPathsWithRequest(graph, *roots->front(),
+                                                    **target, request.pathMode,
+                                                    *controls, coverage);
     result.pathResult = callgraph::pathResult(graph, search, coverage);
     result.traversal = std::move(search.traversal);
     result.paths = std::move(search.paths);
