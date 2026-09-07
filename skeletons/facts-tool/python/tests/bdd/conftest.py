@@ -28,6 +28,14 @@ def native_codebase() -> CodeBase:
         yield value
 
 
+@pytest.fixture
+def native_schema12_codebase(native_schema12_pair: tuple[Path, Path]) -> CodeBase:
+    with open_codebase(
+        facts_db=native_schema12_pair[0], project_db=native_schema12_pair[1]
+    ) as value:
+        yield value
+
+
 @given("a valid paired facts and project database", target_fixture="cb")
 def valid_pair(codebase: CodeBase, native_codebase: CodeBase):
     return ((False, codebase), (True, native_codebase))

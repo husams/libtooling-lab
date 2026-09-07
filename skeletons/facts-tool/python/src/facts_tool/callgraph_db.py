@@ -47,7 +47,8 @@ def edges(
         "SELECT e.*,s.usr AS source_usr,d.usr AS target_usr "
         "FROM callgraph_run_edge e JOIN symbol s ON s.id=e.source_id "
         "JOIN symbol d ON d.id=e.destination_id WHERE e.run_id=? "
-        "ORDER BY e.depth,e.source_id,e.destination_id,e.kind,e.position "
+        "ORDER BY e.depth,e.source_id,e.destination_id,e.kind,e.position,"
+        "e.file_id,e.offset,e.cycle "
         "LIMIT ? OFFSET ?"
     )
     return many(db, sql, (run_id, limit, offset))

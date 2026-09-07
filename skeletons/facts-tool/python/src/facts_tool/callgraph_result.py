@@ -9,6 +9,7 @@ from .callgraph_models import (
 )
 from .callgraph_page import CallGraphPage
 from .callgraph_recovery import CallGraphRecovery
+from .callgraph_serialization import page_dict
 from .provenance import PairProvenance
 
 
@@ -66,7 +67,11 @@ class CallGraphRun:
             return "not-applicable"
         if self.target_reached or self.self_path:
             return "found"
-        return "unreachable" if self.status == "complete" else "truncated"
+        if self.status == "complete":
+            return "unreachable"
+        if self.status in {"truncated", "cancelled", "recovery-failed", "failed"}:
+            return self.status
+        return "unknown"
 
     @property
     def truncated(self) -> bool:
@@ -87,14 +92,8 @@ class CallGraphRun:
 
     def to_dict(self) -> dict[str, Any]:
         value = self.__dict__.copy()
-        for name in ("roots", "targets", "edges", "frontier", "recovery"):
-            page = value[name]
-            value[name] = {
-                "items": [row.to_dict() for row in page.items],
-                "total": page.total,
-                "next_cursor": page.next_cursor,
-                "complete": page.complete,
-            }
+        names = ("roots", "targets", "edges", "frontier", "recovery")
+        value.update({name: page_dict(value[name]) for name in names})
         value["components"] = list(self.components)
         value["provenance"] = self.provenance.to_dict()
         return value

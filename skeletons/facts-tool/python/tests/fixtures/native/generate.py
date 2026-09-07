@@ -30,7 +30,9 @@ def main() -> None:
             "import",
             "--conf",
             str(project),
-            "--compilation-database",
+            "--facts",
+            str(facts),
+            "-p",
             str(root),
         ]
     )

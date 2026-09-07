@@ -1,8 +1,6 @@
 import sqlite3
 
-import pytest
-
-from facts_tool import FactsToolError, open_codebase
+from facts_tool import open_codebase
 
 
 def _add_run(facts):
@@ -51,6 +49,13 @@ def _add_run(facts):
             "INSERT INTO callgraph_run_edge VALUES(1,?,?,?,?,?,?,?,?)",
             (ids["save"], ids["persist"], 1, 0, 1, 80, 2, 0),
         )
+        db.executemany(
+            "INSERT INTO callgraph_run_edge VALUES(1,?,?,?,?,?,?,?,?)",
+            (
+                (ids["run"], ids["save"], 1, 0, 1, 130, 1, 0),
+                (ids["run"], ids["save"], 1, 0, 1, 140, 1, 0),
+            ),
+        )
         db.execute(
             "INSERT INTO callgraph_run_frontier VALUES(1,?,?)",
             (ids["persist"], "max_depth"),
@@ -69,16 +74,18 @@ def test_schema12_run_reader_is_bounded_and_read_only(paired_databases):
         assert [run.run_id for run in cb.callgraphs.list(limit=1)] == [1]
         run = cb.callgraphs.get(1, limit=1)
         assert run.status == "complete" and run.path_found
-        assert run.path_outcome == "found" and run.edges.total == 2
-        assert run.edges.next_cursor == 1 and run.roots.total == 2
+        assert run.path_outcome == "found" and run.edges.total == 4
+        assert run.edges.next_cursor == 1 and run.edges.total == 4
+        assert run.edges[0].site and run.edges[0].site.offset == 120
         next_run = cb.callgraphs.get(1, limit=1, cursors={"edges": 1})
-        assert next_run.edges[0].source.qualified_name == "app::save"
-        empty_page = cb.callgraphs.get(1, limit=1, cursors={"edges": 2})
-        assert not empty_page.edges and empty_page.edges.total == 2
+        assert next_run.edges[0].site and next_run.edges[0].site.offset == 130
+        last_page = cb.callgraphs.get(1, limit=1, cursors={"edges": 2})
+        assert last_page.edges[0].site and last_page.edges[0].site.offset == 140
+        empty_page = cb.callgraphs.get(1, limit=1, cursors={"edges": 4})
+        assert not empty_page.edges and empty_page.edges.total == 4
         assert not next_run.edges[0].site.enriched
         assert run.edges[0].semantic_kind == "Calls"
         assert run.edges[0].site and run.edges[0].site.offset == 120
         assert run.frontier[0].reason == "max_depth"
         assert run.recovery[0].outcome == "reused"
     assert (facts.read_bytes(), project.read_bytes()) == before
-
