@@ -5,6 +5,7 @@
 #include "analysis/callgraph/CallGraphRecoveryTypes.h"
 
 #include "cli/Options.h"
+#include <functional>
 #include <span>
 
 #include <expected>
@@ -23,10 +24,13 @@ struct RecoveryResult {
   RecoveryReport report;
 };
 
-std::expected<RecoveryResult, std::string>
-recoverCallGraph(const cli::CallGraphOptions &options,
-                 callgraph::QueryGraph graph,
-                 std::optional<callgraph::CoverageReport> coverage,
-                 std::span<const SymbolId> roots);
+using RecoveryObserver =
+    std::function<std::expected<std::vector<SymbolId>, std::string>(
+        const RecoveryResult &)>;
+
+std::expected<RecoveryResult, std::string> recoverCallGraph(
+    const cli::CallGraphOptions &options, callgraph::QueryGraph graph,
+    std::optional<callgraph::CoverageReport> coverage,
+    std::span<const SymbolId> roots, RecoveryObserver observe = {});
 
 } // namespace facts::commands

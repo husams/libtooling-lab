@@ -1,43 +1,57 @@
 #include "commands/analyse/CallGraphRun.h"
-
-#include "analysis/callgraph/CallGraphJson.h"
-#include "analysis/callgraph/CallGraphSearch.h"
 #include "analysis/callgraph/CallGraphSelection.h"
 #include "analysis/callgraph/CallGraphText.h"
-#include "commands/analyse/CallGraphRecovery.h"
-
+#include "cli/Trace.h"
+#include "commands/analyse/CallGraphCancellation.h"
+#include "commands/analyse/CallGraphResult.h"
 #include <format>
-#include <iostream>
 
 namespace facts::commands {
-namespace {
-std::unexpected<std::string> usage(std::string message) {
-  return std::unexpected("facts-tool: usage error: " + std::move(message));
+std::expected<CallGraphResult, std::string>
+queryCallGraph(const cli::CallGraphOptions &options,
+               const CallGraphRequest &request,
+               const callgraph::QueryGraph &graph,
+               const callgraph::CoverageReport *coverage) {
+  auto roots = callgraph::selectRoots(graph, options.function, options.all);
+  if (!roots)
+    return std::unexpected("facts-tool: usage error: " + roots.error());
+  cli::logVerbose(options.verbosity, 1, "facts-tool: graph traversal");
+  auto controls = makeCallGraphRequest(
+      options, coverage, [&] { return CallGraphCancellation::cancelled(); });
+  if (!controls)
+    return std::unexpected(controls.error());
+  const auto view = options.edges == "calls" ? callgraph::EdgeView::Calls
+                                             : callgraph::EdgeView::Semantic;
+  CallGraphResult result;
+  result.roots = *roots;
+  if (request.mode == callgraph::QueryMode::Callees) {
+    result.traversal =
+        callgraph::renderCallGraph(graph, *roots, *controls, coverage, view);
+  } else if (request.mode == callgraph::QueryMode::Callers) {
+    result.traversal =
+        callgraph::searchCallersWithRequest(graph, *roots, *controls, coverage);
+    result.traversal.text =
+        "query=callers\n" + callgraph::renderCallGraphText(graph, *roots,
+                                                           result.traversal,
+                                                           coverage, view);
+  } else {
+    auto target = callgraph::selectOne(graph, *options.target, "target");
+    if (!target)
+      return std::unexpected("facts-tool: usage error: " + target.error());
+    result.target = *target;
+    auto search = callgraph::searchPathsWithRequest(graph, *roots->front(), **target,
+                                         request.pathMode, *controls, coverage);
+    result.pathResult = callgraph::pathResult(graph, search, coverage);
+    result.traversal = std::move(search.traversal);
+    result.paths = std::move(search.paths);
+    result.traversal.text = std::format(
+        "query=path path-mode={} path-result={}\n{}",
+        callgraph::pathModeName(request.pathMode), result.pathResult,
+        callgraph::renderCallGraphText(graph, *roots, result.traversal,
+                                       coverage, view));
+  }
+  return result;
 }
-
-callgraph::EdgeView edgeView(const cli::CallGraphOptions &options) {
-  return options.edges == "calls" ? callgraph::EdgeView::Calls
-                                  : callgraph::EdgeView::Semantic;
-}
-
-void printOutput(const cli::CallGraphOptions &options,
-                 const callgraph::QueryGraph &graph,
-                 const std::vector<const callgraph::QueryNode *> &roots,
-                 const callgraph::RenderedGraph &traversal,
-                 const callgraph::CoverageReport *coverage,
-                 callgraph::EdgeView view, callgraph::QueryMode mode,
-                 std::optional<callgraph::PathMode> pathMode = std::nullopt,
-                 const callgraph::QueryNode *target = nullptr,
-                 const std::vector<callgraph::QueryPath> &paths = {},
-                 std::string_view result = {},
-                 const callgraph::RecoveryReport *recovery = nullptr) {
-  std::cout << (options.format == "json"
-                    ? callgraph::renderCallGraphJson(
-                          graph, roots, traversal, coverage, view, mode,
-                          pathMode, target, paths, result, recovery)
-                    : traversal.text);
-}
-} // namespace
 
 std::expected<int, std::string>
 runCallGraphQuery(const cli::CallGraphOptions &options,
@@ -45,47 +59,10 @@ runCallGraphQuery(const cli::CallGraphOptions &options,
                   const callgraph::QueryGraph &graph,
                   const callgraph::CoverageReport *coverage,
                   const callgraph::RecoveryReport *recovery) {
-  auto roots = callgraph::selectRoots(graph, options.function, options.all);
-  if (!roots)
-    return usage(roots.error());
-  auto controls = makeCallGraphRequest(options, coverage, request.cancelled);
-  if (!controls)
-    return std::unexpected(controls.error());
-  const auto view = edgeView(options);
-  if (request.mode == callgraph::QueryMode::Callees) {
-    if (graph.edges.empty() && !recovery)
-      return std::unexpected("facts database contains no call facts");
-    const auto traversal =
-        callgraph::renderCallGraph(graph, *roots, *controls, coverage, view);
-    printOutput(options, graph, *roots, traversal, coverage, view, request.mode,
-                std::nullopt, nullptr, {}, {}, recovery);
-    return traversal.reason == "cancelled" ? 130 : 0;
-  }
-  if (request.mode == callgraph::QueryMode::Callers) {
-    auto traversal =
-        callgraph::searchCallersWithRequest(graph, *roots, *controls, coverage);
-    traversal.text = "query=callers\n" +
-                     callgraph::renderCallGraphText(graph, *roots, traversal,
-                                                    coverage, view);
-    printOutput(options, graph, *roots, traversal, coverage, view, request.mode,
-                std::nullopt, nullptr, {}, {}, recovery);
-    return traversal.reason == "cancelled" ? 130 : 0;
-  }
-  auto target = callgraph::selectOne(graph, *options.target, "target");
-  if (!target)
-    return usage(target.error());
-  auto search = callgraph::searchPathsWithRequest(
-      graph, *roots->front(), **target, request.pathMode, *controls, coverage);
-  const auto result = callgraph::pathResult(graph, search, coverage);
-  search.traversal.text =
-      std::format("query=path path-mode={} path-result={}\n{}",
-                  callgraph::pathModeName(request.pathMode), result,
-                  callgraph::renderCallGraphText(
-                      graph, *roots, search.traversal, coverage, view));
-  printOutput(options, graph, *roots, search.traversal, coverage, view,
-              request.mode, request.pathMode, *target, search.paths, result,
-              recovery);
-  return search.traversal.reason == "cancelled" ? 130 : 0;
+  return queryCallGraph(options, request, graph, coverage)
+      .and_then([&](const auto &result) {
+        return publishCallGraph(options, request, graph, coverage, result,
+                                recovery);
+      });
 }
-
 } // namespace facts::commands

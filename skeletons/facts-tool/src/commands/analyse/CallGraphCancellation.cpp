@@ -17,6 +17,6 @@ CallGraphCancellation::~CallGraphCancellation() {
   interrupted = 0;
 }
 
-bool CallGraphCancellation::cancelled() const { return interrupted != 0; }
+bool CallGraphCancellation::cancelled() { return interrupted != 0; }
 
 } // namespace facts::commands

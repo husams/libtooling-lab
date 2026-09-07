@@ -26,6 +26,11 @@ not present code-structure conclusions as confirmed.
    state that evidence boundary; read source at native locations for local
    detail.
 
+## How to
+
+- [Build a call graph](references/how-to-build-call-graph.md)
+- [Search for a symbol](references/how-to-search-symbol.md)
+
 Read only the guide needed for the task:
 
 - [Query C++ with Python](references/query-cpp.md)

@@ -10,7 +10,7 @@ public:
   ~CallGraphCancellation();
   CallGraphCancellation(const CallGraphCancellation &) = delete;
   CallGraphCancellation &operator=(const CallGraphCancellation &) = delete;
-  bool cancelled() const;
+  static bool cancelled();
 
 private:
   using Handler = void (*)(int);

@@ -295,6 +295,7 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/CallGraphJsonEvidence.cpp
   src/analysis/callgraph/CallGraphJsonLocation.cpp
   src/analysis/callgraph/CallGraphJsonQuery.cpp
+  src/analysis/callgraph/CallGraphMermaid.cpp
   src/analysis/callgraph/CallGraphText.cpp
 )
 target_include_directories(facts-ast PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -373,6 +374,9 @@ add_library(facts-commands STATIC
   src/commands/match/RelationPersistence.cpp
   src/commands/match/RelationValidation.cpp
   src/commands/match/SymbolDispatch.cpp
+  src/commands/analyse/CallGraphSession.cpp
+  src/commands/analyse/CallGraphOutput.cpp
+  src/commands/analyse/CallGraphPublish.cpp
   src/commands/analyse/CallGraphCommand.cpp
   src/commands/analyse/CallGraphCancellation.cpp
   src/commands/analyse/CallGraphEntryCommand.cpp
@@ -463,6 +467,9 @@ if(BUILD_TESTING)
     NAME fact-store
     COMMAND fact-store-test ${CMAKE_CURRENT_BINARY_DIR}/fact-store-test.sqlite
   )
+  add_executable(call-graph-mermaid-test tests/CallGraphMermaidTest.cpp)
+  target_link_libraries(call-graph-mermaid-test PRIVATE facts-ast facts-storage)
+  add_test(NAME call-graph-mermaid COMMAND call-graph-mermaid-test)
   add_executable(call-graph-test tests/CallGraphTest.cpp)
   target_link_libraries(call-graph-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph COMMAND call-graph-test)

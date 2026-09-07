@@ -67,13 +67,12 @@ validateCallGraphRequest(const cli::CallGraphOptions &options) {
   if (options.pathMode && !options.target)
     return usage("--path-mode requires --to");
   if (options.target)
-    return CallGraphRequest{{},
-                            callgraph::QueryMode::Path,
+    return CallGraphRequest{callgraph::QueryMode::Path,
                             options.pathMode == "all-simple"
                                 ? callgraph::PathMode::AllSimple
                                 : callgraph::PathMode::Shortest};
   if (options.direction == "callers")
-    return CallGraphRequest{{}, callgraph::QueryMode::Callers};
+    return CallGraphRequest{callgraph::QueryMode::Callers};
   return CallGraphRequest{};
 }
 
