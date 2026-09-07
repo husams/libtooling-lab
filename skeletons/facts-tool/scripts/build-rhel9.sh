@@ -6,6 +6,7 @@
 #   ./scripts/build-rhel9.sh              # install deps, build, run ctest
 #   DEPS_ONLY=1 ./scripts/build-rhel9.sh  # install dependencies, no build
 #   SKIP_TESTS=1 ./scripts/build-rhel9.sh # build only, no pytest venv, no ctest
+#   CLEAN=1 ./scripts/build-rhel9.sh      # remove the build dir first: clean build + full ctest (E2E BDD)
 #
 # Produces: <root>/build-rhel9/facts-tool.
 #
@@ -44,6 +45,9 @@
 #   SKIP_DEPS=1             skip dnf installs (deps already present).
 #   DEPS_ONLY=1             install dependencies, then exit (no build).
 #   SKIP_TESTS=1            configure with BUILD_TESTING=OFF and skip ctest.
+#   CLEAN=1                 delete BUILD_DIR before configuring so the gate is
+#                           a from-scratch build followed by the complete ctest
+#                           suite, including the registered E2E BDD run.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -58,6 +62,11 @@ SQLITE_AMALGAMATION_URL="${SQLITE_AMALGAMATION_URL:-https://www.sqlite.org/2026/
 BUILD_DIR="${BUILD_DIR:-$FACTS_ROOT/build-rhel9}"
 VENV_DIR="${VENV_DIR:-$FACTS_ROOT/.venv-rhel9}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
+
+if [ "${CLEAN:-0}" = "1" ]; then
+  echo "==> CLEAN=1: removing $BUILD_DIR for a from-scratch build"
+  rm -rf "$BUILD_DIR"
+fi
 
 SUDO=""
 [ "$(id -u)" -eq 0 ] || SUDO="sudo"
