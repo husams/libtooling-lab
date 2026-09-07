@@ -81,6 +81,12 @@ def main() -> None:
             "--match" in output(file_set_help) and "--arg" in output(file_set_help),
             output(file_set_help))
 
+    repo_add_help = run(tool, "repo", "add", "--help")
+    require(repo_add_help.returncode == 0 and
+            all(option in output(repo_add_help) for option in
+                ("name", "path", "--label", "--remote")),
+            output(repo_add_help))
+
     clone_help = run(tool, "repo", "rm-clone", "--help")
     require(clone_help.returncode == 0 and "remove-clone" in output(
         run(tool, "repo", "--help")), output(clone_help))

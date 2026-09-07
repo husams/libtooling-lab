@@ -21,8 +21,7 @@ int main() {
   input.requested_usrs = {"usr:target"};
   runDigestCacheTests(fixture);
   const auto source_time = std::filesystem::last_write_time(fixture.source);
-  std::ofstream(fixture.source) << "int source = 2;\n";
-  std::filesystem::last_write_time(fixture.source, source_time);
+  rewriteUntilIdentityChanges(fixture.source, "int source = 2;\n", source_time);
   assert(miss(cache, input));
   key = cache.build(input);
   input.requested_usrs.insert("usr:other");
@@ -60,7 +59,7 @@ int main() {
   expectHit(cache, input, AttemptOutcome::no_match);
   std::ofstream(fixture.facts) << "facts-v2";
   expectHit(cache, input, AttemptOutcome::no_match);
-  std::ofstream(fixture.header) << "int header = 2;\n";
+  rewriteUntilIdentityChanges(fixture.header, "int header = 2;\n");
   assert(miss(cache, input));
   std::ofstream(fixture.header) << "int header = 1;\n";
   key = cache.build(input);

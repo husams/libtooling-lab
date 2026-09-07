@@ -36,6 +36,13 @@ catalog::Result<std::string> operate(catalog::Database &database,
   if (options.action == Action::list) {
     return catalog::repositories(database).transform(displayRepositories);
   }
+  if (options.action == Action::add) {
+    return catalog::addRepository(database, {options.name, options.remote,
+                                             options.path, options.label})
+        .transform([](const auto &) {
+          return std::string{"Repository registered\n"};
+        });
+  }
   return catalog::repository(database, options.name)
       .and_then([&](const catalog::Repository &repo)
                     -> catalog::Result<std::string> {
@@ -58,6 +65,7 @@ catalog::Result<std::string> operate(catalog::Database &database,
                                            options.deleteComponents)
               .transform([] { return std::string{"Repository removed\n"}; });
         case Action::list:
+        case Action::add:
           break;
         }
         return std::unexpected("unsupported repository action");
@@ -71,7 +79,7 @@ catalog::Result<int> runRepository(const cli::RepositoryOptions &options) {
                         options.action != Action::show;
   return runCatalog(
       options.configuration, writable,
-      [&](auto &database) { return operate(database, options); }, false,
-      options.configurationFile, options.facts);
+      [&](auto &database) { return operate(database, options); },
+      options.action == Action::add, options.configurationFile, options.facts);
 }
 } // namespace facts::commands

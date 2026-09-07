@@ -9,6 +9,12 @@ cmake_minimum_required(VERSION 3.20)
 # C is needed too: LLVM's own cmake modules (FindLibEdit) run C header checks.
 project(facts_tool C CXX)
 
+# URL downloads (yaml-cpp, SQLite) take the extraction time as their file
+# timestamp so a changed archive rebuilds; also silences the CMP0135 warning.
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -148,6 +154,7 @@ add_library(facts-storage STATIC
   src/storage/UnresolvedCallSite.cpp
   src/storage/catalog/Database.cpp
   src/storage/catalog/Repository.cpp
+  src/storage/catalog/RepositoryRegistration.cpp
   src/storage/catalog/Component.cpp
   src/storage/catalog/Directory.cpp
   src/storage/catalog/Clone.cpp
@@ -625,6 +632,14 @@ if(BUILD_TESTING)
       ${CMAKE_CURRENT_BINARY_DIR}/dependency-analysis-output.sqlite)
   set(dependency_fixture
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/dependency)
+  # Import may only create a project; mutating one left by an earlier ctest
+  # run demands a paired facts store. Start every run from a clean slate.
+  add_test(
+    NAME dependency-analysis-reset
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${dependency_config} ${dependency_output}
+  )
+  set_tests_properties(dependency-analysis-reset PROPERTIES
+    FIXTURES_SETUP dependency-analysis)
   add_test(
     NAME dependency-analysis-import
     COMMAND facts-tool import
@@ -633,6 +648,8 @@ if(BUILD_TESTING)
             --extra-arg=-I${dependency_fixture}
             ${dependency_fixture}/root.cpp
   )
+  set_tests_properties(dependency-analysis-import PROPERTIES
+    FIXTURES_REQUIRED dependency-analysis)
   add_test(
     NAME dependency-analysis-first
     COMMAND facts-tool analyse dependency
@@ -641,7 +658,8 @@ if(BUILD_TESTING)
             ${dependency_fixture}/root.cpp
   )
   set_tests_properties(dependency-analysis-first PROPERTIES
-    DEPENDS dependency-analysis-import)
+    DEPENDS dependency-analysis-import
+    FIXTURES_REQUIRED dependency-analysis)
   add_test(
     NAME dependency-analysis-second
     COMMAND facts-tool analyse dependency
@@ -650,7 +668,8 @@ if(BUILD_TESTING)
             ${dependency_fixture}/root.cpp
   )
   set_tests_properties(dependency-analysis-second PROPERTIES
-    DEPENDS dependency-analysis-first)
+    DEPENDS dependency-analysis-first
+    FIXTURES_REQUIRED dependency-analysis)
   add_test(
     NAME dependency-analysis-extract
     COMMAND facts-tool extract
@@ -659,7 +678,8 @@ if(BUILD_TESTING)
             ${dependency_fixture}/root.cpp
   )
   set_tests_properties(dependency-analysis-extract PROPERTIES
-    DEPENDS dependency-analysis-second)
+    DEPENDS dependency-analysis-second
+    FIXTURES_REQUIRED dependency-analysis)
   add_test(
     NAME dependency-analysis-verify
     COMMAND dependency-database-test
@@ -670,7 +690,8 @@ if(BUILD_TESTING)
             ${dependency_fixture}/c.h
   )
   set_tests_properties(dependency-analysis-verify PROPERTIES
-    DEPENDS dependency-analysis-extract)
+    DEPENDS dependency-analysis-extract
+    FIXTURES_REQUIRED dependency-analysis)
   add_test(
     NAME multi-tu-project-import
     COMMAND facts-tool import
