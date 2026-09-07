@@ -119,6 +119,7 @@ pytest_plugins = (
     "steps.call_graph_run_matrix_steps",
     "steps.call_graph_run_examples_steps",
     "steps.call_graph_run_cancel_steps",
+    "steps.call_graph_run_failed_steps",
 )
 
 

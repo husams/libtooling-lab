@@ -3,7 +3,8 @@ import subprocess
 
 from support.call_graph_matrix_cancel import (
     cancel_before_traversal, cancel_during_recovery)
-from support.call_graph_matrix_db_cases import database_empty_all, database_missing_facts
+from support.call_graph_matrix_db_cases import (
+    database_empty_all, database_missing_facts, failed_after_traversal)
 from support.callgraph_run import command, run_count
 
 
@@ -53,6 +54,7 @@ CASES = {
     "database_missing_facts": database_missing_facts,
     "database_empty_all": database_empty_all,
     "recovery_failure": _recovery_failure,
+    "failed_after_traversal": failed_after_traversal,
     "cancel_before_traversal": cancel_before_traversal,
     "cancel_during_recovery": cancel_during_recovery,
     "commit_failure": _commit_failure,

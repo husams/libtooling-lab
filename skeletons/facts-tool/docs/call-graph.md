@@ -129,9 +129,14 @@ deleted by a later invocation.
 | `callgraph_run_frontier` | `run_id, symbol_id, reason` |
 | `callgraph_run_recovery` | `run_id, tu_file_id, outcome (attempted\|failed\|reused\|suppressed), diagnostic` |
 
-Path mode persists only the edges on found paths; an unreachable target gives
-a run with status `complete` and no edges. Callers mode persists
-reversed-direction reached sites (`source_id` is the caller).
+Path mode persists only the edges on the found paths when at least one path
+exists. When the target is unreachable the run still completes and keeps every
+edge the search actually explored, so a non-empty edge set does not mean a
+path was found. Check reachability by asking whether the target of
+`callgraph_run_target` appears as a `destination_id` in the run's edges; a
+source equal to its target is a found zero-edge path, whose run has a target
+row and no edges. Callers mode persists reversed-direction reached sites
+(`source_id` is the caller).
 
 Intentionally **not** persisted: coverage/freshness/definition-availability
 prose, external-boundary/definition-boundary labels, excluded-scope listings,
@@ -223,6 +228,27 @@ named = conn.execute(
     """,
     (run_id,),
 ).fetchall()
+```
+
+For a `--to` query, decide whether the target was reached before reading the
+edges as a path:
+
+```python
+reached = conn.execute(
+    """
+    SELECT COUNT(*) FROM callgraph_run_target t
+    JOIN callgraph_run_edge e
+      ON e.run_id = t.run_id AND e.destination_id = t.symbol_id
+    WHERE t.run_id = ?
+    """,
+    (run_id,),
+).fetchone()[0] > 0
+self_path = conn.execute(
+    "SELECT COUNT(*) FROM callgraph_run_target t JOIN callgraph_run_root r "
+    "ON r.run_id = t.run_id AND r.symbol_id = t.symbol_id WHERE t.run_id = ?",
+    (run_id,),
+).fetchone()[0] > 0
+found = reached or self_path  # otherwise the edges are the explored subgraph
 ```
 
 See the

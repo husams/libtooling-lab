@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pytest_bdd import given, then
 from support import callgraph_run as cg
+from support import s024_paths as s024
 from support.database import require
 from support.s024_fixture import prepare
 from support.scenario import FactsToolContext
@@ -32,7 +33,7 @@ def callers(context: FactsToolContext) -> None:
 @then("S-024 paths cross components with deterministic cycle semantics")
 def paths(context: FactsToolContext) -> None:
     facts = context.facts_database_path
-    args = ("--function", "s024_fixture::source", "--to", "s024_fixture::target")
+    args = ("--function", s024.SOURCE, "--to", s024.TARGET)
     first_id, _ = cg.completion(cg.run_graph(context, *args))
     second_id, _ = cg.completion(cg.run_graph(context, *args))
     all_first_id, _ = cg.completion(cg.run_graph(context, *args, "--path-mode", "all-simple"))
@@ -41,28 +42,30 @@ def paths(context: FactsToolContext) -> None:
             "shortest path edges changed between runs")
     require(cg.edges(facts, all_first_id) == cg.edges(facts, all_second_id),
             "all-simple path edges changed between runs")
-    shortest_edges = sorted(cg.edges(facts, first_id), key=lambda edge: edge["depth"])
-    require([edge["source"] for edge in shortest_edges] ==
-            ["s024_fixture::source", "s024_fixture::alpha"] and
-            [edge["target"] for edge in shortest_edges] ==
-            ["s024_fixture::alpha", "s024_fixture::target"], str(shortest_edges))
+    shortest_edges = cg.edges(facts, first_id)
+    require(s024.edge_triples(shortest_edges) == s024.SHORTEST_EDGES and
+            [edge["depth"] for edge in shortest_edges] == [1, 2], str(shortest_edges))
     all_edges = cg.edges(facts, all_first_id)
-    require(len(all_edges) >= len(shortest_edges), str(all_edges))
-    dispatch_edges = [edge for edge in all_edges if edge["kind"] == 18]
-    require(dispatch_edges, str(all_edges))
-    edge = dispatch_edges[0]
-    certainties = cg.query(facts, "SELECT certainty FROM relation_site WHERE "
-        "source_id=? AND destination_id=? AND kind=? AND position=? AND "
-        "file_id=? AND offset=?", (edge["source_id"], edge["target_id"], edge["kind"],
-        edge["position"], edge["file_id"], edge["offset"]))
-    require(certainties == [(2,)], str(certainties))
-    self_result = cg.run_graph(context, "--function", "s024_fixture::source", "--to",
-                               "s024_fixture::source", "--path-mode", "all-simple")
+    require(s024.edge_triples(all_edges) == s024.ALL_SIMPLE_EDGES, str(all_edges))
+    require(len(all_edges) == len(s024.ALL_SIMPLE_EDGES), "duplicate persisted sites")
+    require(all(edge["cycle"] == 0 for edge in all_edges), "a cycle edge was persisted")
+    found_paths = s024.simple_paths(all_edges, s024.SOURCE, s024.TARGET)
+    require(found_paths == s024.ALL_SIMPLE_PATHS, str(found_paths))
+    require({(e["source"], e["target"]) for e in all_edges} ==
+            s024.edges_on_paths(found_paths), "an edge lies on no node-simple path")
+    dispatch_edges = [edge for edge in all_edges if edge["kind"] == s024.DISPATCH]
+    for edge in dispatch_edges:
+        certainties = cg.query(facts, "SELECT certainty FROM relation_site WHERE "
+            "source_id=? AND destination_id=? AND kind=? AND position=? AND "
+            "file_id=? AND offset=?", (edge["source_id"], edge["target_id"], edge["kind"],
+            edge["position"], edge["file_id"], edge["offset"]))
+        require(certainties == [(2,)], str(certainties))
+    self_result = cg.run_graph(context, "--function", s024.SOURCE, "--to", s024.SOURCE,
+                               "--path-mode", "all-simple")
     self_id, self_status = cg.completion(self_result)
     require(self_status == "complete", self_status)
     self_target = cg.target(facts, self_id)
-    require(self_target is not None and self_target[0] == "s024_fixture::source",
-            str(self_target))
+    require(self_target is not None and self_target[0] == s024.SOURCE, str(self_target))
     require(not cg.edges(facts, self_id), "self path must record no edges")
 
 

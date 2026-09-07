@@ -89,6 +89,7 @@ Feature: One native call graph invocation persists its run
       | truncated                | 0         | 0    | present  |
       | truncated                | 1         | 0    | present  |
       | help                     | 0         | 0    | absent   |
+      | help                     | 1         | 0    | absent   |
       | usage_format             | 0         | 2    | absent   |
       | usage_format             | 1         | 2    | absent   |
       | usage_output             | 0         | 2    | absent   |
@@ -109,6 +110,8 @@ Feature: One native call graph invocation persists its run
       | database_empty_all       | 1         | 1    | absent   |
       | recovery_failure         | 0         | 1    | present  |
       | recovery_failure         | 1         | 1    | present  |
+      | failed_after_traversal   | 0         | 1    | present  |
+      | failed_after_traversal   | 1         | 1    | present  |
       | cancel_before_traversal  | 0         | 130  | absent   |
       | cancel_before_traversal  | 1         | 130  | absent   |
       | cancel_during_recovery   | 0         | 130  | present  |
@@ -141,3 +144,24 @@ Feature: One native call graph invocation persists its run
     Then the commit failure exits 1 with empty stdout
     And the commit failure stderr is exactly the readonly diagnostic
     And no run or child rows were added by the failed commit
+
+  Scenario Outline: An operational failure after traversal persists a failed run
+    Given S-025 recovers the run for function root
+    When S-025 breaks the project index and recovers again at verbosity <verbosity>
+    Then the failed run exits 1 with a completion line of status failed
+    And the failed run stderr carries exactly one non-verbose line naming the SQLite error
+    And the failed run row has status failed with the SQLite error and its reached edges
+    Examples:
+      | verbosity |
+      | 0         |
+      | 1         |
+
+  Scenario Outline: A forced child-row failure rolls the whole run back
+    Given S-025 recovers the run for function root
+    When S-025 forces the edge insert to fail and runs again at verbosity <verbosity>
+    Then the rolled-back run exits 1 with empty stdout and the forced SQLite diagnostic
+    And no run or child rows were added and the earlier run is intact
+    Examples:
+      | verbosity |
+      | 0         |
+      | 1         |

@@ -42,7 +42,11 @@ Default traversal is forward across all registered components with no
 automatic limits. Explicit options include `--component NAME`, `--calls-scope
 all|project|library`, `--max-depth N`, `--max-nodes N`, `--max-edges N`, and
 `--time-limit-ms N`. Reverse queries use `--direction callers`; paths use
-`--to TARGET --path-mode shortest|all-simple`. See
+`--to TARGET --path-mode shortest|all-simple`. A path run persists only the
+edges on found paths; when the target is unreachable it keeps the explored
+edges instead, so test reachability by joining `callgraph_run_target` to the
+run's `callgraph_run_edge.destination_id` (a source equal to its target is a
+found zero-edge path with a target row and no edges). See
 [the native reference](../../../../docs/call-graph.md).
 
 ## Fixture-backed recipe

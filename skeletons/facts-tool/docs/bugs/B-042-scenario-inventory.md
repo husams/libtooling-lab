@@ -1,6 +1,6 @@
 # B-042 scenario inventory (base b763c55 -> head)
 
-Collected pytest-bdd scenarios (`pytest tests/e2e --collect-only`): base 766, head 789.
+Collected pytest-bdd scenarios (`pytest tests/e2e --collect-only`): base 766, head 888.
 Removal rule: a scenario was removed only when its sole subject was intentionally deleted
 behaviour (renderer formatting, the JSON document, the Mermaid artifact lifecycle, `--output`
 safety, coverage/freshness prose in output). Every graph, scope, budget, recovery, entry and
@@ -42,7 +42,7 @@ matched-index check was migrated to `callgraph_run*` reads or the outcome matrix
 
 ## Added scenarios
 
-- call_graph_runs.feature: the outcome matrix (16 outcomes x verbosity off/on), the five deterministic run examples (two successive runs, failed recovery, SIGINT during recovery, SIGINT before traversal, read-only facts store), plus the migrated S-025 checks above.
+- call_graph_runs.feature: the outcome matrix (17 outcomes x verbosity off/on, including the post-traversal operational failure and help at both verbosities), the deterministic run examples (two successive runs, failed recovery, operational failure after traversal, SIGINT during recovery, SIGINT before traversal, read-only facts store, forced child-row rollback), plus the migrated S-025 checks above.
 - call_graph_entries.feature: `Entry command help and output match the recorded pre-change snapshot` (byte-identical `analyse call-graph-entry` regression against tests/fixtures/e2e/entries/call_graph_entry_snapshot.json recorded from the base binary).
 
 ## Dropped assertions inside migrated scenarios (fields no longer persisted)
@@ -94,9 +94,13 @@ Removed:
 
 Added:
 
+- test_a_forced_childrow_failure_rolls_the_whole_run_back[0]
+- test_a_forced_childrow_failure_rolls_the_whole_run_back[1]
 - test_a_onenode_budget_truncates_with_a_nonempty_frontier
 - test_a_readonly_facts_store_rejects_the_final_commit
 - test_a_readonly_rerun_reuses_the_graph_without_extraction
+- test_an_operational_failure_after_traversal_persists_a_failed_run[0]
+- test_an_operational_failure_after_traversal_persists_a_failed_run[1]
 - test_applies_an_explicit_positive_depth_cap_before_an_external_boundary_and_reports_depth_truncation_distinctly
 - test_budgeted_callers_and_path_queries_truncate[callers]
 - test_budgeted_callers_and_path_queries_truncate[path]
@@ -135,7 +139,10 @@ Added:
 - test_the_outcome_matrix_holds_without_and_with_verbosity[database_empty_all-1-1-absent]
 - test_the_outcome_matrix_holds_without_and_with_verbosity[database_missing_facts-0-1-absent]
 - test_the_outcome_matrix_holds_without_and_with_verbosity[database_missing_facts-1-1-absent]
+- test_the_outcome_matrix_holds_without_and_with_verbosity[failed_after_traversal-0-1-present]
+- test_the_outcome_matrix_holds_without_and_with_verbosity[failed_after_traversal-1-1-present]
 - test_the_outcome_matrix_holds_without_and_with_verbosity[help-0-0-absent]
+- test_the_outcome_matrix_holds_without_and_with_verbosity[help-1-0-absent]
 - test_the_outcome_matrix_holds_without_and_with_verbosity[recovery_failure-0-1-present]
 - test_the_outcome_matrix_holds_without_and_with_verbosity[recovery_failure-1-1-present]
 - test_the_outcome_matrix_holds_without_and_with_verbosity[truncated-0-0-present]

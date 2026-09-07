@@ -14,6 +14,7 @@ CONTRACT_LINE = {
         r"^facts-tool: configuration error: recovery requires a project configuration$"),
     "database_missing_facts": re.compile(r"^facts-tool: cannot open facts database .*$"),
     "database_empty_all": re.compile(r"^facts-tool: facts database contains no call facts$"),
+    "failed_after_traversal": re.compile(r"^facts-tool: no such column: usr.*$"),
     "recovery_failure": re.compile(
         r"^facts-tool: recovery failed for \d+ translation unit\(s\); "
         r"see callgraph_run_recovery run \d+$"),
@@ -25,7 +26,8 @@ CONTRACT_LINE = {
         r"attempt to write a readonly database$"),
 }
 SUCCESS = {"complete", "truncated"}
-COMPLETION_STDOUT = {"recovery_failure", "cancel_during_recovery"}
+COMPLETION_STDOUT = {"recovery_failure", "failed_after_traversal",
+                     "cancel_during_recovery"}
 
 
 def assert_case(outcome, verbosity, result):
