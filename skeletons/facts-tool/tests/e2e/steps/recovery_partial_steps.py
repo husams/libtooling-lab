@@ -12,13 +12,13 @@ def partial(context):
                 "--facts", context.facts_database_path, "--matcher",
                 'callExpr(callee(functionDecl(hasName("leaf")).bind("callee"))).bind("call")',
                 source))
-    result, data = graph(context, recover=False)
+    result, discovered = graph(context, recover=False)
     success(result)
-    assert ("bridge", "leaf") in edge_names(data), data
-    assert ("bridge", "second_leaf") not in edge_names(data), data
+    assert ("bridge", "leaf") in edge_names(discovered), discovered
+    assert ("bridge", "second_leaf") not in edge_names(discovered), discovered
 
 
 @then("S-021 recovers the missing second call despite the existing first call")
 def missing_call(context):
     success(context.recovery_result)
-    assert {("bridge", "leaf"), ("bridge", "second_leaf")} <= edge_names(context.recovery_graph)
+    assert {("bridge", "leaf"), ("bridge", "second_leaf")} <= edge_names(context.recovery_run)

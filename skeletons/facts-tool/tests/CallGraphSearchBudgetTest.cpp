@@ -1,8 +1,6 @@
-#include "analysis/callgraph/CallGraphJson.h"
 #include "analysis/callgraph/CallGraphScope.h"
 #include "analysis/callgraph/CallGraphSearch.h"
 #include <iostream>
-#include <llvm/Support/JSON.h>
 using namespace facts;
 using namespace facts::callgraph;
 
@@ -38,12 +36,10 @@ int main() {
     ok &= require(paths.traversal.reason == reason && paths.paths.empty() &&
                       paths.traversal.nodes.size() == 2,
                   "path budget ignored");
-    auto json = llvm::json::parse(renderCallGraphJson(
-        graph, roots, callers, nullptr, EdgeView::Calls, QueryMode::Callers));
-    const auto *query = json->getAsObject()->getObject("query");
-    ok &= require(query && query->getString("mode") == "callers" &&
-                      query->getObject("limits") && query->getObject("scope"),
-                  "query renderer lost scope, limits, or mode");
+    ok &= require(callers.limits.nodes == request.limits.nodes &&
+                      callers.limits.edges == request.limits.edges &&
+                      callers.scope.calls == CallsScope::all,
+                  "reverse search lost its scope or limits");
   }
   for (bool cancelled : {true, false}) {
     TraversalRequest request;
@@ -75,10 +71,7 @@ int main() {
                 "reverse search crossed excluded endpoint");
   ok &= require(paths.paths.empty() && paths.traversal.excluded.size() == 1,
                 "path search reconnected across excluded endpoint");
-  auto scopedJson =
-      llvm::json::parse(renderCallGraphJson(graph, roots, callers, &coverage));
-  const auto *excluded = scopedJson->getAsObject()->getObject("excluded_scope");
-  ok &= require(excluded->getInteger("observed_node_count") == 1 &&
+  ok &= require(callers.excludedNodes.size() == 1 &&
                     callers.excluded.front().source == graph.nodes[1].id &&
                     callers.excluded.front().target == graph.nodes[2].id,
                 "reverse exclusion changed edge direction or node count");

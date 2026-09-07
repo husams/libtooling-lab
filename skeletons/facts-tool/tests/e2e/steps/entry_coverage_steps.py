@@ -2,7 +2,7 @@ import sqlite3
 
 from pytest_bdd import then, when
 
-from support.entries import graph, lookup
+from support.entries import lookup
 from support.database import require
 
 
@@ -27,12 +27,9 @@ def complete_coverage(context):
 @then("S-027 entry aggregate coverage reports the missing library definition")
 def aggregate_missing_definition(context):
     entry = lookup(context, "boundary")
-    regular = graph(context, "boundary")
     require(entry["coverage"]["state"] == "complete" and
             entry["definition_availability"] == "available" and
-            entry["extraction_coverage"]["state"] == "incomplete" and
-            regular["extraction_coverage"]["state"] ==
-            entry["extraction_coverage"]["state"], str(entry))
+            entry["extraction_coverage"]["state"] == "incomplete", str(entry))
 
 
 @when("S-027 catalog metadata marks the entry source stale")

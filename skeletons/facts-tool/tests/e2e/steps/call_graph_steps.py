@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
+import shutil
 import sqlite3
 import subprocess
-import shutil
 import tempfile
 from pathlib import Path
 
-import pytest
 from pytest_bdd import given, then
+from support import callgraph_run as cg
 from support.database import require
 from support.scenario import FactsToolContext
 
@@ -115,32 +114,44 @@ def ownership(context: FactsToolContext) -> None:
 
 
 def assert_exact_dispatch(context: FactsToolContext, receiver: str, target: str) -> None:
+    facts = context.facts_database_path
     stored = rows(context, "SELECT receiver.qualified_name,site.certainty FROM relation_site site "
         "JOIN symbol d ON d.id=site.destination_id LEFT JOIN symbol receiver ON "
         "receiver.id=site.receiver_type_id WHERE site.kind=18 AND d.qualified_name="
         f"'call_graph_fixture::{target}::toString'")
     require(stored == [(f"call_graph_fixture::{receiver}", 1)], f"bad exact dispatch: {stored}")
-    output = cli(context, "--function", "call_graph_fixture::exactCalls")
-    require(output.returncode == 0 and f"target=call_graph_fixture::{target}::toString" in output.stdout,
-            output.stdout + output.stderr)
-    other = "Y" if target == "X" else "X"
-    section = output.stdout.split(f"receiver=call_graph_fixture::{receiver} certainty=exact", 1)[1]
-    section = section.split("depth=1 relation=Calls", 1)[0]
-    require(f"target=call_graph_fixture::{other}::toString" not in section, output.stdout)
+    result = cg.run_graph(context, "--function", "call_graph_fixture::exactCalls")
+    run_id, status = cg.completion(result)
+    require(result.returncode == 0 and status == "complete", result.stdout + result.stderr)
+    dispatch_edges = [edge for edge in cg.edges(facts, run_id) if edge["kind"] == 18 and
+                      edge["source"] == "call_graph_fixture::Base::log"]
+    matching = [edge for edge in dispatch_edges
+                if edge["target"] == f"call_graph_fixture::{target}::toString"]
+    require(matching, f"missing dispatch edge to {target}: {dispatch_edges}")
+    edge = matching[0]
+    context_rows = cg.query(facts, "SELECT receiver.qualified_name,site.certainty FROM "
+        "relation_site site LEFT JOIN symbol receiver ON receiver.id=site.receiver_type_id "
+        "WHERE site.source_id=? AND site.destination_id=? AND site.kind=? AND "
+        "site.position=? AND site.file_id=? AND site.offset=?",
+        (edge["source_id"], edge["target_id"], edge["kind"], edge["position"],
+         edge["file_id"], edge["offset"]))
+    require(context_rows == [(f"call_graph_fixture::{receiver}", 1)],
+            f"dispatch edge receiver mismatch: {context_rows}")
 
 
-@then("MessageX dispatch is exact in storage and text")
+@then("MessageX dispatch is exact in storage and in the persisted run")
 def exact_x(context: FactsToolContext) -> None:
     assert_exact_dispatch(context, "X", "X")
 
 
-@then("MessageY dispatch is exact in storage and text")
+@then("MessageY dispatch is exact in storage and in the persisted run")
 def exact_y(context: FactsToolContext) -> None:
     assert_exact_dispatch(context, "Y", "Y")
 
 
 @then("unproven receiver dispatch is possible and conservative")
 def possible_dispatch(context: FactsToolContext) -> None:
+    facts = context.facts_database_path
     found = rows(context, "SELECT d.qualified_name,site.receiver_type_id,site.certainty "
         "FROM relation_site site JOIN symbol s ON s.id=site.source_id JOIN symbol d "
         "ON d.id=site.destination_id WHERE site.kind=18 AND s.qualified_name="
@@ -158,12 +169,23 @@ def possible_dispatch(context: FactsToolContext) -> None:
         ("call_graph_fixture::PossibleRoot::call", "call_graph_fixture::PossibleLeaf::value", 2),
         ("call_graph_fixture::PossibleRoot::call", "call_graph_fixture::PossibleMid::value", 2),
     ], str(transitive))
-    output = cli(context, "--function", "call_graph_fixture::possibleCall")
-    require("receiver=* certainty=possible" in output.stdout, output.stdout)
-    transitive_output = cli(context, "--function", "call_graph_fixture::transitivePossible")
-    for target in ("PossibleMid::value", "PossibleLeaf::value"):
-        require(f"target=call_graph_fixture::{target}" in transitive_output.stdout,
-                transitive_output.stdout + transitive_output.stderr)
+    result = cg.run_graph(context, "--function", "call_graph_fixture::possibleCall")
+    run_id, status = cg.completion(result)
+    require(result.returncode == 0 and status == "complete", result.stdout + result.stderr)
+    dispatch_edge = next(edge for edge in cg.edges(facts, run_id) if edge["kind"] == 18)
+    context_rows = cg.query(facts, "SELECT receiver_type_id,certainty FROM relation_site "
+        "WHERE source_id=? AND destination_id=? AND kind=? AND position=? AND "
+        "file_id=? AND offset=?", (dispatch_edge["source_id"], dispatch_edge["target_id"],
+        dispatch_edge["kind"], dispatch_edge["position"], dispatch_edge["file_id"],
+        dispatch_edge["offset"]))
+    require(context_rows == [(None, 2)], str(context_rows))
+    transitive_result = cg.run_graph(context, "--function", "call_graph_fixture::transitivePossible")
+    transitive_id, transitive_status = cg.completion(transitive_result)
+    require(transitive_status == "complete", transitive_status)
+    targets = {edge["target"] for edge in cg.edges(facts, transitive_id)}
+    for target in ("call_graph_fixture::PossibleMid::value",
+                   "call_graph_fixture::PossibleLeaf::value"):
+        require(target in targets, str(targets))
 
 
 @then("instantiated callers normalize to the written pattern")
@@ -191,38 +213,54 @@ def migration_passes(migration_result: subprocess.CompletedProcess[str]) -> None
 
 @then("name USR and positive-depth root selection agree")
 def selectors(context: FactsToolContext) -> None:
+    facts = context.facts_database_path
     usr = rows(context, "SELECT usr FROM symbol WHERE qualified_name="
         "'call_graph_fixture::exactCalls'")[0][0]
-    by_name = cli(context, "--function", "call_graph_fixture::exactCalls")
-    by_usr = cli(context, "--function", usr)
-    require(by_name.returncode == by_usr.returncode == 0 and by_name.stdout == by_usr.stdout,
-            by_name.stdout + by_usr.stdout)
-    bounded = cli(context, "--function", "call_graph_fixture::exactCalls", "--max-depth", "1")
-    require("depth-truncated=true" in bounded.stdout, bounded.stdout)
+    by_name = cg.run_graph(context, "--function", "call_graph_fixture::exactCalls")
+    by_usr = cg.run_graph(context, "--function", usr)
+    name_id, name_status = cg.completion(by_name)
+    usr_id, usr_status = cg.completion(by_usr)
+    require(by_name.returncode == by_usr.returncode == 0, by_name.stderr + by_usr.stderr)
+    require(name_status == usr_status, (name_status, usr_status))
+    require(cg.roots(facts, name_id) == cg.roots(facts, usr_id), "root selection differs")
+    require(cg.edges(facts, name_id) == cg.edges(facts, usr_id), "edge sets differ")
+    bounded = cg.run_graph(context, "--function", "call_graph_fixture::exactCalls",
+                           "--max-depth", "1")
+    bounded_id, bounded_status = cg.completion(bounded)
+    require(bounded_status == "truncated", bounded_status)
+    require(cg.run_row(facts, bounded_id)["truncation_reason"] == "max_depth", bounded_id)
+    require(cg.frontier(facts, bounded_id), "expected a frontier row")
 
 
 @then("all-mode output is byte stable canonically ordered and excludes the virtual root")
 def all_mode(context: FactsToolContext) -> None:
-    first, second = cli(context, "--all"), cli(context, "--all")
-    roots = [line for line in first.stdout.splitlines() if line.startswith("root=")]
-    require(first.returncode == second.returncode == 0 and first.stdout == second.stdout,
-            first.stdout + second.stdout)
-    expected = [f"root={name} usr={usr}" for name, usr in rows(
-        context, "SELECT qualified_name,usr FROM symbol WHERE node=1 AND is_definition=1 "
-                 "ORDER BY qualified_name,usr,id")]
-    require(roots == expected and "virtual root" not in first.stdout.lower(), str(roots))
+    facts = context.facts_database_path
+    first = cg.run_graph(context, "--all")
+    second = cg.run_graph(context, "--all")
+    first_id, _ = cg.completion(first)
+    second_id, _ = cg.completion(second)
+    require(first.returncode == second.returncode == 0, first.stderr + second.stderr)
+    expected_roots = rows(context, "SELECT qualified_name,usr FROM symbol WHERE node=1 "
+        "AND is_definition=1 ORDER BY qualified_name,usr")
+    require(cg.roots(facts, first_id) == cg.roots(facts, second_id) == expected_roots,
+            str((cg.roots(facts, first_id), expected_roots)))
+    require(cg.edges(facts, first_id) == cg.edges(facts, second_id),
+            "edge sets differ between identical --all runs")
 
 
 @then("invalid graph state database and depth requests are diagnosed")
 def invalid_requests(context: FactsToolContext) -> None:
+    facts = context.facts_database_path
     no_calls = context.run_root_path / "no-call-facts.sqlite"
-    shutil.copy2(context.facts_database_path, no_calls)
+    shutil.copy2(facts, no_calls)
     with sqlite3.connect(no_calls) as database:
         database.execute("DELETE FROM relation_site WHERE kind IN (1,18)")
     absent = run([str(context.facts_tool), "analyse", "call-graph", "-v", "0",
                   "-f", str(no_calls), "--all"])
-    require(absent.returncode == 1 and "no call facts" in absent.stderr,
+    require(absent.returncode == 1 and absent.stdout == "" and
+            len(cg.stderr_lines(absent)) == 1 and "no call facts" in absent.stderr,
             absent.stdout + absent.stderr)
+    require(cg.run_count(no_calls) == 0, "usage error left a run")
     broken = context.run_root_path / "broken.cpp"
     broken.write_text("int broken( {\n", encoding="utf-8")
     broken_conf = context.run_root_path / "broken-files.sqlite"
@@ -235,21 +273,29 @@ def invalid_requests(context: FactsToolContext) -> None:
     require(incomplete.returncode == 1 and
             ("error:" in incomplete.stderr or "incomplete" in incomplete.stderr),
             incomplete.stdout + incomplete.stderr)
-    with sqlite3.connect(context.facts_database_path) as database:
+    before_run_count = cg.run_count(facts)
+    with sqlite3.connect(facts) as database:
         database.execute("UPDATE relation_site SET receiver_type_id=NULL,certainty=1 "
                          "WHERE kind=18 AND destination_id=(SELECT id FROM symbol "
                          "WHERE qualified_name='call_graph_fixture::X::toString')")
     invalid = cli(context, "--function", "call_graph_fixture::exactCalls")
-    require(invalid.returncode == 1 and "invalid relation-site receiver context" in invalid.stderr,
+    require(invalid.returncode == 1 and invalid.stdout == "" and
+            len(cg.stderr_lines(invalid)) == 1 and
+            "invalid relation-site receiver context" in invalid.stderr,
             invalid.stdout + invalid.stderr)
+    require(cg.run_count(facts) == before_run_count, "operational error left a run")
     missing = run([str(context.facts_tool), "analyse", "call-graph", "-v", "0", "-f",
                    str(context.run_root_path / "missing.sqlite"), "--all"])
-    require(missing.returncode == 1 and "cannot open facts database" in missing.stderr,
+    require(missing.returncode == 1 and missing.stdout == "" and
+            len(cg.stderr_lines(missing)) == 1 and
+            "cannot open facts database" in missing.stderr,
             missing.stdout + missing.stderr)
     for value in ("0", "-1", "abc"):
         depth = cli(context, "--all", "--max-depth", value)
-        require(depth.returncode != 0 and "--max-depth" in depth.stderr,
-                depth.stdout + depth.stderr)
+        require(depth.returncode != 0 and depth.stdout == "" and
+                len(cg.stderr_lines(depth)) == 1 and
+                "--max-depth" in depth.stderr, depth.stdout + depth.stderr)
+    require(cg.run_count(facts) == before_run_count, "invalid depth requests left a run")
 
 
 @given("the call graph architecture regression is run", target_fixture="architecture_result")
@@ -265,12 +311,17 @@ def architecture_passes(architecture_result: subprocess.CompletedProcess[str]) -
             architecture_result.stdout + architecture_result.stderr)
 
 
-@then("representative deterministic text fields are present")
+@then("representative deterministic run fields are present")
 def text_fields(context: FactsToolContext) -> None:
-    output = cli(context, "--function", "call_graph_fixture::exactCalls")
-    for field in ("relation=Calls", "receiver=", "certainty=", "target=",
-                  "cycle=", "depth-truncated=", "complete=true"):
-        require(field in output.stdout, f"missing {field}:\n{output.stdout}")
+    facts = context.facts_database_path
+    result = cg.run_graph(context, "--function", "call_graph_fixture::exactCalls")
+    run_id, status = cg.completion(result)
+    require(result.returncode == 0 and status == "complete", result.stdout + result.stderr)
+    row = cg.run_row(facts, run_id)
+    require(row["mode"] == "callees" and row["status"] == "complete" and
+            row["truncation_reason"] is None, str(row))
+    edges = cg.edges(facts, run_id)
+    require(any(edge["kind"] == 1 and edge["depth"] >= 1 for edge in edges), str(edges))
 
 
 @then("template receiver contexts collapse while dispatch targets remain")
@@ -288,18 +339,26 @@ def template_contexts(context: FactsToolContext) -> None:
 
 @then("default traversal reports a complete external boundary")
 def external_boundary(context: FactsToolContext) -> None:
-    output = cli(context, "--function", "call_graph_fixture::externalRoot")
-    require(output.returncode == 0 and "external-boundary=true" in output.stdout and
-            "depth-truncated=false" in output.stdout and "complete=true truncated=0" in output.stdout,
-            output.stdout + output.stderr)
+    facts = context.facts_database_path
+    result = cg.run_graph(context, "--function", "call_graph_fixture::externalRoot")
+    run_id, status = cg.completion(result)
+    require(result.returncode == 0 and status == "complete", result.stdout + result.stderr)
+    require(cg.run_row(facts, run_id)["truncation_reason"] is None, run_id)
+    edge_pairs = cg.edge_names(facts, run_id)
+    require(("call_graph_fixture::externalRoot", "call_graph_fixture::externalOnly")
+            in edge_pairs, str(edge_pairs))
+    require(not cg.frontier(facts, run_id), "expected no frontier for a complete run")
 
 
 @then("explicit depth truncation is distinct from an external boundary")
 def depth_boundary(context: FactsToolContext) -> None:
-    output = cli(context, "--function", "call_graph_fixture::depthRoot", "--max-depth", "1")
-    require(output.returncode == 0 and "depth-truncated=true" in output.stdout and
-            "external-boundary=false" in output.stdout and "complete=false" in output.stdout,
-            output.stdout + output.stderr)
+    facts = context.facts_database_path
+    result = cg.run_graph(context, "--function", "call_graph_fixture::depthRoot",
+                          "--max-depth", "1")
+    run_id, status = cg.completion(result)
+    require(result.returncode == 0 and status == "truncated", result.stdout + result.stderr)
+    require(cg.run_row(facts, run_id)["truncation_reason"] == "max_depth", run_id)
+    require(cg.frontier(facts, run_id), "expected a frontier row")
 
 
 def b040_sources(context: FactsToolContext) -> dict[str, Path]:
@@ -341,15 +400,6 @@ def prepare_b040(context: FactsToolContext, include_missing: bool,
             )
 
 
-def b040_graph(context: FactsToolContext, *extra: str) -> dict:
-    output = run([str(context.facts_tool), "analyse", "call-graph", "-v", "0",
-                  "-f", str(context.facts_database_path), "-c",
-                  str(context.files_database_path), "--format", "json",
-                  "--function", "b040_fixture::root", *extra])
-    require(output.returncode == 0, output.stdout + output.stderr)
-    return json.loads(output.stdout)
-
-
 @given("an isolated B-040 pair has a declaration-only project boundary")
 def b040_partial_pair(context: FactsToolContext) -> None:
     prepare_b040(context, include_missing=False, metadata=True)
@@ -360,86 +410,38 @@ def b040_complete_pair(context: FactsToolContext) -> None:
     prepare_b040(context, include_missing=True, metadata=True)
 
 
-@given("an isolated B-040 pair has missing coverage metadata")
-def b040_unknown_pair(context: FactsToolContext) -> None:
-    prepare_b040(context, include_missing=True, metadata=False)
-
-
-@given("an isolated B-040 pair has stale coverage metadata")
-def b040_stale_pair(context: FactsToolContext) -> None:
-    prepare_b040(context, include_missing=True, metadata=True)
-    with sqlite3.connect(context.files_database_path) as database:
-        database.execute("UPDATE file SET mtime=0 WHERE name='b040_root.cpp'")
-
-
-@then("B-040 reports complete traversal and incomplete extraction coverage separately")
+@then("B-040 records complete traversal with the missing definition edge and no further calls")
 def b040_reproduction(context: FactsToolContext) -> None:
-    graph = b040_graph(context)
-    missing = next(node for node in graph["nodes"] if node["name"] == "b040_fixture::missing")
-    leaf = next(node for node in graph["nodes"] if node["name"] == "b040_fixture::leaf_only")
-    edge = next(edge for edge in graph["edges"] if edge["target_id"] == missing["id"])
-    require(graph["complete"] and graph["truncated"] == 0, str(graph["traversal"]))
-    require(graph["extraction_coverage"]["state"] == "incomplete", str(graph))
-    require(missing["definition_availability"] == "project-missing" and
-            missing["coverage"]["state"] == "incomplete", str(missing))
-    require(not edge["external_boundary"] and edge["definition_boundary"], str(edge))
-    require(leaf["facts"]["definition"] and
-            leaf["coverage"]["catalog_indexed"] is False, str(leaf))
-    candidates = graph["extraction_coverage"]["recovery_candidates"]
-    require([Path(path).name for path in candidates] == ["b040_missing.cpp"],
-            str(graph))
+    facts = context.facts_database_path
+    result = cg.run_graph(context, "--function", "b040_fixture::root")
+    run_id, status = cg.completion(result)
+    require(result.returncode == 0 and status == "complete", result.stdout + result.stderr)
+    require(cg.run_row(facts, run_id)["truncation_reason"] is None, run_id)
+    edge_pairs = cg.edge_names(facts, run_id)
+    require(any(target == "b040_fixture::missing" for _, target in edge_pairs),
+            str(edge_pairs))
+    require(not any(source == "b040_fixture::missing" for source, _ in edge_pairs),
+            str(edge_pairs))
 
 
-@then("B-040 reports complete paired coverage with usable paths and stable identities")
-def b040_complete(context: FactsToolContext) -> None:
-    graph = b040_graph(context)
-    project = [node for node in graph["nodes"]
-               if node["source"]["project_local"] is True]
-    require(graph["schema"] == "facts-tool.call-graph.v1", str(graph))
-    require(graph["extraction_coverage"]["state"] == "complete", str(graph))
-    require(all(node["usr"] and node["source"]["path"] and
-                node["definition"] and node["definition"]["path"] and
-                node["coverage"]["state"] == "complete" for node in project), str(project))
-
-
-@then("B-040 reports the genuine external definition boundary separately")
+@then("B-040 records the external definition edge and nothing beyond it")
 def b040_external(context: FactsToolContext) -> None:
-    graph = b040_graph(context)
-    external = next(node for node in graph["nodes"]
-                    if node["name"] == "b040_external::unavailable")
-    edge = next(edge for edge in graph["edges"] if edge["target_id"] == external["id"])
-    require(external["definition_availability"] == "external-unavailable", str(external))
-    require(external["coverage"]["state"] == "not-applicable", str(external))
-    require(edge["external_boundary"] and not edge["definition_boundary"], str(edge))
+    facts = context.facts_database_path
+    result = cg.run_graph(context, "--function", "b040_fixture::root")
+    run_id, status = cg.completion(result)
+    require(result.returncode == 0 and status == "complete", result.stdout + result.stderr)
+    edge_pairs = cg.edge_names(facts, run_id)
+    require(any(target == "b040_external::unavailable" for _, target in edge_pairs),
+            str(edge_pairs))
+    require(not any(source == "b040_external::unavailable" for source, _ in edge_pairs),
+            str(edge_pairs))
 
 
-@then("B-040 reports unknown coverage and metadata reconciliation")
-def b040_unknown(context: FactsToolContext) -> None:
-    graph = b040_graph(context)
-    project = [node for node in graph["nodes"]
-               if node["source"]["project_local"] is True]
-    require(graph["extraction_coverage"]["state"] == "unknown", str(graph))
-    require(all(node["coverage"]["freshness"] == "unknown" and
-                node["coverage"]["failure"] is None for node in project), str(project))
-    require(all(node["coverage"]["action"] == "reconcile-coverage-metadata"
-                for node in project), str(project))
-
-
-@then("B-040 reports stale coverage with a focused refresh action")
-def b040_stale(context: FactsToolContext) -> None:
-    graph = b040_graph(context)
-    stale = [node for node in graph["nodes"]
-             if node["coverage"]["state"] == "stale"]
-    require(graph["complete"] and graph["extraction_coverage"]["state"] == "stale",
-            str(graph))
-    require(stale and all(node["coverage"]["freshness"] == "stale" and
-                          node["coverage"]["action"] == "refresh-source" and
-                          node["coverage"]["failure"] is None for node in stale), str(stale))
-
-
-@then("B-040 reports depth truncation independently in structured output")
+@then("B-040 reports depth truncation as max_depth in the persisted run")
 def b040_depth(context: FactsToolContext) -> None:
-    graph = b040_graph(context, "--max-depth", "1")
-    require(not graph["complete"] and graph["truncated"] > 0, str(graph))
-    require(any(edge["depth_truncated"] for edge in graph["edges"]), str(graph))
-    require(graph["extraction_coverage"]["state"] == "incomplete", str(graph))
+    facts = context.facts_database_path
+    result = cg.run_graph(context, "--function", "b040_fixture::root", "--max-depth", "1")
+    run_id, status = cg.completion(result)
+    require(result.returncode == 0 and status == "truncated", result.stdout + result.stderr)
+    require(cg.run_row(facts, run_id)["truncation_reason"] == "max_depth", run_id)
+    require(cg.frontier(facts, run_id), "expected a frontier row")

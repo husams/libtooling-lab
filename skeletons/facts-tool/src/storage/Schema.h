@@ -294,7 +294,75 @@ CREATE TABLE IF NOT EXISTS facts_project_provenance (
   universe_key TEXT NOT NULL
 );
 
-PRAGMA user_version=11;
+-- One row per `analyse call-graph` invocation that reached traversal. Runs are
+-- append-only: a caller identifies its invocation by the run_id printed on the
+-- completion line (or the largest run_id) and never by inspecting relation
+-- rows. Only edges actually reached from the selected roots are recorded.
+CREATE TABLE IF NOT EXISTS callgraph_run (
+  run_id            INTEGER PRIMARY KEY,
+  created_at        TEXT NOT NULL,
+  project_path      TEXT NOT NULL,
+  facts_path        TEXT NOT NULL,
+  mode              TEXT NOT NULL CHECK(mode IN ('callees','callers','path')),
+  path_mode         TEXT CHECK(path_mode IN ('shortest','all-simple')),
+  calls_scope       TEXT NOT NULL CHECK(calls_scope IN ('all','project','library')),
+  components        TEXT NOT NULL,
+  max_depth         INTEGER,
+  max_nodes         INTEGER,
+  max_edges         INTEGER,
+  time_limit_ms     INTEGER,
+  recover_missing   INTEGER NOT NULL CHECK(recover_missing IN (0,1)),
+  status            TEXT NOT NULL CHECK(status IN
+    ('complete','truncated','cancelled','recovery-failed','failed')),
+  truncation_reason TEXT,
+  error             TEXT
+);
+
+CREATE TABLE IF NOT EXISTS callgraph_run_root (
+  run_id    INTEGER NOT NULL REFERENCES callgraph_run(run_id) ON DELETE CASCADE,
+  symbol_id INTEGER NOT NULL,
+  usr       TEXT NOT NULL,
+  PRIMARY KEY (run_id, symbol_id)
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS callgraph_run_target (
+  run_id    INTEGER NOT NULL REFERENCES callgraph_run(run_id) ON DELETE CASCADE,
+  symbol_id INTEGER NOT NULL,
+  usr       TEXT NOT NULL,
+  PRIMARY KEY (run_id, symbol_id)
+) WITHOUT ROWID;
+
+-- The relation_site row that the traversal followed, with its hop depth.
+CREATE TABLE IF NOT EXISTS callgraph_run_edge (
+  run_id         INTEGER NOT NULL REFERENCES callgraph_run(run_id) ON DELETE CASCADE,
+  source_id      INTEGER NOT NULL,
+  destination_id INTEGER NOT NULL,
+  kind           INTEGER NOT NULL,
+  position       INTEGER NOT NULL,
+  file_id        INTEGER NOT NULL,
+  offset         INTEGER NOT NULL,
+  depth          INTEGER NOT NULL,
+  cycle          INTEGER NOT NULL CHECK(cycle IN (0,1)),
+  PRIMARY KEY (run_id, source_id, destination_id, kind, position, file_id, offset)
+) WITHOUT ROWID;
+
+-- Discovered-but-unexpanded nodes for depth/node/edge/time/cancelled stops.
+CREATE TABLE IF NOT EXISTS callgraph_run_frontier (
+  run_id    INTEGER NOT NULL REFERENCES callgraph_run(run_id) ON DELETE CASCADE,
+  symbol_id INTEGER NOT NULL,
+  reason    TEXT NOT NULL
+);
+
+-- Per-translation-unit recovery outcome of a --recover-missing run.
+CREATE TABLE IF NOT EXISTS callgraph_run_recovery (
+  run_id     INTEGER NOT NULL REFERENCES callgraph_run(run_id) ON DELETE CASCADE,
+  tu_file_id INTEGER NOT NULL,
+  outcome    TEXT NOT NULL CHECK(outcome IN ('attempted','failed','reused','suppressed')),
+  diagnostic TEXT,
+  PRIMARY KEY (run_id, tu_file_id)
+) WITHOUT ROWID;
+
+PRAGMA user_version=12;
 
 )sql";
 

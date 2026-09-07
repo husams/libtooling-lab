@@ -1,11 +1,12 @@
 #pragma once
-#include "analysis/callgraph/CallGraphCoverage.h"
 #include "cli/Options.h"
 
+#include <expected>
+#include <string>
+
 namespace facts::commands {
+// Resolves the project/facts pair from explicit options or configuration and
+// canonicalises the facts path before anything is opened.
 std::expected<cli::CallGraphOptions, std::string>
 resolveGraphSession(cli::CallGraphOptions options);
-std::expected<void, std::string>
-validateGraphOutput(const cli::CallGraphOptions &options,
-                    const callgraph::CoverageReport *coverage);
 } // namespace facts::commands

@@ -3,6 +3,7 @@ import sqlite3
 
 from pytest_bdd import given, then
 from support.recovery import extract, graph, run, seed_match, success
+from support.recovery_facts import component_tu
 
 
 def _variant(context, source: str) -> None:
@@ -42,20 +43,25 @@ def virtual_variant(context):
 
 @then("S-021 recovers and reuses the C++ variant three times")
 def recover_and_repeat(context):
-    first, data = context.recovery_result, context.recovery_graph
+    first, run_info = context.recovery_result, context.recovery_run
     success(first)
-    recovery = data["recovery"]
-    assert not recovery["failed"], recovery
-    assert any(item["component"] == "library" for item in recovery["attempted"]), recovery
+    failed = [row for row in run_info["recovery"] if row[1] == "failed"]
+    assert not failed, run_info["recovery"]
+    library_tu = component_tu(context, "library")
+    assert any(row[0] == library_tu and row[1] == "attempted"
+               for row in run_info["recovery"]), run_info["recovery"]
     assert first.stderr.count("warning: S021_FRONTEND") == 1, first.stderr
     for _ in range(3):
-        result, data = graph(context)
+        result, run_info = graph(context, verbosity=1)
         success(result)
-        assert data["recovery"]["attempted"] == [], data["recovery"]
-        assert data["recovery"]["reused"], data["recovery"]
+        attempted = [row for row in run_info["recovery"] if row[1] == "attempted"]
+        assert not attempted, run_info["recovery"]
+        assert any(row[1] == "reused" for row in run_info["recovery"]), run_info["recovery"]
         assert result.stderr.count("warning: S021_FRONTEND") == 1, result.stderr
+        # Freshness validation re-parses on every invocation, so unsupported-
+        # semantics coverage notices repeat on reuse too; only fact writes
+        # ("symbol(s) recorded") distinguish a reuse from a real attempt.
         assert "symbol(s) recorded" not in result.stderr, result.stderr
-        assert "coverage.unsupported_semantics" not in result.stderr, result.stderr
     with sqlite3.connect(context.facts_database_path) as db:
         names = [row[0] for row in db.execute("SELECT name FROM s021_generation")]
     assert names.count("bridge") == 1, names

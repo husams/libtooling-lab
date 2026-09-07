@@ -24,7 +24,7 @@ std::vector<const QueryNode *> roots(const QueryGraph &graph) {
   return {&graph.nodes[0], &graph.nodes[1], &graph.nodes[2]};
 }
 
-bool hasFrontier(const RenderedGraph &result, SymbolId id,
+bool hasFrontier(const TraversalResult &result, SymbolId id,
                  std::string_view reason) {
   return std::ranges::any_of(result.frontier, [&](const auto &item) {
     return item.id == id && item.reason == reason;
@@ -36,11 +36,11 @@ int main() {
   const auto graph = rootsOnly();
   TraversalRequest bounded;
   bounded.limits.nodes = 1;
-  const auto nodeBound = renderCallGraph(graph, roots(graph), bounded);
+  const auto nodeBound = traverseCallGraph(graph, roots(graph), bounded);
   TraversalRequest cancelled;
   cancelled.cancelled = [] { return true; };
   const auto cancelledResult =
-      renderCallGraph(graph, roots(graph), std::move(cancelled));
+      traverseCallGraph(graph, roots(graph), std::move(cancelled));
   return require(nodeBound.nodes == std::vector<SymbolId>{{1, 1}},
                  "node budget admitted extra roots") &&
                  require(hasFrontier(nodeBound, {2, 1}, "max_nodes") &&

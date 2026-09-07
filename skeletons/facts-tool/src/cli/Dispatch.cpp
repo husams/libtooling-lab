@@ -69,9 +69,9 @@ std::string commandDetails(const DependencyOptions &options) {
 }
 
 std::string commandDetails(const CallGraphOptions &options) {
-  return std::format("facts='{}', configuration='{}', scope='{}', format='{}'",
+  return std::format("facts='{}', configuration='{}', scope='{}'",
                      options.facts, options.configuration,
-                     options.all ? "all" : *options.function, options.format);
+                     options.all ? "all" : *options.function);
 }
 
 std::string commandDetails(const CallGraphEntryOptions &options) {
@@ -147,6 +147,8 @@ int report(std::expected<int, std::string> result) {
       return 3;
     if (result.error().starts_with("facts-tool: usage error:"))
       return 2;
+    if (result.error().starts_with("facts-tool: cancelled"))
+      return 130;
     return 1;
   }
   return *result;

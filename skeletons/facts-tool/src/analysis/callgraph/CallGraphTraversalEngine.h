@@ -13,7 +13,7 @@ class TraversalEngine {
 public:
   TraversalEngine(const QueryGraph &graph, TraversalRequest request,
                   const CoverageReport *coverage);
-  RenderedGraph run(const std::vector<const QueryNode *> &roots);
+  TraversalResult run(const std::vector<const QueryNode *> &roots);
 
 private:
   using EdgeKey = std::tuple<SymbolId, SymbolId, RelationKind, int>;
@@ -35,7 +35,7 @@ private:
   std::set<QueryContext> expanded_;
   std::set<EdgeKey> edgeKeys_;
   std::set<EdgeKey> excludedKeys_;
-  RenderedGraph result_;
+  TraversalResult result_;
 };
 
 } // namespace facts::callgraph

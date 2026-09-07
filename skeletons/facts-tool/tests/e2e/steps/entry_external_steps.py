@@ -42,8 +42,8 @@ def resolved(context):
     require(sites == context.entry_external_sites, "resolution changed sites")
     after = graph(context, "boundary")
     def identities(value):
-        return [(edge["source_id"], edge["target_id"], edge["relation"], edge["location"])
-                for edge in value["edges"]]
+        return [(edge["source_id"], edge["target_id"], edge["kind"], edge["file_id"],
+                 edge["offset"]) for edge in value["edges"]]
     require(identities(after) == identities(context.entry_external_graph), str(after))
 
 
@@ -53,8 +53,7 @@ def multisource(context):
         succeed(run(context, "extract", "-v", "0", "--conf", context.files_database_path,
                     "--output", context.facts_database_path, *sources))
         left = graph(context, "left")
-        require({"s027::left", "s027::shared", "s027::leaf"}.issubset(
-                {node["name"] for node in left["nodes"]}), str(left))
+        require({"s027::left", "s027::shared", "s027::leaf"}.issubset(left["nodes"]), str(left))
         require(lookup(context, "external")["entry_available"], "library entry lost")
         require(lookup(context, "boundary")["external_targets"] == [], "resolved target lost")
 

@@ -6,7 +6,7 @@
 namespace facts::callgraph::detail {
 SearchBudget::SearchBudget(TraversalRequest request,
                            const CoverageReport *coverage,
-                           RenderedGraph &result)
+                           TraversalResult &result)
     : request_(std::move(request)), coverage_(coverage), result_(result),
       started_(std::chrono::steady_clock::now()) {
   result_.scope = request_.scope;

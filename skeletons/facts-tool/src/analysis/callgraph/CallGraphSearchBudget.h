@@ -7,7 +7,7 @@ namespace facts::callgraph::detail {
 class SearchBudget {
 public:
   SearchBudget(TraversalRequest request, const CoverageReport *coverage,
-               RenderedGraph &result);
+               TraversalResult &result);
   bool root(const QueryNode &node);
   bool include(const QueryNode &node, const QueryEdge *edge = nullptr);
   bool admit(const QueryNode &node, const QueryEdge *edge = nullptr);
@@ -18,7 +18,7 @@ private:
   using Key = std::tuple<SymbolId, SymbolId, RelationKind, unsigned>;
   TraversalRequest request_;
   const CoverageReport *coverage_;
-  RenderedGraph &result_;
+  TraversalResult &result_;
   std::chrono::steady_clock::time_point started_;
   std::set<Key> edges_;
   std::set<Key> excluded_;

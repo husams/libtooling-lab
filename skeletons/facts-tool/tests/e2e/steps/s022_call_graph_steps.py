@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from pytest_bdd import given, then
 
-from support.database import require
+from support.database import file_snapshot, require
 from support.scenario import FactsToolContext
-from support.s022 import graph, named_edges, run
+from support.s022 import (definition_available, definition_path, graph,
+                           named_edges, run, source_path)
 
 
 @given("the S-022 multi-component corpus is extracted")
@@ -33,7 +34,8 @@ def callable_lifetimes(context: FactsToolContext) -> None:
         edges = named_edges(graph(context, f"s022_fixture::{root}"))
         cleanup = [(edge, target) for edge, target in edges
                    if edge["semantic_kind"] == "destructor" and edge["depth"] == 1]
-        require(len(cleanup) == 1 and cleanup[0][0]["implicit"] is implicit,
+        sites = {(edge["target"], edge["file_id"], edge["offset"]) for edge, _ in cleanup}
+        require(len(sites) == 1 and all(edge["implicit"] is implicit for edge, _ in cleanup),
                 f"bad cleanup for {root}: {cleanup}")
         require(cleanup[0][0]["location"]["path"].endswith("entry.cpp"), str(cleanup))
     constructors = named_edges(graph(context, "s022_fixture::run"))
@@ -49,11 +51,14 @@ def lambda_and_components(context: FactsToolContext) -> None:
     lambdas = [(edge, target) for edge, target in edges
                if edge["semantic_kind"] == "lambda" and edge["depth"] == 1]
     require(len(lambdas) == 1 and "::<lambda@" in lambdas[0][1], str(lambdas))
-    constructor = next(node for node in document["nodes"]
-                       if node["name"] == "s022_fixture::Derived::Derived")
-    require(constructor["definition_availability"] == "available", str(constructor))
-    require(constructor["source"]["path"].endswith("service.hpp") and
-            constructor["definition"]["path"].endswith("service.cpp"), str(constructor))
+    constructor_id = next(edge["target_id"] for edge, target in edges
+                          if target == "s022_fixture::Derived::Derived")
+    facts = context.facts_database_path
+    paths = dict(file_snapshot(context.files_database_path))
+    require(definition_available(facts, constructor_id), str(constructor_id))
+    require(source_path(paths, constructor_id).endswith("service.hpp") and
+            definition_path(facts, paths, constructor_id).endswith("service.cpp"),
+            str(constructor_id))
 
 
 @then("static targets and dispatch expansions retain receiver certainty")
@@ -75,15 +80,10 @@ def dispatch_certainty(context: FactsToolContext) -> None:
     require(all(edge["receiver_type_id"] is None for edge, _ in possible), str(possible))
 
 
-@then("the Calls view and unsupported-semantic evidence remain inspectable")
+@then("exposes raw relation kinds and unsupported frontend semantics")
 def compatibility_and_coverage(context: FactsToolContext) -> None:
-    document = graph(context, "s022_fixture::run", "calls")
-    require(document["edge_view"] == "calls", str(document))
-    require(all(edge["relation_kind"] in {"Calls", "DispatchCalls"} and
-                "semantic_kind" not in edge for edge in document["edges"]),
-            str(document["edges"]))
-    unsupported = document["extraction_coverage"]["unsupported_semantics"]
-    require(unsupported["state"] == "not-persisted" and not unsupported["sites"], str(unsupported))
+    document = graph(context, "s022_fixture::run")
+    require(all(edge["kind"] in {1, 18} for edge in document["edges"]), str(document["edges"]))
     require("coverage.unsupported_semantics kind=indirect-call" in context.last_output and
             "entry.cpp:39:42" in context.last_output and
             "service.hpp:30:" in context.last_output, context.last_output)

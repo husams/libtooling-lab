@@ -15,10 +15,11 @@ struct RecoveryEntry {
   std::vector<std::string> arguments;
   std::vector<std::string> relatedUsrs;
   std::string reason;
+  // Captured front-end output of the candidate compile, when one ran.
+  std::string diagnostic;
 };
 
 struct RecoveryReport {
-  bool requested = false;
   std::vector<RecoveryEntry> attempted;
   std::vector<RecoveryEntry> reused;
   std::vector<RecoveryEntry> failed;

@@ -1,7 +1,11 @@
 """Review regressions use only ordinary CLI-produced evidence."""
 import sqlite3
 from pytest_bdd import given, when, then
-from support.recovery import graph, extract, success
+from support.callgraph_run import completion
+from support.callgraph_run_rows import edge_names as db_edge_names
+from support.callgraph_run_rows import recovery as db_recovery
+from support.recovery import graph, extract, success, run
+from support.recovery_facts import component_tu, has_definition, is_external, query
 from steps.recovery_audit_steps import audit
 
 
@@ -10,10 +14,11 @@ def repeat(context):
     success(context.recovery_result)
     audit(context)
     for _ in range(4):
-        result, data = graph(context)
+        result, run_info = graph(context)
         success(result)
-        assert not data["recovery"]["attempted"], data["recovery"]
-        context.recovery_graph = data
+        touched = [row for row in run_info["recovery"] if row[1] in ("attempted", "failed")]
+        assert not touched, run_info["recovery"]
+        context.recovery_run = run_info
     with sqlite3.connect(context.facts_database_path) as db:
         assert db.execute("SELECT * FROM s021_generation").fetchall() == []
 
@@ -23,7 +28,6 @@ def standard(context):
     context.recovery_sources[0].write_text(
         '#include <cstdio>\nint bridge(); int root() { std::puts("hello"); return bridge(); }\n')
     # Re-import registers the real system include paths for the changed source.
-    from support.recovery import run
     success(run(context, "import", "--conf", context.files_database_path,
                 "--facts", context.facts_database_path, "-p",
                 context.recovery_sources[0].parent.parent,
@@ -34,12 +38,13 @@ def standard(context):
 
 @then("S-021 never probes the external unavailable target")
 def no_external(context):
-    data = context.recovery_graph
-    external = next(node for node in data["nodes"] if node["name"] == "puts")
-    assert external["definition_availability"] == "external-unavailable"
-    for entry in data["recovery"]["attempted"]:
-        assert external["usr"] not in entry["related_usrs"], entry
-    assert external["id"] in data["coverage"]["missing_definitions"]
+    facts = context.facts_database_path
+    run_info = context.recovery_run
+    assert ("root", "puts") in run_info["edges"], run_info["edges"]
+    assert not has_definition(facts, "puts")
+    assert is_external(facts, "puts")
+    for _, _, diagnostic in run_info["recovery"]:
+        assert "puts" not in (diagnostic or ""), run_info["recovery"]
 
 
 @given("the unrelated S-021 registered alternative is missing")
@@ -49,12 +54,15 @@ def missing_alternative(context):
 
 @then("S-021 reused entries batch symbols under actual translation units")
 def grouped(context):
-    entries = context.recovery_graph["recovery"]["reused"]
-    ids = [entry["tu_file_id"] for entry in entries]
-    assert len(ids) == len(set(ids)), entries
-    assert all(entry["arguments"] and entry["driver"] for entry in entries), entries
-    assert any({"c:@F@bridge#", "c:@F@leaf#"} <= set(entry["related_usrs"])
-               for entry in entries), entries
+    reused = [row for row in context.recovery_run["recovery"] if row[1] == "reused"]
+    tu_ids = {row[0] for row in reused}
+    assert tu_ids, reused
+    for tu_id in tu_ids:
+        driver, arguments = query(context.files_database_path,
+                                  "SELECT driver, compile_options FROM file WHERE id=?",
+                                  (tu_id,))[0]
+        assert driver and arguments, (tu_id, driver, arguments)
+    assert {("root", "bridge"), ("bridge", "leaf")} <= context.recovery_run["edges"]
 
 
 @given("S-021 library calls a deeper missing function")
@@ -65,19 +73,23 @@ def deeper(context):
 
 @when("S-021 recovery is limited to one edge")
 def limited(context):
-    import json
-    from support.recovery import run
     result = run(context, "analyse", "call-graph", "-v", "0", "--conf",
-                 context.files_database_path, "--facts", context.facts_database_path,
-                 "--function", "root", "--format", "json", "--recover-missing",
-                 "--max-depth", "1")
+                context.files_database_path, "--facts", context.facts_database_path,
+                "--function", "root", "--recover-missing", "--max-depth", "1")
     success(result)
-    context.recovery_graph = json.loads(result.stdout)
+    run_id, status = completion(result)
+    facts = context.facts_database_path
+    context.recovery_result = result
+    context.recovery_run = {"run_id": run_id, "status": status,
+                            "edges": db_edge_names(facts, run_id),
+                            "recovery": db_recovery(facts, run_id)}
 
 
 @then("S-021 does not attempt the deeper missing function")
 def depth_boundary(context):
-    attempts = context.recovery_graph["recovery"]["attempted"]
-    assert any(entry["component"] == "library" for entry in attempts), attempts
-    entries = attempts + context.recovery_graph["recovery"]["reused"]
-    assert all("c:@F@deep#" not in entry["related_usrs"] for entry in entries), entries
+    run_info = context.recovery_run
+    assert run_info["status"] == "truncated", run_info
+    assert ("bridge", "deep") not in run_info["edges"], run_info["edges"]
+    library_tu = component_tu(context, "library")
+    touched = {row[0]: row[1] for row in run_info["recovery"]}
+    assert touched.get(library_tu) in ("attempted", "reused"), run_info["recovery"]

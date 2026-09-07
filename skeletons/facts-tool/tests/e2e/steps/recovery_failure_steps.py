@@ -1,7 +1,8 @@
 """Real failed compiler inputs and an index-write storage guard."""
 import sqlite3
 from pytest_bdd import given, when, then
-from support.recovery import graph, edge_names
+from support.recovery import graph
+from support.recovery_facts import component_tu
 
 
 @given("the S-021 registered library has a syntax error")
@@ -11,24 +12,23 @@ def broken(context):
 
 @then("S-021 reports the failed library once with the partial graph")
 def failure(context):
-    result, data = context.recovery_result, context.recovery_graph
+    result, run = context.recovery_result, context.recovery_run
     assert result.returncode == 1, result.stdout + result.stderr
-    assert ("root", "bridge") in edge_names(data), data
-    assert "recovery-failed" in str(data["errors"]), data
-    assert data["coverage"]["missing_definitions"] or data["coverage"]["unresolved_targets"], data
-    failed = data["recovery"]["failed"]
-    library = [entry for entry in failed if entry["component"] == "library"]
-    assert len(library) == 1 and library[0]["reason"], failed
-    attempts = data["recovery"]["attempted"]
-    keys = [(entry["tu_file_id"], tuple(entry["arguments"])) for entry in attempts]
-    assert len(keys) == len(set(keys)), attempts
-    assert "recovery-complete" in result.stderr
+    assert run is not None and run["status"] == "recovery-failed", run
+    assert ("root", "bridge") in run["edges"], run["edges"]
+    library_tu = component_tu(context, "library")
+    failed = [row for row in run["recovery"]
+              if row[0] == library_tu and row[1] == "failed"]
+    assert len(failed) == 1 and failed[0][2], run["recovery"]
+    expected = ("facts-tool: recovery failed for 1 translation unit(s); "
+                f"see callgraph_run_recovery run {run['run_id']}")
+    assert expected in result.stderr.splitlines(), result.stderr
 
 
 @when("the S-021 library is repaired and recovery is requested again")
 def repair(context):
     context.recovery_sources[1].write_text(context.recovery_library_body)
-    context.recovery_result, context.recovery_graph = graph(context)
+    context.recovery_result, context.recovery_run = graph(context, verbosity=1)
 
 
 def index_rows(context):

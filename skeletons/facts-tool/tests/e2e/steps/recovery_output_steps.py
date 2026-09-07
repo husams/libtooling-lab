@@ -16,13 +16,12 @@ def diagnostic_body(context):
 @then(parsers.parse("S-021 validation output respects verbosity {level:d}"))
 def validation_output(context, level):
     first = success(context.recovery_result)
-    recovered = [entry for entry in context.recovery_graph["recovery"]["attempted"]
-                 if entry["reason"] == "recovered"]
+    recovered = [row for row in context.recovery_run["recovery"] if row[1] == "attempted"]
     assert first.stderr.count("symbol(s) recorded") == len(recovered), first.stderr
     recover_and_repeat(context)
-    result, data = graph(context, verbosity=level)
+    result, run_info = graph(context, verbosity=level)
     success(result)
-    assert data["recovery"]["attempted"] == [], data
+    assert not [row for row in run_info["recovery"] if row[1] == "attempted"], run_info
     assert "symbol(s) recorded" not in result.stderr, result.stderr
     message = "recovery-validation: temporary facts only; user facts unchanged"
     if level == 0:
