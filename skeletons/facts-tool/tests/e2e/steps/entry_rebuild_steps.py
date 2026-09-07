@@ -17,7 +17,7 @@ def replace_evidence(context):
     entry = lookup(context, "left")
     require(entry["entry_available"] and entry["symbol_id"] == before["symbol_id"],
             str(entry))
-    names = {node["name"] for node in graph(context, "left")["nodes"]}
+    names = graph(context, "left")["nodes"]
     require(names == {"s027::left", "s027::leaf"}, str(names))
     require(not lookup(context, "indirect")["coverage"]["unresolved_targets"],
             "obsolete unresolved call survived regeneration")

@@ -2,22 +2,31 @@
 
 #include "analysis/callgraph/CallGraphCoverage.h"
 #include "analysis/callgraph/CallGraphQuery.h"
-#include "analysis/callgraph/CallGraphRecoveryTypes.h"
 #include "commands/analyse/CallGraphRequest.h"
+#include "commands/analyse/CallGraphRunRecord.h"
 
 namespace facts::commands {
 
-std::expected<int, std::string>
-runSelectedCallGraph(const cli::CallGraphOptions &options,
-                     const CallGraphRequest &request,
-                     const callgraph::QueryGraph &graph,
-                     const callgraph::CoverageReport *coverage);
+// Validates root, target, scope and budget selectors before any traversal so
+// usage and configuration errors never write a run.
+std::expected<void, std::string>
+validateCallGraphSelection(const cli::CallGraphOptions &options,
+                           const CallGraphRequest &request,
+                           const callgraph::QueryGraph &graph,
+                           const callgraph::CoverageReport *coverage);
 
-std::expected<int, std::string>
-runCallGraphQuery(const cli::CallGraphOptions &options,
-                  const CallGraphRequest &request,
-                  const callgraph::QueryGraph &graph,
-                  const callgraph::CoverageReport *coverage,
-                  const callgraph::RecoveryReport *recovery);
+// Traverses the stored graph once and describes the run to persist.
+std::expected<CallGraphRunRecord, std::string>
+runStoredCallGraph(const cli::CallGraphOptions &options,
+                   const CallGraphRequest &request,
+                   const callgraph::QueryGraph &graph,
+                   const callgraph::CoverageReport *coverage);
+
+// Recovers missing evidence and describes the final graph generation.
+std::expected<CallGraphRunRecord, std::string>
+runRecoveredCallGraph(const cli::CallGraphOptions &options,
+                      const CallGraphRequest &request,
+                      const callgraph::QueryGraph &graph,
+                      const callgraph::CoverageReport *coverage);
 
 } // namespace facts::commands

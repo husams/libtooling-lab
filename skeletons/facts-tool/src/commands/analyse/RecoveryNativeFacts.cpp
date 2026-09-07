@@ -44,7 +44,7 @@ collectRecoveryNativeFacts(const RecoveryContext &context,
     FactStore store(path, context.verbosity == 0 ? -1 : context.verbosity);
     if (auto begun = store.begin(); !begun)
       return std::unexpected(begun.error().message());
-    IndexingStatus status;
+    IndexingStatus status{context.verbosity >= 1};
     for (const auto &unit : scan.units)
       traverse(unit->getASTContext(), **files, store, status);
     if (!status.complete()) {

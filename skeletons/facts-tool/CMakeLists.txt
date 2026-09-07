@@ -262,13 +262,11 @@ add_library(facts-ast STATIC
   src/ast/visitors/SymbolVisitor.cpp
   src/ast/visitors/Traversal.cpp
   src/analysis/callgraph/CallGraphTypes.cpp
-  src/analysis/callgraph/CallGraphSemantics.cpp
   src/analysis/callgraph/CallGraphLinker.cpp
   src/analysis/callgraph/OverrideIndex.cpp
   src/analysis/callgraph/ReceiverPropagation.cpp
   src/analysis/callgraph/DispatchResolver.cpp
   src/analysis/callgraph/CallGraphContext.cpp
-  src/analysis/callgraph/CallGraphError.cpp
   src/analysis/callgraph/CallGraphRequest.cpp
   src/analysis/callgraph/CallGraphQuery.cpp
   src/analysis/callgraph/CallGraphScope.cpp
@@ -288,15 +286,6 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/CallGraphCatalog.cpp
   src/analysis/callgraph/CallGraphNodes.cpp
   src/analysis/callgraph/CallGraphFreshness.cpp
-  src/analysis/callgraph/CallGraphJson.cpp
-  src/analysis/callgraph/CallGraphJsonRequest.cpp
-  src/analysis/callgraph/CallGraphJsonRecovery.cpp
-  src/analysis/callgraph/CallGraphJsonEdge.cpp
-  src/analysis/callgraph/CallGraphJsonEvidence.cpp
-  src/analysis/callgraph/CallGraphJsonLocation.cpp
-  src/analysis/callgraph/CallGraphJsonQuery.cpp
-  src/analysis/callgraph/CallGraphMermaid.cpp
-  src/analysis/callgraph/CallGraphText.cpp
 )
 target_include_directories(facts-ast PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-ast
@@ -375,14 +364,16 @@ add_library(facts-commands STATIC
   src/commands/match/RelationValidation.cpp
   src/commands/match/SymbolDispatch.cpp
   src/commands/analyse/CallGraphSession.cpp
-  src/commands/analyse/CallGraphOutput.cpp
-  src/commands/analyse/CallGraphPublish.cpp
   src/commands/analyse/CallGraphCommand.cpp
   src/commands/analyse/CallGraphCancellation.cpp
   src/commands/analyse/CallGraphEntryCommand.cpp
   src/commands/analyse/CallGraphRequest.cpp
   src/commands/analyse/CallGraphRecoveryRun.cpp
   src/commands/analyse/CallGraphRun.cpp
+  src/commands/analyse/CallGraphOutcome.cpp
+  src/commands/analyse/CallGraphCompletion.cpp
+  src/commands/analyse/CallGraphRunStore.cpp
+  src/commands/analyse/CallGraphRunRows.cpp
   src/commands/analyse/CallGraphRecoveryState.cpp
   src/commands/analyse/CallGraphRecovery.cpp
   src/commands/analyse/CallGraphRecoveryPass.cpp
@@ -467,9 +458,6 @@ if(BUILD_TESTING)
     NAME fact-store
     COMMAND fact-store-test ${CMAKE_CURRENT_BINARY_DIR}/fact-store-test.sqlite
   )
-  add_executable(call-graph-mermaid-test tests/CallGraphMermaidTest.cpp)
-  target_link_libraries(call-graph-mermaid-test PRIVATE facts-ast facts-storage)
-  add_test(NAME call-graph-mermaid COMMAND call-graph-mermaid-test)
   add_executable(call-graph-test tests/CallGraphTest.cpp)
   target_link_libraries(call-graph-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph COMMAND call-graph-test)

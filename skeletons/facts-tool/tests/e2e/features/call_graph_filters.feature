@@ -23,5 +23,5 @@ Feature: Optional call graph filters and traversal budgets
     Then an exact-depth leaf is complete and cycles terminate without a cap
 
   Scenario: Invalid budgets are usage errors and requests persist no state
-    Then invalid graph budgets fail as usage errors and requests leave no cache
-    And operational JSON failures report error truncation and exit one
+    Then invalid graph budgets fail as usage errors and requests persist only their run
+    And operational failures before traversal exit one with a single stderr line and no run

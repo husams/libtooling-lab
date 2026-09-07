@@ -3,6 +3,7 @@ import json
 from pytest_bdd import given, parsers, then, when
 from steps.external_target_steps import prepare_compile_database, run
 from steps.implicit_allocation_target_steps import extract_implicit
+from support import callgraph_run as cg
 from support.database import file_snapshot, query, require
 
 
@@ -77,8 +78,10 @@ def matrix_calls(context, matrix):
             require(properties == [(1, 1, 1, 0)], str(properties))
         require(query(context.facts_database_path,
                       "SELECT COUNT(*) FROM symbol WHERE usr=?", (cell["usr"],)) == [(1,)], str(row))
-        graph = run([str(context.facts_tool), "analyse", "call-graph", "--facts",
-                     str(context.facts_database_path), "--function", cell["caller"]])
-        require(graph.returncode == 0 and cell["target"] in graph.stdout, graph.stderr)
+        graph = cg.run_graph(context, "--function", cell["caller"], conf=False)
+        graph_id, _ = cg.completion(graph)
+        require(graph.returncode == 0, graph.stderr)
+        edges = cg.edge_names(context.facts_database_path, graph_id)
+        require((cell["caller"], cell["target"]) in edges, str(edges))
         ids.append(row[0])
     require(len(ids) == len(set(ids)), "overloads collapsed")

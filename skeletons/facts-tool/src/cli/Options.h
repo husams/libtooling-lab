@@ -52,8 +52,6 @@ struct CallGraphOptions {
   std::string facts;
   std::string configuration;
   std::string configurationFile;
-  std::string format = "text";
-  std::string edges = "semantic";
   std::optional<std::string> function;
   bool all = false;
   std::optional<int> maxDepth;
@@ -66,7 +64,6 @@ struct CallGraphOptions {
   std::optional<std::string> target;
   std::optional<std::string> pathMode;
   bool recoverMissing = false;
-  std::string output;
 };
 
 struct CallGraphEntryOptions {

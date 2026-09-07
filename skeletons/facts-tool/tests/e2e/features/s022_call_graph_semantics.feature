@@ -14,7 +14,7 @@ Feature: Cross-component callable semantics
     Then static targets and dispatch expansions retain receiver certainty
 
   Scenario: exposes raw relations and unsupported frontend semantics
-    Then the Calls view and unsupported-semantic evidence remain inspectable
+    Then exposes raw relation kinds and unsupported frontend semantics
 
   Scenario: separates explicit and implicit cleanup occurrences
     Then mixed cleanup and destructor subobjects retain site semantics

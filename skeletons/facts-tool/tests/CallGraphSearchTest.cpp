@@ -79,10 +79,12 @@ int main() {
                          "all-simple paths lost a possible edge") &&
                  require(self.paths.size() == 1 && self.paths[0].edges.empty(),
                          "zero-edge self path is missing") &&
-                 require(pathResult(value, capped, &coverage) == "truncated",
+                 require(capped.traversal.truncated > 0 &&
+                             capped.traversal.reason == "max_depth",
                          "explicit path cap was not reported") &&
-                 require(pathResult(value, missing, &coverage) == "not_found",
-                         "external boundary invalidated complete evidence") &&
+                 require(missing.paths.empty() &&
+                             missing.traversal.truncated == 0,
+                         "external boundary was reported as truncation") &&
                  require(callers.edges.size() == 5 &&
                              callers.edges.front().edge.destination ==
                                  (*target)->id,

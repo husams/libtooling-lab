@@ -15,21 +15,21 @@ struct QueryPath {
 };
 
 struct QuerySearch {
-  RenderedGraph traversal;
+  TraversalResult traversal;
   std::vector<QueryPath> paths;
 };
 
 std::string_view queryModeName(QueryMode mode);
 std::string_view pathModeName(PathMode mode);
-RenderedGraph searchCallers(const QueryGraph &graph,
-                            const std::vector<const QueryNode *> &roots,
-                            std::optional<int> maxDepth,
-                            const CoverageReport *coverage = nullptr);
+TraversalResult searchCallers(const QueryGraph &graph,
+                              const std::vector<const QueryNode *> &roots,
+                              std::optional<int> maxDepth,
+                              const CoverageReport *coverage = nullptr);
 QuerySearch searchPaths(const QueryGraph &graph, const QueryNode &source,
                         const QueryNode &target, PathMode mode,
                         std::optional<int> maxDepth,
                         const CoverageReport *coverage = nullptr);
-RenderedGraph searchCallersWithRequest(
+TraversalResult searchCallersWithRequest(
     const QueryGraph &graph, const std::vector<const QueryNode *> &roots,
     TraversalRequest request, const CoverageReport *coverage = nullptr);
 QuerySearch searchPathsWithRequest(const QueryGraph &graph,
@@ -37,7 +37,5 @@ QuerySearch searchPathsWithRequest(const QueryGraph &graph,
                                    const QueryNode &target, PathMode mode,
                                    TraversalRequest request,
                                    const CoverageReport *coverage = nullptr);
-std::string pathResult(const QueryGraph &graph, const QuerySearch &search,
-                       const CoverageReport *coverage);
 
 } // namespace facts::callgraph

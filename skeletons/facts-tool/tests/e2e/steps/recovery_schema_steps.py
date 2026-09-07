@@ -4,11 +4,13 @@ from pytest_bdd import given, then
 
 
 def schemas(context):
+    """sqlite_master snapshot, excluding the contracted callgraph_run* tables."""
     result = []
     for path in (context.files_database_path, context.facts_database_path):
         with sqlite3.connect(path) as db:
             result.append(db.execute(
-                "SELECT type,name,sql FROM sqlite_master ORDER BY type,name").fetchall())
+                "SELECT type,name,sql FROM sqlite_master WHERE name NOT LIKE "
+                "'callgraph_run%' ORDER BY type,name").fetchall())
     return result
 
 

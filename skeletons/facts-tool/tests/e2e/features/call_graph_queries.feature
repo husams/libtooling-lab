@@ -13,5 +13,5 @@ Feature: Opt-in callers and paths across components
   Scenario: exact selectors diagnose ambiguity and incompatible options
     Then S-024 selector and option failures are explicit usage errors
 
-  Scenario: path results distinguish complete unknown and truncated evidence
-    Then S-024 path result coverage states remain distinct
+  Scenario: path runs distinguish found unreachable and truncated evidence
+    Then path runs distinguish found, unreachable and truncated evidence

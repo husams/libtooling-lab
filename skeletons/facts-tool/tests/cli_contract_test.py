@@ -157,13 +157,19 @@ def main() -> None:
     call_graph_help = run(tool, "analyse", "call-graph", "--help")
     require(call_graph_help.returncode == 0 and
             all(option in output(call_graph_help) for option in
-                ("--facts", "--conf", "--format", "--max-depth",
-                 "--direction", "--to", "--path-mode")),
+                ("--facts", "--conf", "--max-depth", "--direction", "--to",
+                 "--path-mode", "--recover-missing")) and
+            not any(line.lstrip().startswith(("--format", "-o,", "--output",
+                                              "--edges"))
+                    for line in output(call_graph_help).splitlines()),
             output(call_graph_help))
-    invalid_graph_format = run(tool, "analyse", "call-graph", "-f", "missing.sqlite",
-                               "--all", "--format", "yaml")
-    require(invalid_graph_format.returncode != 0 and
-            "--format" in output(invalid_graph_format), output(invalid_graph_format))
+    for removed in (("--format", "json"), ("--output", "graph.mmd")):
+        rejected = run(tool, "analyse", "call-graph", "-f", "missing.sqlite",
+                       "--all", *removed)
+        require(rejected.returncode == 2 and rejected.stdout == "" and
+                removed[0] in rejected.stderr and
+                rejected.stderr.startswith("facts-tool: usage error:") and
+                rejected.stderr.count("\n") == 1, output(rejected))
 
     dependency_help = run(tool, "analyse", "dependency", "--help")
     require(dependency_help.returncode == 0, output(dependency_help))

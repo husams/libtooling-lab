@@ -2,7 +2,11 @@
 import json
 import os
 import subprocess
-import sqlite3
+
+from support.callgraph_run import completion, run_row
+from support.callgraph_run_rows import edge_names as _edges
+from support.callgraph_run_rows import frontier as _frontier
+from support.callgraph_run_rows import recovery as _recovery
 
 
 def run(context, *args):
@@ -61,12 +65,23 @@ def extract(context, position):
 
 
 def graph(context, recover=True, verbosity=0):
+    """Run `analyse call-graph` and return (result, run) from the facts store.
+
+    `run` is None unless the invocation reached the completion line (exit
+    0/1/130 with non-empty stdout); otherwise no callgraph_run row exists.
+    """
     result = run(context, "analyse", "call-graph", "-v", verbosity, "--conf",
                  context.files_database_path, "--facts", context.facts_database_path,
-                 "--function", "root", "--format", "json",
+                 "--function", "root",
                  *(["--recover-missing"] if recover else []))
-    assert result.stdout.strip(), result.stderr
-    return result, json.loads(result.stdout)
+    info = None
+    if result.returncode in (0, 1, 130) and result.stdout.strip():
+        run_id, status = completion(result)
+        facts = context.facts_database_path
+        info = {"run_id": run_id, "status": status, "row": run_row(facts, run_id),
+                "edges": _edges(facts, run_id), "recovery": _recovery(facts, run_id),
+                "frontier": _frontier(facts, run_id)}
+    return result, info
 
 
 def seed_match(context):
@@ -76,6 +91,5 @@ def seed_match(context):
                        context.recovery_sources[1]))
 
 
-def edge_names(graph):
-    names = {node["id"]: node["name"] for node in graph["nodes"]}
-    return {(names[e["source_id"]], names[e["target_id"]]) for e in graph["edges"]}
+def edge_names(run):
+    return run["edges"]

@@ -37,7 +37,7 @@ On open, `storage/SchemaMigration.cpp` detects legacy packed flags and applies
 versioned upgrades inside the storage connection's `BEGIN IMMEDIATE`
 transaction. Existing identities and facts are preserved. The complete fresh
 schema is defined by `storage/Schema.h`; fresh databases are created directly
-at SQLite `user_version = 10` without packed persisted flags.
+at SQLite `user_version = 12` without packed persisted flags.
 
 The version-8-to-9 migration adds `callable_return_type`, keyed by `symbol_id`
 with a cascading foreign key to `symbol`. Its nonempty `canonical_type` text
@@ -83,3 +83,17 @@ discovery index without changing facts `user_version`. See the
 
 Readback composes the explicit columns into the original compact in-memory
 flags, preserving the public C++ model and extraction behavior.
+
+## Version 11-to-12: persisted call-graph runs
+
+Version 12 adds the append-only call-graph run history tables: `callgraph_run`,
+`callgraph_run_root`, `callgraph_run_target`, `callgraph_run_edge`,
+`callgraph_run_frontier`, and `callgraph_run_recovery` (columns documented in
+[call-graph.md](call-graph.md)). Fresh schema creation includes them
+directly; the migration adds them to an existing schema-11 database the next
+time any command opens that facts store read/write, so a store extracted
+before this change gains the tables at its next `extract` or `analyse
+call-graph` invocation even before that invocation records any symbols or
+runs a traversal. Rows are appended only by a subsequent `analyse call-graph`
+invocation that reaches traversal; no migration and no other command deletes
+or rewrites an existing run.

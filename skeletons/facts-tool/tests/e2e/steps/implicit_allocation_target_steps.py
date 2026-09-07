@@ -1,6 +1,7 @@
 from pytest_bdd import given, then, when
 
 from steps.external_target_steps import prepare_compile_database, run
+from support import callgraph_run as cg
 from support.database import file_snapshot, query, require
 
 
@@ -59,7 +60,9 @@ def committed(context, implicit_source):
                      "SELECT qualified_name FROM symbol WHERE is_definition=1 "
                      "AND qualified_name IN ('seed_new','explicit_new') ORDER BY qualified_name")
     require(siblings == [("explicit_new",), ("seed_new",)], str(siblings))
-    graph = run([str(context.facts_tool), "analyse", "call-graph", "--facts",
-                 str(context.facts_database_path), "--function", "explicit_new"])
-    require(graph.returncode == 0 and "operator new" in graph.stdout,
-            graph.stdout + graph.stderr)
+    facts = context.facts_database_path
+    graph = cg.run_graph(context, "--function", "explicit_new", conf=False)
+    graph_id, graph_status = cg.completion(graph)
+    require(graph.returncode == 0 and graph_status == "complete", graph.stdout + graph.stderr)
+    require(("explicit_new", "operator new") in cg.edge_names(facts, graph_id),
+            str(cg.edge_names(facts, graph_id)))

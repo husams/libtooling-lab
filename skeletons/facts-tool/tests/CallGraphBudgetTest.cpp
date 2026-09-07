@@ -42,11 +42,11 @@ CoverageReport coverage() {
             .componentKind = "repo",
             .projectLocal = true}}};
 }
-RenderedGraph run(TraversalRequest request,
+TraversalResult run(TraversalRequest request,
                   const CoverageReport *report = nullptr) {
   static const auto graph = chain();
   const auto roots = selectRoots(graph, "a", false);
-  return renderCallGraph(graph, *roots, std::move(request), report);
+  return traverseCallGraph(graph, *roots, std::move(request), report);
 }
 } // namespace
 

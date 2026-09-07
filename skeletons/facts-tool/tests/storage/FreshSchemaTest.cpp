@@ -447,7 +447,7 @@ SELECT group_concat(record, char(10)) FROM (
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'facts_project_provenance')") == 3,
               "fresh provenance schema is incomplete") &&
-      require(scalar(database, "PRAGMA user_version") == 11,
+      require(scalar(database, "PRAGMA user_version") == 12,
               "fresh schema version was not recorded");
   sqlite3_close(database);
   return valid;

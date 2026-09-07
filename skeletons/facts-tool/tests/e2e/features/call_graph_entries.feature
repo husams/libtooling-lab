@@ -84,3 +84,7 @@ Feature: Committed entries into the shared function graph
   Scenario: Regenerated function bodies replace obsolete call evidence
     Given an extracted S-027 application component
     Then S-027 regenerated bodies replace obsolete calls and unresolved sites
+
+  Scenario: Entry command help and output match the recorded pre-change snapshot
+    Given an extracted S-027 application component
+    Then the call-graph-entry help and outputs are byte-identical to the snapshot

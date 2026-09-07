@@ -3,7 +3,6 @@
 #include "analysis/callgraph/CallGraphSearchBudget.h"
 
 #include "analysis/callgraph/CallGraphOrder.h"
-#include "analysis/callgraph/CallGraphText.h"
 
 #include <map>
 #include <set>
@@ -24,13 +23,12 @@ public:
       });
   }
 
-  RenderedGraph run(const std::vector<const QueryNode *> &roots) {
+  TraversalResult run(const std::vector<const QueryNode *> &roots) {
     for (const auto *root : roots) {
       if (!budget_.root(*root))
         continue;
       walk(*root, 0, {});
     }
-    result_.text = renderCallGraphText(graph_, roots, result_, coverage_);
     return std::move(result_);
   }
 
@@ -80,12 +78,12 @@ private:
   const CoverageReport *coverage_;
   std::set<SymbolId> expanded_;
   std::map<SymbolId, std::vector<const QueryEdge *>> incoming_;
-  RenderedGraph result_;
+  TraversalResult result_;
   detail::SearchBudget budget_;
 };
 } // namespace
 
-RenderedGraph searchCallersWithRequest(
+TraversalResult searchCallersWithRequest(
     const QueryGraph &graph, const std::vector<const QueryNode *> &roots,
     TraversalRequest request, const CoverageReport *coverage) {
   return CallerSearch{graph, std::move(request), coverage}.run(roots);

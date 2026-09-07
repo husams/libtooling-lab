@@ -15,6 +15,11 @@ class Parser {
 public:
   Parser() : app_("Extract and import C++ project facts", "facts-tool") {
     app_.require_subcommand(1, 1);
+    // Every parse failure is one prefixed stderr line so callers can rely on
+    // the same usage-error contract the commands themselves use.
+    app_.failure_message([](const CLI::App *, const CLI::Error &error) {
+      return "facts-tool: usage error: " + std::string(error.what()) + "\n";
+    });
     configureExtract(*app_.add_subcommand(
         "extract", "Extract facts using a stored project configuration"));
     configureImport(*app_.add_subcommand(
@@ -26,7 +31,10 @@ public:
     configureDependency(*analyseCommand_->add_subcommand(
         "dependency", "Build the direct include dependency graph"));
     configureCallGraph(*analyseCommand_->add_subcommand(
-        "call-graph", "Query contextual function call graphs"));
+        "call-graph",
+        "Traverse a contextual function call graph and persist the run in "
+        "the facts database (callgraph_run tables); prints one completion "
+        "line"));
     configureCallGraphEntry(*analyseCommand_->add_subcommand(
         "call-graph-entry", "Inspect one collected function entry"));
     repositoryCommand_ = configureRepository(app_, repository_);
@@ -202,17 +210,6 @@ private:
         ->type_name("FILE");
     configurationOptions(command, callGraph_.configuration,
                          callGraph_.configurationFile);
-    command
-        .add_option("--format", callGraph_.format,
-                    "Output representation: text, json, or mermaid")
-        ->check(CLI::IsMember({"text", "json", "mermaid"}))
-        ->type_name("FORMAT");
-    command
-        .add_option("--edges", callGraph_.edges,
-                    "Presentation of the same stored edges: semantic callable "
-                    "kinds or raw Calls/DispatchCalls")
-        ->check(CLI::IsMember({"semantic", "calls"}))
-        ->type_name("VIEW");
     auto *scope = command.add_option_group("scope", "Select graph roots");
     scope
         ->add_option("--function", callGraph_.function,
@@ -235,9 +232,6 @@ private:
                     "Path selection: shortest or all-simple")
         ->check(CLI::IsMember({"shortest", "all-simple"}))
         ->type_name("MODE");
-    command.add_option(
-        "-o,--output", callGraph_.output,
-        "Atomically replace an output artifact; stdout otherwise");
     configureCallGraphOptions(command, callGraph_);
     command.add_flag("--recover-missing", callGraph_.recoverMissing,
                      "Recover missing project graph evidence");

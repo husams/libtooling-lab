@@ -1,6 +1,8 @@
 """Recovery behavior exercised exclusively through the native command."""
 from pytest_bdd import given, when, then
+from support.callgraph_run import run_count
 from support.recovery import prepare, graph, edge_names, extract, seed_match, success
+from support.recovery_facts import component_tu, component_arguments, facts_snapshot
 
 
 @given("an S-021 app calls an unextracted registered library")
@@ -20,47 +22,43 @@ def complete(context):
 
 @when("S-021 missing recovery is requested")
 def recover(context):
-    context.recovery_result, context.recovery_graph = graph(context)
+    context.recovery_result, context.recovery_run = graph(context, verbosity=1)
 
 
 @then("S-021 recovers the library body with its stored command")
 def recovered(context):
-    result, data = context.recovery_result, context.recovery_graph
+    result, run = context.recovery_result, context.recovery_run
     success(result)
-    assert data["schema_version"] == 1 and data["errors"] == [], data
-    assert {("root", "bridge"), ("bridge", "leaf")} <= edge_names(data), data
-    recovery = data["recovery"]
-    assert recovery["requested"] is True
-    assert not recovery["failed"], recovery
-    attempts = recovery["attempted"]
-    library = [entry for entry in attempts if entry["component"] == "library"]
-    assert library, recovery
-    assert all("-DS021_LIBRARY=1" in entry["arguments"] for entry in library), library
-    assert all(entry["driver"] and isinstance(entry["tu_file_id"], str) and
-               entry["tu_file_id"].isdigit() for entry in library), library
-    expected_cwd = str(context.recovery_sources[1].parent)
-    assert all(entry["working_directory"] == expected_cwd for entry in library), (
-        expected_cwd, [entry["working_directory"] for entry in library])
+    assert {("root", "bridge"), ("bridge", "leaf")} <= edge_names(run), run
+    assert not [row for row in run["recovery"] if row[1] == "failed"], run["recovery"]
+    library_tu = component_tu(context, "library")
+    attempted = [row for row in run["recovery"] if row[1] == "attempted"]
+    assert any(row[0] == library_tu for row in attempted), run["recovery"]
+    assert "-DS021_LIBRARY=1" in component_arguments(context, "library")
     assert "recovery-start" in result.stderr and "recovery-complete" in result.stderr
 
 
 @then("S-021 reuses existing facts without extraction")
 def reused(context):
     success(context.recovery_result)
-    recovery = context.recovery_graph["recovery"]
-    assert recovery["attempted"] == [], recovery
-    assert recovery["reused"], recovery
-    assert ("bridge", "leaf") in edge_names(context.recovery_graph)
+    run = context.recovery_run
+    assert not [row for row in run["recovery"] if row[1] == "attempted"], run["recovery"]
+    assert any(row[1] == "reused" for row in run["recovery"]), run["recovery"]
+    assert ("bridge", "leaf") in edge_names(run)
 
 
 @then("omitting S-021 recovery preserves the partial graph and stores")
 def readonly(context):
-    before = [path.read_bytes() for path in
-              (context.files_database_path, context.facts_database_path)]
-    result, data = graph(context, recover=False)
+    facts = context.facts_database_path
+    project_before = context.files_database_path.read_bytes()
+    facts_before = facts_snapshot(facts)
+    count_before = run_count(facts)
+    result, run = graph(context, recover=False)
     success(result)
-    assert ("root", "bridge") in edge_names(data)
-    assert ("bridge", "leaf") not in edge_names(data)
-    assert before == [path.read_bytes() for path in
-                      (context.files_database_path, context.facts_database_path)]
+    assert ("root", "bridge") in edge_names(run)
+    assert ("bridge", "leaf") not in edge_names(run)
+    assert context.files_database_path.read_bytes() == project_before
+    assert facts_snapshot(facts) == facts_before
+    assert run_count(facts) == count_before + 1
+    assert run["recovery"] == []
     assert "recovery-start" not in result.stderr

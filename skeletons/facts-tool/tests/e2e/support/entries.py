@@ -4,6 +4,8 @@ import json
 import shutil
 import subprocess
 
+from support.callgraph_run import completion, run_row
+from support.callgraph_run_rows import edges as run_edges
 from support.database import require
 
 
@@ -71,7 +73,16 @@ def match(context, expression=None):
 
 
 def graph(context, name, *options):
+    """Persist an `analyse call-graph` run and return its run row, edges and nodes."""
+    root = f"s027::{name}"
     result = succeed(run(context, "analyse", "call-graph", "-v", "0", "--conf",
                          context.files_database_path, "--facts", context.facts_database_path,
-                         "--function", f"s027::{name}", "--format", "json", *options))
-    return json.loads(result.stdout)
+                         "--function", root, *options))
+    run_id, _ = completion(result)
+    facts = context.facts_database_path
+    persisted = run_edges(facts, run_id)
+    nodes = {root}
+    for edge in persisted:
+        nodes.add(edge["source"])
+        nodes.add(edge["target"])
+    return {"run_id": run_id, "row": run_row(facts, run_id), "edges": persisted, "nodes": nodes}

@@ -1,4 +1,5 @@
 #include "commands/analyse/CallGraphRecoveryPassHelpers.h"
+#include "commands/analyse/RecoveryScan.h"
 
 #include <string>
 #include <utility>
@@ -24,6 +25,8 @@ bool processRecoveryProbe(const RecoveryContext &context,
                           const recovery::RequestedUsrs &requested,
                           RecoveryReport &report,
                           recovery::AttemptCache &cache) {
+  candidate.entry.diagnostic =
+      recoveryScanDiagnostics(context, candidate.entry.tuFileId);
   auto probe = probeRecoveryCandidate(context, candidate);
   if (!probe) {
     recordFailure(candidate, key, requested, probe.error(), "probe", report,

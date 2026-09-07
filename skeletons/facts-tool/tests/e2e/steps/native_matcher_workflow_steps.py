@@ -5,6 +5,7 @@ import subprocess
 
 from pytest_bdd import given, then, when
 
+from support import callgraph_run as cg
 from support.database import require
 from support.scenario import FactsToolContext
 
@@ -70,17 +71,18 @@ def paired_direct_call(context: FactsToolContext) -> None:
 
 @then("the native call graph can traverse the matched facts twice")
 def paired_call_graph(context: FactsToolContext) -> None:
-    command = [
-        str(context.facts_tool), "analyse", "call-graph", "-v", "0",
-        "--facts", str(context.facts_database), "--function",
-        "targeted_match::caller",
-    ]
-    first = run(command)
-    second = run(command)
+    facts = context.facts_database_path
+    first = cg.run_graph(context, "--function", "targeted_match::caller", conf=False)
+    second = cg.run_graph(context, "--function", "targeted_match::caller", conf=False)
+    first_id, _ = cg.completion(first)
+    second_id, _ = cg.completion(second)
     require(first.returncode == 0, first.stdout + first.stderr)
     require(second.returncode == 0, second.stdout + second.stderr)
-    require(first.stdout == second.stdout, second.stdout + second.stderr)
-    require("targeted_match::print" in first.stdout, first.stdout)
+    first_edges = cg.edge_names(facts, first_id)
+    second_edges = cg.edge_names(facts, second_id)
+    require(first_edges == second_edges, str((first_edges, second_edges)))
+    require(("targeted_match::caller", "targeted_match::print") in first_edges,
+            str(first_edges))
 
 
 @when("an invalid symbol binding runs with the explicit database pair")

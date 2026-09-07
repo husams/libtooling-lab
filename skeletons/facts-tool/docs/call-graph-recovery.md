@@ -4,7 +4,7 @@ Request recovery explicitly on the native graph command:
 
 ```sh
 facts-tool analyse call-graph --conf project.sqlite --facts facts.sqlite \
-  --function 'app::run' --recover-missing --format json
+  --function 'app::run' --recover-missing
 ```
 
 The ordinary command remains read-only when `--recover-missing` is omitted.
@@ -39,19 +39,29 @@ work is entered only through the explicit recovery request. This change builds
 on the existing S-027 evidence and does not remove its extraction hooks; their
 separate correction must preserve usable ordinary-fact evidence for recovery.
 
-The graph's `recovery` object contains `requested`, `attempted`, `reused`,
-`failed`, and `suppressed`. Candidate entries identify the TU, component, driver,
-working directory, ordered arguments, reason, and relevant symbol USRs. Reused
-entries group symbols under a registered owning TU, including header bodies. Recovery
-progress appears on stderr as `recovery-start` and `recovery-complete`, keeping
-JSON output usable by machine consumers.
-The default text format prints the ordinary graph without a recovery summary;
-use `--format json` to inspect attempted, reused, failed and suppressed entries.
+Every attempted TU is recorded in `callgraph_run_recovery(run_id, tu_file_id,
+outcome, diagnostic)`, one row per TU. `outcome` is `attempted`, `failed`,
+`reused`, or `suppressed`; `diagnostic` holds the reason for that outcome,
+including the captured compiler output when a TU fails to compile. Reused
+outcomes cover symbols grouped under a registered owning TU, including header
+bodies. This table is the durable record; there is no separate JSON
+`recovery` object.
 
-A requested recovery failure exits 1, retains the available partial graph, and
-reports `recovery-failed`. A successful search can still leave an unavailable
-definition boundary; inspect graph coverage rather than interpreting exit 0 as
-proof of complete source coverage.
+Recovery progress (`facts-tool: recovery-start` / `recovery-complete`) is
+printed only at `-v 1` or higher, alongside extraction summaries and compiler
+diagnostics. At `-v 3`, `facts-tool: recovery validation tu=<id> reason=...`
+also appears; use it to synchronise SIGINT during recovery. Without `-v`,
+none of this progress is printed.
+
+A requested recovery failure completes the run with status
+`recovery-failed`, exits 1, and prints exactly one stderr line:
+`facts-tool: recovery failed for N translation unit(s); see
+callgraph_run_recovery run <id>`. The run keeps the edges reached before the
+failing TU (for example root->bridge but not bridge->leaf if the leaf's TU
+failed to compile). A successful search can still leave an unavailable
+definition boundary; read `callgraph_run_recovery` and the persisted edges
+rather than interpreting exit 0 as proof of complete source coverage. See
+[the outcome matrix](call-graph.md) for the full stdout/stderr/exit contract.
 
 Retry tracking exists only during one invocation. Its identity includes the
 canonical store pair, TU, driver, working directory, effective ordered argv,

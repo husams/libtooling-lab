@@ -31,13 +31,6 @@ Select one root by qualified name or USR:
 facts-tool analyse call-graph -f facts.db -c project.db --function app::run
 ```
 
-The default `--edges semantic` view classifies each stored edge as `function`,
-`constructor`, `destructor`, `lambda`, or `virtual_dispatch`. Use
-`--edges calls` for the compatibility view of the underlying `Calls` and
-`DispatchCalls` primitives without semantic classification. Both views keep
-the stored relation kind and traverse the same stored edge set; only their
-presentation differs.
-
 Or list every definition-backed root with calls:
 
 ```text
@@ -62,17 +55,17 @@ count canonical symbol identities, edge budgets count canonical relation keys,
 depth counts call-edge hops, and time uses a monotonic clock. The root counts
 as one node. An exact-depth leaf with no qualifying outgoing edge is complete.
 
-Every reached budget reports its exact reason and discovered-but-unexpanded
-frontier while setting traversal coverage incomplete. SIGINT emits a coherent
-partial result when possible, reports `cancelled`, and exits 130. Filters,
-counters, timers, and cancellation state are released at process exit; neither
-the facts database nor project catalog is used as a result cache.
+Every reached budget records its truncation reason on the persisted run and
+in `callgraph_run_frontier`. SIGINT emits a coherent partial result when
+possible, records status `cancelled`, and exits 130. Filters, counters,
+timers, and cancellation state are released at process exit; neither the
+facts database nor project catalog is used as a result cache.
 
-Structural-budget frontier entries are discovered endpoints that were not
+Structural-budget frontier rows are discovered endpoints that were not
 admitted or expanded. For time limits and cancellation, the frontier also
-includes the admitted node whose expansion stopped and every remaining eligible
-selected root; filtered roots remain in `excluded_scope` instead.
-These controls also apply to reverse callers and path queries.
+includes the admitted node whose expansion stopped and every remaining
+eligible selected root. These controls also apply to reverse callers and path
+queries.
 
 Reverse callers and between-symbol paths are opt-in:
 
@@ -93,107 +86,147 @@ selected. `--direction callers` cannot be combined with `--to`, `--to` cannot
 be combined with `--all`, and `--path-mode` requires `--to`.
 
 `--max-depth N` adds a positive traversal cap. Without it, traversal continues
-until a cycle, a reused context, or an external symbol. External boundaries are
-complete stops and are not reported as truncation. Output ordering is canonical
-and each edge reports relation kind, receiver context, source location, cycle
-reuse, external-boundary, and depth-truncation state.
+until a cycle, a reused context, or an external symbol. External boundaries
+are complete stops and are not reported as truncation. Persisted edges keep
+the stored relation kind, position, source location, and depth; cycle reuse
+is recorded on the edge's `cycle` flag.
 
 `-c/--conf` supplies the matching project catalog. When present, the command
-validates the project/facts file identities, resolves source paths, and reports
-pair-aware extraction evidence. Stored traversal completion remains the
-top-level `complete` value; it never implies extraction coverage. A
-project-local declaration without a stored definition is
-`definition-availability=project-missing`, while a genuinely unavailable
-third-party target remains an `external-boundary`.
+validates the project/facts file identities and resolves source paths for
+recovery. Without `--conf`, roots and recovery are limited to what the facts
+store alone can resolve.
 
-Use `--format json` for the stable `facts-tool.call-graph.v1` representation.
-It contains `complete`, `query`, `coverage`, `truncation`, `excluded_scope`,
-`recovery`, `errors`, `traversal`, `extraction_coverage`, `roots`, `nodes`, and
-`edges`, `edge_view`, `paths`, and `path_result`.
-`query` echoes explicit scope and nullable limits; `truncation` names
-the reason and frontier; `excluded_scope` reports filters plus observed node
-and edge identities/counts.
-`query.mode` is `callees`, `callers`, or `path`; path results distinguish `found`,
-`not_found`, `unknown`, and `truncated`, and each path carries stable string
-node IDs and canonical relation-site edge keys. A `truncated` result can retain
-paths found before the requested cap; it does not imply an empty path array.
-`not_found` is emitted only
-for complete relevant extraction evidence; missing metadata or unresolved
-boundaries remain `unknown`. All query state is request-local and creates no
-cache or schema. Node evidence includes the stable USR, resolved
-declaration path, definition availability, a separate defining path/file/offset
-object, outgoing-call presence, catalog `indexed`/`indexed_at` values,
-freshness, the reserved failure member, coverage state, recommended action,
-and candidate unindexed translation units. Coverage metadata follows the
-definition file when one exists. Edge
-evidence keeps `relation_kind`, `implicit`, receiver name, `receiver_type_id`,
-certainty, source location, cycle, reuse,
-external-boundary, definition-boundary, and depth-truncation flags. Exact
-receiver sites have a concrete receiver identity and certainty `exact`;
-conservative sites use a null receiver identity and certainty `possible`.
-Semantic-view edges additionally include `semantic_kind`; calls-view edges
-omit that derived classification.
+Version 8 extends `relation_site` in place with nullable `receiver_type_id`
+and `certainty` columns. The migration does not rebuild the table or add a
+context table, and it preserves the existing primary and foreign keys.
+Version 12 adds the persisted call-graph run tables described below (see
+[storage schema](storage-schema.md) for the full migration note).
 
-Indirect calls or cleanup actions for which the frontend supplies no resolved
-callable target are printed during extraction as
-`coverage.unsupported_semantics` diagnostics with their registered project-file
-source site. These coverage diagnostics use the logging facility's always-on
-level and therefore remain visible at `--verbose 0`; unregistered system files
-are suppressed. Schema v8 has no persistence field for these diagnostics, so
-JSON reports the coverage member as `not-persisted` with an action to inspect
-extraction diagnostics; it does not claim an empty persisted list is complete.
+## Persisted result contract (facts schema 11 -> 12)
 
-Emitted coverage states are `complete`, `incomplete`, `unknown`, `stale`, or
-`not-applicable`. Missing catalog evidence is reported as `unknown`; it is not
-silently upgraded to complete and does not trigger blind re-extraction when
-definition or call facts already exist. The v1 `failure` member is reserved
-and always null because the current stores persist no extraction-failure
-record. The current import and extract commands also do not stamp `indexed`,
-`indexed_at`, or `mtime`, so ordinary CLI-created pairs remain `unknown` until
-another producer reconciles that catalog metadata. The complete/fresh/stale
-fixtures explicitly simulate those catalog states. Without `--conf`, text
-output retains opaque file identifiers and reports extraction coverage as
-`unknown`.
+`analyse call-graph` no longer prints a text listing, JSON document, or
+Mermaid diagram. It traverses, then persists one append-only run per
+invocation that reaches traversal, and prints exactly one completion line on
+stdout:
 
-Version 8 extends `relation_site` in place with nullable `receiver_type_id` and
-`certainty` columns. The migration does not rebuild the table or add a context
-table, and it preserves the existing primary and foreign keys.
-
-## Portable output and recovery lifecycle
-
-```sh
-facts-tool analyse call-graph --conf project.db --facts facts.db \
-  --function main --recover-missing --format mermaid --output main-callgraph.mmd
+```text
+facts-tool: call graph run <run_id> <status>
 ```
 
-`--format text|json|mermaid` defaults to text. An omitted `--output` writes
-stdout; an explicit file is replaced atomically with a sibling temporary file.
-Input database and registered source aliases are rejected as output targets.
-If `--facts` is omitted, the validated configuration must provide a
-project-scoped `facts_template`; configuration selection is resolved once and
-passed to recovery as a concrete project path.
+`<status>` is one of `complete`, `truncated`, `cancelled`, `recovery-failed`,
+or `failed`. The run is identified only by `<run_id>`; never identify an
+invocation by scanning relation rows, since runs are never rewritten or
+deleted by a later invocation.
 
-For Mermaid file output with recovery, an initial diagram with a visible
-partial/pending label is published before recovery begins. Changed graph
-generations replace that diagram; the final publication reports recovery
-results. There is one native traversal per graph generation, shared by
-recovery selection and rendering. Text and JSON emit one final document.
-Progress uses stderr. A recovery failure leaves a valid diagram labelled
-partial and returns exit 1. Invalid configuration or selectors do not replace
-an existing artifact. A successful stored traversal does not imply complete
-extraction or fresh source evidence.
+### Run tables
 
-If recovery is interrupted, the final artifact retains the last usable graph
-generation and marks it cancelled and incomplete (exit 130). Newly extracted
-facts can remain in the database even when cancellation prevents their graph
-from being traversed; the artifact does not claim to include that later evidence.
-Operational errors in JSON stdout mode produce one JSON error document and
-exit 1 without a duplicate stderr diagnostic.
+| Table | Columns |
+|---|---|
+| `callgraph_run` | `run_id, created_at, project_path, facts_path, mode (callees\|callers\|path), path_mode (shortest\|all-simple\|NULL), calls_scope (all\|project\|library), components (comma-joined selected --component names, '' for all), max_depth, max_nodes, max_edges, time_limit_ms (NULL when not given), recover_missing (0/1), status, truncation_reason (NULL when none), error (NULL when none)` |
+| `callgraph_run_root` | `run_id, symbol_id, usr` — selected roots (all definition roots for `--all`) |
+| `callgraph_run_target` | `run_id, symbol_id, usr` — the `--to` target, when given |
+| `callgraph_run_edge` | `run_id, source_id, destination_id, kind (1=Calls, 18=DispatchCalls), position, file_id, offset, depth, cycle` — only the `relation_site` rows actually reached |
+| `callgraph_run_frontier` | `run_id, symbol_id, reason` |
+| `callgraph_run_recovery` | `run_id, tu_file_id, outcome (attempted\|failed\|reused\|suppressed), diagnostic` |
 
-Mermaid uses pair-scoped stable node IDs and escaped labels. Native edges,
-shared nodes, cycles, callable semantics, and call sites survive rendering.
-Its JSON header comment preserves root USRs, source/facts provenance, coverage,
-selected query controls, frontiers, excluded identities and recovery errors.
-The [runnable skill recipe](../.agents/skills/facts-tool-code-reasoning/references/how-to-build-call-graph.md)
-uses a checked-in fixture; [symbol search](../.agents/skills/facts-tool-code-reasoning/references/how-to-search-symbol.md)
-explains exact selection and match-only index evidence.
+Path mode persists only the edges on found paths; an unreachable target gives
+a run with status `complete` and no edges. Callers mode persists
+reversed-direction reached sites (`source_id` is the caller).
+
+Intentionally **not** persisted: coverage/freshness/definition-availability
+prose, external-boundary/definition-boundary labels, excluded-scope listings,
+pair state, path results as a distinct object, `semantic_kind`, and
+receiver/certainty on edges (join `relation_site` on
+`source_id, destination_id, kind, position, file_id, offset` when a check
+needs receiver, certainty, line, or column).
+
+### Outcome matrix
+
+| Outcome | stdout | stderr without `-v` | stderr with `-v` | exit | run row |
+|---|---|---|---|---|---|
+| complete | completion line | empty | verbose diagnostics only | 0 | yes (status `complete`) |
+| truncated by budget (`--max-depth`/`--max-nodes`/`--max-edges`/`--time-limit-ms`) | completion line | empty | verbose diagnostics only | 0 | yes; `truncation_reason` = `max_depth\|max_nodes\|max_edges\|time_limit`; frontier rows carry that reason |
+| usage error (unknown option, `--format`/`--output`, bad selector, `--to` with `--all`, invalid budget value, unknown `--component`) | empty | one `facts-tool: usage error: ...` line | same line plus verbose | 2 | no |
+| configuration error (missing `--conf`, `--recover-missing` without a project configuration, `--component`/`--calls-scope` without a project/facts pair) | empty | one `facts-tool: configuration error: ...` line | same line plus verbose | 3 | no |
+| database or operational error before traversal (missing facts db, no call facts for `--all`, invalid relation-site receiver context) | empty | one line | same line plus verbose | 1 | no |
+| recovery failure (`--recover-missing`, a TU fails to compile) | completion line (status `recovery-failed`) | one `facts-tool: recovery failed for N translation unit(s); see callgraph_run_recovery run <id>` line | same line plus verbose | 1 | yes; `callgraph_run_recovery` has `outcome=failed` for that TU with the compiler diagnostic in `diagnostic`; the run keeps edges reached before the failure |
+| operational failure after traversal started (status `failed`) | completion line | one line | same line plus verbose | 1 | yes; `error` column set |
+| cancellation before traversal (SIGINT at the checkpoint after root selection) | empty | one `facts-tool: cancelled before traversal` line | same line plus verbose | 130 | no |
+| cancellation during traversal or recovery | completion line (status `cancelled`) | one `facts-tool: cancelled; run <id> keeps the last usable generation` line | same line plus verbose | 130 | yes; `truncation_reason=cancelled`, a frontier row with reason `cancelled`, edges of the last usable generation |
+| final commit failure (e.g. facts store read-only) | empty | one `facts-tool: cannot persist call graph run: <SQLite text>` line | same line plus verbose | 1 | no run and no child rows |
+
+A `--conf` path that does not exist is reported the way every other command
+reports it, as a database error (`project configuration database not found`,
+exit 1), not as a configuration error.
+
+Without `-v`, stderr never carries more than one line. With `-v`, that same
+single error or summary line is present alongside verbose lines. stdout never
+carries anything but the completion line or `--help` text.
+
+At `-v 1` stderr adds `facts-tool: call-graph: starting`, `facts-tool: roots
+selected`, `facts-tool: graph traversal`, recovery progress, compiler
+diagnostics, and `facts-tool: call-graph: complete|failed`. `roots selected`
+is emitted before the pre-traversal cancellation checkpoint, so a
+cancellation there still shows which roots were selected. At `-v 2`, one
+`facts-tool: root name='..' usr='..'` line follows per selected root. `-v 3`
+adds trace detail including the recovery-validation line described in
+[recovery](call-graph-recovery.md).
+
+### Persistence rules
+
+- Pre-traversal errors (usage, configuration, and most database/operational
+  errors) write no run at all.
+- A successful invocation writes its run in one transaction at the end;
+  nothing is written incrementally during traversal.
+- If that final commit fails (for example a read-only facts store), no run
+  and no child rows are written; stderr reports
+  `facts-tool: cannot persist call graph run: <SQLite text>` and the process
+  exits 1.
+- There are two cancellation checkpoints: one immediately after root
+  selection (no run, exit 130) and one during traversal or recovery (a run
+  with status `cancelled` covering the last usable generation, exit 130).
+
+## Reading a run back
+
+Graph results are never printed as text, JSON, or Mermaid; read them from the
+facts SQLite database with Python:
+
+```python
+import sqlite3
+
+run_id = 1  # from "facts-tool: call graph run 1 complete"
+conn = sqlite3.connect("facts.db")
+
+edges = conn.execute(
+    "SELECT source_id, destination_id, kind, file_id, offset, depth "
+    "FROM callgraph_run_edge WHERE run_id = ?",
+    (run_id,),
+).fetchall()
+```
+
+The same `SELECT ... WHERE run_id = ?` pattern applies to
+`callgraph_run_recovery` (`tu_file_id, outcome, diagnostic`) and
+`callgraph_run_frontier` (`symbol_id, reason`). Join `symbol` on
+`source_id`/`destination_id` for qualified names, and join `relation_site` on
+`(source_id, destination_id, kind, position, file_id, offset)` for receiver
+name and certainty:
+
+```python
+named = conn.execute(
+    """
+    SELECT s1.qualified_name, s2.qualified_name, e.kind, e.depth
+    FROM callgraph_run_edge e
+    JOIN symbol s1 ON s1.id = e.source_id
+    JOIN symbol s2 ON s2.id = e.destination_id
+    WHERE e.run_id = ?
+    ORDER BY e.depth
+    """,
+    (run_id,),
+).fetchall()
+```
+
+See the
+[runnable skill recipe](../.agents/skills/facts-tool-code-reasoning/references/how-to-build-call-graph.md)
+for a fixture-backed walkthrough, and
+[symbol search](../.agents/skills/facts-tool-code-reasoning/references/how-to-search-symbol.md)
+for exact selection and match-only index evidence.

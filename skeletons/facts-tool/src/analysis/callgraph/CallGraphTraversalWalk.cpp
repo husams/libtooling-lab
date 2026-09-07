@@ -51,7 +51,7 @@ void TraversalEngine::walk(const QueryNode &source, const QueryContext &current,
   }
 }
 
-RenderedGraph
+TraversalResult
 TraversalEngine::run(const std::vector<const QueryNode *> &roots) {
   result_.scope = request_.scope;
   result_.limits = request_.limits;

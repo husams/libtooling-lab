@@ -24,11 +24,14 @@ std::expected<RecoveryAttemptResult, std::string> extractRecoveryCandidate(
   auto pairing = prepareFactPairForWrite(options.facts, context.project);
   if (!pairing)
     return std::unexpected(pairing.error());
-  FactStore store(options.facts, options.verbosity);
+  // Extraction summaries, coverage notices and indexing diagnostics are
+  // verbose-only inside a graph run; the run tables keep the durable form.
+  const bool verbose = options.verbosity >= 1;
+  FactStore store(options.facts, verbose ? options.verbosity : -1);
   if (auto begun = store.begin(); !begun)
     return std::unexpected("cannot begin recovery transaction: " +
                            begun.error().message());
-  IndexingStatus status;
+  IndexingStatus status{verbose};
   for (const auto &unit : scan->second->units)
     traverse(unit->getASTContext(), **files, store, status);
   if (!status.complete()) {
@@ -55,7 +58,7 @@ std::expected<RecoveryAttemptResult, std::string> extractRecoveryCandidate(
                              published.error().message());
     }
   }
-  if (auto ended = store.end(); !ended)
+  if (auto ended = store.end(verbose); !ended)
     return std::unexpected("cannot commit recovery transaction: " +
                            ended.error().message());
   return RecoveryAttemptResult{true, "recovered"};

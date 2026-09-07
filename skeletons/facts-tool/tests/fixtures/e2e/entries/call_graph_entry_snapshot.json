@@ -1,0 +1,125 @@
+{
+ "help": "Inspect one collected function entry\n\n\nfacts-tool analyse call-graph-entry [OPTIONS]\n\n\nOPTIONS:\n  -h,     --help              Print this help message and exit\n  -v,     --verbose LEVEL:INT in [0 - 3] [1]  \n                              Verbosity level: 0=quiet, 1=stages, 2=details, 3=trace; defaults\n                              to 1 when omitted\n  -f,     --facts FILE REQUIRED \n                              SQLite facts database\n  -c,     --conf FILE         Direct project DB: overrides FACTS_TOOL_CONF and generated\n                              naming/ownership; compiler extras use YAML when CLI --extra-arg\n                              is omitted\n          --config FILE       YAML defaults (yaml-cpp 0.9.0); every explicitly supplied CLI\n                              value overrides its YAML value, while omitted CLI values fall\n                              back. Files merge per key, highest precedence first:\n                              --config/FACTS_TOOL_CONFIG file, the nearest project\n                              .facts-tool.yaml, then the user file at\n                              XDG_CONFIG_HOME/facts-tool/config.yaml or\n                              HOME/.config/facts-tool/config.yaml; explicit --extra-arg\n                              occurrences replace the complete YAML extra_args list. Without\n                              CLI extras, YAML tokens concatenate user, then project, then\n                              selected file. Built-ins: XDG_DATA_HOME/facts-tool or\n                              HOME/.local/share/facts-tool,\n                              conf_template={relative_path}/{filename}.db, and extra_args=[].\n                              Placeholders in conf_template/facts_template: {project_root},\n                              {project_name}, {relative_path}, {filename}, {user}, and\n                              ${ENV_NAME}. facts_template supplies --output/-o, --facts/-f when\n                              omitted. Use config show for per-key provenance without mutation.\n          --function SELECTOR REQUIRED \n                              Qualified function name or USR\n          --format FORMAT:{text,json} \n                              Output representation: text or json\n",
+ "outputs": {
+  "boundary-json-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"reconcile-coverage-metadata\",\"catalog_indexed\":false,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":0},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[{\"external_symbol_id\":\"12884901889\",\"name\":\"s027::external\",\"site\":{\"column\":25,\"destination_id\":\"12884901889\",\"file_id\":1,\"kind\":1,\"line\":16,\"offset\":329,\"position\":0,\"source_id\":\"4294967301\"},\"symbol_id\":\"12884901889\",\"usr\":\"c:@N@s027@F@external#\"}],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[\"{root}/library/library.cpp\"],\"state\":\"incomplete\"},\"graph_node_ref\":\"4294967301\",\"is_leaf\":false,\"pair\":{\"state\":\"validated\"},\"schema_version\":1,\"symbol_id\":\"4294967301\",\"usr\":\"c:@N@s027@F@boundary#\"}\n"
+  },
+  "boundary-json-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"supply-project-conf\",\"catalog_indexed\":null,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":0},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[{\"external_symbol_id\":\"12884901889\",\"name\":\"s027::external\",\"site\":{\"column\":25,\"destination_id\":\"12884901889\",\"file_id\":1,\"kind\":1,\"line\":16,\"offset\":329,\"position\":0,\"source_id\":\"4294967301\"},\"symbol_id\":\"12884901889\",\"usr\":\"c:@N@s027@F@external#\"}],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[],\"state\":\"unknown\"},\"graph_node_ref\":\"4294967301\",\"is_leaf\":false,\"pair\":{\"state\":\"unavailable\"},\"schema_version\":1,\"symbol_id\":\"4294967301\",\"usr\":\"c:@N@s027@F@boundary#\"}\n"
+  },
+  "boundary-text-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967301 usr=c:@N@s027@F@boundary# entry_available=true graph_node_ref=4294967301 is_leaf=false\nexternal_targets=1 pair=validated definition_availability=available extraction_coverage=incomplete freshness=unknown unresolved_targets=0\n"
+  },
+  "boundary-text-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967301 usr=c:@N@s027@F@boundary# entry_available=true graph_node_ref=4294967301 is_leaf=false\nexternal_targets=1 pair=unavailable definition_availability=available extraction_coverage=unknown freshness=unknown unresolved_targets=0\n"
+  },
+  "cycle_a-json-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"reconcile-coverage-metadata\",\"catalog_indexed\":false,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":0},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[\"{root}/library/library.cpp\"],\"state\":\"unknown\"},\"graph_node_ref\":\"4294967300\",\"is_leaf\":false,\"pair\":{\"state\":\"validated\"},\"schema_version\":1,\"symbol_id\":\"4294967300\",\"usr\":\"c:@N@s027@F@cycle_a#I#\"}\n"
+  },
+  "cycle_a-json-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"supply-project-conf\",\"catalog_indexed\":null,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":0},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[],\"state\":\"unknown\"},\"graph_node_ref\":\"4294967300\",\"is_leaf\":false,\"pair\":{\"state\":\"unavailable\"},\"schema_version\":1,\"symbol_id\":\"4294967300\",\"usr\":\"c:@N@s027@F@cycle_a#I#\"}\n"
+  },
+  "cycle_a-text-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967300 usr=c:@N@s027@F@cycle_a#I# entry_available=true graph_node_ref=4294967300 is_leaf=false\nexternal_targets=0 pair=validated definition_availability=available extraction_coverage=unknown freshness=unknown unresolved_targets=0\n"
+  },
+  "cycle_a-text-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967300 usr=c:@N@s027@F@cycle_a#I# entry_available=true graph_node_ref=4294967300 is_leaf=false\nexternal_targets=0 pair=unavailable definition_availability=available extraction_coverage=unknown freshness=unknown unresolved_targets=0\n"
+  },
+  "external-json-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"extract-candidate-translation-unit\",\"catalog_indexed\":false,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"incomplete\",\"unresolved_targets\":0},\"definition_availability\":\"project-missing\",\"entry_available\":false,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[\"{root}/library/library.cpp\"],\"state\":\"incomplete\"},\"graph_node_ref\":null,\"is_leaf\":null,\"pair\":{\"state\":\"validated\"},\"schema_version\":1,\"symbol_id\":\"12884901889\",\"usr\":\"c:@N@s027@F@external#\"}\n"
+  },
+  "external-json-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"supply-project-conf\",\"catalog_indexed\":null,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":0},\"definition_availability\":\"unknown\",\"entry_available\":false,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[],\"state\":\"unknown\"},\"graph_node_ref\":null,\"is_leaf\":null,\"pair\":{\"state\":\"unavailable\"},\"schema_version\":1,\"symbol_id\":\"12884901889\",\"usr\":\"c:@N@s027@F@external#\"}\n"
+  },
+  "external-text-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=12884901889 usr=c:@N@s027@F@external# entry_available=false graph_node_ref=null is_leaf=null\nexternal_targets=0 pair=validated definition_availability=project-missing extraction_coverage=incomplete freshness=unknown unresolved_targets=0\n"
+  },
+  "external-text-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=12884901889 usr=c:@N@s027@F@external# entry_available=false graph_node_ref=null is_leaf=null\nexternal_targets=0 pair=unavailable definition_availability=unknown extraction_coverage=unknown freshness=unknown unresolved_targets=0\n"
+  },
+  "indirect-json-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"reconcile-coverage-metadata\",\"catalog_indexed\":false,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":1},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[\"{root}/library/library.cpp\"],\"state\":\"unknown\"},\"graph_node_ref\":\"4294967302\",\"is_leaf\":false,\"pair\":{\"state\":\"validated\"},\"schema_version\":1,\"symbol_id\":\"4294967302\",\"usr\":\"c:@N@s027@F@indirect#*FI()#\"}\n"
+  },
+  "indirect-json-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"supply-project-conf\",\"catalog_indexed\":null,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":1},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[],\"state\":\"unknown\"},\"graph_node_ref\":\"4294967302\",\"is_leaf\":false,\"pair\":{\"state\":\"unavailable\"},\"schema_version\":1,\"symbol_id\":\"4294967302\",\"usr\":\"c:@N@s027@F@indirect#*FI()#\"}\n"
+  },
+  "indirect-text-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967302 usr=c:@N@s027@F@indirect#*FI()# entry_available=true graph_node_ref=4294967302 is_leaf=false\nexternal_targets=0 pair=validated definition_availability=available extraction_coverage=unknown freshness=unknown unresolved_targets=1\n"
+  },
+  "indirect-text-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967302 usr=c:@N@s027@F@indirect#*FI()# entry_available=true graph_node_ref=4294967302 is_leaf=false\nexternal_targets=0 pair=unavailable definition_availability=available extraction_coverage=unknown freshness=unknown unresolved_targets=1\n"
+  },
+  "leaf-json-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"reconcile-coverage-metadata\",\"catalog_indexed\":false,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":0},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[\"{root}/library/library.cpp\"],\"state\":\"unknown\"},\"graph_node_ref\":\"4294967296\",\"is_leaf\":true,\"pair\":{\"state\":\"validated\"},\"schema_version\":1,\"symbol_id\":\"4294967296\",\"usr\":\"c:@N@s027@F@leaf#\"}\n"
+  },
+  "leaf-json-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"supply-project-conf\",\"catalog_indexed\":null,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":0},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[],\"state\":\"unknown\"},\"graph_node_ref\":\"4294967296\",\"is_leaf\":true,\"pair\":{\"state\":\"unavailable\"},\"schema_version\":1,\"symbol_id\":\"4294967296\",\"usr\":\"c:@N@s027@F@leaf#\"}\n"
+  },
+  "leaf-text-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967296 usr=c:@N@s027@F@leaf# entry_available=true graph_node_ref=4294967296 is_leaf=true\nexternal_targets=0 pair=validated definition_availability=available extraction_coverage=unknown freshness=unknown unresolved_targets=0\n"
+  },
+  "leaf-text-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967296 usr=c:@N@s027@F@leaf# entry_available=true graph_node_ref=4294967296 is_leaf=true\nexternal_targets=0 pair=unavailable definition_availability=available extraction_coverage=unknown freshness=unknown unresolved_targets=0\n"
+  },
+  "left-json-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"reconcile-coverage-metadata\",\"catalog_indexed\":false,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":0},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[\"{root}/library/library.cpp\"],\"state\":\"unknown\"},\"graph_node_ref\":\"4294967298\",\"is_leaf\":false,\"pair\":{\"state\":\"validated\"},\"schema_version\":1,\"symbol_id\":\"4294967298\",\"usr\":\"c:@N@s027@F@left#\"}\n"
+  },
+  "left-json-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "{\"coverage\":{\"action\":\"supply-project-conf\",\"catalog_indexed\":null,\"catalog_mtime\":null,\"failure\":null,\"freshness\":\"unknown\",\"indexed_at\":null,\"state\":\"unknown\",\"unresolved_targets\":0},\"definition_availability\":\"available\",\"entry_available\":true,\"external_targets\":[],\"extraction_coverage\":{\"failure\":null,\"recovery_candidates\":[],\"state\":\"unknown\"},\"graph_node_ref\":\"4294967298\",\"is_leaf\":false,\"pair\":{\"state\":\"unavailable\"},\"schema_version\":1,\"symbol_id\":\"4294967298\",\"usr\":\"c:@N@s027@F@left#\"}\n"
+  },
+  "left-text-conf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967298 usr=c:@N@s027@F@left# entry_available=true graph_node_ref=4294967298 is_leaf=false\nexternal_targets=0 pair=validated definition_availability=available extraction_coverage=unknown freshness=unknown unresolved_targets=0\n"
+  },
+  "left-text-noconf": {
+   "exit": 0,
+   "stderr": "",
+   "stdout": "symbol_id=4294967298 usr=c:@N@s027@F@left# entry_available=true graph_node_ref=4294967298 is_leaf=false\nexternal_targets=0 pair=unavailable definition_availability=available extraction_coverage=unknown freshness=unknown unresolved_targets=0\n"
+  }
+ }
+}

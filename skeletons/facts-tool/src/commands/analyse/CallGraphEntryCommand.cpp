@@ -65,7 +65,7 @@ runCallGraphEntry(const cli::CallGraphEntryOptions &options) {
                                }) &&
                   (*selected)->unresolved == 0;
               if (coverage) {
-                const auto traversal = callgraph::renderCallGraph(
+                const auto traversal = callgraph::traverseCallGraph(
                     graph, {*selected}, std::nullopt, &*coverage);
                 record.aggregateCoverage = callgraph::summarizeCoverage(
                     *coverage, graph, traversal.nodes);

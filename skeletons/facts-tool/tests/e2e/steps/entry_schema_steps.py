@@ -18,7 +18,7 @@ def migration(context):
         connection.execute("DROP TABLE facts_project_provenance")
         connection.execute("PRAGMA user_version=10")
     succeed(match(context, 'functionDecl(hasName("absent_s027")).bind("symbol")'))
-    require(query(database, "PRAGMA user_version") == [(11,)], "wrong migration version")
+    require(query(database, "PRAGMA user_version") == [(12,)], "wrong migration version")
     require(query(database, "SELECT * FROM callgraph_entry") == [], "migration inferred entries")
     require(query(database, "SELECT * FROM callgraph_external_reference") == [],
             "migration inferred external references")
@@ -59,7 +59,7 @@ def readonly(context):
 @then("S-027 tables have exactly their contracted columns and cascading references")
 def schema(context):
     database = context.facts_database_path
-    require(query(database, "PRAGMA user_version") == [(11,)], "wrong facts version")
+    require(query(database, "PRAGMA user_version") == [(12,)], "wrong facts version")
     for table, columns in (
         ("callgraph_entry", ["symbol_id", "graph_node_ref"]),
         ("callgraph_external_reference", ["source_id", "destination_id", "kind",

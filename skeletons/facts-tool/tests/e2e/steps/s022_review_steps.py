@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pytest_bdd import then
 
-from support.database import require
+from support.database import query, require
 from support.scenario import FactsToolContext
 from support.s022 import graph, named_edges
 
@@ -63,13 +63,12 @@ def implicit_and_raw(context: FactsToolContext) -> None:
     semantic = graph(context, "s022_fixture::implicitConstruction")
     targets = {edge["target_id"] for edge in semantic["edges"]
                if edge["depth"] == 1 and edge["semantic_kind"] == "constructor"}
-    constructors = [node for node in semantic["nodes"] if node["id"] in targets]
-    require(len(constructors) == 2 and all(node["facts"]["implicit"] and
-            node["definition_availability"] == "available"
-            for node in constructors), str(constructors))
-    require(semantic["extraction_coverage"]["state"] != "incomplete",
-            str(semantic["extraction_coverage"]))
-    raw = graph(context, "s022_fixture::run", "calls")
-    require(raw["edge_view"] == "calls" and
-            len(raw["edges"]) == len(graph(context, "s022_fixture::run")["edges"]) and
-            all("semantic_kind" not in edge for edge in raw["edges"]), str(raw))
+    require(len(targets) == 2, str(targets))
+    facts = context.facts_database_path
+    placeholders = ",".join("?" * len(targets))
+    implicit_flags = query(facts, f"SELECT is_implicit FROM symbol WHERE id IN "
+                           f"({placeholders})", tuple(targets))
+    require(all(flag for (flag,) in implicit_flags), str(implicit_flags))
+    raw = graph(context, "s022_fixture::run")
+    require(all(edge["relation_kind"] in {"Calls", "DispatchCalls"}
+               for edge in raw["edges"]), str(raw["edges"]))

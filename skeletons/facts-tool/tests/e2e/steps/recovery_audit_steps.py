@@ -1,7 +1,8 @@
 """Observe committed body generation, rather than trusting progress counters."""
 import sqlite3
 from pytest_bdd import given, then
-from support.recovery import extract, success
+from support.recovery import extract, success, edge_names
+from support.recovery_facts import component_tu, has_definition
 
 
 @given("S-021 body generation is recorded by the fixture")
@@ -36,13 +37,13 @@ def absent(context):
 @then("S-021 keeps an honest unavailable definition boundary")
 def unavailable(context):
     success(context.recovery_result)
-    data = context.recovery_graph
-    assert not data["recovery"]["failed"], data
-    bridge = next(node for node in data["nodes"] if node["name"] == "bridge")
-    assert bridge["definition_availability"] != "available", bridge
-    attempts = data["recovery"]["attempted"]
-    assert any(entry["component"] == "library" for entry in attempts), attempts
-    assert len({entry["tu_file_id"] for entry in attempts}) == len(attempts), attempts
+    run = context.recovery_run
+    assert not [row for row in run["recovery"] if row[1] == "failed"], run["recovery"]
+    assert not has_definition(context.facts_database_path, "bridge")
+    attempted = [row for row in run["recovery"] if row[1] == "attempted"]
+    library_tu = component_tu(context, "library")
+    assert any(row[0] == library_tu for row in attempted), attempted
+    assert len({row[0] for row in attempted}) == len(attempted), attempted
 
 
 @given("the S-021 app needs two definitions in the same library TU")
@@ -63,9 +64,8 @@ def same_component(context):
 
 @then("S-021 finds the same-component definition without extracting unrelated TUs")
 def same_component_found(context):
-    from support.recovery import edge_names
     success(context.recovery_result)
-    assert ("bridge", "leaf") in edge_names(context.recovery_graph)
+    assert ("bridge", "leaf") in edge_names(context.recovery_run)
     with sqlite3.connect(context.facts_database_path) as db:
         names = [row[0] for row in db.execute("SELECT name FROM s021_generation")]
     assert sorted(names) == ["bridge", "leaf"], names

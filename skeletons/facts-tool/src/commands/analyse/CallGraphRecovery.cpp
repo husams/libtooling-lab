@@ -1,7 +1,7 @@
 #include "commands/analyse/CallGraphCancellation.h"
 #include "commands/analyse/CallGraphRecoverySelection.h"
 #include "commands/analyse/CallGraphRecoveryState.h"
-#include <iostream>
+#include "cli/Verbose.h"
 
 namespace facts::commands {
 std::expected<RecoveryResult, std::string>
@@ -10,7 +10,6 @@ recoverCallGraph(const cli::CallGraphOptions &options,
                  std::optional<callgraph::CoverageReport> coverage,
                  std::span<const SymbolId> roots, RecoveryObserver observe) {
   RecoveryResult result{std::move(graph), std::move(coverage), {}};
-  result.report.requested = true;
   auto reachable =
       observe ? observe(result)
               : std::expected<std::vector<SymbolId>, std::string>{
@@ -19,11 +18,11 @@ recoverCallGraph(const cli::CallGraphOptions &options,
     return std::unexpected(reachable.error());
   if (CallGraphCancellation::cancelled())
     return result;
-  std::cerr << "facts-tool: recovery-start\n";
+  cli::logVerbose(options.verbosity, 1, "facts-tool: recovery-start");
   auto context = loadRecoveryContext(options);
   if (!context) {
     recoveryFailure(result.report, context.error());
-    std::cerr << "facts-tool: recovery-complete\n";
+    cli::logVerbose(options.verbosity, 1, "facts-tool: recovery-complete");
     return result;
   }
   preserveRecoveryEvidence(*context, result, roots, false, options.maxDepth);
@@ -77,7 +76,7 @@ recoverCallGraph(const cli::CallGraphOptions &options,
       return std::unexpected(reachable.error());
   }
   result.report.reused = collectRecoveryReuseReport(*context, result.graph);
-  std::cerr << "facts-tool: recovery-complete\n";
+  cli::logVerbose(options.verbosity, 1, "facts-tool: recovery-complete");
   return result;
 }
 } // namespace facts::commands

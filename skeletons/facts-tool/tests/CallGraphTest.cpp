@@ -1,7 +1,9 @@
 #include "analysis/callgraph/CallGraphQuery.h"
 #include "analysis/callgraph/CallGraphTraversal.h"
 
+#include <algorithm>
 #include <iostream>
+#include <ranges>
 #include <string>
 
 namespace {
@@ -52,29 +54,36 @@ int main() {
                "name and USR selectors disagree") ||
       !require(all && all->size() == 3, "all roots omit call-free definitions"))
     return 1;
-  const auto complete = facts::callgraph::renderCallGraph(
+  const auto complete = facts::callgraph::traverseCallGraph(
       value, *byName, facts::callgraph::TraversalRequest{});
-  if (!require(complete.text.find("cycle=true") != std::string::npos,
+  const auto anyEdge = [](const auto &result, auto predicate) {
+    return std::ranges::any_of(result.edges, predicate);
+  };
+  const auto targets = [](const auto &result, facts::SymbolId id) {
+    return std::ranges::any_of(result.edges, [&](const auto &value) {
+      return value.edge.destination == id;
+    });
+  };
+  if (!require(anyEdge(complete, [](const auto &e) { return e.cycle; }),
                "recursive cycle was not reported") ||
-      !require(complete.text.find("external-boundary=true") !=
-                   std::string::npos,
+      !require(anyEdge(complete,
+                       [](const auto &e) { return e.externalBoundary; }),
                "external boundary was not reported") ||
       !require(complete.truncated == 0, "default traversal was truncated"))
     return 1;
   facts::callgraph::TraversalRequest boundedRequest;
   boundedRequest.limits.depth = 1;
   const auto bounded =
-      facts::callgraph::renderCallGraph(value, *byName, boundedRequest);
+      facts::callgraph::traverseCallGraph(value, *byName, boundedRequest);
   auto contextual = contextualGraph();
   auto contextualRoot =
       facts::callgraph::selectRoots(contextual, "entry", false);
-  const auto rendered = facts::callgraph::renderCallGraph(
+  const auto rendered = facts::callgraph::traverseCallGraph(
       contextual, *contextualRoot, facts::callgraph::TraversalRequest{});
   return require(bounded.truncated == 1 &&
-                     bounded.text.find("depth-truncated=true") !=
-                         std::string::npos &&
-                     rendered.text.find("target=x") != std::string::npos &&
-                     rendered.text.find("target=y") == std::string::npos,
+                     anyEdge(bounded,
+                             [](const auto &e) { return e.depthTruncated; }) &&
+                     targets(rendered, {2, 3}) && !targets(rendered, {2, 4}),
                  "explicit depth was not distinguished")
              ? 0
              : 1;

@@ -10,11 +10,14 @@ def application(context):
     succeed(extract(context))
 
 
+def _shared_target_ids(document):
+    return {edge["target_id"] for edge in document["edges"] if edge["target"] == "s027::shared"}
+
+
 @then("S-027 entries reuse shared nodes and preserve generated leaves")
 def shared(context):
     left, right = graph(context, "left"), graph(context, "right")
-    shared_ids = [{node["id"] for node in value["nodes"]
-                   if node["name"] == "s027::shared"} for value in (left, right)]
+    shared_ids = [_shared_target_ids(value) for value in (left, right)]
     require(shared_ids[0] == shared_ids[1] and len(shared_ids[0]) == 1, str(shared_ids))
     leaf = lookup(context, "leaf")
     require(leaf["entry_available"] and leaf["is_leaf"] is True, str(leaf))
@@ -23,8 +26,7 @@ def shared(context):
     require(lookup(context, leaf["usr"]) == leaf, "USR lookup differs")
     require(graph(context, "leaf")["edges"] == [], "fabricated leaf call")
     cycle = graph(context, "cycle_a")
-    require({"s027::cycle_a", "s027::cycle_b"}.issubset(
-        {node["name"] for node in cycle["nodes"]}), str(cycle))
+    require({"s027::cycle_a", "s027::cycle_b"}.issubset(cycle["nodes"]), str(cycle))
 
 
 @then("repeated S-027 extraction is idempotent")
@@ -32,8 +34,9 @@ def idempotent(context):
     before = graph(context, "left")
     entry = lookup(context)
     succeed(extract(context))
-    require(graph(context, "left") == before and lookup(context) == entry,
-            "repeated generation changed shared identity or relations")
+    after = graph(context, "left")
+    require(after["edges"] == before["edges"] and after["nodes"] == before["nodes"] and
+            lookup(context) == entry, "repeated generation changed shared identity or relations")
     rows = query(context.facts_database_path,
                  "SELECT symbol_id,graph_node_ref FROM callgraph_entry")
     require(len(rows) == len(set(rows)), str(rows))
@@ -70,4 +73,5 @@ def coverage(context):
     require(entry["entry_available"] and entry["coverage"]["freshness"] == "unknown",
             str(entry))
     partial = graph(context, "left", "--max-depth", "1")
-    require(partial["truncated"] > 0 and lookup(context, "left") == entry, str(partial))
+    require(partial["row"]["status"] == "truncated" and
+            lookup(context, "left") == entry, str(partial))

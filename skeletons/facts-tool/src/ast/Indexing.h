@@ -62,6 +62,9 @@ withContext(std::expected<Value, Error> result, std::string_view context) {
 
 class IndexingStatus {
 public:
+  // A quiet status still counts failures; it only skips the stderr notice.
+  explicit IndexingStatus(bool report = true) : report_(report) {}
+
   void record(IndexingResult result) {
     if (result) {
       return;
@@ -70,7 +73,7 @@ public:
     ++failureCount_;
     const auto &error = result.error();
     const auto &key = error.category.empty() ? error.message : error.category;
-    if (reported_.insert(key).second) {
+    if (reported_.insert(key).second && report_) {
       llvm::errs() << "facts-tool: indexing incomplete: " << error.message
                    << '\n';
     }
@@ -81,6 +84,7 @@ public:
   [[nodiscard]] std::size_t failureCount() const { return failureCount_; }
 
 private:
+  bool report_ = true;
   std::size_t failureCount_ = 0;
   std::unordered_set<std::string> reported_;
 };
