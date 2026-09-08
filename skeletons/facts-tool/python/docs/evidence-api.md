@@ -23,8 +23,11 @@ offset and size, lowercase SHA-256, symbol kind, freshness, and an optional
 bounded `text` value. The SDK hashes the file in streaming chunks and seeks
 only the requested range. A changed, truncated, missing, invalid-UTF8, or
 unavailable source is returned with `stale` or `unavailable` freshness and a
-reason; no guessed text is returned. `limit` and `after_id` apply stable
-numeric paging, while `max_bytes` bounds each requested region.
+reason; no guessed text is returned. The resolved file path must match the
+capture path recorded in `facts_project_provenance`, so an identical file in
+another checkout is unavailable rather than falsely current. `limit` and
+`after_id` apply stable numeric paging, while `max_bytes` bounds each
+requested region.
 
 Evidence methods raise `E_CAPABILITY` for schema 10–12, `E_IDENTITY` for an
 ambiguous symbol, and `E_LIMIT` for invalid page or byte bounds. Existing graph

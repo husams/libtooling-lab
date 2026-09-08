@@ -10,6 +10,13 @@ def _symbol_id(value: object) -> int:
     return SymbolId.unpack(int(cast(int, value))).packed
 
 
+def _capture_path(db: sqlite3.Connection, file_id: int) -> str | None:
+    row = db.execute(
+        "SELECT path FROM facts_project_provenance WHERE file_id=?", (file_id,)
+    ).fetchone()
+    return None if row is None else str(row[0])
+
+
 def load_expression_occurrences(
     db: sqlite3.Connection, files: FileResolver
 ) -> list[Row]:
@@ -37,6 +44,7 @@ def load_expression_occurrences(
                 "target_id": None if target is None else _symbol_id(target),
                 "target": row.pop("target_name"),
                 "file": files.path(int(row["file_id"]), required=False),
+                "_capture_path": _capture_path(db, int(row["file_id"])),
                 "_db_id": occurrence_id,
                 "_key": logical_id("expression_occurrence", occurrence_id),
                 "_view": "expression_occurrence",
@@ -62,6 +70,7 @@ def load_source_regions(db: sqlite3.Connection, files: FileResolver) -> list[Row
                 "symbol_id": _symbol_id(row["symbol_id"]),
                 "symbol": row.pop("symbol_name"),
                 "file": files.path(int(row["file_id"]), required=False),
+                "_capture_path": _capture_path(db, int(row["file_id"])),
                 "_db_id": region_id,
                 "_key": logical_id("source_region", region_id),
                 "_view": "source_region",

@@ -65,3 +65,21 @@ def test_schema13_missing_cross_checkout_and_size_outcomes(schema13_pair, tmp_pa
             cb.source_regions("app::run", include_text=True).rows[0]["freshness"]
             == "unavailable"
         )
+
+
+def test_schema13_same_content_cross_checkout_is_unavailable(schema13_pair, tmp_path):
+    facts, project, source = schema13_pair
+    other = tmp_path / "other-checkout" / "src"
+    other.mkdir(parents=True)
+    alternate = other / "main.cpp"
+    alternate.write_bytes(source.read_bytes())
+    with sqlite3.connect(project) as database:
+        database.execute("UPDATE clone SET path=?", (str(other.parent),))
+    with open_codebase(facts_db=facts, project_db=project) as cb:
+        regions = cb.source_regions("app::run", include_text=True)
+        expressions = cb.expression_occurrences("app::run")
+        assert regions.unknown and expressions.unknown
+        assert regions.rows[0]["freshness"] == "unavailable"
+        assert all(row["freshness"] == "unavailable" for row in expressions)
+        assert "checkout" in regions.rows[0]["unavailable_reason"]
+        assert "checkout" in expressions.rows[0]["unavailable_reason"]

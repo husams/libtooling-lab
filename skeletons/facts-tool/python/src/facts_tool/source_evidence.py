@@ -50,6 +50,10 @@ def _attach_text(row: Row, max_bytes: int, include_text: bool) -> None:
         _unavailable(row, "source file path is unavailable")
         return
     path = Path(str(path_value))
+    captured = row.get("_capture_path")
+    if captured and path.resolve() != Path(str(captured)).resolve():
+        _unavailable(row, "source checkout differs from facts provenance")
+        return
     try:
         if _sha256(path) != str(row["source_sha256"]):
             _stale(row, "source fingerprint changed")

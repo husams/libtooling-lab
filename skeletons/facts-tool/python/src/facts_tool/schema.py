@@ -57,7 +57,9 @@ def inspect_schema(db: sqlite3.Connection, role: str) -> SchemaIdentity:
             if absent:
                 fail("E_SCHEMA", f"facts.{table} lacks columns: " + ", ".join(absent))
     if role == "facts" and version == 13:
-        missing_evidence = sorted(EVIDENCE_TABLES - set(tables))
+        missing_evidence = sorted(
+            (EVIDENCE_TABLES | {"facts_project_provenance"}) - set(tables)
+        )
         if missing_evidence:
             fail(
                 "E_SCHEMA",

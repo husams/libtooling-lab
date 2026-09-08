@@ -24,6 +24,7 @@ def add_symbols(db: sqlite3.Connection) -> dict[str, int]:
         "cycle_b",
     )
     ids = {name: (1 << 32) + index for index, name in enumerate(names, 1)}
+    ids["base"] = (1 << 32) + len(names) + 1
     rows = (
         symbol(
             ids["run"], 1, 13, "c:@F@run#", "app::run", is_definition=1, is_noexcept=1
@@ -42,6 +43,7 @@ def add_symbols(db: sqlite3.Connection) -> dict[str, int]:
             is_pure=1,
         ),
         symbol(ids["box_int"], 2, 7, "c:@S@Box>#I", "app::Box<int>"),
+        symbol(ids["base"], 2, 7, "c:@S@Base", "app::Base", is_definition=1),
         symbol(ids["color"], 3, 6, "c:@E@Color", "app::Color"),
         symbol(ids["red"], 6, 16, "c:@E@Color@Red", "app::Color::Red"),
         symbol(

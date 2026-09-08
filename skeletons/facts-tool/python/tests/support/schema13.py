@@ -33,6 +33,9 @@ def add_schema13(facts: Path, root: Path) -> None:
               file_id INTEGER, line INTEGER, col INTEGER, offset INTEGER, size INTEGER,
               source_sha256 TEXT, symbol_kind TEXT, freshness TEXT,
               unavailable_reason TEXT);
+            CREATE TABLE facts_project_provenance(
+              file_id INTEGER PRIMARY KEY, path TEXT NOT NULL,
+              universe_key TEXT NOT NULL);
             PRAGMA user_version=13;
             """
         )
@@ -91,4 +94,7 @@ def add_schema13(facts: Path, root: Path) -> None:
         )
         db.execute(
             "INSERT INTO source_region VALUES(1,'region-1',?,?,?,?,?,?,?,?,?,?)", values
+        )
+        db.execute(
+            "INSERT INTO facts_project_provenance VALUES(1,?,'demo')", (str(source),)
         )
