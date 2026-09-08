@@ -2,6 +2,7 @@
 
 #include "commands/FactPairValidation.h"
 #include "commands/match/MatchCallback.h"
+#include "commands/match/MatchCancellation.h"
 #include "commands/match/MatchPublication.h"
 #include "platform/PlatformFlags.h"
 #include "storage/FactStore.h"
@@ -60,6 +61,7 @@ Result execute(const cli::MatchOptions &options,
     }
   }
   try {
+    MatchCancellation cancellation;
     FactStore store(options.facts, options.verbosity);
     if (auto begun = store.begin(); !begun)
       return std::unexpected("cannot begin facts transaction: " +
@@ -71,6 +73,12 @@ Result execute(const cli::MatchOptions &options,
                          "matcher cannot run at the top level", {});
     const auto status =
         tool.run(clang::tooling::newFrontendActionFactory(&finder).get());
+    if (MatchCancellation::cancelled()) {
+      return finishMatch(store, options, status,
+                         "facts-tool: cancelled during match",
+                         callback.matchedSymbols(), selected,
+                         pairing ? &*pairing : nullptr);
+    }
     return finishMatch(store, options, status, callback.error(),
                        callback.matchedSymbols(), selected,
                        pairing ? &*pairing : nullptr);

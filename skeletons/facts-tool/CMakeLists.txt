@@ -364,6 +364,7 @@ add_library(facts-commands STATIC
   src/commands/match/ExpressionEvidence.cpp
   src/commands/match/DirectCall.cpp
   src/commands/match/MatchCallback.cpp
+  src/commands/match/MatchCancellation.cpp
   src/commands/match/MatchContract.cpp
   src/commands/match/MatchExecution.cpp
   src/commands/match/MatchPublication.cpp

@@ -4,6 +4,7 @@
 #include "commands/match/MatchContract.h"
 #include "commands/match/RelationPersistence.h"
 #include "commands/match/SymbolDispatch.h"
+#include "cli/Verbose.h"
 
 #include <iostream>
 #include <iterator>
@@ -55,9 +56,13 @@ void MatchCallback::run(
                 return matched;
               });
         } else if constexpr (std::is_same_v<Value, ExpressionMatch>) {
-          return captureExpression(match.expression, *result.Context, files_,
-                                   store_, fingerprints_)
-              .transform([] { return std::vector<MatchedSymbol>{}; });
+          auto captured = captureExpression(match.expression, *result.Context,
+                                            files_, store_, fingerprints_);
+          if (captured) {
+            cli::logVerbose(options_.verbosity, 3,
+                            "facts-tool: match: expression captured");
+          }
+          return captured.transform([] { return std::vector<MatchedSymbol>{}; });
         } else if constexpr (std::is_same_v<Value, RelationMatch>) {
           return persistRelation(match, *result.Context, files_, store_);
         } else {

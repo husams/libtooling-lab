@@ -27,3 +27,7 @@ each translation unit clears its fingerprint cache. Identities include the
 stable file scope, content fingerprint, range, and symbol identity, so changed
 source creates a new evidence version and unavailable occurrences from separate
 translation units do not collide.
+
+SIGINT during `match` reports `facts-tool: cancelled during match` with exit 130;
+the active evidence transaction is rolled back, so the last committed occurrence,
+source-region, and symbol rows remain usable.

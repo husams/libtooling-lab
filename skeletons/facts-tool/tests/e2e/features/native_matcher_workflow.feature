@@ -46,6 +46,11 @@ Feature: Native matcher workflow
     When a valid then invalid expression matcher runs
     Then the failed expression match leaves every facts table unchanged
 
+  Scenario: Cancelled expression matching rolls back captured evidence
+    Given a separately stored expression evidence fixture
+    When a cancelled expression matcher runs after capture starts
+    Then the cancelled expression match retains prior evidence
+
   Scenario: Ordinary extraction leaves expression evidence opt-in
     Given a separately stored expression evidence fixture
     When ordinary extraction runs for the expression fixture

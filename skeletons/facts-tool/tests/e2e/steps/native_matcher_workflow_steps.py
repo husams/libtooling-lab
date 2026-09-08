@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import selectors
 import shutil
 import subprocess
 import sqlite3
+import signal
+import time
 
 from pytest_bdd import given, then, when
 
@@ -369,6 +372,67 @@ def valid_then_invalid_expression_match(context: FactsToolContext) -> None:
 @then("the failed expression match leaves every facts table unchanged")
 def failed_expression_match_unchanged(context: FactsToolContext) -> None:
     require(context.last_returncode != 0, context.last_output)
+    after = evidence_counts(context.facts_database)
+    require(after == context.expression_counts_before,
+            f"before={context.expression_counts_before} after={after}")
+
+
+@when("a cancelled expression matcher runs after capture starts")
+def cancelled_expression_match(context: FactsToolContext) -> None:
+    initial = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(context.expression_source),
+    ])
+    require(initial.returncode == 0, initial.stdout + initial.stderr)
+    context.expression_counts_before = evidence_counts(context.facts_database)
+
+    cancel_source = context.run_root_path / "expression_match_cancel.cpp"
+    shutil.copy2(context.fixture_root / "expression_match_cancel.cpp", cancel_source)
+    context._write_compilation_database((context.expression_source, cancel_source))
+    imported = run([
+        str(context.facts_tool), "import", "-v", "0", "--conf",
+        str(context.files_database), "--compilation-database",
+        str(context.run_root_path), str(context.expression_source),
+        str(cancel_source),
+    ])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+    process = subprocess.Popen([
+        str(context.facts_tool), "match", "-v", "3", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(context.expression_source), str(cancel_source),
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    captured = []
+    selector = selectors.DefaultSelector()
+    selector.register(process.stderr, selectors.EVENT_READ)
+    deadline = time.monotonic() + 30
+    sent = False
+    while time.monotonic() < deadline and not sent:
+        for key, _ in selector.select(timeout=0.1):
+            line = key.fileobj.readline()
+            if not line:
+                continue
+            captured.append(line)
+            if "expression captured" in line:
+                process.send_signal(signal.SIGINT)
+                sent = True
+                break
+    if not sent:
+        process.kill()
+    stdout, stderr = process.communicate(timeout=30)
+    selector.close()
+    context.last_returncode = process.returncode
+    context.last_output = "".join(captured) + stdout + stderr
+    require(sent, "expression capture did not begin before cancellation")
+
+
+@then("the cancelled expression match retains prior evidence")
+def cancelled_expression_match_unchanged(context: FactsToolContext) -> None:
+    require(context.last_returncode == 130, context.last_output)
+    require("facts-tool: cancelled during match" in context.last_output,
+            context.last_output)
     after = evidence_counts(context.facts_database)
     require(after == context.expression_counts_before,
             f"before={context.expression_counts_before} after={after}")
