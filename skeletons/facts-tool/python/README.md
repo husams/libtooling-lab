@@ -33,6 +33,7 @@ and refuses unsupported facts schema versions or missing FileId mappings.
 - [Relations](docs/relations.md), [views](docs/views.md), and [symbol kinds](docs/symbol-kinds.md)
 - [Database lifecycle and mapping](docs/databases.md)
 - [Results, errors, and budgets](docs/results.md)
+- [Persisted call-graph runs](docs/callgraph-runs.md)
 - [Typed and fluent APIs](docs/model-api.md)
 - [cpp-indexer compatibility](docs/cidx-migration.md)
 - [UV development and validation](docs/development.md)

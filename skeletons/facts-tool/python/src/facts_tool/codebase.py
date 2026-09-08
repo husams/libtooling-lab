@@ -1,6 +1,7 @@
 import sqlite3
 from typing import TYPE_CHECKING
 
+from .callgraph_reader import CallGraphReader
 from .executor import Executor
 from .graph import GraphQuery
 from .provenance import PairProvenance
@@ -21,6 +22,7 @@ class CodeBase:
         self._facts, self._project = facts, project
         self.executor, self.provenance = executor, provenance
         self.graph = GraphQuery(executor)
+        self.callgraphs = CallGraphReader(facts, project, provenance)
         self._closed = False
 
     def __enter__(self) -> "CodeBase":
