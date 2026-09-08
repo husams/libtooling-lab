@@ -29,6 +29,7 @@ def _python(environment: Path) -> Path:
 
 def test_wheel_and_sdist_install_and_query(
     paired_databases: tuple[Path, Path],
+    schema13_pair: tuple[Path, Path, Path],
     tmp_path: Path,
 ) -> None:
     dist = tmp_path / "dist"
@@ -70,5 +71,12 @@ def test_wheel_and_sdist_install_and_query(
             str(python),
             str(ROOT / "scripts" / "installed_smoke.py"),
             *map(str, paired_databases),
+            cwd=tmp_path,
+        )
+        _run(
+            str(python),
+            str(ROOT / "scripts" / "installed_smoke.py"),
+            *map(str, schema13_pair[:2]),
+            "evidence",
             cwd=tmp_path,
         )

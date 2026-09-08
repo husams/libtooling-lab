@@ -2,7 +2,8 @@
 
 Facts views are `symbol`, `parameter`, `template_parameter`,
 `template_argument`, `edge`, `site`, `definition`, `enumeration`, `enumerator`,
-`initializer`, and `return_type`. Project views are `repository`, `clone`,
+`initializer`, `return_type`, `expression_occurrence`, and `source_region`.
+Project views are `repository`, `clone`,
 `component`, `directory`, and `file`.
 
 Symbols expose identity, USR, qualified and short names, raw `kind_id`, mapped

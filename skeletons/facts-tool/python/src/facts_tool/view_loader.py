@@ -11,6 +11,7 @@ from .view_details import (
     load_return_types,
 )
 from .view_edges import load_edges, load_sites
+from .view_evidence import load_expression_occurrences, load_source_regions
 from .view_parameters import (
     load_parameters,
     load_template_arguments,
@@ -26,6 +27,11 @@ class ViewLoader:
         self.files = FileResolver(project)
 
     def load(self, view: str) -> list[Row]:
+        if (
+            view in {"expression_occurrence", "source_region"}
+            and self.facts.execute("PRAGMA user_version").fetchone()[0] < 13
+        ):
+            fail("E_CAPABILITY", f"{view} requires facts schema 13")
         functions = {
             "symbol": lambda: load_symbols(self.facts, self.files),
             "parameter": lambda: load_parameters(self.facts, self.files),
@@ -38,6 +44,10 @@ class ViewLoader:
             "enumerator": lambda: load_enumerators(self.facts),
             "initializer": lambda: load_initializers(self.facts),
             "return_type": lambda: load_return_types(self.facts),
+            "expression_occurrence": lambda: load_expression_occurrences(
+                self.facts, self.files
+            ),
+            "source_region": lambda: load_source_regions(self.facts, self.files),
         }
         if view in {"repository", "clone", "component", "directory", "file"}:
             return load_project(self.project, view, self.files)

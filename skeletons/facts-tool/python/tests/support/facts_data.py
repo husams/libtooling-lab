@@ -17,6 +17,7 @@ def add_facts(db: sqlite3.Connection) -> None:
         (ids["run"], 1, 21, 0),
         (ids["run"], ids["box"], 22, 0),
         (ids["box_int"], ids["box"], 5, 0),
+        (ids["box"], ids["base"], 2, 0),
         (ids["box_int"], 1, 23, 0),
         (ids["diamond_source"], ids["diamond_left"], 1, 0),
         (ids["diamond_source"], ids["diamond_right"], 1, 0),

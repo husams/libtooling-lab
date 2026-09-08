@@ -32,3 +32,7 @@ with open_codebase(facts_db=facts, project_db=project) as cb:
 outside the plan, runs after the shared executor, and never appears in
 canonical JSON or a portable IR. Use predicate constructors for serializable
 behavior.
+
+Schema13 expression and bounded source APIs are described in
+[evidence-api.md](evidence-api.md); they preserve immutable `Result`
+provenance, paging cursors, partial status, and unknown status.

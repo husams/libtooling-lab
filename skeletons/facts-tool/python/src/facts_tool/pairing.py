@@ -10,6 +10,8 @@ def validate_pair(facts: sqlite3.Connection, project: sqlite3.Connection) -> Non
         "SELECT DISTINCT ((id >> 32) & 4294967295) FROM symbol",
         "SELECT DISTINCT file_id FROM definition",
         "SELECT DISTINCT file_id FROM relation_site",
+        "SELECT DISTINCT file_id FROM expression_occurrence",
+        "SELECT DISTINCT file_id FROM source_region",
         "SELECT src_file_id FROM include_dependency UNION SELECT dst_file_id "
         "FROM include_dependency",
     )

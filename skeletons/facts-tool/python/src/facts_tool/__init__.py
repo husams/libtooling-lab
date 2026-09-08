@@ -5,6 +5,7 @@ from .callgraph_result import CallGraphRun
 from .codebase import CodeBase
 from .entity import Callable, Entity, Method, Record
 from .errors import FactsToolError
+from .evidence import EvidenceQuery
 from .executor import Executor
 from .graph import GraphQuery
 from .ids import SymbolId
@@ -21,6 +22,7 @@ __all__ = [
     "CallGraphSymbol",
     "CodeBase",
     "Entity",
+    "EvidenceQuery",
     "Executor",
     "FactsToolError",
     "GraphQuery",
