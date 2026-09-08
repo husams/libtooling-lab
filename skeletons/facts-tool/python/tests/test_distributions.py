@@ -3,6 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from support.callgraph_data import schema12_pair
 from support.native_agent import build_native_agent_pair
 
@@ -33,14 +34,17 @@ def test_wheel_and_sdist_install_and_query(
     paired_databases: tuple[Path, Path],
     native_schema12_pair: tuple[Path, Path],
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    native_tool = ROOT.parent / "build-s032" / "facts-tool"
+    assert native_tool.is_file(), "build the current native facts-tool first"
+    monkeypatch.setenv("FACTS_TOOL_NATIVE", str(native_tool))
     dist = tmp_path / "dist"
     _run("uv", "build", "--out-dir", str(dist))
     artifacts = sorted((*dist.glob("*.whl"), *dist.glob("*.tar.gz")))
     assert len(artifacts) == 2
 
     native = build_native_agent_pair(tmp_path / "native-agent")
-    transcripts: list[str] = []
     for index, artifact in enumerate(artifacts):
         environment = tmp_path / f"clean-{index}"
         _run(
@@ -89,11 +93,7 @@ def test_wheel_and_sdist_install_and_query(
             cwd=tmp_path,
         )
         assert f"callgraphs.get({native.run_id})" in transcript
+        assert "class region: exact app::Box" in transcript
         assert "call graph reuse: run ids unchanged" in transcript
         assert "acceptance metrics:" in transcript
-        transcripts.append(transcript)
-        (tmp_path / f"agent-transcript-{index}.txt").write_text(
-            transcript, encoding="utf-8"
-        )
-
-    assert all("site-packages" in transcript for transcript in transcripts)
+        assert "site-packages" in transcript

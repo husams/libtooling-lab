@@ -1,21 +1,18 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 from pathlib import Path
 
 
 def tool() -> Path:
     configured = os.environ.get("FACTS_TOOL_NATIVE")
-    root = Path(__file__).parents[3]
-    candidates = (root / "build-s032" / "facts-tool", root / "build" / "facts-tool")
-    candidate = next((path for path in candidates if path.exists()), None)
-    return (
-        Path(configured)
-        if configured
-        else (candidate or Path(shutil.which("facts-tool") or "facts-tool"))
-    )
+    if not configured:
+        raise RuntimeError("FACTS_TOOL_NATIVE must name the current native executable")
+    executable = Path(configured)
+    if not executable.is_file():
+        raise RuntimeError(f"FACTS_TOOL_NATIVE is not a file: {executable}")
+    return executable
 
 
 def call(executable: Path, args: list[str], root: Path) -> str:

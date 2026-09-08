@@ -23,11 +23,7 @@ def forwarding(facade: Any, name: str, target: str) -> Any:
 
 
 def regions(cb: Any, lines: list[str]) -> None:
-    refs = (
-        ("app::run", "function"),
-        ("app::Box::flush", "method"),
-        ("app::Box::Box", "class"),
-    )
+    refs = (("app::run", "function"), ("app::Box::flush", "method"))
     for ref, label in refs:
         result = cb.definition_regions(ref, include_text=True, max_bytes=32000)
         assert result.rows
@@ -39,3 +35,12 @@ def regions(cb: Any, lines: list[str]) -> None:
             lines.append(
                 f"{label} region: typed unavailable ({row['unavailable_reason']})"
             )
+    class_rows = [
+        row
+        for row in cb.source_regions(include_text=True, max_bytes=32000).rows
+        if row["symbol"] == "app::Box" and row.get("text")
+    ]
+    assert class_rows
+    lines.append(
+        f"class region: exact app::Box ({len(class_rows)} current bounded rows)"
+    )
