@@ -193,62 +193,26 @@ adds trace detail including the recovery-validation line described in
 
 ## Reading a run back
 
-Graph results are never printed as text, JSON, or Mermaid; read them from the
-facts SQLite database with Python:
+Graph results are never printed as text, JSON, or Mermaid; read the exact
+persisted run through the installed public SDK:
 
 ```python
-import sqlite3
+from facts_tool import open_codebase
 
-run_id = 1  # from "facts-tool: call graph run 1 complete"
-conn = sqlite3.connect("facts.db")
-
-edges = conn.execute(
-    "SELECT source_id, destination_id, kind, file_id, offset, depth "
-    "FROM callgraph_run_edge WHERE run_id = ?",
-    (run_id,),
-).fetchall()
+with open_codebase(facts_db="facts.db", project_db="project.db") as cb:
+    run_id = 1  # parse the id from native's completion line
+    run = cb.callgraphs.get(run_id)
+    print(run.run_id, run.status, run.path_outcome)
+    for edge in run.edges:
+        print(edge.source.qualified_name, edge.target.qualified_name)
+    for item in run.recovery:
+        print(item.outcome, item.diagnostic)
 ```
 
-The same `SELECT ... WHERE run_id = ?` pattern applies to
-`callgraph_run_recovery` (`tu_file_id, outcome, diagnostic`) and
-`callgraph_run_frontier` (`symbol_id, reason`). Join `symbol` on
-`source_id`/`destination_id` for qualified names, and join `relation_site` on
-`(source_id, destination_id, kind, position, file_id, offset)` for receiver
-name and certainty:
-
-```python
-named = conn.execute(
-    """
-    SELECT s1.qualified_name, s2.qualified_name, e.kind, e.depth
-    FROM callgraph_run_edge e
-    JOIN symbol s1 ON s1.id = e.source_id
-    JOIN symbol s2 ON s2.id = e.destination_id
-    WHERE e.run_id = ?
-    ORDER BY e.depth
-    """,
-    (run_id,),
-).fetchall()
-```
-
-For a `--to` query, decide whether the target was reached before reading the
-edges as a path:
-
-```python
-reached = conn.execute(
-    """
-    SELECT COUNT(*) FROM callgraph_run_target t
-    JOIN callgraph_run_edge e
-      ON e.run_id = t.run_id AND e.destination_id = t.symbol_id
-    WHERE t.run_id = ?
-    """,
-    (run_id,),
-).fetchone()[0] > 0
-self_path = conn.execute(
-    "SELECT COUNT(*) FROM callgraph_run_target t JOIN callgraph_run_root r "
-    "ON r.run_id = t.run_id AND r.symbol_id = t.symbol_id WHERE t.run_id = ?",
-    (run_id,),
-).fetchone()[0] > 0
-found = reached or self_path  # otherwise the edges are the explored subgraph
+Use `target_reached`, `self_path`, and `path_found` for `--to` outcomes. Use
+`truncated`, `truncation_reason`, `frontier`, and `recovery` to report limits
+or recovery failures; a complete stored traversal does not prove complete
+source extraction.
 ```
 
 See the

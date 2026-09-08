@@ -3,16 +3,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from support.callgraph_data import schema12_pair
+from support.native_agent import build_native_agent_pair
 
 ROOT = Path(__file__).parents[1]
 
 
-def _run(*args: str, cwd: Path = ROOT) -> None:
+def _run(*args: str, cwd: Path = ROOT) -> str:
     environment = os.environ.copy()
     environment.pop("PYTHONHOME", None)
     environment.pop("PYTHONPATH", None)
-    subprocess.run(
+    result = subprocess.run(
         args,
         cwd=cwd,
         check=True,
@@ -20,6 +22,7 @@ def _run(*args: str, cwd: Path = ROOT) -> None:
         capture_output=True,
         env=environment,
     )
+    return result.stdout + result.stderr
 
 
 def _python(environment: Path) -> Path:
@@ -29,13 +32,19 @@ def _python(environment: Path) -> Path:
 
 def test_wheel_and_sdist_install_and_query(
     paired_databases: tuple[Path, Path],
-    schema13_pair: tuple[Path, Path, Path],
+    native_schema12_pair: tuple[Path, Path],
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    native_tool = ROOT.parent / "build-s032" / "facts-tool"
+    assert native_tool.is_file(), "build the current native facts-tool first"
+    monkeypatch.setenv("FACTS_TOOL_NATIVE", str(native_tool))
     dist = tmp_path / "dist"
     _run("uv", "build", "--out-dir", str(dist))
     artifacts = sorted((*dist.glob("*.whl"), *dist.glob("*.tar.gz")))
     assert len(artifacts) == 2
+
+    native = build_native_agent_pair(tmp_path / "native-agent")
     for index, artifact in enumerate(artifacts):
         environment = tmp_path / f"clean-{index}"
         _run(
@@ -73,10 +82,18 @@ def test_wheel_and_sdist_install_and_query(
             *map(str, paired_databases),
             cwd=tmp_path,
         )
-        _run(
+        transcript = _run(
             str(python),
-            str(ROOT / "scripts" / "installed_smoke.py"),
-            *map(str, schema13_pair[:2]),
-            "evidence",
+            str(ROOT / "scripts" / "agent_acceptance.py"),
+            str(native.facts),
+            str(native.project),
+            str(native.run_id),
+            str(native.setup_calls),
+            str(native.setup_output_chars),
             cwd=tmp_path,
         )
+        assert f"callgraphs.get({native.run_id})" in transcript
+        assert "class region: exact app::Box" in transcript
+        assert "call graph reuse: run ids unchanged" in transcript
+        assert "acceptance metrics:" in transcript
+        assert "site-packages" in transcript

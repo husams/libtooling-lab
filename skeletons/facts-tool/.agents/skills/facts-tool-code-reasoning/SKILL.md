@@ -22,9 +22,20 @@ not present code-structure conclusions as confirmed.
 4. Ground conclusions in native names, kinds, locations, relations, sites, and
    explicit boundary or failure diagnostics; symbol-only matching does not
    establish outgoing call coverage.
-5. Use the Python SDK only when native output cannot answer the question, and
-   state that evidence boundary; read source at native locations for local
-   detail.
+5. Use the installed Python SDK for persisted graph runs, expressions, field
+   effects, ancestors, and bounded source regions; do not scan source files or
+   replace a missing fact with an inferred answer.
+
+## Agent workflow
+
+Use the paired-store workflow in [agent workflows](references/agent-workflows.md).
+It covers native symbol/match/call-graph commands, SDK evidence queries,
+freshness and coverage flags, bounded paging, and clean installed-package
+acceptance. Keep one concise sentence per query and record tool-call/output
+metrics when an acceptance harness provides them.
+
+The S-028 skill refinement remains separately owned; this skill links its
+native-first disposition and does not claim S-028 acceptance.
 
 ## How to
 

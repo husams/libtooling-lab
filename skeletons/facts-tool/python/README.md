@@ -34,6 +34,8 @@ and refuses unsupported facts schema versions or missing FileId mappings.
 - [Database lifecycle and mapping](docs/databases.md)
 - [Results, errors, and budgets](docs/results.md)
 - [Persisted call-graph runs](docs/callgraph-runs.md)
+- [Expressions, field effects, and bounded source regions](docs/evidence-api.md)
+- [Installed agent workflow acceptance](docs/s032-progress.md)
 - [Typed and fluent APIs](docs/model-api.md)
 - [cpp-indexer compatibility](docs/cidx-migration.md)
 - [UV development and validation](docs/development.md)

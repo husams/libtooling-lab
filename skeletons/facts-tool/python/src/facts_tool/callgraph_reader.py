@@ -29,8 +29,11 @@ class CallGraphReader:
         )
 
     def _require_supported(self) -> None:
-        if self.provenance.facts.schema.user_version != 12:
-            fail("E_CAPABILITY", "persisted call graph runs require facts schema 12")
+        if self.provenance.facts.schema.user_version not in (12, 13):
+            fail(
+                "E_CAPABILITY",
+                "persisted call graph runs require facts schema 12 or 13",
+            )
 
     def list(
         self, *, limit: int = 100, after: int | None = None
