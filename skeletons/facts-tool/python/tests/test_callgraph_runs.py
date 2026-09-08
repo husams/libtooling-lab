@@ -1,77 +1,25 @@
 import sqlite3
 
+from support.callgraph_seed import add_run
+
 from facts_tool import open_codebase
-
-
-def _add_run(facts):
-    ids = {
-        name: (1 << 32) + index
-        for index, name in enumerate(("run", "save", "persist"), 1)
-    }
-    with sqlite3.connect(facts) as db:
-        db.executescript("""
-        CREATE TABLE callgraph_run(run_id INTEGER PRIMARY KEY,created_at TEXT,
-          project_path TEXT,facts_path TEXT,mode TEXT,path_mode TEXT,
-          calls_scope TEXT,components TEXT,max_depth INTEGER,max_nodes INTEGER,
-          max_edges INTEGER,time_limit_ms INTEGER,recover_missing INTEGER,
-          status TEXT,truncation_reason TEXT,error TEXT);
-        CREATE TABLE callgraph_run_root(run_id INTEGER,symbol_id INTEGER,usr TEXT);
-        CREATE TABLE callgraph_run_target(run_id INTEGER,symbol_id INTEGER,usr TEXT);
-        CREATE TABLE callgraph_run_edge(run_id INTEGER,source_id INTEGER,
-          destination_id INTEGER,kind INTEGER,position INTEGER,file_id INTEGER,
-          offset INTEGER,depth INTEGER,cycle INTEGER);
-        CREATE TABLE callgraph_run_frontier(
-          run_id INTEGER,symbol_id INTEGER,reason TEXT);
-        CREATE TABLE callgraph_run_recovery(run_id INTEGER,tu_file_id INTEGER,
-          outcome TEXT,diagnostic TEXT);
-        PRAGMA user_version=12;
-        """)
-        db.execute(
-            "INSERT INTO callgraph_run VALUES(1,'now','project','facts',"
-            "'path','shortest','all','',NULL,NULL,NULL,NULL,0,'complete',NULL,NULL)"
-        )
-        db.execute(
-            "INSERT INTO callgraph_run_root VALUES(1,?,?)", (ids["run"], "c:@F@run#")
-        )
-        db.execute(
-            "INSERT INTO callgraph_run_target VALUES(1,?,?)",
-            (ids["persist"], "c:@F@persist#"),
-        )
-        db.execute(
-            "INSERT INTO callgraph_run_root VALUES(1,?,?)",
-            (ids["persist"], "c:@F@persist#"),
-        )
-        db.execute(
-            "INSERT INTO callgraph_run_edge VALUES(1,?,?,?,?,?,?,?,?)",
-            (ids["run"], ids["save"], 1, 0, 1, 120, 1, 0),
-        )
-        db.execute(
-            "INSERT INTO callgraph_run_edge VALUES(1,?,?,?,?,?,?,?,?)",
-            (ids["save"], ids["persist"], 1, 0, 1, 80, 2, 0),
-        )
-        db.executemany(
-            "INSERT INTO callgraph_run_edge VALUES(1,?,?,?,?,?,?,?,?)",
-            (
-                (ids["run"], ids["save"], 1, 0, 1, 130, 1, 0),
-                (ids["run"], ids["save"], 1, 0, 1, 140, 1, 0),
-            ),
-        )
-        db.execute(
-            "INSERT INTO callgraph_run_frontier VALUES(1,?,?)",
-            (ids["persist"], "max_depth"),
-        )
-        db.execute(
-            "INSERT INTO callgraph_run_recovery VALUES(1,?,?,?)",
-            (1, "reused", "cached"),
-        )
 
 
 def test_schema12_run_reader_is_bounded_and_read_only(paired_databases):
     facts, project = paired_databases
-    _add_run(facts)
+    add_run(facts)
+    with sqlite3.connect(facts) as db:
+        db.execute(
+            "INSERT INTO callgraph_run VALUES(2,'later','project','facts',"
+            "'path','shortest','all','',NULL,NULL,NULL,NULL,0,'complete',NULL,NULL)"
+        )
     before = (facts.read_bytes(), project.read_bytes())
     with open_codebase(facts_db=facts, project_db=project) as cb:
-        assert [run.run_id for run in cb.callgraphs.list(limit=1)] == [1]
+        first = cb.callgraphs.list(limit=1)
+        second = cb.callgraphs.list(limit=1, after=first[-1].run_id)
+        assert [run.run_id for run in first] == [1]
+        assert [run.run_id for run in second] == [2]
+        assert second[0].roots.total == 0 and second[0].roots.complete
         run = cb.callgraphs.get(1, limit=1)
         assert run.status == "complete" and run.path_found
         assert run.target_reached and run.self_path
@@ -82,11 +30,30 @@ def test_schema12_run_reader_is_bounded_and_read_only(paired_databases):
         assert next_run.edges[0].site and next_run.edges[0].site.offset == 130
         last_page = cb.callgraphs.get(1, limit=1, cursors={"edges": 2})
         assert last_page.edges[0].site and last_page.edges[0].site.offset == 140
+        fourth_page = cb.callgraphs.get(1, limit=1, cursors={"edges": 3})
+        assert fourth_page.edges[0].site and fourth_page.edges[0].site.offset == 80
         empty_page = cb.callgraphs.get(1, limit=1, cursors={"edges": 4})
         assert not empty_page.edges and empty_page.edges.total == 4
+        for name, key in (
+            ("roots", lambda item: item.symbol.usr),
+            ("targets", lambda item: item.symbol.usr),
+            ("edges", lambda item: item.site.offset),
+            ("frontier", lambda item: (item.symbol.usr, item.reason)),
+            ("recovery", lambda item: item.tu_file_id),
+        ):
+            values, cursor = [], 0
+            while True:
+                page = cb.callgraphs.get(1, limit=1, cursors={name: cursor})
+                collection = getattr(page, name)
+                values.extend(key(item) for item in collection.items)
+                if collection.next_cursor is None:
+                    assert len(values) == collection.total
+                    assert len(values) == len(set(values))
+                    break
+                cursor = collection.next_cursor
         assert not next_run.edges[0].site.enriched
         assert run.edges[0].semantic_kind == "Calls"
         assert run.edges[0].site and run.edges[0].site.offset == 120
-        assert run.frontier[0].reason == "max_depth"
+        assert run.frontier[0].reason == "budget"
         assert run.recovery[0].outcome == "reused"
     assert (facts.read_bytes(), project.read_bytes()) == before
