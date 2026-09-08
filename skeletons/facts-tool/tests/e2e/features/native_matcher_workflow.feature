@@ -16,8 +16,28 @@ Feature: Native matcher workflow
     Given a separately stored expression evidence fixture
     When an expression matcher captures field evidence
     Then the expression evidence rows record direct field effects and a source fingerprint
+    When the expression source changes and matching runs again
+    Then both source fingerprints remain queryable
     When a symbol matcher captures source regions
     Then the source region rows retain definition ranges and freshness
+
+  Scenario: Expression evidence keeps distinct translation-unit provenance
+    Given a two-translation-unit expression evidence fixture
+    When an expression matcher captures both translation units
+    Then each translation unit retains its own source fingerprint
+    When a project pair omits one evidence translation unit
+    Then pair validation rejects the evidence store
+
+  Scenario: Unavailable expression identities remain translation-unit scoped
+    Given two unavailable expression fixtures with equal source offsets
+    When an expression matcher captures unavailable field evidence
+    Then unavailable occurrences remain distinct with explicit reasons
+
+  Scenario: Failed expression persistence does not publish partial evidence
+    Given a separately stored expression evidence fixture
+    When an expression matcher captures field evidence
+    And the expression facts store becomes read-only for a second match
+    Then the failed expression match leaves the prior evidence unchanged
 
   Scenario: Invalid binding fails before writing through the paired workflow
     Given a separately stored native matcher fixture

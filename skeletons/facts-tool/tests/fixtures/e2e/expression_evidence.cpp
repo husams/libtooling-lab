@@ -1,5 +1,9 @@
 namespace expression_evidence {
 
+using RefFn = void (*)(int &);
+
+void consume(int &) {}
+
 struct Base {
   virtual ~Base() = default;
 };
@@ -10,6 +14,8 @@ struct Record : Base {
   void update() { field += 1; }
   int read() const { return field; }
   void escape(int *out) { out = &field; }
+  void reference() { consume(field); }
+  void unknown(RefFn fn) { fn(field); }
 };
 
 template <typename T>

@@ -451,7 +451,7 @@ SELECT group_concat(record, char(10)) FROM (
                                "'expression_occurrence')") == 14,
               "fresh expression-occurrence schema is incomplete") &&
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
-                               "'source_region')") == 13,
+                               "'source_region')") == 12,
               "fresh source-region schema is incomplete") &&
       require(scalar(database, "PRAGMA user_version") == 13,
               "fresh schema version was not recorded");

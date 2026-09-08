@@ -109,4 +109,5 @@ matcher captures function, method, or record definition ranges in
 `source_region`, using each definition's own file hash; declaration-only,
 macro, implicit, and unavailable regions retain an explicit reason. These
 tables are append-only by versioned identity, and the match transaction rolls
-back all new evidence on matcher failure or cancellation.
+back all new evidence on matcher failure or cancellation. The access and
+capture matrix is documented in [expression-evidence.md](expression-evidence.md).

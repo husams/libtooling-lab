@@ -19,7 +19,9 @@ class FileManager;
 
 namespace commands::match {
 
-using SourceFingerprintCache = std::unordered_map<unsigned, std::string>;
+// FileID values are local to a SourceManager; the callback clears this cache
+// for each translation unit and keys entries by their stable file names.
+using SourceFingerprintCache = std::unordered_map<std::string, std::string>;
 
 std::expected<void, std::string>
 captureExpression(const clang::Expr &expression, clang::ASTContext &context,

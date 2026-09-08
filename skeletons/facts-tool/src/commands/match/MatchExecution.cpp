@@ -11,6 +11,7 @@
 #include <clang/ASTMatchers/Dynamic/Parser.h>
 #include <clang/Tooling/Tooling.h>
 
+#include <exception>
 #include <filesystem>
 #include <optional>
 
@@ -58,20 +59,25 @@ Result execute(const cli::MatchOptions &options,
       pairing = std::move(*prepared);
     }
   }
-  FactStore store(options.facts, options.verbosity);
-  if (auto begun = store.begin(); !begun)
-    return std::unexpected("cannot begin facts transaction: " +
-                           begun.error().message());
-  MatchCallback callback(options, files, store, rejectLegacyWrites);
-  clang::ast_matchers::MatchFinder finder;
-  if (!finder.addDynamicMatcher(*matcher, &callback))
-    return finishMatch(store, options, 1, "matcher cannot run at the top level",
-                       {});
-  const auto status =
-      tool.run(clang::tooling::newFrontendActionFactory(&finder).get());
-  return finishMatch(store, options, status, callback.error(),
-                     callback.matchedSymbols(), selected,
-                     pairing ? &*pairing : nullptr);
+  try {
+    FactStore store(options.facts, options.verbosity);
+    if (auto begun = store.begin(); !begun)
+      return std::unexpected("cannot begin facts transaction: " +
+                             begun.error().message());
+    MatchCallback callback(options, files, store, rejectLegacyWrites);
+    clang::ast_matchers::MatchFinder finder;
+    if (!finder.addDynamicMatcher(*matcher, &callback))
+      return finishMatch(store, options, 1,
+                         "matcher cannot run at the top level", {});
+    const auto status =
+        tool.run(clang::tooling::newFrontendActionFactory(&finder).get());
+    return finishMatch(store, options, status, callback.error(),
+                       callback.matchedSymbols(), selected,
+                       pairing ? &*pairing : nullptr);
+  } catch (const std::exception &error) {
+    return std::unexpected("cannot persist match evidence: " +
+                           std::string{error.what()});
+  }
 }
 
 } // namespace facts::commands::match
