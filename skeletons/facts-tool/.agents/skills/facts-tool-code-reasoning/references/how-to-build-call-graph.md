@@ -66,8 +66,9 @@ with open_codebase(
     facts_db="build/graph-recipe/facts.db",
     project_db="build/graph-recipe/project.db",
 ) as cb:
-    run = cb.callgraphs.latest()
-    assert run is not None and run.status == "complete"
+    run_id = 1  # parsed from the native completion line
+    run = cb.callgraphs.get(run_id)
+    assert run.status == "complete"
     for edge in run.edges:
         print(edge.source.qualified_name, "->", edge.target.qualified_name)
 ```

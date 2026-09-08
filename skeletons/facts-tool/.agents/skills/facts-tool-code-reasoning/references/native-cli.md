@@ -37,9 +37,9 @@ facts-tool match --conf project.sqlite --facts facts.sqlite \
 
 `analyse dependency` writes direct include facts. `analyse call-graph` reads a
 facts database unless `--recover-missing` is explicitly requested. It prints
-one completion line and persists an append-only run; use
-`cb.callgraphs.latest()` or `cb.callgraphs.get(run_id)` in the installed SDK to
-read it. `match` persists bound facts; invalid binding sets fail before facts
+one completion line and persists an append-only run; parse its `run_id` and
+pass that exact id to `cb.callgraphs.get(run_id)` in the installed SDK.
+`match` persists bound facts; invalid binding sets fail before facts
 are committed. Inspect each command's `--help` for the current binding and
 relation options.
 

@@ -200,13 +200,13 @@ persisted run through the installed public SDK:
 from facts_tool import open_codebase
 
 with open_codebase(facts_db="facts.db", project_db="project.db") as cb:
-    run = cb.callgraphs.latest()
-    if run is not None:
-        print(run.run_id, run.status, run.path_outcome)
-        for edge in run.edges:
-            print(edge.source.qualified_name, edge.target.qualified_name)
-        for item in run.recovery:
-            print(item.outcome, item.diagnostic)
+    run_id = 1  # parse the id from native's completion line
+    run = cb.callgraphs.get(run_id)
+    print(run.run_id, run.status, run.path_outcome)
+    for edge in run.edges:
+        print(edge.source.qualified_name, edge.target.qualified_name)
+    for item in run.recovery:
+        print(item.outcome, item.diagnostic)
 ```
 
 Use `target_reached`, `self_path`, and `path_found` for `--to` outcomes. Use

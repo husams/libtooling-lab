@@ -1,20 +1,19 @@
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from support.agent_data import add_agent_source_regions
 from support.callgraph_data import schema12_pair
+from support.native_agent import build_native_agent_pair
 
 ROOT = Path(__file__).parents[1]
 
 
-def _run(*args: str, cwd: Path = ROOT) -> None:
+def _run(*args: str, cwd: Path = ROOT) -> str:
     environment = os.environ.copy()
     environment.pop("PYTHONHOME", None)
     environment.pop("PYTHONPATH", None)
-    subprocess.run(
+    result = subprocess.run(
         args,
         cwd=cwd,
         check=True,
@@ -22,6 +21,7 @@ def _run(*args: str, cwd: Path = ROOT) -> None:
         capture_output=True,
         env=environment,
     )
+    return result.stdout + result.stderr
 
 
 def _python(environment: Path) -> Path:
@@ -31,7 +31,6 @@ def _python(environment: Path) -> Path:
 
 def test_wheel_and_sdist_install_and_query(
     paired_databases: tuple[Path, Path],
-    schema13_pair: tuple[Path, Path, Path],
     native_schema12_pair: tuple[Path, Path],
     tmp_path: Path,
 ) -> None:
@@ -39,12 +38,10 @@ def test_wheel_and_sdist_install_and_query(
     _run("uv", "build", "--out-dir", str(dist))
     artifacts = sorted((*dist.glob("*.whl"), *dist.glob("*.tar.gz")))
     assert len(artifacts) == 2
+
+    native = build_native_agent_pair(tmp_path / "native-agent")
+    transcripts: list[str] = []
     for index, artifact in enumerate(artifacts):
-        schema_facts = tmp_path / f"agent-schema13-facts-{index}.sqlite"
-        schema_project = tmp_path / f"agent-schema13-project-{index}.sqlite"
-        shutil.copy2(schema13_pair[0], schema_facts)
-        shutil.copy2(schema13_pair[1], schema_project)
-        add_agent_source_regions(schema_facts, schema13_pair[2])
         environment = tmp_path / f"clean-{index}"
         _run(
             "uv",
@@ -81,19 +78,22 @@ def test_wheel_and_sdist_install_and_query(
             *map(str, paired_databases),
             cwd=tmp_path,
         )
-        _run(
+        transcript = _run(
             str(python),
             str(ROOT / "scripts" / "agent_acceptance.py"),
-            *map(str, native_schema12_pair),
-            str(schema_facts),
-            str(schema_project),
+            str(native.facts),
+            str(native.project),
+            str(native.run_id),
+            str(native.setup_calls),
+            str(native.setup_output_chars),
             cwd=tmp_path,
         )
-        _run(
-            str(python),
-            str(ROOT / "scripts" / "installed_smoke.py"),
-            str(schema_facts),
-            str(schema_project),
-            "evidence",
-            cwd=tmp_path,
+        assert f"callgraphs.get({native.run_id})" in transcript
+        assert "call graph reuse: run ids unchanged" in transcript
+        assert "acceptance metrics:" in transcript
+        transcripts.append(transcript)
+        (tmp_path / f"agent-transcript-{index}.txt").write_text(
+            transcript, encoding="utf-8"
         )
+
+    assert all("site-packages" in transcript for transcript in transcripts)

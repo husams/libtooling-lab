@@ -1,20 +1,20 @@
 # Persisted call-graph runs
 
-Schema 12 stores each native `analyse call-graph` result as an append-only run.
-Open a paired database read-only, then use `cb.callgraphs.list()`,
-`cb.callgraphs.latest()`, or `cb.callgraphs.get(run_id)`; these APIs only read
-the persisted run and never replay traversal.
+Schemas 12 and 13 store each native `analyse call-graph` result as an append-only
+run. Capture the completion `run_id`, open the same paired database read-only,
+then use `cb.callgraphs.get(run_id)`; this API only reads the persisted run and
+never replays traversal.
 
 ```python
 from facts_tool import open_codebase
 
 with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
-    run = cb.callgraphs.latest()
-    if run is not None:
-        print(run.run_id, run.status, run.path_found)
-        for edge in run.edges:
-            print(edge.source.qualified_name, edge.semantic_kind,
-                  edge.target.qualified_name, edge.site)
+    run_id = 1  # parse the id from native: call graph run <id> <status>
+    run = cb.callgraphs.get(run_id)
+    print(run.run_id, run.status, run.path_found)
+    for edge in run.edges:
+        print(edge.source.qualified_name, edge.semantic_kind,
+              edge.target.qualified_name, edge.site)
 ```
 
 `CallGraphRun` also exposes `roots`, `targets`, `frontier`, `recovery`,

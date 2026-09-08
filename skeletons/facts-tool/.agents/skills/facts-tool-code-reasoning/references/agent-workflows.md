@@ -12,7 +12,7 @@ read SQLite directly.
 facts-tool import --conf project.db --facts facts.db -p build
 facts-tool extract --conf project.db --output facts.db
 facts-tool analyse call-graph --conf project.db --facts facts.db \
-  --function app::run
+  --function app::run  # capture the printed run_id
 ```
 
 The native command output identifies the persisted graph run. The SDK reads
@@ -22,8 +22,9 @@ that exact run without replaying traversal:
 from facts_tool import open_codebase
 
 with open_codebase(facts_db="facts.db", project_db="project.db") as cb:
-    run = cb.callgraphs.latest()
-    edges = () if run is None else run.edges
+    run_id = 1  # parsed from the native completion line
+    run = cb.callgraphs.get(run_id)
+    edges = run.edges
     print("graph: " + ", ".join(
         f"{edge.source.qualified_name}->{edge.target.qualified_name}"
         for edge in edges
