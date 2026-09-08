@@ -37,7 +37,7 @@ On open, `storage/SchemaMigration.cpp` detects legacy packed flags and applies
 versioned upgrades inside the storage connection's `BEGIN IMMEDIATE`
 transaction. Existing identities and facts are preserved. The complete fresh
 schema is defined by `storage/Schema.h`; fresh databases are created directly
-at SQLite `user_version = 12` without packed persisted flags.
+at SQLite `user_version = 13` without packed persisted flags.
 
 The version-8-to-9 migration adds `callable_return_type`, keyed by `symbol_id`
 with a cascading foreign key to `symbol`. Its nonempty `canonical_type` text
@@ -97,3 +97,17 @@ call-graph` invocation even before that invocation records any symbols or
 runs a traversal. Rows are appended only by a subsequent `analyse call-graph`
 invocation that reaches traversal; no migration and no other command deletes
 or rewrites an existing run.
+
+## Version 13: opt-in expression and source evidence
+
+The explicit `match` operation accepts `bind("expression")` for an `Expr` and
+persists one `expression_occurrence` row per source-fingerprinted occurrence.
+Rows carry the nearest owning callable and resolved target when available,
+expression/access kind, token-inclusive byte range, SHA-256, and
+`current`/`stale`/`unavailable` freshness. `--capture-source` on a symbol
+matcher captures function, method, or record definition ranges in
+`source_region`, using each definition's own file hash; declaration-only,
+macro, implicit, and unavailable regions retain an explicit reason. These
+tables are append-only by versioned identity, and the match transaction rolls
+back all new evidence on matcher failure or cancellation. The access and
+capture matrix is documented in [expression-evidence.md](expression-evidence.md).

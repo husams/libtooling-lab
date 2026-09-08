@@ -15,10 +15,10 @@ bool verifyFreshReturnSchema() {
   if (sqlite3_open(":memory:", &database) != SQLITE_OK)
     return false;
   // The published fresh schema must be complete without Storage applying
-  // extra scripts after it has already recorded user_version=12.
+  // extra scripts after it has already recorded user_version=13.
   const auto valid =
       execute(database, facts::schemaSql) &&
-      require(scalar(database, "PRAGMA user_version") == 12,
+      require(scalar(database, "PRAGMA user_version") == 13,
               "fresh schema does not declare version eleven") &&
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'callable_return_type')") == 2,
@@ -90,7 +90,7 @@ bool migrateReturnTypes(sqlite3 *database, facts::SymbolId callable) {
                  "version-eight migration failed") &&
          require(facts::storage::migrateSchema(database).has_value(),
                  "repeated version-eight migration failed") &&
-         require(scalar(database, "PRAGMA user_version") == 12,
+         require(scalar(database, "PRAGMA user_version") == 13,
                  "return-type migration did not record version eleven") &&
          require(
              scalar(database, "SELECT COUNT(*) FROM callable_return_type") == 0,

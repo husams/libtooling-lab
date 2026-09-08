@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import json
+import selectors
+import shutil
 import subprocess
+import sqlite3
+import signal
+import time
 
 from pytest_bdd import given, then, when
 
@@ -13,6 +18,20 @@ from support.scenario import FactsToolContext
 def run(command: list[str], cwd=None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, cwd=cwd, capture_output=True,
                           text=True, check=False)
+
+
+def evidence_counts(path) -> tuple[int, int, int]:
+    with sqlite3.connect(path) as db:
+        counts = []
+        for table in ("expression_occurrence", "source_region", "symbol"):
+            try:
+                counts.append(db.execute(
+                    f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+            except sqlite3.OperationalError as error:
+                if "no such table" not in str(error):
+                    raise
+                counts.append(0)
+    return tuple(counts)
 
 
 def prepare_pair(context: FactsToolContext) -> None:
@@ -67,6 +86,385 @@ def paired_direct_call(context: FactsToolContext) -> None:
     require(first.returncode == 0, first.stdout + first.stderr)
     second = run(command)
     require(second.returncode == 0, second.stdout + second.stderr)
+
+
+@given("a separately stored expression evidence fixture")
+def expression_fixture(context: FactsToolContext) -> None:
+    context.prepare()
+    context.expression_source = context.run_root_path / "expression_evidence.cpp"
+    shutil.copy2(context.fixture_root / "expression_evidence.cpp",
+                 context.expression_source)
+    context._write_compilation_database((context.expression_source,))
+    context.files_database = context.run_root_path / "expression-project.sqlite"
+    context.facts_database = context.run_root_path / "expression-facts.sqlite"
+    imported = run([
+        str(context.facts_tool), "import", "-v", "0", "--conf",
+        str(context.files_database), "--compilation-database",
+        str(context.run_root_path), str(context.expression_source),
+    ])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+
+
+@when("an expression matcher captures field evidence")
+def expression_match(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher",
+        'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(context.expression_source),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("the expression evidence rows record direct field effects and a source fingerprint")
+def expression_rows(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT access,source_sha256,freshness FROM expression_occurrence "
+            "WHERE target_id IS NOT NULL").fetchall()
+    require(rows, "no expression evidence rows")
+    require({row[0] for row in rows} >= {
+        "read", "write", "read_write", "escape", "unknown"}, str(rows))
+    require(all(len(row[1]) == 64 and row[2] == "current" for row in rows), str(rows))
+
+
+@when("the expression source changes and matching runs again")
+def changed_expression_match(context: FactsToolContext) -> None:
+    with context.expression_source.open("a", encoding="utf-8") as source:
+        source.write("\n// source revision for evidence freshness\n")
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(context.expression_source),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("both source fingerprints remain queryable")
+def both_expression_fingerprints(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        count = db.execute(
+            "SELECT COUNT(DISTINCT source_sha256) FROM expression_occurrence"
+        ).fetchone()[0]
+    require(count >= 2, f"expected two expression source revisions, got {count}")
+
+
+@when("a symbol matcher captures source regions")
+def source_region_match(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--capture-source",
+        "--conf", str(context.files_database), "--facts",
+        str(context.facts_database), "--matcher",
+        'namedDecl(isExpansionInMainFile(), anyOf('
+        'functionDecl(isDefinition(), unless(isImplicit())), '
+        'cxxRecordDecl(isDefinition()))).bind("symbol")',
+        str(context.expression_source),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("the source region rows retain definition ranges and freshness")
+def source_region_rows(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT sr.symbol_kind,s.qualified_name,sr.offset,sr.size,"
+            "sr.source_sha256,sr.freshness FROM source_region sr JOIN symbol s "
+            "ON s.id=sr.symbol_id WHERE sr.freshness='current'").fetchall()
+    require(rows, "no source region rows")
+    require({row[0] for row in rows} >= {"record", "method", "function"},
+            str(rows))
+    require(sum(row[1] == "expression_evidence::Record::overload"
+                for row in rows) >= 2, str(rows))
+    require(any(row[1] == "expression_evidence::Record::outOfLine"
+                for row in rows), str(rows))
+    require(any("::Nested" in row[1] for row in rows), str(rows))
+    require(any(row[1] == "expression_evidence::Box" for row in rows), str(rows))
+    require(any(row[1] == "expression_evidence::Derived" for row in rows), str(rows))
+    require(all(row[2] >= 0 and row[3] > 0 and len(row[4]) == 64 and
+                row[5] == "current" for row in rows), str(rows))
+
+
+@when("a symbol matcher captures unsupported source regions")
+def unsupported_source_region_match(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--capture-source",
+        "--conf", str(context.files_database), "--facts",
+        str(context.facts_database), "--matcher",
+        'namedDecl(isExpansionInMainFile(), anyOf(functionDecl(), '
+        'cxxRecordDecl())).bind("symbol")',
+        str(context.expression_source),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("unavailable source region reasons remain explicit")
+def unavailable_source_region_rows(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT freshness,unavailable_reason FROM source_region "
+            "WHERE freshness='unavailable'").fetchall()
+    require(rows, "no unavailable source region rows")
+    reasons = {row[1] for row in rows}
+    require(any("declaration-only" in reason for reason in reasons), str(rows))
+    require(any("implicit" in reason for reason in reasons), str(rows))
+    require(any("macro" in reason for reason in reasons), str(rows))
+
+
+@given("a two-translation-unit expression evidence fixture")
+def two_tu_expression_fixture(context: FactsToolContext) -> None:
+    context.prepare()
+    first = context.run_root_path / "expression_evidence.cpp"
+    second = context.run_root_path / "expression_evidence_two.cpp"
+    shutil.copy2(context.fixture_root / "expression_evidence.cpp", first)
+    shutil.copy2(context.fixture_root / "expression_evidence_two.cpp", second)
+    context.expression_sources = (first, second)
+    context._write_compilation_database(context.expression_sources)
+    context.files_database = context.run_root_path / "expression-project.sqlite"
+    context.facts_database = context.run_root_path / "expression-facts.sqlite"
+    imported = run([
+        str(context.facts_tool), "import", "-v", "0", "--conf",
+        str(context.files_database), "--compilation-database",
+        str(context.run_root_path), *(str(source) for source in context.expression_sources),
+    ])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+
+
+@when("an expression matcher captures both translation units")
+def two_tu_expression_match(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        *(str(source) for source in context.expression_sources),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("each translation unit retains its own source fingerprint")
+def two_tu_fingerprints(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT COUNT(DISTINCT file_id), COUNT(DISTINCT source_sha256) "
+            "FROM expression_occurrence").fetchone()
+    require(rows[0] >= 2 and rows[1] >= 2, str(rows))
+
+
+@when("a project pair omits one evidence translation unit")
+def mismatched_expression_pair(context: FactsToolContext) -> None:
+    alternate_conf = context.run_root_path / "alternate-project.sqlite"
+    alternate_root = context.run_root_path / "alternate-project"
+    alternate_root.mkdir()
+    alternate_source = alternate_root / context.expression_sources[0].name
+    shutil.copy2(context.expression_sources[0], alternate_source)
+    original_run_root = context.run_root
+    context.run_root = alternate_root
+    context._write_compilation_database((alternate_source,))
+    context.run_root = original_run_root
+    imported = run([
+        str(context.facts_tool), "import", "-v", "0", "--conf",
+        str(alternate_conf), "--compilation-database",
+        str(alternate_root), str(alternate_source),
+    ])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(alternate_conf), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(alternate_source),
+    ])
+    context.last_returncode = completed.returncode
+    context.last_output = completed.stdout + completed.stderr
+
+
+@then("pair validation rejects the evidence store")
+def mismatched_expression_pair_rejected(context: FactsToolContext) -> None:
+    require(context.last_returncode != 0, context.last_output)
+    require("pair" in context.last_output.lower() or
+            "provenance" in context.last_output.lower() or
+            "incompatible-symbol-universe" in context.last_output.lower(),
+            context.last_output)
+
+
+@given("two unavailable expression fixtures with equal source offsets")
+def unavailable_expression_fixtures(context: FactsToolContext) -> None:
+    context.prepare()
+    first = context.run_root_path / "expression_unavailable_one.cpp"
+    second = context.run_root_path / "expression_unavailable_two.cpp"
+    shutil.copy2(context.fixture_root / "expression_unavailable_one.cpp", first)
+    shutil.copy2(context.fixture_root / "expression_unavailable_two.cpp", second)
+    context.expression_sources = (first, second)
+    context._write_compilation_database(context.expression_sources)
+    context.files_database = context.run_root_path / "unavailable-project.sqlite"
+    context.facts_database = context.run_root_path / "unavailable-facts.sqlite"
+    imported = run([
+        str(context.facts_tool), "import", "-v", "0", "--conf",
+        str(context.files_database), "--compilation-database",
+        str(context.run_root_path), *(str(source) for source in context.expression_sources),
+    ])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+
+
+@when("an expression matcher captures unavailable field evidence")
+def unavailable_expression_match(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        *(str(source) for source in context.expression_sources),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("unavailable occurrences remain distinct with explicit reasons")
+def unavailable_expression_rows(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT identity,freshness,unavailable_reason FROM "
+            "expression_occurrence").fetchall()
+    require(len(rows) >= 2 and len({row[0] for row in rows}) == len(rows), str(rows))
+    require(all(row[1] == "unavailable" and row[2] for row in rows), str(rows))
+
+
+@when("the expression facts store becomes read-only for a second match")
+def readonly_expression_match(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        before = db.execute(
+            "SELECT COUNT(*) FROM expression_occurrence").fetchone()[0]
+    context.facts_database.chmod(0o444)
+    try:
+        completed = run([
+            str(context.facts_tool), "match", "-v", "0", "--conf",
+            str(context.files_database), "--facts", str(context.facts_database),
+            "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+            str(context.expression_source),
+        ])
+    finally:
+        context.facts_database.chmod(0o644)
+    context.last_returncode = completed.returncode
+    context.last_output = completed.stdout + completed.stderr
+    context.expression_before_failure = before
+
+
+@when("a valid then invalid expression matcher runs")
+def valid_then_invalid_expression_match(context: FactsToolContext) -> None:
+    invalid = context.run_root_path / "expression_match_failure.cpp"
+    shutil.copy2(context.fixture_root / "expression_match_failure.cpp", invalid)
+    context._write_compilation_database((context.expression_source, invalid))
+    imported = run([
+        str(context.facts_tool), "import", "-v", "0", "--conf",
+        str(context.files_database), "--compilation-database",
+        str(context.run_root_path), str(invalid),
+    ])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+    context.expression_counts_before = evidence_counts(context.facts_database)
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(context.expression_source), str(invalid),
+    ])
+    context.last_returncode = completed.returncode
+    context.last_output = completed.stdout + completed.stderr
+
+
+@then("the failed expression match leaves every facts table unchanged")
+def failed_expression_match_unchanged(context: FactsToolContext) -> None:
+    require(context.last_returncode != 0, context.last_output)
+    after = evidence_counts(context.facts_database)
+    require(after == context.expression_counts_before,
+            f"before={context.expression_counts_before} after={after}")
+
+
+@when("a cancelled expression matcher runs after capture starts")
+def cancelled_expression_match(context: FactsToolContext) -> None:
+    initial = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(context.expression_source),
+    ])
+    require(initial.returncode == 0, initial.stdout + initial.stderr)
+    context.expression_counts_before = evidence_counts(context.facts_database)
+
+    cancel_source = context.run_root_path / "expression_match_cancel.cpp"
+    shutil.copy2(context.fixture_root / "expression_match_cancel.cpp", cancel_source)
+    context._write_compilation_database((context.expression_source, cancel_source))
+    imported = run([
+        str(context.facts_tool), "import", "-v", "0", "--conf",
+        str(context.files_database), "--compilation-database",
+        str(context.run_root_path), str(context.expression_source),
+        str(cancel_source),
+    ])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+    process = subprocess.Popen([
+        str(context.facts_tool), "match", "-v", "3", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(context.expression_source), str(cancel_source),
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    captured = []
+    selector = selectors.DefaultSelector()
+    selector.register(process.stderr, selectors.EVENT_READ)
+    deadline = time.monotonic() + 30
+    sent = False
+    while time.monotonic() < deadline and not sent:
+        for key, _ in selector.select(timeout=0.1):
+            line = key.fileobj.readline()
+            if not line:
+                continue
+            captured.append(line)
+            if "expression captured" in line:
+                process.send_signal(signal.SIGINT)
+                sent = True
+                break
+    if not sent:
+        process.kill()
+    stdout, stderr = process.communicate(timeout=30)
+    selector.close()
+    context.last_returncode = process.returncode
+    context.last_output = "".join(captured) + stdout + stderr
+    require(sent, "expression capture did not begin before cancellation")
+
+
+@then("the cancelled expression match retains prior evidence")
+def cancelled_expression_match_unchanged(context: FactsToolContext) -> None:
+    require(context.last_returncode == 130, context.last_output)
+    require("facts-tool: cancelled during match" in context.last_output,
+            context.last_output)
+    after = evidence_counts(context.facts_database)
+    require(after == context.expression_counts_before,
+            f"before={context.expression_counts_before} after={after}")
+
+
+@when("ordinary extraction runs for the expression fixture")
+def ordinary_expression_extract(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "extract", "-v", "0", "--conf",
+        str(context.files_database), "--output", str(context.facts_database),
+        str(context.expression_source),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("ordinary extraction has no expression or source evidence rows")
+def ordinary_expression_rows_absent(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT (SELECT COUNT(*) FROM expression_occurrence), "
+            "(SELECT COUNT(*) FROM source_region)").fetchone()
+    require(rows == (0, 0), str(rows))
+
+
+@then("the failed expression match leaves the prior evidence unchanged")
+def readonly_expression_result(context: FactsToolContext) -> None:
+    require(context.last_returncode != 0, context.last_output)
+    with sqlite3.connect(context.facts_database) as db:
+        after = db.execute(
+            "SELECT COUNT(*) FROM expression_occurrence").fetchone()[0]
+    require(after == context.expression_before_failure,
+            str((after, context.expression_before_failure)))
 
 
 @then("the native call graph can traverse the matched facts twice")

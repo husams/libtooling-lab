@@ -4,6 +4,7 @@
 #include "commands/match/MatchContract.h"
 #include "commands/match/RelationPersistence.h"
 #include "commands/match/SymbolDispatch.h"
+#include "cli/Verbose.h"
 
 #include <iostream>
 #include <iterator>
@@ -38,6 +39,15 @@ void MatchCallback::run(
         using Value = decltype(match);
         if constexpr (std::is_same_v<Value, SymbolMatch>) {
           return persistSymbol(match.symbol, *result.Context, files_, store_)
+              .and_then([&](PersistedSymbol symbol) {
+                if (!options_.captureSource)
+                  return std::expected<PersistedSymbol, std::string>{
+                      std::move(symbol)};
+                return captureSourceRegion(match.symbol, symbol.id,
+                                           *result.Context, files_, store_,
+                                           fingerprints_)
+                    .transform([&] { return std::move(symbol); });
+              })
               .transform([&](PersistedSymbol symbol) {
                 std::cout << "symbol kind=" << symbol.kind
                           << " name=" << symbol.name << '\n';
@@ -45,6 +55,14 @@ void MatchCallback::run(
                 appendMatchedIndex(matched, std::move(symbol));
                 return matched;
               });
+        } else if constexpr (std::is_same_v<Value, ExpressionMatch>) {
+          auto captured = captureExpression(match.expression, *result.Context,
+                                            files_, store_, fingerprints_);
+          if (captured) {
+            cli::logVerbose(options_.verbosity, 3,
+                            "facts-tool: match: expression captured");
+          }
+          return captured.transform([] { return std::vector<MatchedSymbol>{}; });
         } else if constexpr (std::is_same_v<Value, RelationMatch>) {
           return persistRelation(match, *result.Context, files_, store_);
         } else {

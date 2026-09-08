@@ -2,6 +2,7 @@
 
 #include "cli/Options.h"
 #include "model/MatchedSymbol.h"
+#include "commands/match/ExpressionEvidence.h"
 
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 
@@ -21,6 +22,7 @@ class MatchCallback final
 public:
   MatchCallback(const cli::MatchOptions &options, FileManager &files,
                 FactStore &store, bool rejectLegacyWrites = false);
+  void onStartOfTranslationUnit() override { fingerprints_.clear(); }
   void
   run(const clang::ast_matchers::MatchFinder::MatchResult &result) override;
 
@@ -35,6 +37,7 @@ private:
   bool rejectLegacyWrites_ = false;
   std::optional<std::string> error_;
   std::vector<MatchedSymbol> matches_;
+  SourceFingerprintCache fingerprints_;
 };
 
 } // namespace facts::commands::match

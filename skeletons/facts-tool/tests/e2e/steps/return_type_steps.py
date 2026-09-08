@@ -156,7 +156,7 @@ def previous_schema(context: FactsToolContext):
 @then("the upgrade preserves existing identities and unrelated facts")
 def verify_upgrade(context: FactsToolContext):
     require(unrelated_facts(context) == context.before_upgrade, "upgrade changed unrelated facts")
-    require(query(context.facts_database_path, "PRAGMA user_version") == [(12,)],
+    require(query(context.facts_database_path, "PRAGMA user_version") == [(13,)],
             "return-type schema migration did not advance to version 12")
     context.run_tool()
     require(unrelated_facts(context) == context.before_upgrade, "second migration changed facts")

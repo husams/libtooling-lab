@@ -73,6 +73,11 @@ void testContracts(ASTContext &context) {
   auto symbol = match(varDecl(hasName("N::variable")).bind("symbol"), context);
   require(symbol.size() == 1 && classify(symbol.front(), std::nullopt));
   require(!classify(symbol.front(), "Uses"));
+  auto expression =
+      match(memberExpr(hasDeclaration(fieldDecl())).bind("expression"),
+            context);
+  require(!expression.empty() && classify(expression.front(), std::nullopt));
+  require(!classify(expression.front(), "Uses"));
 }
 } // namespace
 
@@ -81,7 +86,7 @@ int main() {
   auto ast = tooling::buildASTFromCodeWithArgs(
       "namespace N { struct Base { virtual void run(); }; struct Record : Base "
       "{ int field; void run() override; }; enum Colour { Red }; int variable; "
-      "void function(); }",
+      "void function(); void use(Record &r) { r.field = 1; } }",
       {"-std=c++23"});
   require(ast);
   testEndpoints(ast->getASTContext());

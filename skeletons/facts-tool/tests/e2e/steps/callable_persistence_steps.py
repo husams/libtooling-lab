@@ -41,7 +41,7 @@ def migrated_callables(context, version):
     assert context.facts_database_path.read_bytes() == historical
     context.run_tool()
     assert snapshot(context.facts_database_path) == before
-    assert query(context.facts_database_path, "PRAGMA user_version") == [(12,)]
+    assert query(context.facts_database_path, "PRAGMA user_version") == [(13,)]
     context.run_tool()
     assert snapshot(context.facts_database_path) == before
 

@@ -66,6 +66,12 @@ Feature: Canonical source file registry
       | targeted_match_two.cpp |
       | toolchain_targets.cpp |
       | undeclared_template_instances.cpp |
+      | expression_evidence.cpp |
+      | expression_evidence_two.cpp |
+      | expression_unavailable_one.cpp |
+      | expression_unavailable_two.cpp |
+      | expression_match_failure.cpp |
+      | expression_match_cancel.cpp |
       | one.cpp    |
       | two.cpp    |
     And every registered FileId is greater than zero

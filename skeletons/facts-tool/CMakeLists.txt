@@ -151,6 +151,7 @@ add_library(facts-storage STATIC
   src/storage/CallGraphEntry.cpp
   src/storage/FactProvenance.cpp
   src/storage/ExternalReference.cpp
+  src/storage/ExpressionEvidence.cpp
   src/storage/UnresolvedCallSite.cpp
   src/storage/catalog/Database.cpp
   src/storage/catalog/Repository.cpp
@@ -360,8 +361,10 @@ add_library(facts-commands STATIC
   src/commands/Import.cpp
   src/commands/Match.cpp
   src/commands/match/ArgumentOutput.cpp
+  src/commands/match/ExpressionEvidence.cpp
   src/commands/match/DirectCall.cpp
   src/commands/match/MatchCallback.cpp
+  src/commands/match/MatchCancellation.cpp
   src/commands/match/MatchContract.cpp
   src/commands/match/MatchExecution.cpp
   src/commands/match/MatchPublication.cpp

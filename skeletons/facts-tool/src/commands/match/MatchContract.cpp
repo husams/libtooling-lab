@@ -60,6 +60,14 @@ classify(const clang::ast_matchers::BoundNodes &bound,
       return std::unexpected("symbol binding must be a supported declaration");
     return Contract{SymbolMatch{*symbol}};
   }
+  if (exactKeys(nodes, {"expression"})) {
+    if (relationKind)
+      return std::unexpected("expression binding forbids --relation-kind");
+    auto *expression = nodes.at("expression").get<clang::Expr>();
+    if (!expression)
+      return std::unexpected("expression binding must bind Expr");
+    return Contract{ExpressionMatch{*expression}};
+  }
   if (exactKeys(nodes, {"call", "callee"})) {
     if (relationKind && *relationKind != "Calls")
       return std::unexpected("call and callee bindings only support Calls");
@@ -75,6 +83,7 @@ classify(const clang::ast_matchers::BoundNodes &bound,
   if (!noSite && !withSite)
     return std::unexpected(
         "bindings must exactly match a supported contract: bind(\"symbol\"), "
+        "bind(\"expression\"), "
         "bind(\"call\")+bind(\"callee\"), or "
         "bind(\"source\")+bind(\"target\")[+bind(\"site\")] with "
         "--relation-kind");

@@ -12,6 +12,50 @@ Feature: Native matcher workflow
     When a direct-call matcher runs twice with the explicit database pair
     Then the native call graph can traverse the matched facts twice
 
+  Scenario: Opt-in expression matching persists field effects and source evidence
+    Given a separately stored expression evidence fixture
+    When an expression matcher captures field evidence
+    Then the expression evidence rows record direct field effects and a source fingerprint
+    When the expression source changes and matching runs again
+    Then both source fingerprints remain queryable
+    When a symbol matcher captures source regions
+    Then the source region rows retain definition ranges and freshness
+    When a symbol matcher captures unsupported source regions
+    Then unavailable source region reasons remain explicit
+
+  Scenario: Expression evidence keeps distinct translation-unit provenance
+    Given a two-translation-unit expression evidence fixture
+    When an expression matcher captures both translation units
+    Then each translation unit retains its own source fingerprint
+    When a project pair omits one evidence translation unit
+    Then pair validation rejects the evidence store
+
+  Scenario: Unavailable expression identities remain translation-unit scoped
+    Given two unavailable expression fixtures with equal source offsets
+    When an expression matcher captures unavailable field evidence
+    Then unavailable occurrences remain distinct with explicit reasons
+
+  Scenario: Failed expression persistence does not publish partial evidence
+    Given a separately stored expression evidence fixture
+    When an expression matcher captures field evidence
+    And the expression facts store becomes read-only for a second match
+    Then the failed expression match leaves the prior evidence unchanged
+
+  Scenario: Failed expression matching rolls back a prior translation unit
+    Given a separately stored expression evidence fixture
+    When a valid then invalid expression matcher runs
+    Then the failed expression match leaves every facts table unchanged
+
+  Scenario: Cancelled expression matching rolls back captured evidence
+    Given a separately stored expression evidence fixture
+    When a cancelled expression matcher runs after capture starts
+    Then the cancelled expression match retains prior evidence
+
+  Scenario: Ordinary extraction leaves expression evidence opt-in
+    Given a separately stored expression evidence fixture
+    When ordinary extraction runs for the expression fixture
+    Then ordinary extraction has no expression or source evidence rows
+
   Scenario: Invalid binding fails before writing through the paired workflow
     Given a separately stored native matcher fixture
     When an invalid symbol binding runs with the explicit database pair

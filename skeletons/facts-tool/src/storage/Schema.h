@@ -362,7 +362,49 @@ CREATE TABLE IF NOT EXISTS callgraph_run_recovery (
   PRIMARY KEY (run_id, tu_file_id)
 ) WITHOUT ROWID;
 
-PRAGMA user_version=12;
+-- Opt-in expression occurrences retain the source fingerprint with each
+-- occurrence identity; changed files never refresh old ranges.
+CREATE TABLE IF NOT EXISTS expression_occurrence (
+  occurrence_id INTEGER PRIMARY KEY,
+  identity TEXT NOT NULL UNIQUE,
+  owner_id INTEGER REFERENCES symbol(id) ON DELETE CASCADE,
+  target_id INTEGER REFERENCES symbol(id) ON DELETE CASCADE,
+  file_id INTEGER NOT NULL,
+  line INTEGER NOT NULL,
+  col INTEGER NOT NULL,
+  offset INTEGER NOT NULL,
+  size INTEGER NOT NULL,
+  source_sha256 TEXT NOT NULL,
+  expression_kind TEXT NOT NULL,
+  access TEXT NOT NULL CHECK(access IN ('none','read','write','read_write','escape','unknown')),
+  freshness TEXT NOT NULL CHECK(freshness IN ('current','stale','unavailable')),
+  unavailable_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_expression_occurrence_owner
+  ON expression_occurrence(owner_id, file_id, offset);
+CREATE INDEX IF NOT EXISTS idx_expression_occurrence_target
+  ON expression_occurrence(target_id, access);
+
+-- Source regions are versioned per definition capture, including the exact
+-- definition file hash; no global hash is joined onto an old extent.
+CREATE TABLE IF NOT EXISTS source_region (
+  region_id INTEGER PRIMARY KEY,
+  identity TEXT NOT NULL UNIQUE,
+  symbol_id INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+  file_id INTEGER NOT NULL,
+  line INTEGER NOT NULL,
+  col INTEGER NOT NULL,
+  offset INTEGER NOT NULL,
+  size INTEGER NOT NULL,
+  source_sha256 TEXT NOT NULL,
+  symbol_kind TEXT NOT NULL,
+  freshness TEXT NOT NULL CHECK(freshness IN ('current','stale','unavailable')),
+  unavailable_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_source_region_symbol
+  ON source_region(symbol_id, file_id, offset);
+
+PRAGMA user_version=13;
 
 )sql";
 

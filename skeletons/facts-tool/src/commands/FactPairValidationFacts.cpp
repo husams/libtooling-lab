@@ -15,8 +15,8 @@ factsSchemaVersion(storage::Database &database) {
       });
   try {
     for (auto version : rows) {
-      // Version 12 adds the append-only callgraph_run tables.
-      if (version > 12) {
+      // Version 13 adds opt-in expression/source evidence tables.
+      if (version > 13) {
         return std::unexpected(
             "incompatible-symbol-universe: unsupported facts schema version");
       }
@@ -46,7 +46,7 @@ std::expected<bool, std::string> factsTableExists(storage::Database &database,
 std::expected<std::set<FileId>, std::string>
 usedFactFiles(storage::Database &database) {
   std::set<FileId> result;
-  const std::array<std::pair<const char *, const char *>, 10> tables{
+  const std::array<std::pair<const char *, const char *>, 12> tables{
       {{"symbol", "((id >> 32) & 4294967295)"},
        {"definition", "file_id"},
        {"relation_site", "file_id"},
@@ -57,7 +57,9 @@ usedFactFiles(storage::Database &database) {
        {"callgraph_external_reference",
         "((destination_id >> 32) & 4294967295)"},
        {"callgraph_entry", "((symbol_id >> 32) & 4294967295)"},
-       {"matched_symbol_index", "file_id"}}};
+       {"matched_symbol_index", "file_id"},
+       {"expression_occurrence", "file_id"},
+       {"source_region", "file_id"}}};
   for (const auto &[table, column] : tables) {
     auto present = factsTableExists(database, table);
     if (!present) {
