@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from .entity import Entity, make_entity
 from .errors import FactsToolError
 from .executor import Executor
+from .graph_evidence import GraphEvidenceMethods
 from .queryplan.sources import codebase, start, symbol
 from .queryplan.stages import in_, nodes, out, sites, view
 from .rows import Row
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
     from .fluent import EntityQuery
 
 
-class GraphQuery:
+class GraphQuery(GraphEvidenceMethods):
     def __init__(self, executor: Executor):
         self.executor = executor
 
@@ -66,6 +67,9 @@ class GraphQuery:
 
     def bases(self, ref: str, max_depth: int = 1) -> list[Entity]:
         return self.neighbors(ref, "inherits", max_depth=max_depth)
+
+    def ancestors(self, ref: str, max_depth: int = 1) -> list[Entity]:
+        return self.bases(ref, max_depth)
 
     def subclasses(self, ref: str, max_depth: int = 1) -> list[Entity]:
         return self.neighbors(ref, "inherits", inbound=True, max_depth=max_depth)

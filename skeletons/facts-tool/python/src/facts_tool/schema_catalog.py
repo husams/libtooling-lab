@@ -14,6 +14,8 @@ FACTS_TABLES = {
     "include_dependency",
 }
 
+EVIDENCE_TABLES = {"expression_occurrence", "source_region"}
+
 PROJECT_TABLES = {
     "semantic_universe",
     "repository",
@@ -61,4 +63,34 @@ COLUMNS = {
     },
     "component": {"id", "path", "version", "repository_id"},
     "repository": {"id", "active_clone_id"},
+    "expression_occurrence": {
+        "occurrence_id",
+        "identity",
+        "owner_id",
+        "target_id",
+        "file_id",
+        "line",
+        "col",
+        "offset",
+        "size",
+        "source_sha256",
+        "expression_kind",
+        "access",
+        "freshness",
+        "unavailable_reason",
+    },
+    "source_region": {
+        "region_id",
+        "identity",
+        "symbol_id",
+        "file_id",
+        "line",
+        "col",
+        "offset",
+        "size",
+        "source_sha256",
+        "symbol_kind",
+        "freshness",
+        "unavailable_reason",
+    },
 }

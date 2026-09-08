@@ -10,6 +10,8 @@ FACT_VIEWS = {
     "enumerator",
     "initializer",
     "return_type",
+    "expression_occurrence",
+    "source_region",
 }
 PROJECT_VIEWS = {"repository", "clone", "component", "directory", "file"}
 VIEWS = FACT_VIEWS | PROJECT_VIEWS

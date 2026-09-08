@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from support.facts_data import add_facts
 from support.project_data import add_project
+from support.schema13 import add_schema13
 
 
 def _schema(name: str) -> str:
@@ -24,6 +25,24 @@ def paired_databases(tmp_path: Path) -> tuple[Path, Path]:
         db.executescript(_schema("project_schema.sql"))
         add_project(db, tmp_path / "checkout λ with spaces")
     return facts, project
+
+
+@pytest.fixture
+def schema13_pair(tmp_path: Path):
+    facts = tmp_path / "schema13-facts.sqlite"
+    project = tmp_path / "schema13-project.sqlite"
+    with sqlite3.connect(facts) as db:
+        db.executescript(_schema("facts_schema.sql"))
+        add_facts(db)
+    with sqlite3.connect(project) as db:
+        db.executescript(_schema("project_schema.sql"))
+        add_project(db, tmp_path / "checkout λ with spaces")
+    root = tmp_path / "checkout λ with spaces"
+    source = root / "src" / "main.cpp"
+    source.parent.mkdir(parents=True)
+    source.write_text("int run() { return π; }\n", encoding="utf-8")
+    add_schema13(facts, root)
+    return facts, project, source
 
 
 @pytest.fixture
