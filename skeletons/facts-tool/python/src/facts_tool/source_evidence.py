@@ -50,6 +50,9 @@ def _attach_text(row: Row, max_bytes: int, include_text: bool) -> None:
         _unavailable(row, "source file path is unavailable")
         return
     path = Path(str(path_value))
+    if row.get("_capture_provenance_missing"):
+        _unavailable(row, "facts provenance is missing for source file")
+        return
     captured = row.get("_capture_path")
     if captured and path.resolve() != Path(str(captured)).resolve():
         _unavailable(row, "source checkout differs from facts provenance")

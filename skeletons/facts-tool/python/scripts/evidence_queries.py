@@ -4,6 +4,9 @@ from contextlib import suppress
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
+from evidence_facades import assert_facade_matrix
+from evidence_provenance import assert_provenance_outcomes
+
 from facts_tool import FactsToolError, open_codebase
 
 
@@ -16,6 +19,7 @@ def run_evidence(facts: Path, project: Path) -> None:
         )
         original = source.read_bytes()
         expressions = cb.evidence.expressions()
+        assert_facade_matrix(cb)
         assert cb.expressions().rows == expressions.rows
         assert cb.graph.expressions().rows == expressions.rows
         assert {row["access"] for row in expressions} >= {
@@ -86,3 +90,4 @@ def run_evidence(facts: Path, project: Path) -> None:
     with open_codebase(facts_db=facts, project_db=project) as switched:
         assert switched.source_regions(include_text=True).unknown
         assert switched.expression_occurrences().unknown
+    assert_provenance_outcomes(facts, project, source)

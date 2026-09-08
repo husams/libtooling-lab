@@ -2,7 +2,13 @@ import sqlite3
 from dataclasses import dataclass
 
 from .errors import fail
-from .schema_catalog import COLUMNS, EVIDENCE_TABLES, FACTS_TABLES, PROJECT_TABLES
+from .schema_catalog import (
+    COLUMNS,
+    EVIDENCE_TABLES,
+    FACTS_TABLES,
+    PROJECT_TABLES,
+    PROVENANCE_TABLE,
+)
 from .schema_graph import CALLGRAPH_COLUMNS, CALLGRAPH_TABLES
 
 
@@ -57,16 +63,14 @@ def inspect_schema(db: sqlite3.Connection, role: str) -> SchemaIdentity:
             if absent:
                 fail("E_SCHEMA", f"facts.{table} lacks columns: " + ", ".join(absent))
     if role == "facts" and version == 13:
-        missing_evidence = sorted(
-            (EVIDENCE_TABLES | {"facts_project_provenance"}) - set(tables)
-        )
+        missing_evidence = sorted((EVIDENCE_TABLES | {PROVENANCE_TABLE}) - set(tables))
         if missing_evidence:
             fail(
                 "E_SCHEMA",
                 "unsupported schema 13 layout; lacks evidence tables: "
                 + ", ".join(missing_evidence),
             )
-        for table in EVIDENCE_TABLES:
+        for table in EVIDENCE_TABLES | {PROVENANCE_TABLE}:
             actual = {
                 str(row[1]) for row in db.execute(f'PRAGMA table_info("{table}")')
             }

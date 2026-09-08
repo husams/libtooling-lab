@@ -29,3 +29,6 @@ class GraphEvidenceMethods:
 
     def source_sections(self, *args: Any, **kwargs: Any) -> Any:
         return self.source_regions(*args, **kwargs)
+
+    def definition_regions(self, *args: Any, **kwargs: Any) -> Any:
+        return self.source_regions(*args, **kwargs)

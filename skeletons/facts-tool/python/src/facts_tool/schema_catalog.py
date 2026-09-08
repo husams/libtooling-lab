@@ -15,6 +15,7 @@ FACTS_TABLES = {
 }
 
 EVIDENCE_TABLES = {"expression_occurrence", "source_region"}
+PROVENANCE_TABLE = "facts_project_provenance"
 
 PROJECT_TABLES = {
     "semantic_universe",
@@ -93,4 +94,5 @@ COLUMNS = {
         "freshness",
         "unavailable_reason",
     },
+    PROVENANCE_TABLE: {"file_id", "path", "universe_key"},
 }
