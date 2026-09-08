@@ -354,8 +354,8 @@ def valid_then_invalid_expression_match(context: FactsToolContext) -> None:
     context._write_compilation_database((context.expression_source, invalid))
     imported = run([
         str(context.facts_tool), "import", "-v", "0", "--conf",
-        str(context.files_database), "--compilation-database",
-        str(context.run_root_path), str(invalid),
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--compilation-database", str(context.run_root_path), str(invalid),
     ])
     require(imported.returncode == 0, imported.stdout + imported.stderr)
     context.expression_counts_before = evidence_counts(context.facts_database)
@@ -393,9 +393,9 @@ def cancelled_expression_match(context: FactsToolContext) -> None:
     context._write_compilation_database((context.expression_source, cancel_source))
     imported = run([
         str(context.facts_tool), "import", "-v", "0", "--conf",
-        str(context.files_database), "--compilation-database",
-        str(context.run_root_path), str(context.expression_source),
-        str(cancel_source),
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--compilation-database", str(context.run_root_path),
+        str(context.expression_source), str(cancel_source),
     ])
     require(imported.returncode == 0, imported.stdout + imported.stderr)
     process = subprocess.Popen([
