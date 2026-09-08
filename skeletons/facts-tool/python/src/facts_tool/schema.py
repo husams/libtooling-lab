@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from .errors import fail
 from .schema_catalog import COLUMNS, FACTS_TABLES, PROJECT_TABLES
+from .schema_graph import CALLGRAPH_COLUMNS, CALLGRAPH_TABLES
 
 
 @dataclass(frozen=True)
@@ -34,9 +35,26 @@ def inspect_schema(db: sqlite3.Connection, role: str) -> SchemaIdentity:
     required = FACTS_TABLES if role == "facts" else PROJECT_TABLES
     version = _scalar(db, "PRAGMA user_version")
     facts_shape = {"symbol", "relation"} <= set(tables)
-    if role == "facts" and facts_shape and version not in (10, 11):
-        fail("E_SCHEMA", f"facts schema user_version {version} is unsupported; "
-             "need 10 or 11")
+    if role == "facts" and facts_shape and version not in (10, 11, 12):
+        fail(
+            "E_SCHEMA",
+            f"facts schema user_version {version} is unsupported; need 10, 11, or 12",
+        )
+    if role == "facts" and version == 12:
+        missing_graph = sorted(CALLGRAPH_TABLES - set(tables))
+        if missing_graph:
+            fail(
+                "E_SCHEMA",
+                "unsupported schema 12 layout; lacks callgraph tables: "
+                + ", ".join(missing_graph),
+            )
+        for table in CALLGRAPH_TABLES:
+            actual = {
+                str(row[1]) for row in db.execute(f'PRAGMA table_info("{table}")')
+            }
+            absent = sorted(CALLGRAPH_COLUMNS[table] - actual)
+            if absent:
+                fail("E_SCHEMA", f"facts.{table} lacks columns: " + ", ".join(absent))
     missing = sorted(required - set(tables))
     if missing:
         fail("E_DATABASE_ROLE", f"{role} database lacks tables: {', '.join(missing)}")
