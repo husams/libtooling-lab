@@ -17,6 +17,20 @@ def run(command: list[str], cwd=None) -> subprocess.CompletedProcess[str]:
                           text=True, check=False)
 
 
+def evidence_counts(path) -> tuple[int, int, int]:
+    with sqlite3.connect(path) as db:
+        counts = []
+        for table in ("expression_occurrence", "source_region", "symbol"):
+            try:
+                counts.append(db.execute(
+                    f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+            except sqlite3.OperationalError as error:
+                if "no such table" not in str(error):
+                    raise
+                counts.append(0)
+    return tuple(counts)
+
+
 def prepare_pair(context: FactsToolContext) -> None:
     context.prepare()
     context.targeted_match_source = (
@@ -152,12 +166,47 @@ def source_region_match(context: FactsToolContext) -> None:
 def source_region_rows(context: FactsToolContext) -> None:
     with sqlite3.connect(context.facts_database) as db:
         rows = db.execute(
-            "SELECT symbol_kind,offset,size,source_sha256,freshness FROM "
-            "source_region").fetchall()
+            "SELECT sr.symbol_kind,s.qualified_name,sr.offset,sr.size,"
+            "sr.source_sha256,sr.freshness FROM source_region sr JOIN symbol s "
+            "ON s.id=sr.symbol_id WHERE sr.freshness='current'").fetchall()
     require(rows, "no source region rows")
-    require({row[0] for row in rows} >= {"record", "method"}, str(rows))
-    require(all(row[1] >= 0 and row[2] > 0 and len(row[3]) == 64 and
-                row[4] == "current" for row in rows), str(rows))
+    require({row[0] for row in rows} >= {"record", "method", "function"},
+            str(rows))
+    require(sum(row[1] == "expression_evidence::Record::overload"
+                for row in rows) >= 2, str(rows))
+    require(any(row[1] == "expression_evidence::Record::outOfLine"
+                for row in rows), str(rows))
+    require(any("::Nested" in row[1] for row in rows), str(rows))
+    require(any(row[1] == "expression_evidence::Box" for row in rows), str(rows))
+    require(any(row[1] == "expression_evidence::Derived" for row in rows), str(rows))
+    require(all(row[2] >= 0 and row[3] > 0 and len(row[4]) == 64 and
+                row[5] == "current" for row in rows), str(rows))
+
+
+@when("a symbol matcher captures unsupported source regions")
+def unsupported_source_region_match(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--capture-source",
+        "--conf", str(context.files_database), "--facts",
+        str(context.facts_database), "--matcher",
+        'namedDecl(isExpansionInMainFile(), anyOf(functionDecl(), '
+        'cxxRecordDecl())).bind("symbol")',
+        str(context.expression_source),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("unavailable source region reasons remain explicit")
+def unavailable_source_region_rows(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT freshness,unavailable_reason FROM source_region "
+            "WHERE freshness='unavailable'").fetchall()
+    require(rows, "no unavailable source region rows")
+    reasons = {row[1] for row in rows}
+    require(any("declaration-only" in reason for reason in reasons), str(rows))
+    require(any("implicit" in reason for reason in reasons), str(rows))
+    require(any("macro" in reason for reason in reasons), str(rows))
 
 
 @given("a two-translation-unit expression evidence fixture")
@@ -293,6 +342,55 @@ def readonly_expression_match(context: FactsToolContext) -> None:
     context.last_returncode = completed.returncode
     context.last_output = completed.stdout + completed.stderr
     context.expression_before_failure = before
+
+
+@when("a valid then invalid expression matcher runs")
+def valid_then_invalid_expression_match(context: FactsToolContext) -> None:
+    invalid = context.run_root_path / "expression_match_failure.cpp"
+    shutil.copy2(context.fixture_root / "expression_match_failure.cpp", invalid)
+    context._write_compilation_database((context.expression_source, invalid))
+    imported = run([
+        str(context.facts_tool), "import", "-v", "0", "--conf",
+        str(context.files_database), "--compilation-database",
+        str(context.run_root_path), str(invalid),
+    ])
+    require(imported.returncode == 0, imported.stdout + imported.stderr)
+    context.expression_counts_before = evidence_counts(context.facts_database)
+    completed = run([
+        str(context.facts_tool), "match", "-v", "0", "--conf",
+        str(context.files_database), "--facts", str(context.facts_database),
+        "--matcher", 'memberExpr(hasDeclaration(fieldDecl())).bind("expression")',
+        str(context.expression_source), str(invalid),
+    ])
+    context.last_returncode = completed.returncode
+    context.last_output = completed.stdout + completed.stderr
+
+
+@then("the failed expression match leaves every facts table unchanged")
+def failed_expression_match_unchanged(context: FactsToolContext) -> None:
+    require(context.last_returncode != 0, context.last_output)
+    after = evidence_counts(context.facts_database)
+    require(after == context.expression_counts_before,
+            f"before={context.expression_counts_before} after={after}")
+
+
+@when("ordinary extraction runs for the expression fixture")
+def ordinary_expression_extract(context: FactsToolContext) -> None:
+    completed = run([
+        str(context.facts_tool), "extract", "-v", "0", "--conf",
+        str(context.files_database), "--output", str(context.facts_database),
+        str(context.expression_source),
+    ])
+    require(completed.returncode == 0, completed.stdout + completed.stderr)
+
+
+@then("ordinary extraction has no expression or source evidence rows")
+def ordinary_expression_rows_absent(context: FactsToolContext) -> None:
+    with sqlite3.connect(context.facts_database) as db:
+        rows = db.execute(
+            "SELECT (SELECT COUNT(*) FROM expression_occurrence), "
+            "(SELECT COUNT(*) FROM source_region)").fetchone()
+    require(rows == (0, 0), str(rows))
 
 
 @then("the failed expression match leaves the prior evidence unchanged")

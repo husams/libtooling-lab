@@ -70,6 +70,7 @@ Feature: Canonical source file registry
       | expression_evidence_two.cpp |
       | expression_unavailable_one.cpp |
       | expression_unavailable_two.cpp |
+      | expression_match_failure.cpp |
       | one.cpp    |
       | two.cpp    |
     And every registered FileId is greater than zero

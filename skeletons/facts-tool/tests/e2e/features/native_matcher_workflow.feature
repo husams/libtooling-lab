@@ -20,6 +20,8 @@ Feature: Native matcher workflow
     Then both source fingerprints remain queryable
     When a symbol matcher captures source regions
     Then the source region rows retain definition ranges and freshness
+    When a symbol matcher captures unsupported source regions
+    Then unavailable source region reasons remain explicit
 
   Scenario: Expression evidence keeps distinct translation-unit provenance
     Given a two-translation-unit expression evidence fixture
@@ -38,6 +40,16 @@ Feature: Native matcher workflow
     When an expression matcher captures field evidence
     And the expression facts store becomes read-only for a second match
     Then the failed expression match leaves the prior evidence unchanged
+
+  Scenario: Failed expression matching rolls back a prior translation unit
+    Given a separately stored expression evidence fixture
+    When a valid then invalid expression matcher runs
+    Then the failed expression match leaves every facts table unchanged
+
+  Scenario: Ordinary extraction leaves expression evidence opt-in
+    Given a separately stored expression evidence fixture
+    When ordinary extraction runs for the expression fixture
+    Then ordinary extraction has no expression or source evidence rows
 
   Scenario: Invalid binding fails before writing through the paired workflow
     Given a separately stored native matcher fixture
