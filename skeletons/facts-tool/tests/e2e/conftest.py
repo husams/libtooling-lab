@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -131,6 +132,20 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption("--compiler", type=Path, required=True)
     group.addoption("--clang-driver", type=Path, default=None)
     group.addoption("--output-root", type=Path, required=True)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolated_user_configuration(pytestconfig: pytest.Config) -> None:
+    """Keep the developer's ~/.config/facts-tool/config.yaml out of every scenario.
+
+    facts-tool discovers user defaults through XDG_CONFIG_HOME, so point it at
+    an empty directory under the output root and drop any direct overrides.
+    """
+    root = Path(pytestconfig.getoption("--output-root")).resolve() / "no-user-defaults"
+    root.mkdir(parents=True, exist_ok=True)
+    for name in ("FACTS_TOOL_CONF", "FACTS_TOOL_CONFIG"):
+        os.environ.pop(name, None)
+    os.environ["XDG_CONFIG_HOME"] = str(root)
 
 
 @pytest.fixture
