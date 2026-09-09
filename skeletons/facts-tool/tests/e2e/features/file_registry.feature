@@ -22,6 +22,8 @@ Feature: Canonical source file registry
       | call_graph_two.cpp |
       | external_targets.cpp |
       | external_template_specialization.cpp |
+      | override_relation_perf.cpp |
+      | override_relation_perf_system.hpp |
       | forced-include/include/forced.hpp |
       | forced-include/optional.cpp |
       | forced-include/paths.cpp |

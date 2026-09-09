@@ -14,8 +14,10 @@ extractOverrideRelations(const clang::CXXMethodDecl &method,
                          FileManager &files, FactStore &store) {
   std::vector<callgraph::OverrideFact> facts;
   const auto location = extractLocation(sourceManager, method.getLocation());
+  if (!location)
+    return facts;
   const auto file = resolveFile(sourceManager, method.getLocation(), files);
-  if (!location || !file)
+  if (!file)
     return facts;
   auto source = resolveRelationTarget(method, sourceManager, files, store);
   if (!source)
