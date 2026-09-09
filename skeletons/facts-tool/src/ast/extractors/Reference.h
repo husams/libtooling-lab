@@ -6,9 +6,10 @@
 #include "model/RelationSite.h"
 
 #include <optional>
+#include <vector>
 
 namespace clang {
-class ASTContext;
+class CallExpr;
 class Expr;
 class FunctionDecl;
 class NamedDecl;
@@ -22,13 +23,23 @@ class FileManager;
 
 enum class ReferenceDisposition { Uses, SpecificRelation, Skip };
 
+class ReferenceContext final {
+public:
+  void enter(const clang::CallExpr &call);
+  void leave();
+  [[nodiscard]] bool isDirectCallee(const clang::Expr &expression) const;
+
+private:
+  std::vector<const clang::Expr *> directCallees_;
+};
+
 struct UseFact {
   Relation relation;
   RelationSite site;
 };
 
 ReferenceDisposition classifyReference(const clang::Expr &expression,
-                                       clang::ASTContext &context);
+                                       const ReferenceContext &context);
 
 const clang::FunctionDecl &referenceOwner(const clang::FunctionDecl &decl);
 

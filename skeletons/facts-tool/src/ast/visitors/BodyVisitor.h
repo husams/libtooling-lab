@@ -29,6 +29,8 @@ public:
   bool TraverseCXXMethodDecl(clang::CXXMethodDecl *decl);
   bool TraverseFunctionDecl(clang::FunctionDecl *decl);
   bool TraverseLambdaExpr(clang::LambdaExpr *expression);
+  bool dataTraverseStmtPre(clang::Stmt *statement);
+  bool dataTraverseStmtPost(clang::Stmt *statement);
 
   bool VisitCallExpr(clang::CallExpr *expression);
   bool VisitCXXConstructExpr(clang::CXXConstructExpr *expression);
@@ -57,6 +59,7 @@ private:
 
   const clang::FunctionDecl &owner_;
   clang::ASTContext &context_;
+  ReferenceContext referenceContext_;
   FileManager &files_;
   FactStore &store_;
   IndexingStatus &status_;

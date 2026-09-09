@@ -7,6 +7,7 @@
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
+#include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Tooling/Tooling.h>
 #include <llvm/Support/Casting.h>
 
@@ -16,6 +17,7 @@
 #include <cassert>
 #include <filesystem>
 #include <fstream>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <sys/wait.h>
@@ -23,6 +25,90 @@
 #include <vector>
 
 namespace {
+
+class ReferenceContextProbe final
+    : public clang::RecursiveASTVisitor<ReferenceContextProbe> {
+public:
+  struct Observation {
+    std::string name;
+    facts::ReferenceDisposition disposition;
+  };
+
+  bool dataTraverseStmtPre(clang::Stmt *statement) {
+    if (const auto *call = llvm::dyn_cast<clang::CallExpr>(statement)) {
+      context_.enter(*call);
+    }
+    return true;
+  }
+
+  bool dataTraverseStmtPost(clang::Stmt *statement) {
+    if (llvm::isa<clang::CallExpr>(statement)) {
+      context_.leave();
+    }
+    return true;
+  }
+
+  bool VisitDeclRefExpr(clang::DeclRefExpr *expression) {
+    observations.push_back(
+        {expression->getDecl()->getNameAsString(),
+         facts::classifyReference(*expression, context_)});
+    return true;
+  }
+
+  bool VisitMemberExpr(clang::MemberExpr *expression) {
+    observations.push_back(
+        {expression->getMemberDecl()->getNameAsString(),
+         facts::classifyReference(*expression, context_)});
+    return true;
+  }
+
+  std::vector<Observation> observations;
+
+private:
+  facts::ReferenceContext context_;
+};
+
+void verifyReferenceContext(const std::filesystem::path &outputRoot) {
+  auto ast = clang::tooling::buildASTFromCodeWithArgs(
+      R"cpp(
+int freeFunction();
+struct Member { int field; int method(); };
+int owner(int (*pointer)()) {
+  Member member;
+  return (freeFunction)() + member.method() + pointer() + member.field;
+}
+template <typename T> T dependent(T value) { return value; }
+)cpp",
+      {"-std=c++23"}, "reference_context.cpp");
+  assert(ast);
+
+  ReferenceContextProbe probe;
+  assert(probe.TraverseAST(ast->getASTContext()));
+
+  const auto dispositions = [&](std::string_view name) {
+    const auto matches = probe.observations |
+                         std::views::filter([&](const auto &observation) {
+                           return observation.name == name;
+                         }) |
+                         std::views::transform([](const auto &observation) {
+                           return observation.disposition;
+                         }) |
+                         std::ranges::to<std::vector>();
+    assert(!matches.empty());
+    return matches;
+  };
+  const auto allAre = [&](std::string_view name,
+                          facts::ReferenceDisposition expected) {
+    return std::ranges::all_of(dispositions(name),
+                               [&](auto value) { return value == expected; });
+  };
+  assert(allAre("freeFunction", facts::ReferenceDisposition::SpecificRelation));
+  assert(allAre("method", facts::ReferenceDisposition::SpecificRelation));
+  assert(allAre("pointer", facts::ReferenceDisposition::SpecificRelation));
+  assert(allAre("member", facts::ReferenceDisposition::Uses));
+  assert(allAre("field", facts::ReferenceDisposition::Uses));
+  assert(allAre("value", facts::ReferenceDisposition::Skip));
+}
 
 void verifyExtractorSkips(const std::filesystem::path &outputRoot) {
   auto ast = clang::tooling::buildASTFromCodeWithArgs(
@@ -228,6 +314,7 @@ void verifyOrder(const std::filesystem::path &factsTool,
 int main(int argc, char **argv) {
   assert(argc == 5);
   const std::filesystem::path outputRoot = argv[4];
+  verifyReferenceContext(outputRoot / "reference-context");
   verifyExtractorSkips(outputRoot / "extractor-skips");
   verifyOrder(argv[1], argv[2], argv[3], outputRoot / "forward", false);
   verifyOrder(argv[1], argv[2], argv[3], outputRoot / "reverse", true);

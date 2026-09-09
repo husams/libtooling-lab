@@ -11,6 +11,7 @@
 #include <clang/AST/Expr.h>
 #include <clang/AST/ExprCXX.h>
 #include <clang/Basic/SourceManager.h>
+#include <llvm/Support/Casting.h>
 
 #include <algorithm>
 #include <ranges>
@@ -41,6 +42,20 @@ std::vector<RelationSite> relationSites(const std::vector<UseFact> &facts) {
 
 } // namespace
 
+bool BodyVisitor::dataTraverseStmtPre(clang::Stmt *statement) {
+  if (const auto *call = llvm::dyn_cast<clang::CallExpr>(statement)) {
+    referenceContext_.enter(*call);
+  }
+  return true;
+}
+
+bool BodyVisitor::dataTraverseStmtPost(clang::Stmt *statement) {
+  if (llvm::isa<clang::CallExpr>(statement)) {
+    referenceContext_.leave();
+  }
+  return true;
+}
+
 void BodyVisitor::capture(ExtractionResult<std::optional<UseFact>> fact,
                           const clang::NamedDecl &referenced) {
   if (!fact) {
@@ -65,7 +80,8 @@ void BodyVisitor::capture(ExtractionResult<std::optional<UseFact>> fact,
 void BodyVisitor::capture(const clang::Expr &expression,
                           const clang::NamedDecl &referenced,
                           clang::SourceLocation location) {
-  if (classifyReference(expression, context_) != ReferenceDisposition::Uses) {
+  if (classifyReference(expression, referenceContext_) !=
+      ReferenceDisposition::Uses) {
     return;
   }
   capture(extractUseReference(owner_, referenced, location,

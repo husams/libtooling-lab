@@ -8,11 +8,9 @@
 #include "storage/FactStore.h"
 #include "storage/FileManager.h"
 
-#include <clang/AST/ASTContext.h>
 #include <clang/AST/DeclTemplate.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/ExprCXX.h>
-#include <clang/AST/ParentMapContext.h>
 #include <llvm/Support/Casting.h>
 
 #include <expected>
@@ -35,23 +33,19 @@ bool transparentCalleeWrapper(const clang::Expr &expression) {
                    clang::ExprWithCleanups>(expression);
 }
 
-bool isDirectCallee(const clang::Expr &expression, clang::ASTContext &context) {
+const clang::Expr &unwrapCallee(const clang::Expr &expression) {
   const clang::Expr *current = &expression;
-  while (true) {
-    const auto parents = context.getParents(*current);
-    if (parents.size() != 1) {
-      return false;
+  while (transparentCalleeWrapper(*current)) {
+    if (const auto *paren = llvm::dyn_cast<clang::ParenExpr>(current)) {
+      current = paren->getSubExpr();
+    } else if (const auto *cast =
+                   llvm::dyn_cast<clang::ImplicitCastExpr>(current)) {
+      current = cast->getSubExpr();
+    } else {
+      current = llvm::cast<clang::ExprWithCleanups>(current)->getSubExpr();
     }
-    if (const auto *call = parents[0].get<clang::CallExpr>()) {
-      return call->getCallee()->IgnoreParenImpCasts() ==
-             expression.IgnoreParenImpCasts();
-    }
-    const auto *parent = parents[0].get<clang::Expr>();
-    if (parent == nullptr || !transparentCalleeWrapper(*parent)) {
-      return false;
-    }
-    current = parent;
   }
+  return *current;
 }
 
 ExtractionResult<std::optional<UseFact>>
@@ -102,12 +96,23 @@ addTarget(const clang::NamedDecl &referenced, clang::SourceLocation site,
 
 } // namespace
 
+void ReferenceContext::enter(const clang::CallExpr &call) {
+  const auto &callee = unwrapCallee(*call.getCallee());
+  directCallees_.push_back(&callee);
+}
+
+void ReferenceContext::leave() { directCallees_.pop_back(); }
+
+bool ReferenceContext::isDirectCallee(const clang::Expr &expression) const {
+  return !directCallees_.empty() && directCallees_.back() == &expression;
+}
+
 ReferenceDisposition classifyReference(const clang::Expr &expression,
-                                       clang::ASTContext &context) {
+                                       const ReferenceContext &context) {
   if (expression.isValueDependent()) {
     return ReferenceDisposition::Skip;
   }
-  return isDirectCallee(expression, context)
+  return context.isDirectCallee(expression)
              ? ReferenceDisposition::SpecificRelation
              : ReferenceDisposition::Uses;
 }
