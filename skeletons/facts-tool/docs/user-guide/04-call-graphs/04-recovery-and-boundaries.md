@@ -66,7 +66,7 @@ The run keeps every edge reached **before** the failing TU - for example,
 `root -> bridge` is retained even if `bridge -> leaf` could not be recorded
 because the leaf's translation unit failed to compile. A successful
 recovery search can still leave an unavailable definition boundary; read
-`callgraph_run_recovery` and the persisted edges rather than treating exit
+the public SDK's `cb.callgraphs.get(run_id).recovery` and `.edges` pages rather than treating exit
 0 as proof of complete source coverage.
 
 ### Retry scope

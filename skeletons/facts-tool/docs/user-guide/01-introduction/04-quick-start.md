@@ -260,29 +260,27 @@ facts-tool: call-graph: complete
 facts-tool: call graph run 1 complete
 ```
 
-`analyse call-graph` never writes a graph to your terminal beyond that one
-line - the actual edges live in the facts database's `callgraph_run*`
-tables and must be read back, either with the Python SDK (next step) or
-with raw SQL for a quick look:
+Read the exact persisted run through the public Python SDK, using the run
+ID printed by the command. Never query either database with SQL, `sqlite3`,
+a database driver, or a private SDK connection, even for diagnostics.
 
-```console
-$ sqlite3 demo-facts.db "SELECT s1.qualified_name, s2.qualified_name, e.kind, e.depth
-    FROM callgraph_run_edge e
-    JOIN symbol s1 ON s1.id = e.source_id
-    JOIN symbol s2 ON s2.id = e.destination_id
-    WHERE e.run_id = 1 ORDER BY e.depth;"
-main|(anonymous namespace)::totalArea|1|1
-main|std::function<type-parameter-0-0 (type-parameter-0-1...)>::function<_Rp (_ArgTypes...)>|1|1
-... 15 more depth-1 STL constructor/destructor/operator() edges ...
-(anonymous namespace)::totalArea|std::__1::operator!=|1|2
-... 5 more depth-2 STL iterator edges ...
-(anonymous namespace)::totalArea|shapes::describe|1|2
-shapes::describe|shapes::Shape::area|1|3
-shapes::describe|shapes::Circle::area|18|3
-shapes::describe|shapes::Square::area|18|3
+```python
+from facts_tool import open_codebase
+
+with open_codebase(facts_db="demo-facts.db", project_db="demo.db") as cb:
+    run_id = 1  # Replace with the ID from the native completion line.
+    run = cb.callgraphs.get(run_id, limit=1000)
+    print(run.status, run.edges.total, run.edges.truncated)
+    for edge in run.edges:
+        print(edge.source.qualified_name, edge.target.qualified_name,
+              edge.kind_id, edge.depth)
 ```
 
-That is 27 edges in total: 17 at depth 1, 7 at depth 2, and 3 at depth 3.
+If `run.edges.truncated` is true, page through the remaining edges using the
+[SDK run reader](../05-python-sdk/06-persisted-callgraph-runs.md).
+If the installed SDK cannot read the store, report its schema or capability
+error rather than bypassing it. Traversal completion does not establish
+complete source coverage.
 
 Kind `1` is a static `Calls` edge; kind `18` is `DispatchCalls` - the
 traversal correctly resolved the virtual `Shape::area()` call inside
@@ -293,9 +291,8 @@ model.
 
 ## 7. One query from the Python SDK
 
-Raw SQL works, but it means re-deriving the schema every time and re-doing
-that yourself if the schema changes. The documented, schema-checked way to
-read a run back is through `CodeBase.callgraphs`:
+Always read a persisted run through the public Python SDK's schema-checked
+`CodeBase.callgraphs` API:
 
 ```console
 $ python -c "
@@ -317,9 +314,8 @@ shapes::describe -> shapes::Square::area DispatchCalls 3
 ```
 
 This is the same run you just created from the CLI, read back through the
-SDK's schema-checked, paginated reader instead of raw SQL - the pattern to
-reach for whenever a query needs to survive schema changes or run inside an
-agent. See
+SDK's schema-checked, paginated reader. Use this public interface for all
+agent reads of persisted runs. See
 [05-python-sdk/06-persisted-callgraph-runs](../05-python-sdk/06-persisted-callgraph-runs.md)
 for the full reader API, including paging through large runs.
 

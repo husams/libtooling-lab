@@ -236,7 +236,9 @@ facts-tool: dependency: complete
 
 Like `analyse call-graph`, this writes into the facts database
 (`include_dependency` table) rather than printing a graph to stdout; read
-it back through SQL or the Python SDK. `sources` is required - unlike
+it back through the public Python SDK where supported; if the installed SDK
+does not expose the required evidence, report that capability gap and never
+fall back to SQL or a database driver. `sources` is required - unlike
 `extract`, there is no "extract everything registered" default for this
 command. `facts-tool-batch dependency` (see
 [Batch Processing](../03-extracting-facts/04-batch-processing.md)) runs

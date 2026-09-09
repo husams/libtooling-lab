@@ -23,7 +23,7 @@ and understand why matcher breadth matters on a real, non-trivial file.
 ### 1. A broad matcher can crash on a real, non-trivial translation unit
 
 ```console
-$ facts-tool match --conf project.sqlite --facts facts.sqlite -v 2 \
+$ facts-tool match --conf project.sqlite --facts ./facts.sqlite -v 2 \
     --matcher 'functionDecl(isDefinition()).bind("symbol")' src/commands/Import.cpp
 symbol kind=method name=facts::config::Resolved::Resolved
 ...
@@ -42,7 +42,7 @@ location the extractor cannot persist. The whole `match` invocation fails
 ### 2. Narrow the matcher: it succeeds and lands in the matched-symbol index
 
 ```console
-$ facts-tool match --conf project.sqlite --facts facts.sqlite -v 1 \
+$ facts-tool match --conf project.sqlite --facts ./facts.sqlite -v 1 \
     --matcher 'functionDecl(hasName("import"), isDefinition()).bind("symbol")' src/commands/Import.cpp
 symbol kind=function name=facts::commands::(anonymous namespace)::import
 facts-tool: 6 symbol(s) recorded from 5 file(s)
@@ -68,7 +68,7 @@ for the full contract of this index.
 An unscoped call binding over the whole file fails:
 
 ```console
-$ facts-tool match --conf project.sqlite --facts facts.sqlite -v 1 --relation-kind Calls \
+$ facts-tool match --conf project.sqlite --facts ./facts.sqlite -v 1 --relation-kind Calls \
     --matcher 'callExpr(callee(functionDecl().bind("callee"))).bind("call")' src/commands/Import.cpp
 facts-tool: match: failed
 facts-tool: direct call has no persistable call site
@@ -79,7 +79,7 @@ $ echo $?
 Scoping to one function's body succeeds:
 
 ```console
-$ facts-tool match --conf project.sqlite --facts facts.sqlite -v 1 --relation-kind Calls \
+$ facts-tool match --conf project.sqlite --facts ./facts.sqlite -v 1 --relation-kind Calls \
     --matcher 'callExpr(hasAncestor(functionDecl(hasName("main"))), callee(functionDecl().bind("callee"))).bind("call")' \
     src/main.cpp
 argument index=0 source='argc' type='int' category=prvalue value='unknown'
@@ -97,7 +97,7 @@ know is well-formed for this purpose.
 ### 4. `source`/`target`/`site` binding: source and target must be declarations
 
 ```console
-$ facts-tool match --conf project.sqlite --facts facts.sqlite -v 1 --relation-kind Uses \
+$ facts-tool match --conf project.sqlite --facts ./facts.sqlite -v 1 --relation-kind Uses \
     --matcher 'declRefExpr(to(parmVarDecl(hasName("argv")).bind("target")), \
                             hasAncestor(functionDecl(hasName("main")).bind("source"))).bind("site")' \
     src/main.cpp

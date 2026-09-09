@@ -24,8 +24,8 @@ version of the tool did render text/JSON/Mermaid output directly, but that
 renderer was deliberately removed. If you find older material describing
 `--format`/`--output` flags or inline diagrams for `analyse call-graph`
 itself, it describes a version of the tool that predates this rewrite and
-no longer applies. Read a run back through SQLite directly, or (preferred,
-for anything beyond ad hoc inspection) the Python SDK's persisted-run reader
+no longer applies. Read a run back only through the public Python SDK's
+persisted-run reader; never query SQLite directly, even for diagnostics
 - see [Entries, Runs, and Status](03-entries-runs-and-status.md) and
 [the SDK's persisted call-graph runs chapter](../05-python-sdk/06-persisted-callgraph-runs.md).
 

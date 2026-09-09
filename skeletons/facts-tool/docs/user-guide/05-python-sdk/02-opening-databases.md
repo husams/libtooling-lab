@@ -17,9 +17,9 @@ def open_codebase(
 ```
 
 Both `facts_db` and `project_db` are mandatory keyword arguments. Both must
-name existing, different physical files. `open_codebase` opens each with
-`sqlite3.connect("file:...?mode=ro", uri=True)` and sets
-`PRAGMA query_only=ON` on the connection - the SDK creates no path, table,
+name existing, different physical files. `open_codebase` enforces read-only
+access internally; agents must never open their own database connections or
+issue SQL, including for diagnostics. The SDK creates no path, table,
 migration, backfill, journal setting, or persistent side file, and honors
 writer locks from any process still extracting into the same store.
 

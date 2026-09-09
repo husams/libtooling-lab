@@ -317,7 +317,8 @@ facts-tool: dependency: complete
 
 Writes the `include_dependency` table (see
 [storage schema](02-storage-schema.md)); no CLI surface prints it back - read
-it with the Python SDK or `sqlite3`.
+it through the public Python SDK where supported. Report a capability gap
+if the SDK cannot expose the evidence; never query the database directly.
 
 ### `analyse call-graph`
 
@@ -375,7 +376,7 @@ facts-tool: call graph run 1 complete
 ```
 
 `analyse call-graph` never prints the graph itself - read the persisted run
-back via SQLite or the Python SDK's `cb.callgraphs` reader (schema 12 only);
+back through the public Python SDK's `cb.callgraphs` reader;
 see [storage schema](02-storage-schema.md) and
 [persisted call-graph runs](../05-python-sdk/06-persisted-callgraph-runs.md).
 

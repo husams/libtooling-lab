@@ -4,11 +4,15 @@ Use the native executable built from this checkout. Confirm its configuration
 with `facts-tool config show`, and use `symbol find` to disambiguate the exact
 qualified name or USR (see [symbol search](how-to-search-symbol.md)).
 
+Let YAML configuration resolve the database pair; explicit paths are not
+required for normal CLI use. Add `--config FILE` only when selecting a
+particular YAML file. Keep the same configuration and invocation directory
+throughout the workflow.
+
 ## Run the graph
 
 ```sh
-facts-tool analyse call-graph --conf project.db --facts facts.db \
-  --function main
+facts-tool analyse call-graph --function main
 ```
 
 This reads existing facts and traverses. It prints exactly one completion line
@@ -27,8 +31,7 @@ root writes no run.
 ## Recover missing evidence explicitly
 
 ```sh
-facts-tool analyse call-graph --conf project.db --facts facts.db \
-  --function main --recover-missing
+facts-tool analyse call-graph --function main --recover-missing
 ```
 
 Recovery can write facts using imported translation-unit commands. A failure
@@ -45,7 +48,8 @@ all|project|library`, `--max-depth N`, `--max-nodes N`, `--max-edges N`, and
 
 ## Fixture-backed recipe
 
-From the facts-tool project directory, after building `build/facts-tool`:
+This isolated fixture deliberately overrides configured paths. From the
+facts-tool project directory, after building `build/facts-tool`:
 
 ```sh
 mkdir -p build/graph-recipe

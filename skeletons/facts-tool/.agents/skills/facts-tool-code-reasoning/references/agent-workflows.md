@@ -1,27 +1,30 @@
 # Installed agent workflows
 
-Use explicit paired paths and the installed tools in every workflow. Start by
+Use YAML-resolved paired paths and the installed tools in every workflow. Start by
 checking `facts-tool config show` and the relevant command help, then reuse the
-same project/facts pair for native and SDK calls. Keep temporary acceptance
+same project/facts pair for native and SDK calls. Do not require explicit
+database-path flags; use `--config FILE` to select another YAML file when needed. Keep temporary acceptance
 stores outside the checkout; do not set `PYTHONPATH`, mutate global stores, or
 read SQLite directly.
 
 ## Build or reuse facts
 
 ```sh
-facts-tool import --conf project.db --facts facts.db -p build
-facts-tool extract --conf project.db --output facts.db
-facts-tool analyse call-graph --conf project.db --facts facts.db \
+facts-tool import -p build
+facts-tool extract
+facts-tool analyse call-graph \
   --function app::run  # capture the printed run_id
 ```
 
 The native command output identifies the persisted graph run. The SDK reads
-that exact run without replaying traversal:
+that exact run without replaying traversal. Obtain `facts_path` and
+`project_path` from the configured pair as described in the
+[SDK query guide](query-cpp.md); the SDK still takes concrete path arguments:
 
 ```python
 from facts_tool import open_codebase
 
-with open_codebase(facts_db="facts.db", project_db="project.db") as cb:
+with open_codebase(facts_db=facts_path, project_db=project_path) as cb:
     run_id = 1  # parsed from the native completion line
     run = cb.callgraphs.get(run_id)
     edges = run.edges
@@ -39,7 +42,7 @@ navigation (`callees`, `callers`, `bases`), schema13 expressions and field
 effects, and exact bounded definition regions:
 
 ```python
-with open_codebase(facts_db="facts.db", project_db="project.db") as cb:
+with open_codebase(facts_db=facts_path, project_db=project_path) as cb:
     print("symbols: " + cb.find("app::run").name)
     print("writers: " + str(len(cb.field_writers("app::Box::value").rows)))
     print("ancestors: " + ", ".join(

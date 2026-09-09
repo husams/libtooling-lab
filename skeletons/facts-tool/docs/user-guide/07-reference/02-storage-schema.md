@@ -2,16 +2,15 @@
 
 `facts-tool` always writes into two SQLite databases: the **facts database**
 and the **project (configuration) database**. This chapter documents every
-table and column in both, current schema versions, and what is safe to read
-directly versus what you should never write by hand.
+table and column in both and their current schema versions for conceptual
+reference; it is not a database-access interface.
 
-**Prefer the CLI and the Python SDK over raw SQL.** This chapter exists so an
-agent or a curious reader can understand what a query returns, not as an
-invitation to write to these files directly. The native writer enforces
-invariants (foreign keys, invalidation on catalog mutation, append-only
-history) that a hand-written `UPDATE`/`DELETE`/`INSERT` will not respect and
-can silently corrupt. Reading with `sqlite3`/Python for diagnostics is fine;
-writing is not supported and is never demonstrated in this guide.
+**Never query or modify either database directly.** Agents must use the
+public Python SDK for programmatic reads and native facts-tool commands for
+matching, extraction, and catalog mutations. SQL, `sqlite3`, other database
+drivers, and private SDK connections are prohibited, including diagnostic
+reads. If the public SDK cannot expose a required fact, report the capability
+gap. The native writer owns pairing, invalidation, and history invariants.
 
 Source of truth for both schemas: `src/storage/Schema.h` (facts database),
 `src/storage/FileSchema.h` (project database's base tables), and
@@ -165,13 +164,12 @@ fixed primitive-type IDs (`BuiltinType::Kind + 1`) and dynamically-allocated
 compiler-symbol IDs live there. See
 [locationless callables](04-limitations-and-known-issues.md).
 
-## Safe to read, never to write
+## Supported access only
 
-- **Safe to read directly**: any table in either database, for diagnostics -
-  join `symbol` on `source_id`/`destination_id` for names, join
-  `relation_site` on `(source_id, destination_id, kind, position, file_id,
-  offset)` for receiver/certainty, join `callgraph_run_edge` the same way for
-  a persisted run.
+- **Read through the public Python SDK only**: use public symbol, relation,
+  project-view, and persisted-run APIs. Never inspect tables or construct
+  joins yourself, including for diagnostics. Report missing public API
+  support as a capability gap.
 - **Never write directly**: any table in either database. The native writer
   is the only supported writer; it enforces invalidation-on-mutation,
   append-only run history, and foreign-key integrity that a hand-written

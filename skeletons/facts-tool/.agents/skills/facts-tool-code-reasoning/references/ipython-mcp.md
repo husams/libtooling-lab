@@ -25,7 +25,10 @@ and use UV.
 
 ## Keep the paired databases open
 
-Run this through `execute`, replacing any previous session cleanly:
+Use the existing YAML configuration to resolve the pair, following the
+[SDK query guide](query-cpp.md); do not request paths already configured.
+Run this through `execute` with the resolved `facts_path` and `project_path`,
+replacing any previous session cleanly:
 
 ```python
 from facts_tool import open_codebase
@@ -34,8 +37,8 @@ try:
 except NameError:
     pass
 ft_codebase = open_codebase(
-    facts_db="/absolute/path/to/facts.sqlite",
-    project_db="/absolute/path/to/project.sqlite",
+    facts_db=facts_path,
+    project_db=project_path,
 )
 ```
 

@@ -20,6 +20,35 @@ OPTIONS:
 
 ## The binding contract
 
+For source-symbol discovery, start with a registered translation unit and
+pass a Clang matcher expression directly to `--matcher` (without the
+interactive `clang-query` prefix `match` or `m`):
+
+```sh
+facts-tool match \
+  --matcher 'functionDecl(hasName("main")).bind("symbol")' src/main.cpp
+facts-tool match \
+  --matcher 'functionDecl(hasName("main"), isDefinition()).bind("symbol")' src/main.cpp
+facts-tool symbol find --name main
+```
+
+These commands use the project and facts paths resolved from your YAML
+configuration; inspect them with `facts-tool config show`. Add `--config FILE`
+only to choose a specific YAML file. Replace the example source and name for
+your project; explicit database paths are optional overrides.
+The first expression finds matching function declarations; the second
+requires a definition. `functionDecl` selects the AST node kind,
+`hasName` narrows its name, and `isDefinition` narrows its form; all supplied
+predicates must hold. `.bind("symbol")` identifies the declaration to record.
+Search a header through a registered translation unit that includes it.
+Use `cxxMethodDecl` with `ofClass`, as shown below, to narrow by class.
+
+`match` parses source, while `symbol find` reads only previously matched
+identities; resolve overloads by the returned USR. For additional persisted
+evidence, always use the public Python SDK. Never query either database
+directly, including for diagnostics. A matched definition still does not
+establish extracted body or outgoing-call coverage.
+
 A matcher expression must bind exactly one of three shapes:
 
 - **`symbol`** - bind one declaration node to the name `"symbol"`. This is
