@@ -81,7 +81,7 @@ facts_template: "{project_root}/.index/{relative_path}/{filename}.db"
 | Placeholder | Meaning |
 |---|---|
 | `{project_root}` | The resolved project identity root (see below) |
-| `{project_name}` | The basename of `{project_root}` |
+| `{project_name}` | The git repository's name (from its `origin` remote, or the alphabetically first remote), else the basename of `{project_root}` |
 | `{relative_path}` | The source file's path relative to `{project_root}` |
 | `{filename}` | The source file's basename |
 | `{user}` | The current user's name |
@@ -112,6 +112,15 @@ walk is independent of `--conf`'s literal value - `facts_template`
 resolution keys off this walk even when `--conf` points at a completely
 different path than the project root. Source filenames never determine
 project identity, only the invocation's working directory does.
+
+When `{project_root}` is itself a git repository (`.git` directory or file -
+the same test the identity walk above uses), `{project_name}` is the name of
+its `origin` remote, or, absent an `origin`, its alphabetically first remote;
+the name is the remote URL's last path segment with a trailing `.git`
+stripped, so `https://example.com/team/acme-repo.git` yields `acme-repo`. A
+git repository with no remotes, or a `{project_root}` that is not a git
+repository, falls back to the basename of `{project_root}` - the same value
+`{filename}` uses in `conf_template`.
 
 ## Exit codes related to configuration
 

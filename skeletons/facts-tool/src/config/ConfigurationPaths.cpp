@@ -2,6 +2,7 @@
 #include "config/ConfigurationDiscovery.h"
 #include "config/ConfigurationPlaceholders.h"
 #include "config/ConfigurationShape.h"
+#include "config/RepositoryName.h"
 
 #include <algorithm>
 
@@ -14,8 +15,21 @@ bool contained(const std::filesystem::path &root, const std::filesystem::path &t
   return left == root.end();
 }
 
-std::string projectName(const std::filesystem::path &projectRoot) {
+// {filename}: the project root's own basename, regardless of whether it is
+// a git repository. "_root" covers the filesystem-root edge case, where
+// filename() is empty.
+std::string projectBasename(const std::filesystem::path &projectRoot) {
   return projectRoot.filename().empty() ? "_root" : projectRoot.filename().string();
+}
+
+// {project_name}: the git repository's name (derived from its remote URL)
+// when projectRoot is a git repository, otherwise the same basename as
+// {filename}. repositoryName() fails silently -- see RepositoryName.h -- so
+// this never surfaces a libgit2 diagnostic; it just degrades to the
+// basename.
+std::string projectName(const std::filesystem::path &projectRoot) {
+  if (const auto name = repositoryName(projectRoot)) return *name;
+  return projectBasename(projectRoot);
 }
 
 // The template's leading "{name}" or "${name}" token, verbatim, or empty if
@@ -117,7 +131,7 @@ renderDatabasePath(const Resolved &value) {
   detail::PlaceholderContext context{.projectRoot = value.projectRoot.generic_string(),
                                      .projectName = projectName(value.projectRoot),
                                      .relativePath = relative,
-                                     .filename = projectName(value.projectRoot)};
+                                     .filename = projectBasename(value.projectRoot)};
   return renderTemplate(value.templateText, context, "conf_template", value.templateSource, root,
                         "conf_root", value.discovery);
 }

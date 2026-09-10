@@ -27,8 +27,12 @@ worth knowing before you do:
   does not ship the LibTooling headers this project needs, and mixing the
   two toolchains' ABIs will fail in confusing ways.
 - The project fetches its own dependencies via CMake's `FetchContent` the
-  first time you configure: CLI11, itlib, FTXUI, `yaml-cpp` 0.9.0, and the
-  SQLite amalgamation. The first configure therefore needs network access.
+  first time you configure: CLI11, itlib, FTXUI, `yaml-cpp` 0.9.0, libgit2
+  1.9.7, and the SQLite amalgamation. The first configure therefore needs
+  network access. libgit2 is built with its network/HTTPS backends off and
+  its bundled zlib/regex/hash implementations on, so it needs nothing beyond
+  what the fetch itself brings in - it is used only to read the project's
+  own `.git` remotes, for the `{project_name}` template placeholder.
 - SQLite is vendored as a static library rather than relying on whatever
   version the system provides - the storage layer needs a SQLite new enough
   to support `RETURNING` (3.35+), which older system SQLite installs

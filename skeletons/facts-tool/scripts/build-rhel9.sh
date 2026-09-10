@@ -26,6 +26,10 @@
 #     the ClangConfig.cmake/LLVMConfig.cmake that find_package(Clang) needs.
 #     They stay dynamically linked: to run the binary elsewhere the host needs
 #     `dnf install -y clang-libs llvm-libs`.
+#   * libgit2 (project identity's {project_name}). CMake's own FetchContent
+#     fetches and builds it - this script installs no extra dnf package for
+#     it, the same way it doesn't for yaml-cpp/SQLite. For an offline build,
+#     point FETCHCONTENT_SOURCE_DIR_LIBGIT2 at an unpacked libgit2 1.9.7 tree.
 #
 # Knobs (env vars):
 #   GCC_TOOLSET             gcc-toolset major for C++23 (default 15; 14 is the

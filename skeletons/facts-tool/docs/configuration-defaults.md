@@ -29,7 +29,8 @@ extra_args:
 `facts_template` supplies the default `-o`/`--facts` path for `extract`,
 `analyse dependency`, and `symbol` when the command omits it. Both templates
 share one placeholder set: `{project_root}` (canonical project base),
-`{project_name}` (its basename), `{relative_path}`/`{filename}`, `{user}`
+`{project_name}` (the project's git repository name when `{project_root}` is
+a git repository, else its basename - see below), `{relative_path}`/`{filename}`, `{user}`
 (from `$USER`/`$LOGNAME`, else the passwd entry), and `${ENV_NAME}` for any
 environment variable. Substitution is single-pass; braces or `${}` in a
 substituted value are never re-interpreted. Unknown placeholders, unmatched
@@ -38,7 +39,12 @@ are configuration errors before any file or directory is created.
 
 In `conf_template`, `{relative_path}`/`{filename}` keep their original
 meaning: the project directory's parent relative to `/`, and the complete
-project basename (`/` uses `_root`). Every rendered path is checked
+project basename (`/` uses `_root`) - `{filename}` never reflects the git
+repository name, even when `{project_name}` does. `{project_name}` is the
+name of the `origin` remote (or, absent an `origin`, the alphabetically
+first remote) when `{project_root}` is a git repository; a git repository
+with no remotes, or a `{project_root}` that is not a git repository at all,
+falls back to the same basename as `{filename}`. Every rendered path is checked
 canonically against one anchor and may not escape it, even through a
 symlink, so a template is accepted in any of these forms: a raw leading `~/`
 expands against `HOME` and anchors to `HOME` (the template body is

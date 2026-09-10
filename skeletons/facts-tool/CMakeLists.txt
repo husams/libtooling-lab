@@ -50,6 +50,40 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yaml_cpp)
 
+# libgit2 (project identity reads the repository's remote URL for {project_name});
+# only local repository access is needed, so every network/crypto provider is off
+# and the bundled zlib/regex/hash implementations keep the build self-contained.
+# USE_SHA1 is deliberately left unset: libgit2 has no "builtin" SHA1 backend, only
+# "CollisionDetection" (its own bundled, dependency-free sha1dc), which is also its
+# default, so leaving the cache entry unset already gets a self-contained build.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_CLI OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
+set(USE_SSH OFF CACHE STRING "" FORCE)
+set(USE_HTTPS OFF CACHE STRING "" FORCE)
+set(USE_SHA256 builtin CACHE STRING "" FORCE)
+set(USE_GSSAPI OFF CACHE BOOL "" FORCE)
+set(USE_NTLMCLIENT OFF CACHE BOOL "" FORCE)
+set(USE_ICONV OFF CACHE BOOL "" FORCE)
+set(USE_BUNDLED_ZLIB ON CACHE BOOL "" FORCE)
+set(REGEX_BACKEND builtin CACHE STRING "" FORCE)
+set(USE_HTTP_PARSER builtin CACHE STRING "" FORCE)
+FetchContent_Declare(
+  libgit2
+  URL https://github.com/libgit2/libgit2/archive/refs/tags/v1.9.7.tar.gz
+  URL_HASH SHA256=1a4fbe7589e814777ae76b64734ad80f4ecad22cd33a22682a2aaea4ae5375e7
+)
+FetchContent_MakeAvailable(libgit2)
+
+# libgit2package only exports an INSTALL_INTERFACE include dir (it is built to be
+# installed, not consumed from its own build tree), so point at its source headers
+# directly; SYSTEM keeps its warnings out of our build.
+add_library(facts-git INTERFACE)
+target_include_directories(facts-git SYSTEM INTERFACE ${libgit2_SOURCE_DIR}/include)
+target_link_libraries(facts-git INTERFACE libgit2package)
+
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
@@ -222,9 +256,11 @@ add_library(facts-config STATIC
   src/config/ConfigurationMerge.cpp
   src/config/ConfigurationYaml.cpp
   src/config/ConfigurationOwnership.cpp
+  src/config/RepositoryUrl.cpp
+  src/config/RepositoryName.cpp
 )
 target_include_directories(facts-config PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(facts-config PUBLIC yaml-cpp::yaml-cpp facts-sqlite)
+target_link_libraries(facts-config PUBLIC yaml-cpp::yaml-cpp facts-sqlite PRIVATE facts-git)
 
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
@@ -558,8 +594,10 @@ if(BUILD_TESTING)
     tests/configuration/ArgumentOverrides.cpp
     tests/configuration/Ownership.cpp tests/configuration/Safety.cpp
     tests/configuration/Policies.cpp
-    tests/configuration/Placeholders.cpp)
-  target_link_libraries(configuration-test PRIVATE facts-config facts-clang)
+    tests/configuration/Placeholders.cpp
+    tests/configuration/RepositoryUrl.cpp
+    tests/configuration/RepositoryName.cpp)
+  target_link_libraries(configuration-test PRIVATE facts-config facts-clang facts-git)
   add_test(NAME configuration COMMAND configuration-test)
   add_executable(
     storage-schema-test

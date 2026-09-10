@@ -49,4 +49,6 @@ void ownership();
 void policies();
 void placeholders();
 void safety();
+void repositoryUrl();
+void repositoryName();
 } // namespace configuration_test

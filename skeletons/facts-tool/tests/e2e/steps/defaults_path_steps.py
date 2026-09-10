@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pytest_bdd import given, when, then, parsers
 from support.facts_template import FactsTemplateProject
 
@@ -103,6 +104,23 @@ def token_rendered(defaults):
 @given(parsers.parse('conf_template "{template}"'))
 def bare_template(defaults, template):
     defaults.write(conf_root="store", conf_template=template)
+
+@given(parsers.parse('the project directory is a git repository with origin "{url}"'))
+def git_repository_with_origin(defaults, url):
+    # Isolate from any real user/global git config -- HOME already points at
+    # the sandbox, but GIT_CONFIG_GLOBAL/GIT_DIR/GIT_WORK_TREE could still
+    # leak in from the environment this test runner happens to execute in.
+    isolated_env = dict(defaults.env)
+    isolated_env["GIT_CONFIG_GLOBAL"] = "/dev/null"
+    isolated_env.pop("GIT_DIR", None)
+    isolated_env.pop("GIT_WORK_TREE", None)
+    subprocess.run(["git", "init", "-q"], cwd=defaults.cwd, env=isolated_env, check=True)
+    subprocess.run(["git", "remote", "add", "origin", url], cwd=defaults.cwd,
+                    env=isolated_env, check=True)
+
+@then(parsers.parse('conf ends with "{suffix}"'))
+def conf_ends_with(defaults, suffix):
+    assert defaults.value("conf").endswith(suffix), defaults.value("conf")
 
 @given("a project facts_template using the source placeholder")
 def facts_template_project(defaults):

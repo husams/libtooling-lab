@@ -89,6 +89,12 @@ Feature: Canonical configuration identity and safe path rendering
     When I attempt configuration inspection
     Then configuration fails with "unset environment variable"
 
+  Scenario: {project_name} takes the git remote's repository name
+    Given the project directory is a git repository with origin "https://example.invalid/team/acme-repo.git"
+    And conf_template "{project_name}/{filename}.db"
+    When I inspect the effective configuration twice
+    Then conf ends with "acme-repo/project.v2.db"
+
   Scenario: facts_template supplies the default output for a single source
     Given a project facts_template using the source placeholder
     When I extract with no explicit output and one source
