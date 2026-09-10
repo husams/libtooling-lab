@@ -1,5 +1,6 @@
 #pragma once
 #include "commands/CompilationDatabase.h"
+#include "commands/ArgumentOverrides.h"
 
 namespace facts::commands {
 // Two immutable views share one parsed JSON/fixed compilation database.
@@ -27,7 +28,9 @@ inline CompilationViews compilationViews(CompilationDatabasePtr database,
     const std::vector<std::string> &explicitArguments,
     bool explicitProvided) {
   std::shared_ptr<clang::tooling::CompilationDatabase> base = std::move(database);
-  const auto &runtime = explicitProvided ? explicitArguments : defaults;
+  const auto runtime = explicitProvided
+                           ? overrideArguments(defaults, explicitArguments)
+                           : defaults;
   return {appendExtraArguments(std::make_unique<SharedCompilationView>(base),
                                explicitArguments),
           appendExtraArguments(std::make_unique<SharedCompilationView>(base), runtime)};

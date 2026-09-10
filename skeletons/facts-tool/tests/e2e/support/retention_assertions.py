@@ -24,29 +24,43 @@ def commands(c):
 
 
 def effects(c, family):
-    yaml_active = c.yaml and not c.cli and not getattr(c, "runtime", False)
+    yaml_active = c.yaml
     with sqlite3.connect(c.db) as db:
         files = dict(db.execute("SELECT id,name FROM file"))
     if family == "extract":
         with sqlite3.connect(c.d.root / "extract.db") as db:
-            symbols = set(row[0] for row in db.execute("SELECT qualified_name FROM symbol"))
+            symbols = set(
+                row[0] for row in db.execute("SELECT qualified_name FROM symbol")
+            )
         for unit in ("A", "B"):
             assert "JsonOnly" + unit in symbols, symbols
-            assert ("Both" + unit in symbols) == (yaml_active and c.version == "YAML"), symbols
-            assert ("NewBoth" + unit in symbols) == (yaml_active and c.version == "NEW"), symbols
+            assert ("Both" + unit in symbols) == (
+                yaml_active and c.version == "YAML"
+            ), symbols
+            assert ("NewBoth" + unit in symbols) == (
+                yaml_active and c.version == "NEW"
+            ), symbols
             assert ("Cli" + unit in symbols) == bool(c.cli), symbols
-            assert ("Runtime" + unit in symbols) == bool(getattr(c, "runtime", False)), symbols
+            assert ("Runtime" + unit in symbols) == bool(
+                getattr(c, "runtime", False)
+            ), symbols
         return
     names = set(files.values())
     if family == "dependency":
         with sqlite3.connect(c.d.root / "dependency.db") as db:
-            edges = {(files[a], files[b]) for a, b in db.execute(
-                "SELECT src_file_id,dst_file_id FROM include_dependency")}
+            edges = {
+                (files[a], files[b])
+                for a, b in db.execute(
+                    "SELECT src_file_id,dst_file_id FROM include_dependency"
+                )
+            }
         assert ("unit_a.cpp", "json_a.hpp") in edges, edges
         assert ("unit_a.cpp", "json words") in edges, edges
         names = {b for _, b in edges}
         if yaml_active:
-            assert (c.version + " header.hpp", c.version + " marker.hpp") in edges, edges
+            assert (c.version + " header.hpp", c.version + " marker.hpp") in edges, (
+                edges
+            )
             old = "NEW" if c.version == "YAML" else "YAML"
             assert (old + " header.hpp", old + " marker.hpp") not in edges, edges
     for probe in ("both_a.hpp", "both_b.hpp"):

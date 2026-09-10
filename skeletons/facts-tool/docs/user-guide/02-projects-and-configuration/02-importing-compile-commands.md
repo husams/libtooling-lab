@@ -98,9 +98,9 @@ for what invalidation means for previously-generated call-graph data.
 
 ## `--extra-arg`
 
-Repeatable, shell-tokenized compiler arguments. Supplying any `--extra-arg`
-on the command line **replaces** the entire resolved YAML `extra_args`
-list for this invocation - it does not append to it. See
+Repeatable, shell-tokenized compiler arguments. CLI `--extra-arg` values
+replace matching YAML compiler options for this invocation, preserving
+unrelated defaults without modifying the YAML file. See
 [03-configuration-files](03-configuration-files.md) for the full precedence
 model this participates in.
 

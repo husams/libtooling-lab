@@ -1,6 +1,7 @@
 #pragma once
 
 #include "commands/ExtraArguments.h"
+#include "commands/ArgumentOverrides.h"
 #include "config/Configuration.h"
 #include "config/ConfigurationDiscovery.h"
 
@@ -25,7 +26,7 @@ mergedArguments(const std::vector<std::string> &defaults,
                 const std::vector<std::string> &explicitValues,
                 bool explicitProvided) {
   return tokenizeExtraArguments(explicitValues).transform([&](auto values) {
-    return explicitProvided ? values : defaults;
+    return explicitProvided ? overrideArguments(defaults, values) : defaults;
   });
 }
 

@@ -4,11 +4,14 @@
 #include <filesystem>
 #include <unistd.h>
 
+namespace configuration_test { void argumentOverrides(); }
+
 int main() {
   configuration_test::schema();
   configuration_test::paths();
   configuration_test::discovery();
   configuration_test::arguments();
+  configuration_test::argumentOverrides();
   configuration_test::ownership();
   configuration_test::policies();
   configuration_test::placeholders();
@@ -36,9 +39,8 @@ int main() {
       {"-DNAME=value with spaces", "-include", "header.h"},
       {"-DVALUE=1 '-DOTHER=two words'"}, true);
   assert(args);
-  assert(args->size() == 2);
-  assert((*args)[0] == "-DVALUE=1");
-  assert((*args)[1] == "-DOTHER=two words");
+  assert(*args == std::vector<std::string>({"-DNAME=value with spaces",
+      "-include", "header.h", "-DVALUE=1", "-DOTHER=two words"}));
   assert(!facts::commands::mergedArguments({}, {"'unterminated"}, true));
   std::filesystem::remove_all(unmarked);
 }

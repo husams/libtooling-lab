@@ -33,9 +33,7 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def require_failure(
-    result: subprocess.CompletedProcess[str], expected: str
-) -> None:
+def require_failure(result: subprocess.CompletedProcess[str], expected: str) -> None:
     require(result.returncode == 1, output(result))
     require(expected in output(result), output(result))
 
@@ -46,14 +44,18 @@ def main() -> None:
     root_help = run(tool, "--help")
     require(root_help.returncode == 0, output(root_help))
     require(
-        all(command in output(root_help) for command in
-            ("extract", "import", "config", "file", "symbol")),
+        all(
+            command in output(root_help)
+            for command in ("extract", "import", "config", "file", "symbol")
+        ),
         output(root_help),
     )
 
     config_help = run(tool, "config", "show", "--help")
-    require(config_help.returncode == 0 and "YAML" in output(config_help),
-            output(config_help))
+    require(
+        config_help.returncode == 0 and "YAML" in output(config_help),
+        output(config_help),
+    )
     require(
         "project" in output(config_help)
         and "user file" in output(config_help)
@@ -66,44 +68,80 @@ def main() -> None:
 
     file_help = run(tool, "file", "--help")
     require(file_help.returncode == 0, output(file_help))
-    require(all(command in output(file_help) for command in
-                ("add", "rm", "remove", "list", "ls", "show",
-                 "set-option", "clear-option")), output(file_help))
+    require(
+        all(
+            command in output(file_help)
+            for command in (
+                "add",
+                "rm",
+                "remove",
+                "list",
+                "ls",
+                "show",
+                "set-option",
+                "clear-option",
+            )
+        ),
+        output(file_help),
+    )
 
     file_add_help = run(tool, "file", "add", "--help")
-    require(file_add_help.returncode == 0 and
-            all(option in output(file_add_help) for option in
-                ("--driver", "--working-directory", "--arg")),
-            output(file_add_help))
+    require(
+        file_add_help.returncode == 0
+        and all(
+            option in output(file_add_help)
+            for option in ("--driver", "--working-directory", "--arg")
+        ),
+        output(file_add_help),
+    )
 
     file_set_help = run(tool, "file", "set-option", "--help")
-    require(file_set_help.returncode == 0 and
-            "--match" in output(file_set_help) and "--arg" in output(file_set_help),
-            output(file_set_help))
+    require(
+        file_set_help.returncode == 0
+        and "--match" in output(file_set_help)
+        and "--arg" in output(file_set_help),
+        output(file_set_help),
+    )
 
     repo_add_help = run(tool, "repo", "add", "--help")
-    require(repo_add_help.returncode == 0 and
-            all(option in output(repo_add_help) for option in
-                ("name", "path", "--label", "--remote")),
-            output(repo_add_help))
+    require(
+        repo_add_help.returncode == 0
+        and all(
+            option in output(repo_add_help)
+            for option in ("name", "path", "--label", "--remote")
+        ),
+        output(repo_add_help),
+    )
 
     clone_help = run(tool, "repo", "rm-clone", "--help")
-    require(clone_help.returncode == 0 and "remove-clone" in output(
-        run(tool, "repo", "--help")), output(clone_help))
+    require(
+        clone_help.returncode == 0
+        and "remove-clone" in output(run(tool, "repo", "--help")),
+        output(clone_help),
+    )
 
     symbol_help = run(tool, "symbol", "--help")
-    require(symbol_help.returncode == 0 and "--facts" in output(symbol_help) and
-            "--conf" in output(symbol_help) and
-            all(command in output(symbol_help) for command in
-                ("list", "ls", "show", "browser")), output(symbol_help))
+    require(
+        symbol_help.returncode == 0
+        and "--facts" in output(symbol_help)
+        and "--conf" in output(symbol_help)
+        and all(
+            command in output(symbol_help)
+            for command in ("list", "ls", "show", "browser")
+        ),
+        output(symbol_help),
+    )
 
     empty_config = run(tool, "config", "show", "--config", "")
     require(empty_config.returncode != 0, output(empty_config))
     config_help = run(tool, "config", "show", "--help")
     require("yaml-cpp 0.9.0" in output(config_help), output(config_help))
     config_show = run(tool, "config", "show")
-    require(config_show.returncode == 0 and
-            "parser: YAML / yaml-cpp 0.9.0" in output(config_show), output(config_show))
+    require(
+        config_show.returncode == 0
+        and "parser: YAML / yaml-cpp 0.9.0" in output(config_show),
+        output(config_show),
+    )
 
     removed_symbol_view = run(tool, "symbol", "view")
     require(removed_symbol_view.returncode != 0, output(removed_symbol_view))
@@ -113,20 +151,27 @@ def main() -> None:
         "XDG_CONFIG_HOME": "/tmp/facts-tool-b033-no-config",
     }
     missing_symbol_facts = run(tool, "symbol", "list", environment=isolated)
-    require(missing_symbol_facts.returncode != 0 and
-            "--facts" in output(missing_symbol_facts),
-            output(missing_symbol_facts))
+    require(
+        missing_symbol_facts.returncode != 0
+        and "--facts" in output(missing_symbol_facts),
+        output(missing_symbol_facts),
+    )
     for spelling in ("--facts", "-f"):
-        empty_symbol_facts = run(tool, "symbol", "list", spelling, "",
-                                 environment=isolated)
+        empty_symbol_facts = run(
+            tool, "symbol", "list", spelling, "", environment=isolated
+        )
         require(empty_symbol_facts.returncode != 0, output(empty_symbol_facts))
-        require("unresolved conf" not in output(empty_symbol_facts),
-                output(empty_symbol_facts))
+        require(
+            "unresolved conf" not in output(empty_symbol_facts),
+            output(empty_symbol_facts),
+        )
 
     missing_file_conf = run(tool, "file", "list", environment=isolated)
-    require(missing_file_conf.returncode != 0 and
-            "project configuration database not found" in output(missing_file_conf),
-            output(missing_file_conf))
+    require(
+        missing_file_conf.returncode != 0
+        and "project configuration database not found" in output(missing_file_conf),
+        output(missing_file_conf),
+    )
 
     extract_help = run(tool, "extract", "--help")
     require(extract_help.returncode == 0, output(extract_help))
@@ -153,29 +198,46 @@ def main() -> None:
         output(import_help),
     )
     require(
-        "Compiler argument replacing YAML extra_args for fixed-command or"
-        in output(import_help)
+        "Compiler argument overriding matching YAML options for fixed-command or"
+        in " ".join(output(import_help).split())
         and "compile_commands.json imports; shell-tokenized and repeatable"
-        in output(import_help),
+        in " ".join(output(import_help).split()),
         output(import_help),
     )
 
     call_graph_help = run(tool, "analyse", "call-graph", "--help")
-    require(call_graph_help.returncode == 0 and
-            all(option in output(call_graph_help) for option in
-                ("--facts", "--conf", "--max-depth", "--direction", "--to",
-                 "--path-mode", "--recover-missing")) and
-            not any(line.lstrip().startswith(("--format", "-o,", "--output",
-                                              "--edges"))
-                    for line in output(call_graph_help).splitlines()),
-            output(call_graph_help))
+    require(
+        call_graph_help.returncode == 0
+        and all(
+            option in output(call_graph_help)
+            for option in (
+                "--facts",
+                "--conf",
+                "--max-depth",
+                "--direction",
+                "--to",
+                "--path-mode",
+                "--recover-missing",
+            )
+        )
+        and not any(
+            line.lstrip().startswith(("--format", "-o,", "--output", "--edges"))
+            for line in output(call_graph_help).splitlines()
+        ),
+        output(call_graph_help),
+    )
     for removed in (("--format", "json"), ("--output", "graph.mmd")):
-        rejected = run(tool, "analyse", "call-graph", "-f", "missing.sqlite",
-                       "--all", *removed)
-        require(rejected.returncode == 2 and rejected.stdout == "" and
-                removed[0] in rejected.stderr and
-                rejected.stderr.startswith("facts-tool: usage error:") and
-                rejected.stderr.count("\n") == 1, output(rejected))
+        rejected = run(
+            tool, "analyse", "call-graph", "-f", "missing.sqlite", "--all", *removed
+        )
+        require(
+            rejected.returncode == 2
+            and rejected.stdout == ""
+            and removed[0] in rejected.stderr
+            and rejected.stderr.startswith("facts-tool: usage error:")
+            and rejected.stderr.count("\n") == 1,
+            output(rejected),
+        )
 
     dependency_help = run(tool, "analyse", "dependency", "--help")
     require(dependency_help.returncode == 0, output(dependency_help))
@@ -217,7 +279,11 @@ def main() -> None:
         invalid_root.mkdir()
         (invalid_root / ".facts-tool.yaml").write_text("conf_root: [bad\n")
         direct_catalog = run(
-            tool, "repo", "list", "--conf", str(configuration),
+            tool,
+            "repo",
+            "list",
+            "--conf",
+            str(configuration),
             working_directory=invalid_root,
         )
         require(direct_catalog.returncode != 0, output(direct_catalog))
@@ -248,9 +314,7 @@ def main() -> None:
             output(missing_import_source),
         )
 
-        verbose_import = run(
-            tool, "import", "-v", "--conf", str(configuration)
-        )
+        verbose_import = run(tool, "import", "-v", "--conf", str(configuration))
         require_failure(
             verbose_import,
             "import requires --compilation-database or at least one source",
@@ -295,8 +359,7 @@ def main() -> None:
             "import requires --compilation-database or at least one source",
         )
         require(
-            "compilation_database='fixed commands'"
-            in short_detailed_import.stderr
+            "compilation_database='fixed commands'" in short_detailed_import.stderr
             and "requested_sources=0" in short_detailed_import.stderr,
             output(short_detailed_import),
         )
@@ -400,8 +463,7 @@ def main() -> None:
             "output and project configuration require separate databases",
         )
         require(
-            "facts-tool: extract: validate database paths"
-            in short_extract.stderr,
+            "facts-tool: extract: validate database paths" in short_extract.stderr,
             output(short_extract),
         )
 
@@ -438,8 +500,7 @@ def main() -> None:
         )
         require(
             "facts-tool: dependency: starting" in detailed_dependency.stderr
-            and "facts-tool: dependency: validate sources"
-            in detailed_dependency.stderr
+            and "facts-tool: dependency: validate sources" in detailed_dependency.stderr
             and "roots=1" in detailed_dependency.stderr
             and "facts-tool: dependency:" not in detailed_dependency.stdout,
             output(detailed_dependency),
@@ -461,8 +522,7 @@ def main() -> None:
             "output and project configuration require separate databases",
         )
         require(
-            "facts-tool: dependency: validate sources"
-            in short_dependency.stderr,
+            "facts-tool: dependency: validate sources" in short_dependency.stderr,
             output(short_dependency),
         )
 
@@ -476,9 +536,7 @@ def main() -> None:
             "--compilation-database",
             str(root),
         )
-        require_failure(
-            empty_import, "compilation database contains no commands"
-        )
+        require_failure(empty_import, "compilation database contains no commands")
 
         empty_extract = run(
             tool,
@@ -497,8 +555,7 @@ def main() -> None:
         second = (root / "second.cpp").resolve()
         # import now discovers and registers files, so the sources must exist.
         first.write_text(
-            "struct Base {}; struct Derived : Base {}; "
-            "int first() { return 1; }\n",
+            "struct Base {}; struct Derived : Base {}; int first() { return 1; }\n",
             encoding="utf-8",
         )
         second.write_text("int second() { return 2; }\n", encoding="utf-8")
@@ -535,9 +592,7 @@ def main() -> None:
             str(adjusted_source),
         ]
         extra_arguments = [f"-I{include_root}", "-DEXTRA_IMPORT=1"]
-        adjusted_compilation_database = (
-            adjusted_root / "compile_commands.json"
-        )
+        adjusted_compilation_database = adjusted_root / "compile_commands.json"
         adjusted_compilation_database.write_text(
             json.dumps(
                 [
@@ -581,8 +636,7 @@ def main() -> None:
         stored_commands = json.loads(exported.stdout)
         require(len(stored_commands) == 1, output(exported))
         require(
-            stored_commands[0]["arguments"]
-            == original_arguments + extra_arguments,
+            stored_commands[0]["arguments"] == original_arguments + extra_arguments,
             output(exported),
         )
 
@@ -703,9 +757,7 @@ def main() -> None:
             str(runtime_fixed_configuration),
             str(runtime_source),
         )
-        require(
-            runtime_fixed_extract.returncode == 0, output(runtime_fixed_extract)
-        )
+        require(runtime_fixed_extract.returncode == 0, output(runtime_fixed_extract))
 
         filtered_import = run(
             tool,
@@ -736,14 +788,12 @@ def main() -> None:
         require(traced_extract.returncode == 0, output(traced_extract))
         require(
             "facts-tool: trace: file resolve requested='" in traced_extract.stderr
-            and "facts-tool: trace: file canonical identity='"
-            in traced_extract.stderr
+            and "facts-tool: trace: file canonical identity='" in traced_extract.stderr
             and "facts-tool: trace: ast node kind='CXXRecord' name='Base'"
             in traced_extract.stderr
             and "facts-tool: trace: symbol persisted kind='struct' name='Base'"
             in traced_extract.stderr
-            and "facts-tool: trace: relation kind='inherits'"
-            in traced_extract.stderr,
+            and "facts-tool: trace: relation kind='inherits'" in traced_extract.stderr,
             output(traced_extract),
         )
 

@@ -555,6 +555,7 @@ if(BUILD_TESTING)
   add_executable(configuration-test tests/ConfigurationTest.cpp
     tests/configuration/Schema.cpp tests/configuration/Paths.cpp
     tests/configuration/Discovery.cpp tests/configuration/Arguments.cpp
+    tests/configuration/ArgumentOverrides.cpp
     tests/configuration/Ownership.cpp tests/configuration/Safety.cpp
     tests/configuration/Policies.cpp
     tests/configuration/Placeholders.cpp)

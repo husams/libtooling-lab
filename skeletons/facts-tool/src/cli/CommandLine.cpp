@@ -117,7 +117,7 @@ private:
               extract_.extraArgumentsProvided = true;
               extract_.extraArguments.push_back(argument);
             },
-            "Compiler argument replacing YAML extra_args; shell-tokenized and "
+            "Compiler argument overriding matching YAML options; shell-tokenized and "
             "repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
@@ -165,7 +165,7 @@ private:
               import_.extraArgumentsProvided = true;
               import_.extraArguments.push_back(argument);
             },
-            "Compiler argument replacing YAML extra_args for fixed-command or "
+            "Compiler argument overriding matching YAML options for fixed-command or "
             "compile_commands.json imports; shell-tokenized and repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");
@@ -193,7 +193,7 @@ private:
               dependency_.extraArgumentsProvided = true;
               dependency_.extraArguments.push_back(argument);
             },
-            "Compiler argument replacing YAML extra_args; shell-tokenized and "
+            "Compiler argument overriding matching YAML options; shell-tokenized and "
             "repeatable")
         ->trigger_on_parse()
         ->type_name("ARG");

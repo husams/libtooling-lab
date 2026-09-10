@@ -37,7 +37,7 @@ errors are `FactsToolError(code, message)` with `str(exc) == f"{code}:
 | `facts-tool: configuration error: ...` (exit 3) for an unrelated tier's file | An existing-but-invalid YAML file at *any* precedence tier is a configuration error, even when a higher tier would have won the merge | Every tier is still checked and reported; fix or remove the invalid file at the tier `config show`'s discovery list marks `[invalid]`. A *missing* file at any tier (except an explicit `--config`/`FACTS_TOOL_CONFIG`) is not an error. |
 | `FACTS_TOOL_CONF must not be empty` / `FACTS_TOOL_CONFIG must not be empty` (exit 3) | The environment variable is set but empty | Unset it or give it a real path |
 | `XDG_CONFIG_HOME must be absolute` / relative `XDG_DATA_HOME` rejected | `XDG_CONFIG_HOME`/`XDG_DATA_HOME` is set to a relative path | Set it to an absolute path, or unset it to fall back to `$HOME` |
-| A `--extra-arg` you passed silently dropped a YAML-only flag | Supplying **any** `--extra-arg` replaces the **entire** merged YAML `extra_args` list, not just conflicting tokens | Pass every compiler flag you need via `--extra-arg` when you use it at all; don't rely on YAML extras surviving alongside it |
+| A `--extra-arg` you passed silently dropped an unrelated YAML flag | An older binary may still replace the whole YAML list | Update to per-option override behavior: matching values are overridden at runtime, unrelated defaults survive, and YAML files remain unchanged |
 
 ## SDK errors
 

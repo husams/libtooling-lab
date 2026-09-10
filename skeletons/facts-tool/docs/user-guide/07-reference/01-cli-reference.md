@@ -76,7 +76,7 @@ Every leaf command except `config show` also takes:
 
 | Flag | Type | Default | Meaning |
 |---|---|---|---|
-| `--extra-arg` | `ARG` (repeatable) | merged YAML `extra_args` | Compiler argument; shell-tokenized. Supplying any `--extra-arg` **replaces** the entire merged YAML `extra_args` list, not just conflicting tokens. |
+| `--extra-arg` | `ARG` (repeatable) | merged YAML `extra_args` | Compiler argument; shell-tokenized. Overrides matching YAML compiler options while preserving unrelated defaults; YAML files are unchanged. |
 
 `repo`, `component`, `dir`, and `file` groups additionally take a
 **group-level** flag:
@@ -111,7 +111,7 @@ facts-tool extract [OPTIONS] [sources...]
 | `-c`, `--conf` | `FILE` | - | [[config-help]] |
 | `--config` | `FILE` | - | [[config-help]] |
 | `-v`, `--verbose` | `INT [0-3]` | `1` | Verbosity |
-| `--extra-arg` | `ARG` (repeatable) | YAML `extra_args` | Compiler argument, replaces YAML extras |
+| `--extra-arg` | `ARG` (repeatable) | YAML `extra_args` | Compiler argument, overrides matching YAML options at runtime |
 
 **Exit codes**: standard contract above.
 

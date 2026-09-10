@@ -32,7 +32,7 @@ Feature: CLI extra_args override YAML and preserve compilation database commands
       | extract    |
       | dependency |
 
-  Scenario Outline: Explicit CLI tokens replace YAML for <family>
+  Scenario Outline: Explicit CLI tokens preserve unrelated YAML options for <family>
     Given an independent requirements project with "command" entries and "clang++" driver
     And retention YAML extra_args are "enabled"
     When I exercise retention for "<family>" 1 times with "explicit" CLI additions
@@ -81,7 +81,7 @@ Feature: CLI extra_args override YAML and preserve compilation database commands
     Then every run proves independent compiler effects and preserves both stored base commands
     And VALUE=2 takes effect while VALUE=1 remains in both stored commands
 
-  Scenario Outline: Runtime CLI additions replace YAML and preserve stored JSON for <family>
+  Scenario Outline: Runtime CLI additions preserve unrelated YAML and stored JSON for <family>
     Given an independent requirements project with "command" entries and "clang++" driver
     And retention YAML extra_args are "enabled"
     When I append runtime CLI arguments to "<family>" after import

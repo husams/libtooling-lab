@@ -96,10 +96,11 @@ out of the intended root are always rejected before any file is created.
 
 Without any CLI `--extra-arg`, the YAML `extra_args` lists from all three
 YAML tiers **concatenate**, in order: user file, then project file, then an
-explicit `--config` file. With **any** CLI `--extra-arg` supplied, the
-entire merged YAML list is **replaced**, not appended to - even for
-non-conflicting flags. There is no partial merge between CLI and YAML
-extras; it's all-or-nothing per invocation.
+explicit `--config` file. CLI `--extra-arg` values override **matching compiler options** in that list
+for this invocation; unrelated YAML arguments remain. For example, CLI
+`-std=c++23` replaces YAML `-std=c++17` while retaining YAML `-DKEEP=1`.
+Macro overrides match by name, and joined/separate option spellings match.
+Repeated CLI options retain their order. YAML files themselves never change.
 
 ## Project identity
 

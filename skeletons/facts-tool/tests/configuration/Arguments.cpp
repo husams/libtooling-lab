@@ -10,7 +10,7 @@ void arguments() {
   const auto fallback = facts::commands::mergedArguments(defaults, {}, false);
   assert(fallback && *fallback == defaults);
   const auto args = facts::commands::mergedArguments(defaults, fragments, true);
-  const std::vector<std::string> expected{"-DVALUE=3", "-DSPACE=two words", "-DVALUE=3"};
+  const std::vector<std::string> expected{"-include", "space header.hpp", "-DVALUE=3", "-DSPACE=two words", "-DVALUE=3"};
   assert(args && *args == expected);
   assert(!facts::commands::mergedArguments({}, {"'unterminated"}, true));
   assert(!facts::commands::mergedArguments({}, {"trailing\\"}, true));
@@ -26,7 +26,8 @@ void arguments() {
   const auto applied = views.applied->getCompileCommands("unit.cpp")[0].CommandLine;
   assert(stored.size() == 4 && stored[1] == "-DVALUE=1" &&
          stored[2] == "unit.cpp" && stored[3] == "-DVALUE=3");
-  assert(std::vector<std::string>(applied.end() - 1, applied.end()) == cli);
+  assert(std::vector<std::string>(applied.end() - 3, applied.end()) ==
+         std::vector<std::string>({"-include", "space header.hpp", "-DVALUE=3"}));
   assert(views.stored->getCompileCommands("unit.cpp")[0].CommandLine == stored);
   std::string error;
   auto json = clang::tooling::JSONCompilationDatabase::loadFromBuffer(R"([
@@ -46,7 +47,8 @@ void arguments() {
       auto expectedStored = baseCommands[i].CommandLine;
       expectedStored.insert(expectedStored.end(), cli.begin(), cli.end());
       auto expectedRuntime = baseCommands[i].CommandLine;
-      expectedRuntime.insert(expectedRuntime.end(), cli.begin(), cli.end());
+      const std::vector<std::string> runtimeExtras{"-include", "space header.hpp", "-DVALUE=3"};
+      expectedRuntime.insert(expectedRuntime.end(), runtimeExtras.begin(), runtimeExtras.end());
       assert(persisted[i].CommandLine == expectedStored);
       assert(runtime[i].CommandLine == expectedRuntime);
       assert(runtime[i].Directory == baseCommands[i].Directory);

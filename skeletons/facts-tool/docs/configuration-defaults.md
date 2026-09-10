@@ -9,8 +9,8 @@ file at any tier is not an error; an existing but invalid file at any tier is
 a configuration error, even if a higher tier would have won. Every explicitly
 supplied CLI value overrides its corresponding YAML setting. Among YAML files,
 `extra_args` concatenates in a fixed order (user, then project, then the
-`--config` file). Supplying any CLI `--extra-arg` replaces that entire merged
-YAML argument list, including non-conflicting tokens; omitting `--extra-arg`
+`--config` file). CLI `--extra-arg` replaces matching compiler-option values within that merged
+list and preserves unrelated defaults; omitting `--extra-arg`
 uses the merged YAML list. Overrides apply per option, so other YAML defaults
 remain available. Explicit selectors are
 cwd-relative; a missing explicit `--config`/`FACTS_TOOL_CONFIG` file fails.
@@ -103,13 +103,15 @@ existing databases and different project owners are rejected.
 `extra_args` entries are complete compiler tokens. Repeatable CLI
 `--extra-arg` values are shell-tokenized once, preserving duplicates and
 option/operand order. The effective command is base compile options followed
-by either the explicit CLI fragments or, when none were supplied, the merged
-YAML tokens. For example, YAML `['-std=c++17', '-DYAML_ONLY=1']` with
-`--extra-arg=-std=c++23` contributes only `-std=c++23`; `-DYAML_ONLY=1` is
-removed even though it does not conflict with the CLI token.
+by YAML tokens whose options are not overridden, then the explicit CLI tokens. For example, YAML `['-std=c++17', '-DYAML_ONLY=1']` with
+`--extra-arg=-std=c++23` contributes `-DYAML_ONLY=1 -std=c++23`. Macro overrides match by name:
+`-DNAME=2` or `-UNAME` replaces YAML `-DNAME=1` while preserving other macros.
+Joined and separate spellings, such as `-Ipath` and `-I path`, match the same
+option. Repeated CLI occurrences retain their order and replace the YAML
+occurrences of that option. These overrides never rewrite YAML files.
 Import stores the original compile options plus explicit CLI fragments,
-while extraction and dependency analysis select current YAML or explicit CLI
-extras at runtime. For example YAML `['-DNAME=two words']` supplies one token; CLI
+while extraction and dependency analysis combine current YAML defaults with CLI
+overrides at runtime. For example YAML `['-DNAME=two words']` supplies one token; CLI
 `--extra-arg="-DVALUE=1 '-DNAME=two words'"` supplies two. Unterminated
 quoting fails; neither form executes a shell or expands environment
 variables/globs. Later switches take precedence only where the selected
@@ -126,9 +128,9 @@ Stored-command readback may expand include-search paths to absolute paths
 through the existing component-label mapping and add `--driver-mode=g++`;
 these changes preserve the command's meaning. The B-032 retention scenarios
 check both JSON representations, independent base/YAML requirements and
-CLI replacement of YAML extras across import, extraction and dependency
+CLI overrides of matching YAML options across import, extraction and dependency
 analysis. When CLI extras are present, the original JSON arguments still
-remain intact; only the YAML extra-argument contribution is replaced.
+remain intact; only matching YAML compiler options are replaced at runtime.
 
 See [CLI/YAML precedence coverage](cli-yaml-precedence.md) for supported
 settings, aliases, defaults, and command coverage.

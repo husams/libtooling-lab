@@ -22,7 +22,7 @@ inline void configurationOptions(CLI::App &command, std::string &direct,
       "--config/FACTS_TOOL_CONFIG file, the nearest project .facts-tool.yaml, then "
       "the user file at XDG_CONFIG_HOME/facts-tool/config.yaml or "
       "HOME/.config/facts-tool/config.yaml; explicit --extra-arg occurrences "
-      "replace the complete YAML extra_args list. Without CLI extras, YAML "
+      "override matching compiler options and retain unrelated YAML defaults, without rewriting YAML files. Without CLI extras, YAML "
       "tokens concatenate user, then project, then selected file. Built-ins: "
       "XDG_DATA_HOME/facts-tool or HOME/.local/share/facts-tool, "
       "conf_template={relative_path}/{filename}.db, and extra_args=[]. "

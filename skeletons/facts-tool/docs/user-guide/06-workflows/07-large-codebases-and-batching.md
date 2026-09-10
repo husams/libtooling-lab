@@ -168,9 +168,9 @@ same sources, or keep the flag in YAML instead of on the command line.
   never referenced its path on the command line. Always pass `--facts`
   explicitly at scale, and run `config show` first if a failure looks
   unrelated to your actual command.
-- **`extra_args` concatenate across YAML tiers by default, but any CLI
-  `--extra-arg` replaces the entire merged YAML list for that one
-  invocation only.** It does not carry into a later `extract`/`dependency`
+- **`extra_args` concatenate across YAML tiers by default, and CLI
+  `--extra-arg` overrides matching options while preserving unrelated
+  defaults for that invocation only.** It does not carry into a later `extract`/`dependency`
   call against the same source.
 
 ## Where to go next
