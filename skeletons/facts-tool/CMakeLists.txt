@@ -70,6 +70,10 @@ set(USE_ICONV OFF CACHE BOOL "" FORCE)
 set(USE_BUNDLED_ZLIB ON CACHE BOOL "" FORCE)
 set(REGEX_BACKEND builtin CACHE STRING "" FORCE)
 set(USE_HTTP_PARSER builtin CACHE STRING "" FORCE)
+# Nanosecond stat support is irrelevant here (no index/worktree comparisons
+# happen) and its probe fails under libgit2's strict -std=c90 on glibc, where
+# struct stat's st_mtim is hidden without _GNU_SOURCE.
+set(USE_NSEC OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
   libgit2
   URL https://github.com/libgit2/libgit2/archive/refs/tags/v1.9.7.tar.gz

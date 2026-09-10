@@ -26,10 +26,11 @@
 #     the ClangConfig.cmake/LLVMConfig.cmake that find_package(Clang) needs.
 #     They stay dynamically linked: to run the binary elsewhere the host needs
 #     `dnf install -y clang-libs llvm-libs`.
-#   * libgit2 (project identity's {project_name}). CMake's own FetchContent
-#     fetches and builds it - this script installs no extra dnf package for
-#     it, the same way it doesn't for yaml-cpp/SQLite. For an offline build,
-#     point FETCHCONTENT_SOURCE_DIR_LIBGIT2 at an unpacked libgit2 1.9.7 tree.
+#   * libgit2 1.9.7 (project identity's {project_name}), pinned like yaml-cpp:
+#     the release tarball is fetched once into .deps and handed to CMake as
+#     FETCHCONTENT_SOURCE_DIR_LIBGIT2. It builds with its bundled zlib, regex
+#     and hash code and no network backends, so no dnf package is needed and
+#     it links statically.
 #
 # Knobs (env vars):
 #   GCC_TOOLSET             gcc-toolset major for C++23 (default 15; 14 is the
@@ -39,6 +40,7 @@
 #                           on first use, reused afterwards).
 #   SQLITE_AMALGAMATION_URL amalgamation zip URL (default 3.53.4).
 #   YAML_SOURCE_DIR      unpacked yaml-cpp 0.9.0 source override/cache.
+#   LIBGIT2_SOURCE_DIR      unpacked libgit2 1.9.7 source override/cache.
 #   FORCE_SQLITE=1          re-fetch the amalgamation even if cached, and
 #                           ignore any system libsqlite3.a.
 #   BUILD_DIR               cmake build dir (default <root>/build-rhel9).
@@ -58,6 +60,9 @@ SQLITE_SOURCE_DIR="${SQLITE_SOURCE_DIR:-$FACTS_ROOT/.deps/sqlite-amalgamation}"
 YAML_SOURCE_DIR="${YAML_SOURCE_DIR:-$FACTS_ROOT/.deps/yaml-cpp-0.9.0}"
 YAML_URL="${YAML_URL:-https://github.com/jbeder/yaml-cpp/releases/download/yaml-cpp-0.9.0/yaml-cpp-yaml-cpp-0.9.0.tar.gz}"
 YAML_SHA256="298593d9c440fd9034b8b193d96318b76d49bc97c6ceadb7b0836edf0b6d7539"
+LIBGIT2_SOURCE_DIR="${LIBGIT2_SOURCE_DIR:-$FACTS_ROOT/.deps/libgit2-1.9.7}"
+LIBGIT2_URL="${LIBGIT2_URL:-https://github.com/libgit2/libgit2/archive/refs/tags/v1.9.7.tar.gz}"
+LIBGIT2_SHA256="1a4fbe7589e814777ae76b64734ad80f4ecad22cd33a22682a2aaea4ae5375e7"
 SQLITE_AMALGAMATION_URL="${SQLITE_AMALGAMATION_URL:-https://www.sqlite.org/2026/sqlite-amalgamation-3530400.zip}"
 BUILD_DIR="${BUILD_DIR:-$FACTS_ROOT/build-rhel9}"
 VENV_DIR="${VENV_DIR:-$FACTS_ROOT/.venv-rhel9}"
@@ -97,6 +102,22 @@ else
   echo "==> reusing pinned yaml-cpp 0.9.0 in $YAML_SOURCE_DIR"
 fi
 YAML_ARGS=(-DFETCHCONTENT_SOURCE_DIR_YAML_CPP="$YAML_SOURCE_DIR")
+
+LIBGIT2_ARGS=()
+if [ ! -f "$LIBGIT2_SOURCE_DIR/CMakeLists.txt" ]; then
+  echo "==> fetching pinned libgit2 1.9.7 into $LIBGIT2_SOURCE_DIR"
+  tmp_git2="$(mktemp -d)"
+  curl -fsSL -o "$tmp_git2/libgit2.tar.gz" "$LIBGIT2_URL"
+  echo "$LIBGIT2_SHA256  $tmp_git2/libgit2.tar.gz" | sha256sum -c -
+  mkdir -p "$LIBGIT2_SOURCE_DIR"
+  # The GitHub archive nests everything under libgit2-1.9.7/; flatten it so
+  # CMakeLists.txt sits at the top of the source dir like the yaml-cpp copy.
+  tar -xzf "$tmp_git2/libgit2.tar.gz" --strip-components=1 -C "$LIBGIT2_SOURCE_DIR"
+  rm -rf "$tmp_git2"
+else
+  echo "==> reusing pinned libgit2 1.9.7 in $LIBGIT2_SOURCE_DIR"
+fi
+LIBGIT2_ARGS=(-DFETCHCONTENT_SOURCE_DIR_LIBGIT2="$LIBGIT2_SOURCE_DIR")
 
 if [ "${DEPS_ONLY:-0}" = "1" ]; then
   echo "==> DEPS_ONLY: dependencies installed; skipping build"
@@ -180,6 +201,7 @@ CLANG_CMAKEDIR="$(dirname "$LLVM_CMAKEDIR")/clang"
 cmake -G Ninja -S "$FACTS_ROOT" -B "$BUILD_DIR" \
   "${SQLITE_ARGS[@]}" \
   "${YAML_ARGS[@]}" \
+  "${LIBGIT2_ARGS[@]}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
   -DLLVM_DIR="$LLVM_CMAKEDIR" -DClang_DIR="$CLANG_CMAKEDIR" \
@@ -198,6 +220,10 @@ ldd "$BUILD_DIR/facts-tool" | grep -q 'libyaml-cpp' && {
   echo "error: yaml-cpp is dynamically linked" >&2
   exit 1
 } || echo "    yaml-cpp: static (no libyaml-cpp.so dependency)"
+ldd "$BUILD_DIR/facts-tool" | grep -q 'libgit2' && {
+  echo "error: libgit2 is dynamically linked" >&2
+  exit 1
+} || echo "    libgit2: static (no libgit2.so dependency)"
 # --help still opens the databases named by the default options, so smoke-test
 # from a scratch directory instead of dropping facts.db/project.db in the repo.
 smoke="$(mktemp -d)"
