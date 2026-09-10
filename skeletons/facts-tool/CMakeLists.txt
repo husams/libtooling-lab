@@ -81,6 +81,24 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(libgit2)
 
+# libgit2 compiles its vendored deps (llhttp, pcre2, zlib, xdiff, sha1dc) with
+# its own -Wall -Wextra, and those sources are not ours to fix; silence every
+# target under its tree so the gate's warning count reflects facts-tool only.
+function(facts_silence_third_party_warnings directory)
+  get_property(targets DIRECTORY "${directory}" PROPERTY BUILDSYSTEM_TARGETS)
+  foreach(target IN LISTS targets)
+    get_target_property(type "${target}" TYPE)
+    if(NOT type STREQUAL "INTERFACE_LIBRARY")
+      target_compile_options("${target}" PRIVATE -w)
+    endif()
+  endforeach()
+  get_property(children DIRECTORY "${directory}" PROPERTY SUBDIRECTORIES)
+  foreach(child IN LISTS children)
+    facts_silence_third_party_warnings("${child}")
+  endforeach()
+endfunction()
+facts_silence_third_party_warnings(${libgit2_SOURCE_DIR})
+
 # libgit2package only exports an INSTALL_INTERFACE include dir (it is built to be
 # installed, not consumed from its own build tree), so point at its source headers
 # directly; SYSTEM keeps its warnings out of our build.
