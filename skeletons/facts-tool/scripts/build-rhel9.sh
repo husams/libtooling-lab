@@ -44,8 +44,10 @@
 #   FORCE_SQLITE=1          re-fetch the amalgamation even if cached, and
 #                           ignore any system libsqlite3.a.
 #   BUILD_DIR               cmake build dir (default <root>/build-rhel9).
-#   VENV_DIR                venv holding pytest/pytest-bdd for the e2e suite
-#                           (default <root>/.venv-rhel9).
+#   VENV_DIR                venv holding pytest/pytest-bdd and the Python SDK
+#                           for the e2e suite (default <root>/.venv-rhel9).
+#   VENV_PYTHON             interpreter used to create that venv (default:
+#                           python3.12 when installed, else python3).
 #   JOBS                    parallel build jobs (default: nproc).
 #   SKIP_DEPS=1             skip dnf installs (deps already present).
 #   DEPS_ONLY=1             install dependencies, then exit (no build).
@@ -84,7 +86,7 @@ if [ "${SKIP_DEPS:-0}" != "1" ]; then
   $SUDO dnf -y install \
     "gcc-toolset-${GCC_TOOLSET}" "gcc-toolset-${GCC_TOOLSET}-libstdc++-devel" \
     cmake ninja-build make git tar xz unzip which curl \
-    python3 python3-pip \
+    python3 python3-pip python3.12 python3.12-pip \
     clang-devel llvm-devel clang-libs llvm-libs
 fi
 
@@ -178,15 +180,20 @@ fi
 # --- python venv for the pytest-bdd e2e suite --------------------------------
 # CMake refuses to configure with BUILD_TESTING=ON unless pytest and pytest-bdd
 # import, so the venv is created before configure and handed over as Python3.
+# The e2e suite also imports the Python SDK under python/, which requires
+# Python >= 3.12, so the venv is built from python3.12 when the host has it
+# (the RHEL 9 host interpreter is 3.9) and the SDK is installed into it.
+VENV_PYTHON="${VENV_PYTHON:-$(command -v python3.12 || command -v python3)}"
 PYTHON="$(command -v python3)"
 if [ "${SKIP_TESTS:-0}" != "1" ]; then
   if [ ! -x "$VENV_DIR/bin/python3" ]; then
-    echo "==> creating venv $VENV_DIR"
-    python3 -m venv "$VENV_DIR"
+    echo "==> creating venv $VENV_DIR with $VENV_PYTHON"
+    "$VENV_PYTHON" -m venv "$VENV_DIR"
   fi
-  echo "==> installing e2e test requirements"
+  echo "==> installing e2e test requirements and the Python SDK"
   "$VENV_DIR/bin/python3" -m pip install --quiet --upgrade pip
   "$VENV_DIR/bin/python3" -m pip install --quiet -r "$FACTS_ROOT/tests/e2e/requirements.txt"
+  "$VENV_DIR/bin/python3" -m pip install --quiet -e "$FACTS_ROOT/python"
   PYTHON="$VENV_DIR/bin/python3"
 fi
 

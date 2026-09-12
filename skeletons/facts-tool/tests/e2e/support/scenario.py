@@ -605,12 +605,37 @@ class FactsToolContext:
         self.run_import(self.index_state_sources)
 
     def drop_index_state_columns(self) -> None:
-        """Leave a file table only a read-write open can migrate back."""
+        """Leave a file table only a read-write open can migrate back.
+
+        Rebuilds the table with the pre-feature column list instead of using
+        ALTER TABLE ... DROP COLUMN, which needs SQLite 3.35 and is missing
+        from the RHEL 9 host interpreter's 3.34.
+        """
+        legacy_columns = (
+            "id, directory_id, name, mtime, md5, compile_options, driver, "
+            "working_directory, indexed, indexed_at, args_overridden"
+        )
         connection = sqlite3.connect(self.files_database_path)
         try:
             with connection:
-                connection.execute("ALTER TABLE file DROP COLUMN facts_db")
-                connection.execute("ALTER TABLE file DROP COLUMN git_commit")
+                connection.execute("PRAGMA foreign_keys=OFF")
+                connection.execute(
+                    "CREATE TABLE file_legacy ("
+                    " id INTEGER PRIMARY KEY CHECK(id >= 1),"
+                    " directory_id INTEGER NOT NULL"
+                    "  REFERENCES directory(id) ON DELETE CASCADE,"
+                    " name TEXT NOT NULL, mtime REAL, md5 TEXT,"
+                    " compile_options TEXT, driver TEXT, working_directory TEXT,"
+                    " indexed INTEGER NOT NULL DEFAULT 0, indexed_at TEXT,"
+                    " args_overridden INTEGER NOT NULL DEFAULT 0,"
+                    " UNIQUE(directory_id, name))"
+                )
+                connection.execute(
+                    f"INSERT INTO file_legacy({legacy_columns}) "
+                    f"SELECT {legacy_columns} FROM file"
+                )
+                connection.execute("DROP TABLE file")
+                connection.execute("ALTER TABLE file_legacy RENAME TO file")
         finally:
             connection.close()
 
