@@ -19,3 +19,12 @@ Feature: Import handles symlinked compilation sources
     When the real facts-tool imports and extracts the symlinked source
     Then extraction succeeds
     And the extracted symbols belong to the in-project file identity
+
+  Scenario: Import records the repository's git identity from its origin remote
+    Given a project with a Git remote "https://example.invalid/team/acme-repo.git" at "project"
+    And a compilation database contains a valid command for "project/main.cpp"
+    When the real facts-tool imports the compilation database
+    Then import succeeds
+    And the stored repository name is "acme-repo"
+    And the stored repository remote URL is "https://example.invalid/team/acme-repo.git"
+    And the stored active clone label is the project directory basename

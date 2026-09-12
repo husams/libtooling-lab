@@ -258,6 +258,57 @@ class FactsToolContext:
             "int main() { return 0; }\n", encoding="utf-8"
         )
 
+    def start_git_rooted_project_with_remote(self, remote_url: str) -> None:
+        """A project whose ".git" is a real git repository with an "origin"
+        remote, unlike start_git_rooted_project()'s bare ".git" stub -- this
+        is what exercises repositoryIdentity()'s remote lookup rather than
+        just its directory-detection fast path.
+        """
+        self.prepared = False
+        self.extracted = False
+        self.prepare()
+        self.symlink_project_root.mkdir(parents=True)
+        (self.symlink_project_root / "main.cpp").write_text(
+            "int main() { return 0; }\n", encoding="utf-8"
+        )
+        # Isolate from any real user/global git config -- HOME already points
+        # at the sandbox, but GIT_CONFIG_GLOBAL/GIT_DIR/GIT_WORK_TREE could
+        # still leak in from the environment this test runner happens to
+        # execute in.
+        isolated_env = dict(os.environ)
+        isolated_env["GIT_CONFIG_GLOBAL"] = "/dev/null"
+        isolated_env.pop("GIT_DIR", None)
+        isolated_env.pop("GIT_WORK_TREE", None)
+        subprocess.run(
+            ["git", "init", "-q"],
+            cwd=self.symlink_project_root,
+            env=isolated_env,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "origin", remote_url],
+            cwd=self.symlink_project_root,
+            env=isolated_env,
+            check=True,
+        )
+
+    def write_project_main_compilation_database(self) -> None:
+        commands = [
+            {
+                "directory": str(self.symlink_project_root),
+                "file": str(self.symlink_project_root / "main.cpp"),
+                "arguments": [
+                    str(self.compiler),
+                    "-std=c++23",
+                    "-c",
+                    str(self.symlink_project_root / "main.cpp"),
+                ],
+            }
+        ]
+        (self.symlink_project_root / "compile_commands.json").write_text(
+            json.dumps(commands, indent=2) + "\n", encoding="utf-8"
+        )
+
     def link_generated_source_outside_the_project(self) -> None:
         """Target a directory that shares no near ancestor with the project.
 

@@ -17,7 +17,8 @@ class FileManager;
 struct ProjectImportOptions {
   std::string repositoryName;
   std::string remoteUrl;
-  std::string cloneLabel = "active";
+  // Empty = derived from the active clone directory's basename.
+  std::string cloneLabel;
   std::vector<ProjectComponent> components;
 };
 

@@ -129,6 +129,20 @@ That is: `repo add` for provenance and clone tracking, then a plain
 [04-quick-start](../01-introduction/04-quick-start.md), and it is the one
 this guide recommends as the default for a new project.
 
+## What `import` records about the repository
+
+`import -p DIR` also registers the repository and its active clone, using
+`DIR`'s project root (the nearest enclosing directory found while
+resolving the compilation database, not necessarily `DIR` itself). When
+that root is a real git checkout, the repository is named after its
+`origin` remote - or, lacking an `origin`, its alphabetically-first
+remote - and that remote's URL is stored as the repository's remote URL.
+When the root isn't a git checkout, the repository falls back to the root
+directory's basename with no remote URL recorded. Either way, the active
+clone is labeled with its own directory's basename, not a fixed label.
+`repo add`'s own `--label`/`--remote` options set an explicit label or
+remote by hand for a repository registered outside `import`.
+
 ## Known issues: don't pre-register or alias a component before `import`
 
 Two real, reproducible defects were found while validating this workflow.

@@ -4,6 +4,7 @@
 
 #include <clang/Tooling/CompilationDatabase.h>
 
+#include <git2.h>
 #include <sqlite3.h>
 
 #include <algorithm>
@@ -239,5 +240,84 @@ int main(int argc, char **argv) {
 
   stored = facts::loadStoredCompilationDatabase(databasePath.string());
   assert(stored && (*stored)->getAllCompileCommands().size() == 1);
+
+  // Git-derived repository identity: when the active clone is a real git
+  // checkout, importProjectConfiguration() takes the repository name and
+  // remote URL from its "origin" remote, and labels the active clone with
+  // the clone directory's own basename -- all only when the caller left
+  // ProjectImportOptions unset. A clone that isn't a git checkout still
+  // falls back to the basename name, an empty remote URL, and a basename
+  // label, exactly as before this identity was wired in.
+  {
+    const auto prepareClone = [&](const std::filesystem::path &clone) {
+      std::filesystem::remove_all(clone);
+      std::filesystem::create_directories(clone /
+                                          sourceRelative.parent_path());
+      std::filesystem::copy_file(
+          fixtureRoot / sourceRelative, clone / sourceRelative,
+          std::filesystem::copy_options::overwrite_existing);
+    };
+    const auto runImport = [&](const std::filesystem::path &clone,
+                               const std::filesystem::path &db) {
+      std::filesystem::remove(db);
+      facts::FileManager clonedFiles(db.string());
+      const auto clonedSource = clone / sourceRelative;
+      auto command = clang::tooling::CompileCommand{
+          clone.string(),
+          clonedSource.string(),
+          {"clang++", "-std=c++23", "-Itests/fixtures",
+           clonedSource.string()},
+          ""};
+      TestCompilationDatabase input(command);
+      const std::vector<std::string> sources{clonedSource.string()};
+      auto imported = facts::importProjectConfiguration(
+          clonedFiles, input, sources, facts::ProjectImportOptions{});
+      assert(imported && imported->importedFiles == 1);
+    };
+
+    const auto gitClone = cloneRoot / "acme-repo";
+    const auto gitDatabasePath =
+        databasePath.parent_path() / "project-configuration-git.sqlite";
+    // The clone directory (and its source file) must exist before
+    // git_repository_init(), and must not be wiped afterward -- initializing
+    // it in place is what makes the clone a real git checkout.
+    prepareClone(gitClone);
+    git_libgit2_init();
+    git_repository *repo = nullptr;
+    assert(git_repository_init(&repo, gitClone.c_str(), 0) == 0);
+    git_remote *remote = nullptr;
+    assert(git_remote_create(&remote, repo, "origin",
+                             "https://example.invalid/team/acme-repo.git") ==
+          0);
+    git_remote_free(remote);
+    git_repository_free(repo);
+    runImport(gitClone, gitDatabasePath);
+    assert(scalarText(gitDatabasePath, "SELECT name FROM repository") ==
+          "acme-repo");
+    assert(scalarText(gitDatabasePath, "SELECT remote_url FROM repository") ==
+          "https://example.invalid/team/acme-repo.git");
+    assert(scalarText(gitDatabasePath, "SELECT label FROM clone") ==
+          gitClone.filename().string());
+    assert(scalarText(gitDatabasePath,
+                      "SELECT name FROM component "
+                      "WHERE repository_id IS NOT NULL") == "acme-repo");
+
+    const auto plainClone = cloneRoot / "plain-clone";
+    const auto plainDatabasePath =
+        databasePath.parent_path() / "project-configuration-plain.sqlite";
+    prepareClone(plainClone);
+    runImport(plainClone, plainDatabasePath);
+    assert(scalarText(plainDatabasePath, "SELECT name FROM repository") ==
+          "plain-clone");
+    assert(
+        scalarText(plainDatabasePath, "SELECT remote_url FROM repository")
+            .empty());
+    assert(scalarText(plainDatabasePath, "SELECT label FROM clone") ==
+          "plain-clone");
+
+    std::filesystem::remove(gitDatabasePath);
+    std::filesystem::remove(plainDatabasePath);
+  }
+
   std::filesystem::remove_all(cloneRoot);
 }

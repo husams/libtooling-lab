@@ -1,5 +1,6 @@
 #include "tooling/ProjectImport.h"
 
+#include "config/RepositoryName.h"
 #include "storage/FileManager.h"
 #include "tooling/CompilationCommandCodec.h"
 
@@ -216,7 +217,11 @@ ProjectRoot selectProjectRoot(const CompileCommands &commands) {
   return anchor(depth(canonical) > depth(logical) ? canonical : logical);
 }
 
-std::string repositoryName(const std::filesystem::path &cloneRoot) {
+// The fallback identity for a clone directory that isn't (or whose git
+// identity couldn't be read from) a git repository: its own basename, or
+// its parent's when the path ends in a trailing separator. Also doubles as
+// the default active-clone label, since both want "the directory name".
+std::string cloneBasename(const std::filesystem::path &cloneRoot) {
   auto name = cloneRoot.filename().string();
   return name.empty() ? cloneRoot.parent_path().filename().string() : name;
 }
@@ -344,12 +349,20 @@ prepareCommands(const clang::tooling::CompilationDatabase &database,
   ProjectConfiguration configuration;
   const auto root = selectProjectRoot(commands);
   configuration.activeClone.path = root.canonical.string();
+  // The active clone's own git identity (origin remote, or the
+  // alphabetically-first remote) wins over the directory-basename fallback,
+  // but an explicit option always wins over both.
+  const auto identity = config::repositoryIdentity(configuration.activeClone.path);
   configuration.repositoryName =
-      options.repositoryName.empty()
-          ? repositoryName(configuration.activeClone.path)
-          : options.repositoryName;
-  configuration.remoteUrl = options.remoteUrl;
-  configuration.activeClone.label = options.cloneLabel;
+      !options.repositoryName.empty() ? options.repositoryName
+      : identity                     ? identity->name
+                                      : cloneBasename(configuration.activeClone.path);
+  configuration.remoteUrl = !options.remoteUrl.empty() ? options.remoteUrl
+                            : identity                 ? identity->remoteUrl
+                                                        : std::string{};
+  configuration.activeClone.label =
+      !options.cloneLabel.empty() ? options.cloneLabel
+                                  : cloneBasename(configuration.activeClone.path);
   configuration.components = options.components;
   if (configuration.components.empty()) {
     configuration.components.push_back(ProjectComponent{

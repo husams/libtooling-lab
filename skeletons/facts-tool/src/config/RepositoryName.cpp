@@ -28,7 +28,7 @@ std::optional<std::string> preferredRemoteUrl(git_repository *repo) {
 
 } // namespace
 
-std::optional<std::string> repositoryName(const std::filesystem::path &projectRoot) {
+std::optional<RepositoryIdentity> repositoryIdentity(const std::filesystem::path &projectRoot) {
   std::error_code error;
   if (!std::filesystem::exists(projectRoot / ".git", error) || error) return std::nullopt;
   detail::ensureLibgit2Initialized();
@@ -43,7 +43,13 @@ std::optional<std::string> repositoryName(const std::filesystem::path &projectRo
   if (!url) return std::nullopt;
   auto name = repositoryNameFromUrl(*url);
   if (name.empty()) return std::nullopt;
-  return name;
+  return RepositoryIdentity{.name = std::move(name), .remoteUrl = *url};
+}
+
+std::optional<std::string> repositoryName(const std::filesystem::path &projectRoot) {
+  auto identity = repositoryIdentity(projectRoot);
+  if (!identity) return std::nullopt;
+  return std::move(identity->name);
 }
 
 } // namespace facts::config

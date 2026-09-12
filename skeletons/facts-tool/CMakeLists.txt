@@ -271,7 +271,7 @@ add_library(facts-tooling STATIC
 )
 target_include_directories(facts-tooling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang
-                                            facts-sqlite)
+                                            facts-sqlite facts-config)
 
 add_library(facts-config STATIC
   src/config/ConfigurationPaths.cpp
@@ -639,7 +639,7 @@ if(BUILD_TESTING)
   add_executable(project-configuration-test tests/ProjectConfigurationTest.cpp)
   target_link_libraries(project-configuration-test
                         PRIVATE facts-tooling facts-storage facts-clang
-                                facts-sqlite)
+                                facts-sqlite facts-config facts-git)
   add_test(
     NAME project-configuration
     COMMAND project-configuration-test

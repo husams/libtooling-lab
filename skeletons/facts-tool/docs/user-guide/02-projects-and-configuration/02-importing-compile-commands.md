@@ -73,6 +73,17 @@ import shows dozens of `external`-kind directories under paths like
 seeing a `dir list`/`file list` dominated by compiler and SDK paths is
 seeing expected behavior, not a misconfiguration.
 
+## What import records about the repository
+
+Besides compile commands, `import` also names the repository and labels
+its active clone. When the project root is a real git checkout, the
+repository takes its name and remote URL from the `origin` remote (or,
+absent one, the alphabetically-first remote); otherwise it falls back to
+the root directory's basename with no remote URL. The active clone is
+always labeled with its own directory's basename. See
+[01-repositories-and-projects](01-repositories-and-projects.md#what-import-records-about-the-repository)
+for the full rules and how they interact with `repo add`.
+
 ## `--component NAME=PATH`
 
 Repeatable; associates a name with a path for this import. As covered in

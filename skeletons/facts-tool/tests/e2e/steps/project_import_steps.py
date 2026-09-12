@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pytest_bdd import given, then, when
+from pytest_bdd import given, parsers, then, when
 from support.database import query, require, scalar
 from support.scenario import FactsToolContext
 
@@ -10,6 +10,18 @@ from support.scenario import FactsToolContext
 @given('a project with a Git root at "project"')
 def given_a_git_rooted_project(context: FactsToolContext) -> None:
     context.start_git_rooted_project()
+
+
+@given(parsers.parse('a project with a Git remote "{url}" at "project"'))
+def given_a_project_with_a_real_git_remote(
+    context: FactsToolContext, url: str
+) -> None:
+    context.start_git_rooted_project_with_remote(url)
+
+
+@given('a compilation database contains a valid command for "project/main.cpp"')
+def given_a_command_for_project_main(context: FactsToolContext) -> None:
+    context.write_project_main_compilation_database()
 
 
 @given(
@@ -80,6 +92,32 @@ def then_the_repository_name_is_not_empty(context: FactsToolContext) -> None:
     require(
         all(name for name in names),
         f"a stored repository name is empty: {names}",
+    )
+
+
+@then(parsers.parse('the stored repository name is "{name}"'))
+def then_the_stored_repository_name_is(context: FactsToolContext, name: str) -> None:
+    stored = scalar(context.files_database_path, "SELECT name FROM repository")
+    require(stored == name, f"repository name is '{stored}', expected '{name}'")
+
+
+@then(parsers.parse('the stored repository remote URL is "{url}"'))
+def then_the_stored_repository_remote_url_is(
+    context: FactsToolContext, url: str
+) -> None:
+    stored = scalar(context.files_database_path, "SELECT remote_url FROM repository")
+    require(stored == url, f"repository remote_url is '{stored}', expected '{url}'")
+
+
+@then("the stored active clone label is the project directory basename")
+def then_the_stored_active_clone_label_is_the_basename(
+    context: FactsToolContext,
+) -> None:
+    expected = context.symlink_project_root.name
+    stored = scalar(context.files_database_path, "SELECT label FROM clone")
+    require(
+        stored == expected,
+        f"active clone label is '{stored}', expected '{expected}'",
     )
 
 
