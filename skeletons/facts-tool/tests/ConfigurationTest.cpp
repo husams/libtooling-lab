@@ -18,6 +18,7 @@ int main() {
   configuration_test::safety();
   configuration_test::repositoryUrl();
   configuration_test::repositoryName();
+  configuration_test::gitFileCommit();
   const auto unmarked = std::filesystem::temp_directory_path() /
                         ("facts-tool-unmarked-" + std::to_string(getpid()));
   std::filesystem::create_directories(unmarked / "nested");

@@ -2,6 +2,7 @@
 #define FACTS_TOOL_STORAGE_FILE_MANAGER_H
 
 #include "model/SymbolId.h"
+#include "storage/FileIndexState.h"
 #include "storage/ProjectConfiguration.h"
 
 #include <cstddef>
@@ -50,6 +51,15 @@ public:
                                                 const ProjectClone &clone,
                                                 bool activate = false);
   std::expected<FileId, std::error_code> getId(std::string_view path);
+
+  // What extraction last recorded about one file's index state.
+  std::expected<FileIndexState, std::error_code>
+  indexState(std::string_view path);
+  // Records what extraction just produced for every listed file. Requires a
+  // read-write manager; called on a read-only one fails the way every other
+  // write below does.
+  std::expected<void, std::error_code>
+  markIndexed(std::span<const FileIndexRecord> records);
 
   // What import recorded about this registry, and how import records it.
   std::expected<RegistryStatus, std::error_code> registryStatus();

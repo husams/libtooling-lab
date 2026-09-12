@@ -14,7 +14,9 @@
 #include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <tuple>
 #include <utility>
+#include <vector>
 
 namespace facts {
 namespace {
@@ -80,6 +82,54 @@ currentSetActiveClone(storage::Database &database, std::int64_t repositoryId,
                    : std::expected<void, std::error_code>{
                          std::unexpected(std::make_error_code(
                              std::errc::no_such_file_or_directory))};
+      });
+}
+
+// Identifies a file within a project the same way the file-upsert's own
+// WHERE clause locates it: by component path, in-component directory, and
+// file name, since the directory_id a reimport resolves to is not known
+// until after the component/directory upserts below have run.
+using ProjectFileKey = std::tuple<std::string, std::string, std::string>;
+
+struct PriorCompileOptions {
+  std::string driver;
+  std::string workingDirectory;
+  std::string compileOptions;
+};
+
+// Snapshots every registered file's compile-relevant columns before a
+// reimport's unconditional wipe (see storeProjectConfiguration) clears
+// them, so the file upsert further down can compare what this reimport is
+// about to write against what was actually there beforehand -- the wipe
+// would otherwise make every reimported file look "changed" from NULL,
+// even one whose driver/working directory/compile options are identical to
+// last time.
+std::expected<std::map<ProjectFileKey, PriorCompileOptions>, std::error_code>
+loadPriorCompileOptions(storage::Database &database,
+                        std::int64_t repositoryId) {
+  auto rows = storage::detail::toItlibGenerator(database.query(
+      "SELECT component.path,directory.path,file.name,"
+      "coalesce(file.driver,''),coalesce(file.working_directory,''),"
+      "coalesce(file.compile_options,'') FROM file "
+      "JOIN directory ON directory.id=file.directory_id "
+      "JOIN component ON component.id=directory.component_id "
+      "WHERE component.repository_id=?1",
+      [](const storage::Row &row) {
+        return std::pair<ProjectFileKey, PriorCompileOptions>{
+            ProjectFileKey{row.get<std::string>(0), row.get<std::string>(1),
+                          row.get<std::string>(2)},
+            PriorCompileOptions{row.get<std::string>(3),
+                                row.get<std::string>(4),
+                                row.get<std::string>(5)}};
+      },
+      repositoryId));
+  return storage::detail::collectGenerator(std::move(rows))
+      .transform([](auto pairs) {
+        std::map<ProjectFileKey, PriorCompileOptions> result;
+        for (auto &entry : pairs) {
+          result.emplace(std::move(entry.first), std::move(entry.second));
+        }
+        return result;
       });
 }
 
@@ -213,10 +263,20 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
       .and_then(
           [&] { return currentUpsertRepository(database_, configuration); })
       .and_then([&](std::int64_t repositoryId) {
+        std::map<ProjectFileKey, PriorCompileOptions> priorOptions;
         return currentUpsertClone(database_, repositoryId,
                                   configuration.activeClone)
             .and_then([&](std::int64_t cloneId) {
               return currentSetActiveClone(database_, repositoryId, cloneId);
+            })
+            .and_then([&] {
+              // Captured before the wipe below clears every non-overridden
+              // row's driver/working directory/compile options, so the
+              // file upsert further down can still tell an unchanged
+              // reimport from a real edit.
+              return loadPriorCompileOptions(database_, repositoryId)
+                  .transform(
+                      [&](auto loaded) { priorOptions = std::move(loaded); });
             })
             .and_then([&] {
               return database_.execute(
@@ -280,7 +340,38 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
                     std::unexpected(directories.error())};
               }
 
-              auto files = database_.executeBulk(
+              // A reimport that changes nothing about how a file compiles
+              // must not disturb what extraction already recorded for it;
+              // one that does change its driver/working directory/compile
+              // options invalidates that file's index state the same way a
+              // real edit to the file itself would, so the next plain
+              // extract re-extracts exactly the files this reimport
+              // actually changed, not every registered file. Whether a
+              // file is unchanged is decided in C++ against `priorOptions`
+              // (captured above, before the wipe) rather than compared in
+              // SQL against this row's own current driver/working
+              // directory/compile options: the wipe already cleared those
+              // to NULL for every non-overridden row by this point, so a
+              // same-statement SQL comparison would find every reimported
+              // file "changed" from NULL, forced or not.
+              struct FileUpsertInput {
+                const ProjectFile *file;
+                bool unchanged;
+              };
+              std::vector<FileUpsertInput> upsertInputs;
+              upsertInputs.reserve(configuration.files.size());
+              for (const auto &file : configuration.files) {
+                const auto found = priorOptions.find(ProjectFileKey{
+                    file.componentPath, file.directory, file.name});
+                const bool unchanged =
+                    found != priorOptions.end() &&
+                    found->second.driver == file.driver &&
+                    found->second.workingDirectory == file.workingDirectory &&
+                    found->second.compileOptions == file.compileOptions;
+                upsertInputs.push_back({&file, unchanged});
+              }
+
+              const std::string insertFilesSql =
                   "INSERT INTO file(directory_id,name,driver,"
                   "working_directory,compile_options) "
                   "SELECT directory.id,?4,?5,?6,?7 FROM directory "
@@ -291,10 +382,18 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
                   "driver=excluded.driver,"
                   "working_directory=excluded.working_directory,"
                   "compile_options=excluded.compile_options,"
-                  "args_overridden=0",
-                  configuration.files,
+                  "args_overridden=0,"
+                  "indexed=CASE WHEN ?8=1 THEN indexed ELSE 0 END,"
+                  "indexed_at=CASE WHEN ?8=1 THEN indexed_at ELSE NULL END,"
+                  "mtime=CASE WHEN ?8=1 THEN mtime ELSE NULL END,"
+                  "facts_db=CASE WHEN ?8=1 THEN facts_db ELSE NULL END,"
+                  "git_commit=CASE WHEN ?8=1 THEN git_commit ELSE NULL END";
+              auto files = database_.executeBulk(
+                  insertFilesSql,
+                  upsertInputs,
                   [repositoryId](sqlite3_stmt *statement,
-                                 const ProjectFile &file) {
+                                 const FileUpsertInput &input) {
+                    const auto &file = *input.file;
                     const auto workingDirectory =
                         file.workingDirectory.empty()
                             ? std::optional<std::string>{}
@@ -302,7 +401,8 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
                     return storage::bindParameters(
                         statement, repositoryId, file.componentPath,
                         file.directory, file.name, file.driver,
-                        workingDirectory, file.compileOptions);
+                        workingDirectory, file.compileOptions,
+                        input.unchanged ? 1 : 0);
                   },
                   {.atomic = false});
               return files.transform([](const storage::BulkResult &) {});
@@ -415,6 +515,26 @@ FileDatabase::markRegistryComplete(std::string_view fingerprint) {
             .transform([](const storage::BulkResult &) {});
       })
       .and_then([&] { return transaction->commit(); });
+}
+
+std::expected<FileIndexState, std::error_code>
+FileDatabase::indexState(FileId id) {
+  if (!indexStateColumnsPresent_) {
+    auto present = fileIndexStateColumnsPresent(database_.nativeHandle());
+    if (!present) {
+      return std::unexpected(present.error());
+    }
+    indexStateColumnsPresent_ = *present;
+  }
+  if (!*indexStateColumnsPresent_) {
+    return FileIndexState{};
+  }
+  return readFileIndexStateRow(database_.nativeHandle(), id);
+}
+
+std::expected<void, std::error_code>
+FileDatabase::markIndexed(std::span<const FileIndexRecord> records) {
+  return markFilesIndexed(database_, records);
 }
 
 std::expected<FileId, std::error_code>

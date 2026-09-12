@@ -51,4 +51,5 @@ void placeholders();
 void safety();
 void repositoryUrl();
 void repositoryName();
+void gitFileCommit();
 } // namespace configuration_test

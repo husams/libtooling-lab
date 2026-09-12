@@ -31,7 +31,9 @@ const CoverageFile *findCoverageFile(const CoverageReport &report, FileId id) {
 }
 
 std::expected<CoverageReport, std::string>
-loadCoverage(const std::string &path, const QueryGraph &graph) {
+loadCoverage(const std::string &path, const std::string &factsPath,
+             const QueryGraph &graph) {
+  const auto normalizedFactsPath = normalizedFactsPathOrEmpty(factsPath);
   return catalog::open(path, false).and_then([&](auto database) {
     return catalog::components(database).and_then([&](const auto &components) {
       return catalog::files(database).and_then(
@@ -50,7 +52,7 @@ loadCoverage(const std::string &path, const QueryGraph &graph) {
                   {static_cast<FileId>(file.id), resolved->string(),
                    file.component.id, file.componentName, file.component.path,
                    file.component.kind, file.component.repositoryId.has_value(),
-                   file.indexed, file.mtime, file.indexedAt,
+                   file.indexed, file.mtime, file.indexedAt, file.factsDb,
                    !file.driver.empty()});
             }
             const auto missingNode =
@@ -71,9 +73,18 @@ loadCoverage(const std::string &path, const QueryGraph &graph) {
                 missingDefinition != graph.nodes.end())
               return std::unexpected(
                   "project/facts pair has unmatched file identities");
+            // A file recovery has never touched is always a candidate; one
+            // extract already indexed is a candidate again once its source
+            // has drifted from what was last recorded (so recovery can
+            // still pick up a body that changed after a real extract), or
+            // once its recorded facts database is not this one (so a file
+            // extracted only into some other facts database is still a
+            // candidate here, even though it is genuinely indexed there).
             for (const auto &file : report.files)
-              if (file.projectLocal && file.translationUnit && !file.indexed &&
-                  !factsFiles.contains(file.id))
+              if (file.projectLocal && file.translationUnit &&
+                  !factsFiles.contains(file.id) &&
+                  (!file.indexed || coverageFileMtimeDrifted(file) ||
+                   file.factsDb != normalizedFactsPath))
                 report.recoveryCandidates.push_back(file.path);
             return report;
           });

@@ -46,6 +46,8 @@ struct File {
   bool argsOverridden = false;
   bool indexed = false;
   std::string indexedAt;
+  std::string factsDb;
+  std::string gitCommit;
 };
 
 Result<std::filesystem::path> componentRoot(const Component &component);

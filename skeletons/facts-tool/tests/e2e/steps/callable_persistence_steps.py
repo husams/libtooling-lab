@@ -7,10 +7,15 @@ from support.database import query
 @then("callable facts survive reruns and reversed translation units")
 def stable_callables(context):
     before = snapshot(context.facts_database_path)
-    context.run_tool()
+    # Both reruns below target the exact facts database the Background
+    # already extracted into; --force re-extracts anyway, since rerun
+    # stability on unchanged sources is what this scenario checks. The
+    # third call targets a brand-new facts database, so it is naturally
+    # stale (never indexed there before) and needs no --force.
+    context.run_tool(force=True)
     assert snapshot(context.facts_database_path) == before
     context.sources = tuple(reversed(context.sources))
-    context.run_tool()
+    context.run_tool(force=True)
     assert snapshot(context.facts_database_path) == before
     expected = semantics(context.facts_database_path)
     context.facts_database = context.run_root_path / "reversed.sqlite"
@@ -39,10 +44,15 @@ def migrated_callables(context, version):
     historical = context.facts_database_path.read_bytes()
     assert "qualifiers::Cv::split" in output(context, "show", "qualifiers::Cv::split")
     assert context.facts_database_path.read_bytes() == historical
-    context.run_tool()
+    # Only the facts database's own schema was mangled above; the project
+    # database's recorded index state is untouched and still points at this
+    # same facts database, so both reruns need --force to actually migrate
+    # and re-extract instead of trusting that stale-but-technically-matching
+    # bookkeeping.
+    context.run_tool(force=True)
     assert snapshot(context.facts_database_path) == before
     assert query(context.facts_database_path, "PRAGMA user_version") == [(13,)]
-    context.run_tool()
+    context.run_tool(force=True)
     assert snapshot(context.facts_database_path) == before
 
 

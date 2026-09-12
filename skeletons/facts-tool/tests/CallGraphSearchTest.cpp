@@ -34,14 +34,18 @@ facts::callgraph::QueryGraph graph() {
 
 facts::callgraph::CoverageReport completeCoverage() {
   using facts::callgraph::CoverageFile;
-  return {
-      {},
-      {{CoverageFile{1, "a.cpp", 0, {}, {}, {}, true, true, {}, "now", true},
-        CoverageFile{2, "b.cpp", 0, {}, {}, {}, true, true, {}, "now", true},
-        CoverageFile{3, "c.cpp", 0, {}, {}, {}, true, true, {}, "now", true},
-        CoverageFile{4, "t.cpp", 0, {}, {}, {}, true, true, {}, "now", true},
-        CoverageFile{5, "z.cpp", 0, {}, {}, {}, true, true, {}, "now", true}}},
-      {}};
+  return {{},
+          {{CoverageFile{
+                1, "a.cpp", 0, {}, {}, {}, true, true, {}, "now", {}, true},
+            CoverageFile{
+                2, "b.cpp", 0, {}, {}, {}, true, true, {}, "now", {}, true},
+            CoverageFile{
+                3, "c.cpp", 0, {}, {}, {}, true, true, {}, "now", {}, true},
+            CoverageFile{
+                4, "t.cpp", 0, {}, {}, {}, true, true, {}, "now", {}, true},
+            CoverageFile{
+                5, "z.cpp", 0, {}, {}, {}, true, true, {}, "now", {}, true}}},
+          {}};
 }
 } // namespace
 
@@ -90,7 +94,9 @@ int main() {
                                  (*target)->id,
                          "reverse traversal lost oriented caller sites") &&
                  require(cycleOnly.truncated == 0,
-                         "caller cycle was reported as truncation")
+                         "caller cycle was reported as truncation") &&
+                 require(normalizedFactsPathOrEmpty("") == "",
+                         "an empty facts path must not normalize to cwd")
              ? 0
              : 1;
 }

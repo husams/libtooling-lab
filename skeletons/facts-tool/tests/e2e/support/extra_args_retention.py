@@ -47,7 +47,11 @@ class Retention:
             args = ["import", "--component", "fixture=.", "-p", str(self.d.cwd),
                     "--facts", str(self.d.root / "extract.db")]
         else:
-            args = ["extract"] if family == "extract" else ["analyse", "dependency"]
+            # --force: this harness reruns "extract" against the same
+            # sources and output repeatedly to prove ordering/retention
+            # semantics, not to exercise the index-state freshness check.
+            args = (["extract", "--force"] if family == "extract"
+                    else ["analyse", "dependency"])
             args += ["-o", str(self.d.root / (family + ".db")), *map(str, self.sources)]
         extras = ["--extra-arg=-DCLI_ONLY=1 '-DCLI_SPACE=two words'"] if cli else []
         if runtime:

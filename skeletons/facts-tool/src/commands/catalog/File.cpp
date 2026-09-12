@@ -1,4 +1,5 @@
 #include "storage/catalog/File.h"
+#include "commands/CallGraphInvalidation.h"
 #include "commands/catalog/Commands.h"
 #include "commands/catalog/Run.h"
 #include "tooling/CompilationCommandCodec.h"
@@ -32,10 +33,12 @@ catalog::Result<std::string> displayFile(const catalog::File &value) {
     return std::format(
         "ID: {}\nPATH: {}\nCOMPONENT: {}\nDIRECTORY: {}\nFILE: {}\n"
         "DRIVER: {}\nWORKING DIRECTORY: {}\nCOMPILE OPTIONS: {}\n"
-        "ARGS OVERRIDDEN: {}\nINDEXED: {}\n",
+        "ARGS OVERRIDDEN: {}\nINDEXED: {}\n"
+        "INDEXED AT: {}\nFACTS DB: {}\nGIT COMMIT: {}\n",
         value.id, path.string(), value.componentName, value.directory,
         value.name, value.driver, value.workingDirectory, value.compileOptions,
-        value.argsOverridden, value.indexed);
+        value.argsOverridden, value.indexed, value.indexedAt, value.factsDb,
+        value.gitCommit);
   });
 }
 
@@ -100,13 +103,23 @@ selectedUpdates(const std::vector<catalog::File> &values,
 catalog::Result<std::string>
 applyUpdates(catalog::Database &database,
              const std::vector<CompileOptionsUpdate> &updates) {
+  std::vector<FileId> ids;
+  ids.reserve(updates.size());
   for (const auto &update : updates) {
     auto stored = catalog::setFileCompileOptions(
         database, update.id, encodeCompileOptions(update.arguments));
     if (!stored)
       return std::unexpected(stored.error());
+    ids.push_back(static_cast<FileId>(update.id));
   }
-  return std::format("Updated {} file(s)\n", updates.size());
+  // A changed compile option invalidates whatever extraction previously
+  // recorded for exactly the file(s) touched here -- not the whole catalog
+  // -- inside the same transaction as the mutation, so a failure here rolls
+  // the mutation back too rather than leaving a half-applied change.
+  return resetIndexStateForIds(database, ids).and_then(
+      [&]() -> catalog::Result<std::string> {
+        return std::format("Updated {} file(s)\n", updates.size());
+      });
 }
 
 catalog::Result<std::string> editOptions(catalog::Database &database,
@@ -157,10 +170,17 @@ catalog::Result<int> runFile(const cli::FileOptions &options) {
                         options.action == Action::remove ||
                         options.action == Action::setOption ||
                         options.action == Action::clearOption;
+  // File mutations reset index state themselves, scoped to exactly the
+  // row(s) touched (set-option/clear-option) or not at all (add/rm, which
+  // never change an existing row's compile options): runCatalog's coarse,
+  // whole-table reset is for the structural repo/component/directory/clone
+  // mutations, so it is disabled here.
   return runCatalog(
       options.configuration, writable,
-      [&](auto &database) { return operate(database, options); }, false,
-      options.configurationFile, options.facts);
+      [&](auto &database) -> catalog::Result<std::string> {
+        return operate(database, options);
+      },
+      false, options.configurationFile, options.facts, false);
 }
 
 } // namespace facts::commands

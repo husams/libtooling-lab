@@ -18,7 +18,10 @@ def require_initial_snapshots(context: FactsToolContext) -> None:
 
 @when("indexing is repeated once")
 def when_indexing_is_repeated_once(context: FactsToolContext) -> None:
-    context.run_tool()
+    # The Background already extracted these exact sources into this exact
+    # facts database; --force re-extracts anyway, since that repetition is
+    # the whole point of this rerun-stability scenario.
+    context.run_tool(force=True)
 
 
 @then("FileIds and SymbolIds match the initial extraction")

@@ -57,14 +57,25 @@ std::expected<bool, std::error_code> hasFileColumn(sqlite3 *database,
 }
 
 std::expected<void, std::error_code>
+addFileColumnIfMissing(sqlite3 *database, std::string_view name,
+                       std::string_view type) {
+  return hasFileColumn(database, name).and_then([&](bool present) {
+    if (present) {
+      return std::expected<void, std::error_code>{};
+    }
+    return storage::execute(database, "ALTER TABLE file ADD COLUMN " +
+                                          std::string(name) + " " +
+                                          std::string(type));
+  });
+}
+
+std::expected<void, std::error_code>
 ensureProjectConfigurationSchema(sqlite3 *database) {
-  return hasFileColumn(database, "working_directory")
-      .and_then([&](bool present) {
-        return present
-                   ? std::expected<void, std::error_code>{}
-                   : storage::execute(
-                         database,
-                         "ALTER TABLE file ADD COLUMN working_directory TEXT");
+  return addFileColumnIfMissing(database, "working_directory", "TEXT")
+      .and_then(
+          [&] { return addFileColumnIfMissing(database, "facts_db", "TEXT"); })
+      .and_then([&] {
+        return addFileColumnIfMissing(database, "git_commit", "TEXT");
       });
 }
 

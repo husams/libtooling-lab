@@ -36,6 +36,7 @@ Feature: Facts and file storage boundaries
     And the project configuration database is read-only
     When the real facts-tool extracts one translation unit
     Then extraction succeeds
+    And the extraction warns that index state was not recorded
     And the facts database contains the extracted symbols
     And the project configuration database is unchanged
 

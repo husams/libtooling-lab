@@ -9,8 +9,8 @@ def add_project(db: sqlite3.Connection, root: Path) -> None:
     db.execute("INSERT INTO component VALUES(1,'app','src','repo',NULL,1,1)")
     db.execute("INSERT INTO directory VALUES(1,1,'.')")
     files = (
-        (1, 1, "main.cpp", 1.0, "a", "-std=c++23", "clang++", str(root), 1, None, 0),
-        (2, 1, "save.cpp", 1.0, "b", "-std=c++23", "clang++", str(root), 1, None, 0),
+        (1, 1, "main.cpp", 1.0, "a", "-std=c++23", "clang++", str(root), 1, None, None, None, 0),
+        (2, 1, "save.cpp", 1.0, "b", "-std=c++23", "clang++", str(root), 1, None, None, None, 0),
     )
-    db.executemany("INSERT INTO file VALUES(?,?,?,?,?,?,?,?,?,?,?)", files)
+    db.executemany("INSERT INTO file VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", files)
     db.execute("INSERT INTO project_registry VALUES(1,1,'fixture',2)")

@@ -221,6 +221,7 @@ add_library(facts-storage STATIC
   src/storage/DependencyDatabase.cpp
   src/storage/FileDatabase.cpp
   src/storage/FileIdentity.cpp
+  src/storage/FileIndexState.cpp
   src/storage/FileManager.cpp
   src/storage/FilePersistence.cpp
   src/storage/FileSchemaMigration.cpp
@@ -280,9 +281,24 @@ add_library(facts-config STATIC
   src/config/ConfigurationOwnership.cpp
   src/config/RepositoryUrl.cpp
   src/config/RepositoryName.cpp
+  src/config/GitFileCommit.cpp
 )
 target_include_directories(facts-config PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-config PUBLIC yaml-cpp::yaml-cpp facts-sqlite PRIVATE facts-git)
+
+# Kept separate from facts-commands so a unit test can link the freshness
+# decision (and the discovery/index-state types it depends on) without
+# recompiling ExtractionFreshness.cpp into the test binary or pulling in
+# everything else facts-commands links.
+add_library(facts-extraction-freshness STATIC
+  src/commands/ExtractionFreshness.cpp
+)
+target_include_directories(facts-extraction-freshness PUBLIC
+                           ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(facts-extraction-freshness
+  PUBLIC facts-storage
+  PRIVATE facts-config
+)
 
 add_library(facts-ast STATIC
   src/ast/FactExtractor.cpp
@@ -480,6 +496,7 @@ target_link_libraries(facts-commands PRIVATE
   facts-symbol-ui
   facts-tooling
   facts-config
+  facts-extraction-freshness
   facts-clang
 )
 
@@ -566,6 +583,22 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tu_one.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/shared.h
   )
+  add_executable(file-index-state-test tests/FileIndexStateTest.cpp)
+  target_link_libraries(file-index-state-test PRIVATE facts-storage
+                                                       facts-model
+                                                       facts-sqlite)
+  add_test(
+    NAME file-index-state
+    COMMAND file-index-state-test
+            ${CMAKE_CURRENT_BINARY_DIR}/file-index-state-test.sqlite
+  )
+  add_executable(extraction-freshness-test tests/ExtractionFreshnessTest.cpp)
+  target_link_libraries(extraction-freshness-test PRIVATE
+                        facts-extraction-freshness)
+  add_test(
+    NAME extraction-freshness
+    COMMAND extraction-freshness-test
+  )
   add_executable(compilation-files-test tests/CompilationFilesTest.cpp)
   target_link_libraries(compilation-files-test PRIVATE facts-tooling
                                                        facts-clang)
@@ -621,7 +654,8 @@ if(BUILD_TESTING)
     tests/configuration/Policies.cpp
     tests/configuration/Placeholders.cpp
     tests/configuration/RepositoryUrl.cpp
-    tests/configuration/RepositoryName.cpp)
+    tests/configuration/RepositoryName.cpp
+    tests/configuration/GitFileCommit.cpp)
   target_link_libraries(configuration-test PRIVATE facts-config facts-clang facts-git)
   add_test(NAME configuration COMMAND configuration-test)
   add_executable(

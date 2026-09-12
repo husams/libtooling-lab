@@ -112,6 +112,7 @@ facts-tool extract [OPTIONS] [sources...]
 | `--config` | `FILE` | - | [[config-help]] |
 | `-v`, `--verbose` | `INT [0-3]` | `1` | Verbosity |
 | `--extra-arg` | `ARG` (repeatable) | YAML `extra_args` | Compiler argument, overrides matching YAML options at runtime |
+| `--force` | flag | off | Re-extract sources whose recorded index state is still up to date |
 
 **Exit codes**: standard contract above.
 
@@ -133,6 +134,8 @@ facts-tool: extract: select sources
 facts-tool: extract: resolve registered sources
 [1/2] Processing file .../proj/src/shapes.cpp.
 [2/2] Processing file .../proj/src/main.cpp.
+facts-tool: extract: check index freshness
+facts-tool: extract: up_to_date=0 stale=2
 facts-tool: extract: configure Clang tool
 facts-tool: extract: open output database
 facts-tool: extract: begin output transaction
@@ -141,13 +144,23 @@ facts-tool: extract: Clang parse and AST extraction
 [2/2] Processing file .../proj/src/main.cpp.
 facts-tool: extract: commit output transaction
 facts-tool: 83 symbol(s) recorded from 24 file(s)
+facts-tool: extract: record index state
 facts-tool: extract: complete
 ```
 
 The `[n/2] Processing file` block appears twice: once while resolving
-registered sources and once during the Clang parse. `-v 2` adds
-`facts-tool: extract: configuration=..., output=..., requested_sources=2`
-and `facts-tool: extract: selected_sources=2` to the same sequence.
+registered sources (this pass also discovers each source's included
+headers, which the freshness check right after it uses) and once during the
+Clang parse. `-v 2` adds
+`facts-tool: extract: configuration=..., output=..., requested_sources=2`,
+`facts-tool: extract: selected_sources=2`, and one
+`facts-tool: extract: skip up-to-date source=<path>` line per source the
+freshness check skips, to the same sequence. See
+[skipping up-to-date sources](../03-extracting-facts/01-extract.md#skipping-up-to-date-sources)
+for what "up to date" means (it covers a source's included headers too) and
+what `--force` overrides. If every requested source is up to date,
+everything from `configure Clang tool` onward is skipped and `extract`
+prints `facts-tool: N source(s) up to date; nothing to extract` instead.
 
 An ordinary C++ file that includes the standard library also prints
 `facts-tool: coverage.unsupported_semantics kind=implicit-cleanup site=...`
@@ -546,6 +559,12 @@ $ facts-tool file list -c demo.db
 ID  COMPONENT  DIRECTORY  FILE  OVERRIDDEN  INDEXED  PATH
 ...
 ```
+
+`file show PATH` prints one record per field, ending with `INDEXED`,
+`INDEXED AT`, `FACTS DB`, and `GIT COMMIT` - what the last `extract` run
+recorded for that file, per
+[skipping up-to-date sources](../03-extracting-facts/01-extract.md#skipping-up-to-date-sources).
+The last three are empty until a real extraction touches the file.
 
 `file add` hand-registers one file with a fixed driver (for a
 non-`compile_commands.json`-driven source); `import` supersedes it for the

@@ -29,14 +29,28 @@ def shared(context):
     require({"s027::cycle_a", "s027::cycle_b"}.issubset(cycle["nodes"]), str(cycle))
 
 
+def _without_recorded_at(entry):
+    """A repeated real extraction re-records indexed_at as of its own wall
+    clock, even when nothing about the source or its facts changed; strip it
+    so an idempotency check compares identity and relations, not the moment
+    each extraction happened to run.
+    """
+    if not isinstance(entry, dict) or "coverage" not in entry:
+        return entry
+    coverage = dict(entry["coverage"])
+    coverage.pop("indexed_at", None)
+    return {**entry, "coverage": coverage}
+
+
 @then("repeated S-027 extraction is idempotent")
 def idempotent(context):
     before = graph(context, "left")
-    entry = lookup(context)
+    entry = _without_recorded_at(lookup(context))
     succeed(extract(context))
     after = graph(context, "left")
     require(after["edges"] == before["edges"] and after["nodes"] == before["nodes"] and
-            lookup(context) == entry, "repeated generation changed shared identity or relations")
+            _without_recorded_at(lookup(context)) == entry,
+            "repeated generation changed shared identity or relations")
     rows = query(context.facts_database_path,
                  "SELECT symbol_id,graph_node_ref FROM callgraph_entry")
     require(len(rows) == len(set(rows)), str(rows))
@@ -70,7 +84,13 @@ def indirect(context):
 @then("S-027 freshness and graph truncation remain separate from entries")
 def coverage(context):
     entry = lookup(context, "left")
-    require(entry["entry_available"] and entry["coverage"]["freshness"] == "unknown",
+    # A real extract now records indexed/indexed_at/mtime for real, so a
+    # just-extracted, untouched source reads back "fresh" rather than the
+    # "unknown" that always came back before anything populated those
+    # columns; the point of this scenario is that freshness stays
+    # independent of entry availability and graph truncation, not this
+    # specific value.
+    require(entry["entry_available"] and entry["coverage"]["freshness"] == "fresh",
             str(entry))
     partial = graph(context, "left", "--max-depth", "1")
     require(partial["row"]["status"] == "truncated" and

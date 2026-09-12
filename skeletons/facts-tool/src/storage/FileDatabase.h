@@ -1,6 +1,7 @@
 #ifndef FACTS_TOOL_STORAGE_FILE_DATABASE_H
 #define FACTS_TOOL_STORAGE_FILE_DATABASE_H
 
+#include "storage/FileIndexState.h"
 #include "storage/ProjectConfiguration.h"
 #include "storage/SqliteDatabase.h"
 
@@ -8,6 +9,7 @@
 
 #include <expected>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -53,6 +55,15 @@ public:
                                                 bool activate);
   std::expected<FileId, std::error_code> getId(std::string_view identity);
 
+  // What extraction last recorded about one file's index state. Tolerant of
+  // a registry a writer has not migrated yet, the same as readFileIndexState.
+  std::expected<FileIndexState, std::error_code> indexState(FileId id);
+  // Records what extraction just produced for every listed file, in one
+  // transaction. Fails on a read-only connection, the way every other write
+  // below does.
+  std::expected<void, std::error_code>
+  markIndexed(std::span<const FileIndexRecord> records);
+
   // What import last recorded about the registry. A database written before
   // the marker existed reads as incomplete, which is what it is.
   std::expected<RegistryStatus, std::error_code> registryStatus();
@@ -67,6 +78,9 @@ private:
   storeProjectConfiguration(const ProjectConfiguration &configuration);
 
   storage::Database database_;
+  // Computed once per connection on first use, not once per file: extraction
+  // asks this for every source and every included header in a run.
+  std::optional<bool> indexStateColumnsPresent_;
 };
 
 } // namespace facts

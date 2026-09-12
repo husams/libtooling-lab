@@ -49,7 +49,12 @@ def import_project(context):
 
 
 def extract(context, library=False):
-    return run(context, "extract", "-v", "0", "--conf", context.files_database_path,
+    # --force: these scenarios call extract repeatedly against the same
+    # source/output to test entry publication and invalidation, not the
+    # index-state freshness check, and some of them change nothing the
+    # freshness check looks at (e.g. a reimport with the same source mtime).
+    return run(context, "extract", "-v", "0", "--force", "--conf",
+               context.files_database_path,
                "--output", context.facts_database_path,
                context.entry_sources[1 if library else 0])
 

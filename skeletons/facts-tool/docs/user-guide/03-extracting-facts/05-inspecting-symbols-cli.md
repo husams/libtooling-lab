@@ -163,9 +163,32 @@ ID  COMPONENT  DIRECTORY                                        FILE            
 ...
 ```
 
-`file show PATH` prints the per-file record for one path (not independently
-exercised while writing this chapter; the columns match `file list`'s row
-shape).
+`file show PATH` prints the per-file record for one path. Before any
+extraction, `INDEXED` reads `false` and the three index-state lines below it
+are empty. After a real `extract` run touches the file, they carry what that
+run recorded (see [skipping up-to-date sources](01-extract.md#skipping-up-to-date-sources)
+for what determines whether a later `extract` reuses this state or
+re-extracts):
+
+```console
+$ facts-tool file show -c demo.db proj/src/shapes.cpp
+ID: 2
+PATH: .../proj/src/shapes.cpp
+COMPONENT: proj
+DIRECTORY: src
+FILE: shapes.cpp
+DRIVER: /usr/bin/clang++
+WORKING DIRECTORY: .../proj
+COMPILE OPTIONS: ["-std=c++17"]
+ARGS OVERRIDDEN: false
+INDEXED: true
+INDEXED AT: 2026-09-12T09:51:28Z
+FACTS DB: .../demo-facts.db
+GIT COMMIT:
+```
+
+`GIT COMMIT` is blank whenever the file is outside any git repository, is
+untracked within one, or the repository's `HEAD` is unborn (no commit yet).
 
 ### `file add`
 

@@ -30,6 +30,8 @@ PROJECT_FIELDS = {
         "working_directory",
         "indexed",
         "indexed_at",
+        "facts_db",
+        "git_commit",
         "args_overridden",
     },
 }

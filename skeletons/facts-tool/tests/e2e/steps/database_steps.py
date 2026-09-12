@@ -93,6 +93,21 @@ def then_extraction_succeeds(context: FactsToolContext) -> None:
     )
 
 
+@then("the extraction warns that index state was not recorded")
+def then_extraction_warns_index_state_not_recorded(
+    context: FactsToolContext,
+) -> None:
+    # A read-only project configuration lets extract read everything it
+    # needs through completion and commit the facts normally; the final
+    # "record index state" stage cannot get a read-write handle on that
+    # same database, but recording index state is only an optimization a
+    # later extract can use, so this is a warning and exit 0, not a failure.
+    require(
+        "facts-tool: warning: index state not recorded:" in context.last_output,
+        f"missing index-state warning:\n{context.last_output}",
+    )
+
+
 @then("the facts database contains the extracted symbols")
 def then_facts_database_contains_extracted_symbols(
     context: FactsToolContext,

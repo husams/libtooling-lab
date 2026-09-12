@@ -131,6 +131,7 @@ def extract_once(context: FactsToolContext, source: Path, verbosity: int = 1) ->
         [
             str(context.facts_tool),
             "extract",
+            "--force",
             "--output",
             str(context.facts_database_path),
             "--conf",

@@ -60,7 +60,10 @@ def prepare(context):
 
 
 def extract(context, position):
-    return run(context, "extract", "-v", "0", "--conf", context.files_database_path,
+    # --force: recovery scenarios repeatedly re-extract the same source to
+    # test call-graph recovery, not the index-state freshness check.
+    return run(context, "extract", "-v", "0", "--force", "--conf",
+               context.files_database_path,
                "--output", context.facts_database_path, context.recovery_sources[position])
 
 

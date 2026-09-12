@@ -111,7 +111,7 @@ unrelated `project_registry.schema_version`.
 | `clone` | `id PK`, `repository_id` -> `repository(id)` cascade, `path UNIQUE`, `label` | A registered checkout |
 | `component` | `id PK`, `name`, `path`, `kind` default `'repo'`, `version`, `repository_id` -> `repository(id)`, `semantic_universe_id` -> `semantic_universe(id)`, `UNIQUE(repository_id, path)` | |
 | `directory` | `id PK`, `component_id` -> `component(id)` cascade, `path`, `UNIQUE(component_id, path)` | |
-| `file` | `id PK CHECK(id >= 1)`, `directory_id` -> `directory(id)` cascade, `name`, `mtime`, `md5`, `compile_options`, `driver`, `working_directory`, `indexed` default `0`, `indexed_at`, `args_overridden` default `0`, `UNIQUE(directory_id, name)` | `id` is the FileId the facts database's `SymbolId`s reference |
+| `file` | `id PK CHECK(id >= 1)`, `directory_id` -> `directory(id)` cascade, `name`, `mtime`, `md5`, `compile_options`, `driver`, `working_directory`, `indexed` default `0`, `indexed_at`, `facts_db`, `git_commit`, `args_overridden` default `0`, `UNIQUE(directory_id, name)` | `id` is the FileId the facts database's `SymbolId`s reference |
 | `project_registry` | `id PK CHECK(id = 1)`, `complete` default `0`, `fingerprint` default `''`, `file_count` default `0`, `schema_version` default `0` | Single row; `import` writes it, extraction consumes it as the completeness gate |
 | `matched_symbol_index` | `(usr, file_id) PK` -> `file(id)` cascade, `qualified_name`, `kind`; index `matched_symbol_name(qualified_name, kind)` | Added at `project_registry.schema_version = 1`. Populated **only** by `match`, never by `extract`. Exactly four data columns - no more are ever added to preserve the match-only contract. |
 
@@ -119,6 +119,21 @@ unrelated `project_registry.schema_version`.
 candidate, but a miss never proves a symbol is absent from source, and an
 index row never proves a definition, body, calls, or a complete call graph
 is available.
+
+`file.indexed`, `indexed_at`, `mtime`, `facts_db`, and `git_commit` are the
+per-file index state a real `extract` run writes back once it commits that
+file's facts: `indexed` is `1` and `indexed_at` is the UTC extraction time
+(`YYYY-MM-DDTHH:MM:SSZ`); `mtime` is the file's last-write time (seconds
+since epoch, read by `stat` at that same moment); `facts_db` is the
+absolute, lexically-normalized path of the facts database it was extracted
+into; `git_commit` is the 40-hex `HEAD` commit of the git repository
+tracking the file, or `NULL` when the file is untracked, ignored, outside
+any repository, or `HEAD` is unborn. `md5` stays unused. A later `extract`
+reads these back to decide whether the file is still up to date - see
+[skipping up-to-date sources](../03-extracting-facts/01-extract.md#skipping-up-to-date-sources).
+`facts_db`/`git_commit` are additive columns (`ALTER TABLE file ADD COLUMN`
+inside the existing schema version); a registry a read-only handle opened
+before a writer added them reads back as "not indexed" instead of failing.
 
 ## Schema version history (facts `user_version`)
 

@@ -28,8 +28,8 @@ def callable_entries(context):
     require(unresolved["entry_available"] and unresolved["is_leaf"] is False and
             unresolved["coverage"]["unresolved_targets"] == 1, str(unresolved))
     root = context.fixture_root / "s022"
-    result = run([str(context.facts_tool), "extract", "-v", "0", "--conf",
-                  str(context.files_database_path), "--output",
+    result = run([str(context.facts_tool), "extract", "-v", "0", "--force",
+                  "--conf", str(context.files_database_path), "--output",
                   str(context.facts_database_path), str(root / "beta/service.cpp"),
                   str(root / "alpha/entry.cpp")])
     require(result.returncode == 0, result.stdout + result.stderr)

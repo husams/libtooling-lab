@@ -29,9 +29,18 @@ class Catalog:
             return connection.execute(sql, parameters).fetchall()
 
     def snapshot(self) -> dict[str, list[tuple]]:
+        # "file" excludes the index-state columns (indexed, indexed_at,
+        # mtime, facts_db, git_commit): a catalog mutation is expected to
+        # reset these by design (see runCatalog / File.cpp), the same way
+        # facts_snapshot() below deliberately excludes callgraph_entry.
         return {
             table: self.rows(f'SELECT * FROM "{table}" ORDER BY id')
-            for table in ("repository", "clone", "component", "directory", "file")
+            for table in ("repository", "clone", "component", "directory")
+        } | {
+            "file": self.rows(
+                "SELECT id,directory_id,name,md5,compile_options,driver,"
+                "working_directory,args_overridden FROM file ORDER BY id"
+            )
         }
 
     def remember(self) -> None:

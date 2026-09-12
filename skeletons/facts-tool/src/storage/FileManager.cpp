@@ -209,4 +209,15 @@ FileManager::getId(std::string_view path) {
   return std::move(canonical).and_then(resolve);
 }
 
+std::expected<FileIndexState, std::error_code>
+FileManager::indexState(std::string_view path) {
+  return getId(path).and_then(
+      [&](FileId id) { return database_->indexState(id); });
+}
+
+std::expected<void, std::error_code>
+FileManager::markIndexed(std::span<const FileIndexRecord> records) {
+  return database_->markIndexed(records);
+}
+
 } // namespace facts

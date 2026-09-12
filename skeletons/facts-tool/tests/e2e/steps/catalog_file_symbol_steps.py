@@ -203,8 +203,14 @@ def reimport_included(catalog: Catalog) -> None:
 
 @then("the manual file and every compilation field are preserved")
 def omitted_preserved(catalog: Catalog) -> None:
+    # Compared shape-for-shape with Catalog.snapshot()'s "file" entry (the
+    # compilation-relevant columns, not the index-state bookkeeping ones a
+    # reimport of an unrelated file must not disturb either way).
     before = next(row for row in catalog.before["file"] if row[2] == "manual.cpp")
-    after = catalog.rows("SELECT * FROM file WHERE name='manual.cpp'")
+    after = catalog.rows(
+        "SELECT id,directory_id,name,md5,compile_options,driver,"
+        "working_directory,args_overridden FROM file WHERE name='manual.cpp'"
+    )
     require(after == [before], f"omitted manual row changed: {before} -> {after}")
 
 

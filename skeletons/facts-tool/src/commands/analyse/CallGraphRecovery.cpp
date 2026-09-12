@@ -60,7 +60,8 @@ recoverCallGraph(const cli::CallGraphOptions &options,
     }
     *context = std::move(*currentContext);
     if (result.coverage) {
-      auto updated = callgraph::loadCoverage(context->project, result.graph);
+      auto updated =
+          callgraph::loadCoverage(context->project, options.facts, result.graph);
       if (!updated) {
         recoveryFailure(result.report, updated.error());
         break;

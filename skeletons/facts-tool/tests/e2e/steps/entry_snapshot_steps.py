@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from pytest_bdd import then
 
@@ -11,9 +12,21 @@ NAMES = ("left", "leaf", "boundary", "external", "indirect", "cycle_a")
 FORMATS = ("text", "json")
 CONF_VARIANTS = ((True, "conf"), (False, "noconf"))
 
+# indexed_at/catalog_mtime are real wall-clock/filesystem timestamps recorded
+# by a real extract; they are genuinely different on every run, unlike every
+# other field here, so a byte-identical snapshot has to normalize an engaged
+# value to a fixed placeholder on both sides rather than freeze one run's
+# values. `null` (the "noconf"/never-indexed variants) is a real, stable
+# value in its own right and must stay `null`, not get normalized away too.
+_CATALOG_MTIME = re.compile(r'"catalog_mtime":(?!null)[-0-9.eE]+')
+_INDEXED_AT = re.compile(r'"indexed_at":(?!null)"[^"]*"')
+
 
 def _substitute(text: str, root: str) -> str:
-    return text.replace(root, "{root}")
+    text = text.replace(root, "{root}")
+    text = _CATALOG_MTIME.sub('"catalog_mtime":"{recorded}"', text)
+    text = _INDEXED_AT.sub('"indexed_at":"{recorded}"', text)
+    return text
 
 
 @then("the call-graph-entry help and outputs are byte-identical to the snapshot")

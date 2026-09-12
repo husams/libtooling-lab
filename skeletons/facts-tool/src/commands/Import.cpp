@@ -189,7 +189,7 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
         return invalidateConfiguredCallGraphEntries(
                    resolved, options.factsProvided ? options.facts : "",
                    options.sources)
-            .and_then([&] {
+            .and_then([&](bool) {
               return cli::runStage(
                   options.verbosity, "import", "store compile commands", [&] {
                     return importProjectConfiguration(
@@ -206,6 +206,10 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
                   .and_then(
                       [&](std::size_t) { return registeredFileCount(files); })
                   .transform([&](std::size_t after) {
+                    // A changed driver/working directory/compile option
+                    // already invalidated the affected files' index state
+                    // as part of storing the project configuration above; an
+                    // unchanged reimport leaves it alone.
                     std::cout << "Imported " << result.importedFiles
                               << " compile command(s)\n";
                     std::cout << "Registered " << (after - before)

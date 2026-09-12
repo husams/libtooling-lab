@@ -18,7 +18,7 @@ CREATE TABLE directory (
 CREATE TABLE file (
  id INTEGER PRIMARY KEY, directory_id INTEGER, name TEXT, mtime REAL, md5 TEXT,
  compile_options TEXT, driver TEXT, working_directory TEXT, indexed INTEGER,
- indexed_at TEXT, args_overridden INTEGER
+ indexed_at TEXT, facts_db TEXT, git_commit TEXT, args_overridden INTEGER
 );
 CREATE TABLE project_registry (
  id INTEGER PRIMARY KEY, complete INTEGER, fingerprint TEXT, file_count INTEGER

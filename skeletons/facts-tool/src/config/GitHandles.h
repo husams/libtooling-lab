@@ -21,17 +21,26 @@ inline void ensureLibgit2Initialized() {
 
 struct RepositoryHandle {
   git_repository *repo = nullptr;
+
   ~RepositoryHandle() { git_repository_free(repo); }
 };
 
 struct RemoteHandle {
   git_remote *remote = nullptr;
+
   ~RemoteHandle() { git_remote_free(remote); }
 };
 
 struct StringArrayHandle {
   git_strarray array{};
+
   ~StringArrayHandle() { git_strarray_dispose(&array); }
+};
+
+struct IndexHandle {
+  git_index *index = nullptr;
+
+  ~IndexHandle() { git_index_free(index); }
 };
 
 } // namespace facts::config::detail

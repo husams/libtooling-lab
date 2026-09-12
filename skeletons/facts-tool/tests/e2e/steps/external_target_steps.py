@@ -167,6 +167,7 @@ def extract_fixture(context: FactsToolContext, source: Path) -> None:
         [
             str(context.facts_tool),
             "extract",
+            "--force",
             "--output",
             str(context.facts_database_path),
             "--conf",

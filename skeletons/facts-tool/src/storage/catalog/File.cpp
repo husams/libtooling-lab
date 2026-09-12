@@ -115,43 +115,69 @@ std::string relativeFilePath(const File &file) {
       .generic_string();
 }
 
+// loadProjectProvenance() reads this on a raw, non-migrating handle (extract
+// runs it well before the "record index state" stage ever opens a
+// read-write one), so facts_db/git_commit have to be optional the same way
+// FileIndexState.cpp's columns are: '' on a registry a writer has not
+// migrated yet, not a query failure.
+Result<bool> hasIndexStateColumns(Database &database) {
+  return query(database,
+               "SELECT EXISTS(SELECT 1 FROM pragma_table_info('file') WHERE "
+               "name='facts_db') AND EXISTS(SELECT 1 FROM "
+               "pragma_table_info('file') WHERE name='git_commit')",
+               [](const storage::Row &row) { return row.integer(0) != 0; })
+      .and_then([](const std::vector<bool> &rows) -> Result<bool> {
+        return !rows.empty() && rows.front();
+      });
+}
+
 Result<std::vector<File>> files(Database &database) {
-  return query(
-      database,
-      "SELECT f.id,f.directory_id,c.id,c.name,c.path,c.kind,c.version,"
-      "c.repository_id,cl.id,cl.repository_id,cl.path,cl.label,d.path,f.name,"
-      "coalesce(f.compile_options,'[]'),coalesce(f.driver,''),"
-      "coalesce(f.working_directory,''),f.mtime,f.args_overridden,f.indexed,"
-      "coalesce(f.indexed_at,'') "
-      "FROM file f JOIN directory d ON d.id=f.directory_id "
-      "JOIN component c ON c.id=d.component_id "
-      "LEFT JOIN repository r ON r.id=c.repository_id "
-      "LEFT JOIN clone cl ON cl.id=r.active_clone_id ORDER BY f.id",
-      [](const storage::Row &row) {
-        File value;
-        value.id = row.integer(0);
-        value.directoryId = row.integer(1);
-        value.component = {row.integer(2),
-                           row.string(3),
-                           row.string(4),
-                           row.string(5),
-                           row.get<std::optional<std::string>>(6),
-                           row.get<std::optional<std::int64_t>>(7)};
-        if (!row.isNull(8)) {
-          value.clone = ProjectClone{row.integer(8), row.integer(9),
-                                     row.string(10), row.string(11)};
-        }
-        value.componentName = row.string(3);
-        value.directory = row.string(12);
-        value.name = row.string(13);
-        value.compileOptions = row.string(14);
-        value.driver = row.string(15);
-        value.workingDirectory = row.string(16);
-        value.mtime = row.get<std::optional<double>>(17);
-        value.argsOverridden = row.integer(18) != 0;
-        value.indexed = row.integer(19) != 0;
-        value.indexedAt = row.string(20);
-        return value;
+  return hasIndexStateColumns(database).and_then(
+      [&](bool present) -> Result<std::vector<File>> {
+        const std::string factsDbColumn =
+            present ? "coalesce(f.facts_db,'')" : "''";
+        const std::string gitCommitColumn =
+            present ? "coalesce(f.git_commit,'')" : "''";
+        return query(
+            database,
+            "SELECT f.id,f.directory_id,c.id,c.name,c.path,c.kind,c.version,"
+            "c.repository_id,cl.id,cl.repository_id,cl.path,cl.label,"
+            "d.path,f.name,coalesce(f.compile_options,'[]'),"
+            "coalesce(f.driver,''),coalesce(f.working_directory,''),"
+            "f.mtime,f.args_overridden,f.indexed,coalesce(f.indexed_at,'')," +
+                factsDbColumn + "," + gitCommitColumn +
+                " FROM file f JOIN directory d ON d.id=f.directory_id "
+                "JOIN component c ON c.id=d.component_id "
+                "LEFT JOIN repository r ON r.id=c.repository_id "
+                "LEFT JOIN clone cl ON cl.id=r.active_clone_id ORDER BY f.id",
+            [](const storage::Row &row) {
+              File value;
+              value.id = row.integer(0);
+              value.directoryId = row.integer(1);
+              value.component = {row.integer(2),
+                                 row.string(3),
+                                 row.string(4),
+                                 row.string(5),
+                                 row.get<std::optional<std::string>>(6),
+                                 row.get<std::optional<std::int64_t>>(7)};
+              if (!row.isNull(8)) {
+                value.clone = ProjectClone{row.integer(8), row.integer(9),
+                                           row.string(10), row.string(11)};
+              }
+              value.componentName = row.string(3);
+              value.directory = row.string(12);
+              value.name = row.string(13);
+              value.compileOptions = row.string(14);
+              value.driver = row.string(15);
+              value.workingDirectory = row.string(16);
+              value.mtime = row.get<std::optional<double>>(17);
+              value.argsOverridden = row.integer(18) != 0;
+              value.indexed = row.integer(19) != 0;
+              value.indexedAt = row.string(20);
+              value.factsDb = row.string(21);
+              value.gitCommit = row.string(22);
+              return value;
+            });
       });
 }
 

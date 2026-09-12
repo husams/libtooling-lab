@@ -17,6 +17,7 @@ struct ExtractOptions {
   std::vector<std::string> defaultExtraArguments;
   std::vector<std::string> extraArguments;
   bool extraArgumentsProvided = false;
+  bool force = false;
   std::vector<std::string> sources;
 };
 

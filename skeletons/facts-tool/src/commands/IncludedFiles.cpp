@@ -51,15 +51,16 @@ void announceProgress(std::size_t index, std::size_t total,
 
 } // namespace
 
-std::expected<std::vector<std::string>, std::string>
-discoverIncludedFiles(const clang::tooling::CompilationDatabase &compilations,
-                      std::span<const std::string> selectedSources) {
+std::expected<DiscoveredIncludes, std::string> discoverIncludedFilesPerSource(
+    const clang::tooling::CompilationDatabase &compilations,
+    std::span<const std::string> selectedSources) {
   return configurePlatformCompilationDatabase(compilations, selectedSources)
       .transform_error([](std::string error) {
         return "cannot resolve included files: " + std::move(error);
       })
       .and_then([&](auto configured)
-                    -> std::expected<std::vector<std::string>, std::string> {
+                    -> std::expected<DiscoveredIncludes, std::string> {
+        DiscoveredIncludes result;
         IncludeGraphFacts merged;
         for (std::size_t index = 0; index < selectedSources.size(); ++index) {
           const auto &source = selectedSources[index];
@@ -69,6 +70,10 @@ discoverIncludedFiles(const clang::tooling::CompilationDatabase &compilations,
               !preprocessed) {
             return std::unexpected(std::move(preprocessed.error()));
           }
+          auto owned = facts.visitedSources;
+          std::ranges::sort(owned);
+          owned.erase(std::ranges::unique(owned).begin(), owned.end());
+          result.perSource.emplace(source, std::move(owned));
           std::ranges::move(facts.visitedSources,
                             std::back_inserter(merged.visitedSources));
           std::ranges::move(facts.edges, std::back_inserter(merged.edges));
@@ -77,7 +82,17 @@ discoverIncludedFiles(const clang::tooling::CompilationDatabase &compilations,
         merged.visitedSources.erase(
             std::ranges::unique(merged.visitedSources).begin(),
             merged.visitedSources.end());
-        return std::move(merged.visitedSources);
+        result.merged = std::move(merged.visitedSources);
+        return result;
+      });
+}
+
+std::expected<std::vector<std::string>, std::string>
+discoverIncludedFiles(const clang::tooling::CompilationDatabase &compilations,
+                      std::span<const std::string> selectedSources) {
+  return discoverIncludedFilesPerSource(compilations, selectedSources)
+      .transform([](DiscoveredIncludes discovered) {
+        return std::move(discovered.merged);
       });
 }
 

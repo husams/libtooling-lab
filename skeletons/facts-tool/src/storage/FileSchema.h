@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS file (
   working_directory TEXT,
   indexed         INTEGER NOT NULL DEFAULT 0,
   indexed_at      TEXT,
+  facts_db        TEXT,
+  git_commit      TEXT,
   args_overridden INTEGER NOT NULL DEFAULT 0,
   UNIQUE(directory_id, name)
 );

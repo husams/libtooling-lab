@@ -19,6 +19,7 @@ OPTIONS:
   -c, --conf FILE     Direct project DB path (overrides FACTS_TOOL_CONF and generated naming)
       --config FILE   YAML defaults file
       --extra-arg ARG Compiler argument replacing YAML extra_args; shell-tokenized and repeatable
+      --force         Re-extract sources whose recorded index state is still up to date
 ```
 
 ## Extracting all sources vs. selected sources
@@ -69,8 +70,8 @@ your checkout. `-o` always overrides the template explicitly.
 | Level | Behavior |
 |---|---|
 | 0 | quiet - suppresses the `facts-tool: extract:` stage lines only |
-| 1 | stages - one line per pipeline stage (`starting`, `validate database paths`, ..., `complete`) |
-| 2 | details - adds two extra stage lines, `configuration=...` and `selected_sources=N` |
+| 1 | stages - one line per pipeline stage (`starting`, `validate database paths`, ..., `complete`), including the `up_to_date=N stale=M` freshness summary |
+| 2 | details - adds extra stage lines: `configuration=...`, `selected_sources=N`, and one `skip up-to-date source=<path>` line per source the freshness check skipped |
 | 3 | trace - adds low-level trace detail (thousands of lines on a small project) |
 
 Verbosity controls the `facts-tool: extract:` stage lines and nothing else.
@@ -98,6 +99,8 @@ facts-tool: extract: selected_sources=2
 facts-tool: extract: resolve registered sources
 [1/2] Processing file .../proj/src/shapes.cpp.
 [2/2] Processing file .../proj/src/main.cpp.
+facts-tool: extract: check index freshness
+facts-tool: extract: up_to_date=0 stale=2
 facts-tool: extract: configure Clang tool
 facts-tool: extract: open output database
 facts-tool: extract: begin output transaction
@@ -109,6 +112,7 @@ facts-tool: coverage.unsupported_semantics kind=implicit-cleanup site=.../c++/v1
 ... (18 more, including one at proj/src/main.cpp:25:41 - the lambda's implicit destructor)
 facts-tool: extract: commit output transaction
 facts-tool: 83 symbol(s) recorded from 24 file(s)
+facts-tool: extract: record index state
 facts-tool: extract: complete
 ```
 
@@ -152,6 +156,118 @@ facts-tool: configuration error: cannot create facts_template directory: No such
 
 A `--conf` (or resolved `conf_template`) path that does not exist is always
 a database error (exit 1), never a configuration error.
+
+## Skipping up-to-date sources
+
+After the first successful extraction of a source, `extract` records what it
+did for that file, and every header it transitively included, in each
+file's own `file` row: that it is indexed, when, into which facts database,
+and at which git commit. A later `extract` run reads that recorded state
+back and skips a translation unit entirely - no Clang parse, no
+output-database writes for it - only when **every** file in its transitive
+include set (the TU itself and every header it pulls in) individually
+passes **all** of the following, checked in this order:
+
+1. The file is marked indexed, and its recorded facts database is the exact
+   path this run would write to.
+2. Its recorded git commit matches the current `HEAD` of the git repository
+   that tracks it. This is a repository-wide check, not a per-file one: any
+   new commit in that repository - even one that never touches this file -
+   moves `HEAD`, so it makes every one of the repository's tracked files
+   stale at once. A file outside any git repository, or untracked within
+   one, compares as no-commit on both sides; that counts as a match. A file
+   that moved into or out of a repository does not.
+3. Its current last-write time exactly matches the recorded one. Any
+   difference - forward or backward - counts as changed; there is no "not
+   newer than" allowance, so a source whose mtime moves into the future
+   (a clock change, a restored backup) is stale exactly once, not
+   permanently. `indexed_at` is recorded metadata only and plays no part in
+   this comparison.
+
+Editing only a header is enough to make every translation unit that
+includes it stale, even though none of those TUs' own files changed.
+Any other source - one whose closure fails any rule, or one `extract` has
+never seen before - is stale and gets extracted normally.
+
+> [!info]- What "skipped" means for included headers
+> A source and everything it transitively includes are marked together at
+> the end of a run that actually extracted it. When two facts databases
+> extract overlapping sources that share a header, the header's recorded
+> `facts_db` reflects whichever extraction ran **last** - the previous
+> extraction's skip decision for that header is not retroactively affected,
+> but a later run against the other facts database will see the header's
+> `facts_db` pointing elsewhere and treat it as stale again.
+
+If every requested source is up to date, `extract` prints one line and
+exits 0 without opening or creating the output database and without
+running the AST-extraction pass that would actually record facts.
+Resolving registered sources still preprocesses every selected source
+first regardless of the outcome - the `[n/m] Processing file` block always
+prints, since that same pass is also how the freshness check discovers
+each source's included headers - only the Clang parse and fact extraction
+that would follow it is skipped:
+
+```text
+facts-tool: 2 source(s) up to date; nothing to extract
+```
+
+Pass `--force` to skip this check entirely and re-extract every requested
+source regardless of its recorded state - useful after a toolchain change,
+a manual edit to the facts database, or any time you do not trust the
+recorded state:
+
+```console
+$ facts-tool extract -c demo.db -o demo-facts.db --force proj/src/shapes.cpp
+```
+
+> [!warning]- If the output database goes missing between runs
+> The freshness check only compares recorded paths, not whether the output
+> file still exists on disk. Deleting `demo-facts.db` and re-running
+> `extract` without `--force` reports "up to date; nothing to extract" and
+> does **not** recreate it - pass `--force`, or extract into a fresh path,
+> whenever the previous output no longer exists.
+
+Several other commands reset a file's recorded index state too, each
+scoped to exactly what it invalidates rather than the whole project:
+
+- `file set-option`/`clear-option` resets only the row(s) the match
+  actually touched - other registered files are unaffected.
+- `file add`/`rm` resets nothing: a newly added row is unindexed already,
+  and a removed row is simply gone.
+- `import` resets a row only when this import actually changed its driver,
+  working directory, or compile options; a brand-new row is unindexed
+  already either way. Re-importing an unchanged `compile_commands.json`
+  therefore leaves every row's recorded index state alone, so the next
+  plain `extract` still skips it - the everyday `import && extract`
+  workflow is not defeated by a routine reimport.
+- `repository`, `component`, `directory`, and `clone` mutations reset
+  every row in the project catalog, since a structural change can move
+  what an existing row even refers to. This coarse reset happens only when
+  the mutation actually invalidated a paired facts database's call-graph
+  entries; a project with no facts database configured for it yet has
+  nothing to invalidate, and so nothing to reset either.
+
+Whichever command triggers it, resetting index state re-arms the next
+plain `extract` to re-extract rather than trust bookkeeping the mutation
+just made obsolete.
+
+The three new `file` columns this feature reads and writes -
+`indexed_at`, `facts_db`, `git_commit` - are visible on
+[`facts-tool file show`](05-inspecting-symbols-cli.md) and documented in the
+[storage schema reference](../07-reference/02-storage-schema.md).
+
+Recording index state is an optimization a later `extract` can use to skip
+unchanged work, not a correctness requirement for the facts just committed:
+by the time this step runs, the facts are already durably written. Every
+failure recording it - the project database cannot be opened read-write
+(most commonly because it is read-only), a file cannot be resolved or
+stat'd, or the `UPDATE` itself fails, including a transient `SQLITE_BUSY`
+from a concurrent reader - is therefore only ever a warning, never a reason
+to fail a command that already did its real work; `extract` still exits 0:
+
+```text
+facts-tool: warning: index state not recorded: ...
+```
 
 ## Re-extraction and incremental behavior
 

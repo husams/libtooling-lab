@@ -50,7 +50,8 @@ def resolved(context):
 @then("S-027 multi-source extraction retains shared callers and resolved targets")
 def multisource(context):
     for sources in (context.entry_sources, list(reversed(context.entry_sources))):
-        succeed(run(context, "extract", "-v", "0", "--conf", context.files_database_path,
+        succeed(run(context, "extract", "-v", "0", "--force", "--conf",
+                    context.files_database_path,
                     "--output", context.facts_database_path, *sources))
         left = graph(context, "left")
         require({"s027::left", "s027::shared", "s027::leaf"}.issubset(left["nodes"]), str(left))

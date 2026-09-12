@@ -4,14 +4,17 @@
 #include "commands/ConfigurationSupport.h"
 #include "commands/DatabasePaths.h"
 #include "commands/ExtraArguments.h"
+#include "commands/ExtractionFreshness.h"
 #include "commands/ExtractionSetup.h"
 #include "commands/FactPairValidation.h"
 
 #include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
 #include "cli/Verbose.h"
+#include "config/GitFileCommit.h"
 #include "platform/PlatformFlags.h"
 #include "storage/FactStore.h"
+#include "storage/FileIndexState.h"
 #include "storage/FileManager.h"
 #include "tooling/StoredCompilationDatabase.h"
 
@@ -19,6 +22,8 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <filesystem>
+#include <format>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -26,6 +31,8 @@
 #include <string_view>
 #include <system_error>
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -74,6 +81,98 @@ decltype(auto) runExtractStage(const cli::ExtractOptions &options,
   });
 }
 
+std::string utcNow() {
+  return std::format("{:%FT%TZ}", std::chrono::floor<std::chrono::seconds>(
+                                      std::chrono::system_clock::now()));
+}
+
+// The union of every stale TU's own transitive include set (itself
+// included), in first-seen order -- everything a successful run of
+// `staleSources` needs marked, without discovering it a second time.
+std::vector<std::string>
+filesToMark(const std::vector<std::string> &staleSources,
+            const std::unordered_map<std::string, std::vector<std::string>>
+                &perSource) {
+  std::vector<std::string> result;
+  std::unordered_set<std::string> seen;
+  for (const auto &source : staleSources) {
+    const auto found = perSource.find(source);
+    const std::vector<std::string> singleton{source};
+    const auto &closure = found != perSource.end() ? found->second : singleton;
+    for (const auto &file : closure) {
+      if (seen.insert(file).second) {
+        result.push_back(file);
+      }
+    }
+  }
+  return result;
+}
+
+// Recording index state is an optimization a later extract can use to skip
+// unchanged work, not a correctness requirement for the facts just
+// committed: the facts themselves are already durably written by the time
+// this runs, so every failure here -- whether the project database could
+// not even be opened read-write, a file could not be resolved or stat'd, or
+// the UPDATE itself failed (including a transient SQLITE_BUSY) -- is worth
+// only a warning, never the exit-1 a genuine extraction failure gets.
+struct RecordIndexStateError {
+  std::string message;
+};
+
+// Marks every file `filesToMark` returned as indexed into `options.output`
+// at the git commit each one currently resolves to. Runs after store.end()
+// has already committed the facts, so a failure here must say the facts are
+// safe even though the index state is not.
+std::expected<void, RecordIndexStateError>
+recordIndexState(const cli::ExtractOptions &options,
+                 const std::vector<std::string> &files,
+                 const std::unordered_map<std::string, double> &observedMtime,
+                 config::GitCommitResolver &resolver) {
+  std::unique_ptr<FileManager> opened;
+  try {
+    opened =
+        std::make_unique<FileManager>(options.configuration, options.verbosity);
+  } catch (const std::exception &error) {
+    return std::unexpected(RecordIndexStateError{error.what()});
+  }
+  auto &writable = *opened;
+  const auto normalizedOutput =
+      std::filesystem::absolute(options.output).lexically_normal().string();
+  const auto indexedAt = utcNow();
+
+  std::vector<FileIndexRecord> records;
+  records.reserve(files.size());
+  for (const auto &file : files) {
+    auto id = writable.getId(file);
+    if (!id)
+      return std::unexpected(RecordIndexStateError{
+          "cannot resolve indexed file: " + file + ": " +
+          id.error().message()});
+    // Reuse the mtime partitionSources observed before the Clang parse ran,
+    // so a file edited while a long extraction is still in flight records
+    // the mtime of what was actually extracted, not whatever is on disk
+    // once the parse finishes. Falls back to a fresh stat for a file that
+    // was, for whatever reason, never actually observed there.
+    const auto observed = observedMtime.find(file);
+    const auto mtime = observed != observedMtime.end()
+                           ? std::optional<double>{observed->second}
+                           : currentMtime(file);
+    if (!mtime)
+      return std::unexpected(RecordIndexStateError{
+          "cannot read the last-write time of " + file});
+    records.push_back(FileIndexRecord{.id = *id,
+                                      .indexedAt = indexedAt,
+                                      .mtime = *mtime,
+                                      .factsDb = normalizedOutput,
+                                      .gitCommit = resolver.commitFor(file)});
+  }
+  auto marked = writable.markIndexed(records);
+  if (!marked)
+    return std::unexpected(RecordIndexStateError{
+        "cannot record index state: " + marked.error().message()});
+  return {};
+}
+
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
                                         CompilationDatabasePtr database) {
   auto opened = runExtractStage(options, "open project database", [&] {
@@ -94,20 +193,43 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
   });
   cli::logVerbose(options.verbosity, 2,
                   "facts-tool: extract: selected_sources={}", sources.size());
+
   return runExtractStage(options, "resolve registered sources",
                          [&] {
                            return requireRegisteredSources(files, *database,
                                                            sources, *registry);
                          })
-      .and_then([&] {
+      .and_then([&](DiscoveredIncludes discovered) {
+        config::GitCommitResolver commitResolver;
+        auto partitioned =
+            runExtractStage(options, "check index freshness", [&] {
+              return partitionSources(files, commitResolver, sources,
+                                      discovered.perSource, options.output,
+                                      options.force);
+            });
+        for (const auto &source : partitioned.upToDate) {
+          cli::logVerbose(options.verbosity, 2,
+                          "facts-tool: extract: skip up-to-date source={}",
+                          source);
+        }
+        cli::logVerbose(options.verbosity, 1,
+                        "facts-tool: extract: up_to_date={} stale={}",
+                        partitioned.upToDate.size(), partitioned.stale.size());
+        if (partitioned.stale.empty()) {
+          std::cerr << "facts-tool: " << sources.size()
+                    << " source(s) up to date; nothing to extract\n";
+          return std::expected<int, std::string>{0};
+        }
+        const auto &stale = partitioned.stale;
+
         auto configured = runExtractStage(options, "configure Clang tool", [&] {
-          return configurePlatformCompilationDatabase(*database, sources);
+          return configurePlatformCompilationDatabase(*database, stale);
         });
         if (!configured) {
           return std::expected<int, std::string>{
               std::unexpected(configured.error())};
         }
-        clang::tooling::ClangTool tool(**configured, sources);
+        clang::tooling::ClangTool tool(**configured, stale);
 
         // Deferred until every applicable check above has passed, so a
         // facts_template default never creates a directory ahead of a
@@ -145,8 +267,8 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
                                                   : 1;
         if (result == 0) {
           std::vector<FileId> selected;
-          selected.reserve(sources.size());
-          for (const auto &source : sources) {
+          selected.reserve(stale.size());
+          for (const auto &source : stale) {
             auto id = files.getId(source);
             if (!id) {
               (void)store.rollback();
@@ -173,6 +295,22 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
           return std::expected<int, std::string>{
               std::unexpected("cannot finish output transaction: " +
                               finished.error().message())};
+        }
+        if (result != 0) {
+          return std::expected<int, std::string>{result};
+        }
+        const auto toMark = filesToMark(stale, discovered.perSource);
+        auto recorded = runExtractStage(options, "record index state", [&] {
+          return recordIndexState(options, toMark, partitioned.observedMtime,
+                                  commitResolver);
+        });
+        if (!recorded) {
+          // The facts are already committed at this point; recording is
+          // purely an optimization for a later extract, so any failure --
+          // including a transient SQLITE_BUSY -- is a warning, not a
+          // reason to fail the command that already did its real work.
+          std::cerr << "facts-tool: warning: index state not recorded: "
+                    << recorded.error().message << "\n";
         }
         return std::expected<int, std::string>{result};
       });

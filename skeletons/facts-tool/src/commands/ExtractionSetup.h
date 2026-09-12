@@ -1,6 +1,7 @@
 #pragma once
 
 #include "commands/CompilationDatabase.h"
+#include "commands/IncludedFiles.h"
 
 #include <expected>
 #include <span>
@@ -28,7 +29,12 @@ requireRegisteredFiles(FileManager &files,
                        std::span<const std::string> visitedSources,
                        const std::string &fingerprint);
 
-std::expected<void, std::string> requireRegisteredSources(
+// Validates that `sources` and everything they transitively include are
+// registered, and returns the full per-source discovery result (each
+// source's own transitive include set, plus the merged union that was
+// validated) so a caller does not have to preprocess a second time to know
+// what it just discovered.
+std::expected<DiscoveredIncludes, std::string> requireRegisteredSources(
     FileManager &files, const clang::tooling::CompilationDatabase &database,
     const std::vector<std::string> &sources, const std::string &fingerprint);
 

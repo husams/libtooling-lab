@@ -46,8 +46,8 @@ runCallGraphEntry(const cli::CallGraphEntryOptions &options) {
                 return validateFactPairForRead(options.facts,
                                                resolved.database.string())
                     .and_then([&] {
-                      return callgraph::loadCoverage(resolved.database.string(),
-                                                     graph);
+                      return callgraph::loadCoverage(
+                          resolved.database.string(), options.facts, graph);
                     })
                     .transform(
                         [&](auto report) { coverage = std::move(report); });

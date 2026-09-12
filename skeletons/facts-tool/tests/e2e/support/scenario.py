@@ -83,8 +83,8 @@ class FactsToolContext:
         self.initial_symbols = symbol_snapshot(self.facts_database_path)
         self.extracted = True
 
-    def run_tool(self) -> str:
-        completed = self._run(self.tool_command())
+    def run_tool(self, *, force: bool = False) -> str:
+        completed = self._run(self.tool_command(force=force))
         require(
             completed.returncode == 0,
             f"facts-tool exited with {completed.returncode}:\n{self.last_output}",
@@ -341,8 +341,15 @@ class FactsToolContext:
         self._run(self.import_command((source,)))
 
     def run_concurrently(self) -> list[str]:
+        # Both threads race to re-extract the same already-indexed sources
+        # into the same facts database, which is exactly what this scenario
+        # means to exercise (concurrent writers, not the freshness skip), so
+        # --force bypasses the skip that would otherwise make one of the two
+        # calls a no-op.
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            return list(executor.map(lambda _: self.run_tool(), range(2)))
+            return list(
+                executor.map(lambda _: self.run_tool(force=True), range(2))
+            )
 
     def rerun_from_stored_compile_options(self) -> None:
         self.extract()
@@ -461,7 +468,10 @@ class FactsToolContext:
                 "SELECT RAISE(ABORT, 'forced relation persistence failure'); "
                 "END"
             )
-        self._run(self.tool_command())
+        # Rerunning into the same, already-indexed facts database is the
+        # point of this scenario (triggering the DB failure the tool must
+        # surface), so --force bypasses the freshness skip.
+        self._run(self.tool_command(force=True))
 
     def force_field_relation_persistence_failure(self) -> None:
         self.extract()
@@ -472,7 +482,7 @@ class FactsToolContext:
                 "SELECT RAISE(ABORT, 'forced field relation persistence failure'); "
                 "END"
             )
-        self._run(self.tool_command())
+        self._run(self.tool_command(force=True))
 
     def force_second_inheritance_relation_failure(self) -> None:
         self.extract()
@@ -484,7 +494,7 @@ class FactsToolContext:
                 "SELECT RAISE(ABORT, 'forced second inheritance failure'); "
                 "END"
             )
-        self._run(self.tool_command())
+        self._run(self.tool_command(force=True))
 
     def run_dependent_base_fixture(self) -> None:
         self.prepare()
@@ -494,6 +504,226 @@ class FactsToolContext:
         self._write_compilation_database((source,))
         self.run_import((source,))
         self._run(self._tool_command((source,)))
+
+    # --- index state --------------------------------------------------
+    #
+    # A dedicated pair of freshly written sources for the extract
+    # index-state scenarios. They are never `git add`ed, so they stay
+    # untracked no matter what repository happens to enclose the output
+    # root (the facts-tool checkout itself, in a normal e2e run) -- these
+    # scenarios are about the plain index-state fields, and an untracked
+    # file resolves to a NULL git_commit exactly like one outside any
+    # repository at all.
+
+    @property
+    def index_state_sources(self) -> tuple[Path, Path]:
+        require(self.run_root is not None, "scenario is not prepared")
+        return (self.run_root_path / "alpha.cpp", self.run_root_path / "beta.cpp")
+
+    def start_index_state_project(self) -> None:
+        self.prepared = False
+        self.extracted = False
+        self.prepare()
+        first, second = self.index_state_sources
+        first.write_text("int alpha_value() { return 1; }\n", encoding="utf-8")
+        second.write_text("int beta_value() { return 2; }\n", encoding="utf-8")
+        self._write_compilation_database(sources=(first, second))
+        self.run_import((first, second))
+
+    def extract_index_state_sources(self, *, force: bool = False) -> None:
+        self._run(
+            self._tool_command(self.index_state_sources, force=force, verbosity=2)
+        )
+
+    def bump_first_index_state_source_mtime_into_the_future(self) -> None:
+        first, _ = self.index_state_sources
+        future = time.time() + 3600
+        os.utime(first, (future, future))
+
+    def reimport_index_state_sources_unchanged(self) -> None:
+        """Re-import the exact same compile_commands.json a second time."""
+        self.run_import(self.index_state_sources)
+
+    def reimport_index_state_sources_with_changed_flag_on_first_source(self) -> None:
+        """Re-import with one TU's compile options changed, the other untouched."""
+        first, second = self.index_state_sources
+        self._write_compilation_database(
+            sources=(first, second),
+            extra_options={first.name: ["-DALPHA_CHANGED"]},
+        )
+        self.run_import(self.index_state_sources)
+
+    def drop_index_state_columns(self) -> None:
+        """Leave a file table only a read-write open can migrate back."""
+        connection = sqlite3.connect(self.files_database_path)
+        try:
+            with connection:
+                connection.execute("ALTER TABLE file DROP COLUMN facts_db")
+                connection.execute("ALTER TABLE file DROP COLUMN git_commit")
+        finally:
+            connection.close()
+
+    @property
+    def header_index_state_sources(self) -> tuple[Path, Path]:
+        """(gamma.cpp, gamma.h) -- gamma.cpp includes gamma.h."""
+        require(self.run_root is not None, "scenario is not prepared")
+        return (self.run_root_path / "gamma.cpp", self.run_root_path / "gamma.h")
+
+    def start_header_index_state_project(self) -> None:
+        self.prepared = False
+        self.extracted = False
+        self.prepare()
+        source, header = self.header_index_state_sources
+        header.write_text(
+            "inline int gamma_value() { return 1; }\n", encoding="utf-8"
+        )
+        source.write_text(
+            '#include "gamma.h"\nint gamma_caller() { return gamma_value(); }\n',
+            encoding="utf-8",
+        )
+        self._write_compilation_database(sources=(source,))
+        self.run_import((source,))
+
+    def extract_header_index_state_source(self, *, force: bool = False) -> None:
+        source, _header = self.header_index_state_sources
+        self._run(self._tool_command((source,), force=force, verbosity=2))
+
+    def edit_header_index_state_header(self) -> None:
+        """Rewrite only the header, with its mtime pushed into the future so
+        even a coarse-timestamp filesystem sees a real change."""
+        _source, header = self.header_index_state_sources
+        header.write_text(
+            "inline int gamma_value() { return 2; }\n", encoding="utf-8"
+        )
+        future = time.time() + 3600
+        os.utime(header, (future, future))
+
+    def set_compile_option_on_first_index_state_source(
+        self,
+    ) -> subprocess.CompletedProcess[str]:
+        first, _second = self.index_state_sources
+        # --facts: an existing nonempty project requires an explicit paired
+        # facts store (or a configured facts_template) before any mutation;
+        # this is the same store the prior extract already wrote.
+        return self._run(
+            [
+                str(self.facts_tool),
+                "file",
+                "set-option",
+                "--conf",
+                str(self.files_database_path),
+                "--facts",
+                str(self.facts_database_path),
+                "--match",
+                first.name,
+                "--arg",
+                "-DEXTRA=1",
+            ]
+        )
+
+    def file_show_command(self, path: Path) -> list[str]:
+        return [
+            str(self.facts_tool),
+            "file",
+            "show",
+            str(path),
+            "--conf",
+            str(self.files_database_path),
+        ]
+
+    def run(self, command: list[str]) -> subprocess.CompletedProcess[str]:
+        """Public entry point for steps that need to run an arbitrary command."""
+        return self._run(command)
+
+    # --- a real git-rooted project --------------------------------------
+    #
+    # A repository facts-tool did not create, with an isolated identity and
+    # config so the host's own git settings never leak into a commit made
+    # here.
+
+    @property
+    def git_project_source(self) -> Path:
+        require(self.run_root is not None, "scenario is not prepared")
+        return self.run_root_path / "tracked.cpp"
+
+    def _git_env(self) -> dict[str, str]:
+        return {**os.environ, "HOME": str(self.run_root_path),
+               "GIT_CONFIG_NOSYSTEM": "1"}
+
+    def _git(self, args: list[str]) -> None:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=self.run_root_path,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=self._git_env(),
+        )
+        require(completed.returncode == 0, f"git {args} failed:\n{completed.stderr}")
+
+    def _git_commit(self, message: str) -> None:
+        self._git(
+            [
+                "-c",
+                "user.name=facts-tool e2e",
+                "-c",
+                "user.email=e2e@example.invalid",
+                "commit",
+                "-m",
+                message,
+            ]
+        )
+
+    def git_head(self) -> str:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.run_root_path,
+            capture_output=True,
+            text=True,
+            check=True,
+            env=self._git_env(),
+        )
+        return completed.stdout.strip()
+
+    def start_git_rooted_index_state_project(self) -> None:
+        self.prepared = False
+        self.extracted = False
+        self.prepare()
+        self.git_project_source.write_text(
+            "int tracked_value() { return 1; }\n", encoding="utf-8"
+        )
+        self._git(["init"])
+        self._git(["add", "tracked.cpp"])
+        self._git_commit("initial commit")
+        self._write_compilation_database(sources=(self.git_project_source,))
+        self.run_import((self.git_project_source,))
+
+    def commit_another_change_to_git_project(self) -> None:
+        self.git_project_source.write_text(
+            "int tracked_value() { return 2; }\n", encoding="utf-8"
+        )
+        self._git(["add", "tracked.cpp"])
+        self._git_commit("second commit")
+
+    def commit_an_unrelated_change_to_git_project(self) -> None:
+        """Move HEAD without touching the tracked source's own content or mtime.
+
+        Isolates rule 2 (the recorded git commit no longer matches HEAD) from
+        rule 3 (the recorded mtime no longer matches the current one): only
+        HEAD moves here, so a file staying stale under this alone proves the
+        commit check by itself is enough.
+        """
+        (self.run_root_path / "unrelated.cpp").write_text(
+            "int unrelated_value() { return 3; }\n", encoding="utf-8"
+        )
+        self._git(["add", "unrelated.cpp"])
+        self._git_commit("unrelated commit")
+
+    def extract_git_project(self, *, force: bool = False) -> None:
+        self._run(
+            self._tool_command((self.git_project_source,), force=force,
+                               verbosity=2)
+        )
 
     def stored_tool_command(self) -> list[str]:
         return [
@@ -553,10 +783,20 @@ class FactsToolContext:
     def _select_facts_database(self, filename: str) -> None:
         self.facts_database = self.run_root_path / filename
 
-    def tool_command(self) -> list[str]:
-        return self._tool_command(self.sources)
+    def tool_command(self, *, force: bool = False) -> list[str]:
+        # Unforced by default: a first extraction is unaffected either way
+        # (nothing recorded yet to skip), so this naturally exercises the
+        # freshness skip for the wide majority of scenarios that only
+        # extract once. Callers that deliberately re-extract the same,
+        # already-indexed sources into the same output (a trigger-forced
+        # failure rerun, a concurrent-write test, a rerun-stability check,
+        # ...) pass force=True explicitly instead of relying on a default
+        # here that would silently bypass the feature for everyone else.
+        return self._tool_command(self.sources, force=force)
 
-    def _tool_command(self, sources: tuple[Path, ...]) -> list[str]:
+    def _tool_command(self, sources: tuple[Path, ...], *,
+                      force: bool = False,
+                      verbosity: int | None = None) -> list[str]:
         return [
             str(self.facts_tool),
             "extract",
@@ -564,6 +804,8 @@ class FactsToolContext:
             str(self.facts_database_path),
             "--conf",
             str(self.files_database_path),
+            *(["--force"] if force else []),
+            *(["-v", str(verbosity)] if verbosity is not None else []),
             *(str(source) for source in sources),
         ]
 

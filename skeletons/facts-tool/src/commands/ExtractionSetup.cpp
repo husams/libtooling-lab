@@ -68,12 +68,14 @@ requireRegisteredFiles(FileManager &files,
                    std::string{*missing} + toolchainDrift(fingerprint))};
 }
 
-std::expected<void, std::string> requireRegisteredSources(
+std::expected<DiscoveredIncludes, std::string> requireRegisteredSources(
     FileManager &files, const clang::tooling::CompilationDatabase &database,
     const std::vector<std::string> &sources, const std::string &fingerprint) {
-  return discoverIncludedFiles(database, sources)
-      .and_then([&](const std::vector<std::string> &included) {
-        return requireRegisteredFiles(files, included, fingerprint);
+  return discoverIncludedFilesPerSource(database, sources)
+      .and_then([&](DiscoveredIncludes discovered)
+                    -> std::expected<DiscoveredIncludes, std::string> {
+        return requireRegisteredFiles(files, discovered.merged, fingerprint)
+            .transform([&] { return std::move(discovered); });
       });
 }
 

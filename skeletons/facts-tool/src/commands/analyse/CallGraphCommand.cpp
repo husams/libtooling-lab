@@ -39,7 +39,8 @@ runResolvedGraph(const cli::CallGraphOptions &options,
                     -> std::expected<CallGraphRunRecord, std::string> {
         std::optional<callgraph::CoverageReport> coverage;
         if (!options.configuration.empty()) {
-          auto loaded = callgraph::loadCoverage(options.configuration, graph);
+          auto loaded =
+              callgraph::loadCoverage(options.configuration, options.facts, graph);
           if (!loaded)
             return std::unexpected(loaded.error());
           coverage = std::move(*loaded);

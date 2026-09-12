@@ -127,7 +127,9 @@ def verify_inventory(context: FactsToolContext):
 
 @when("I extract the callable fixture again into the same database")
 def extract_again(context: FactsToolContext):
-    context.run_tool()
+    # Literally "into the same database": the sources are already indexed
+    # there, so --force is required to actually re-extract rather than skip.
+    context.run_tool(force=True)
     require("indexing incomplete" not in context.last_output, context.last_output)
 
 
@@ -158,7 +160,10 @@ def verify_upgrade(context: FactsToolContext):
     require(unrelated_facts(context) == context.before_upgrade, "upgrade changed unrelated facts")
     require(query(context.facts_database_path, "PRAGMA user_version") == [(13,)],
             "return-type schema migration did not advance to version 12")
-    context.run_tool()
+    # Only the facts database's schema was rewound above; the project
+    # database still records this source as indexed into this same facts
+    # database, so --force is required to re-extract rather than skip.
+    context.run_tool(force=True)
     require(unrelated_facts(context) == context.before_upgrade, "second migration changed facts")
     require(inventory(context) == context.return_inventory, "second migration changed return facts")
 
