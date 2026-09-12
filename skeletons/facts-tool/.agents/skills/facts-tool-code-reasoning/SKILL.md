@@ -1,6 +1,6 @@
 ---
 name: facts-tool-code-reasoning
-description: Use facts-tool and its Python query SDK to investigate, explain, or navigate C++ code from persisted symbols, relations, source locations, and project metadata.
+description: Use facts-tool and its public Python SDK to search and reason about C++ code using persisted evidence or native AST match results with source locations.
 ---
 
 # Facts-tool code reasoning
@@ -26,7 +26,11 @@ generation. If the SDK cannot expose evidence, report the capability gap.
    smallest required translation units with native `import`/`extract` or
    `match`; do not use SQL, database drivers, or duplicate SDK callgraph
    traversal.
-3. Use `match --matcher '...bind("symbol")'` for symbols and exact
+3. For an existing name or USR, try `symbol find` before parsing source;
+   an index miss is not proof of source absence. Use `match` for requested AST
+   predicates or missing/refreshed evidence, scoped to candidate registered
+   TUs. Every invocation parses those TUs; narrowing a name does not avoid
+   parsing. Use `match --matcher '...bind("symbol")'` for symbols and exact
    `call`/`callee` bindings for direct Calls; `source`/`target`/`site` are
    relation bindings and require `--relation-kind`.
 4. Ground conclusions in native names, kinds, locations, relations, sites, and
@@ -35,6 +39,13 @@ generation. If the SDK cannot expose evidence, report the capability gap.
 5. Use the installed Python SDK for persisted graph runs, expressions, field
    effects, ancestors, and bounded source regions; do not scan source files or
    replace a missing fact with an inferred answer.
+6. For the exact result collection from a match invocation, use `--format json`
+   and public `MatchResults`/`load_match_results`, following
+   [match result processing](references/match-results.md). Verify these
+   capabilities in the selected executable and Python environment; checkout
+   documentation does not establish that an installed release provides them.
+   Preserve binding names, TU provenance, optional coordinates, and publication
+   flags; a later discovery-index lookup is not the invocation result set.
 
 ## Agent workflow
 
@@ -84,6 +95,7 @@ and worked examples; read the relevant workflow before running commands.
 Read only the guide needed for the task:
 
 - [Query C++ with Python](references/query-cpp.md)
+- [Process native match results with Python](references/match-results.md)
 - [Deploy in IPython-MCP](references/ipython-mcp.md)
 - [Create and inspect databases with the native CLI](references/native-cli.md)
 

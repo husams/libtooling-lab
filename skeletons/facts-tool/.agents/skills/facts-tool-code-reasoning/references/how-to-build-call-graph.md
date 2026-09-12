@@ -1,6 +1,6 @@
 # How to build a call graph
 
-Use the native executable built from this checkout. Confirm its configuration
+Use the selected native facts-tool executable. Confirm its configuration
 with `facts-tool config show`, and use `symbol find` to disambiguate the exact
 qualified name or USR (see [symbol search](how-to-search-symbol.md)).
 

@@ -1,7 +1,8 @@
 # Installed agent workflows
 
-Use YAML-resolved paired paths and the installed tools in every workflow. Start by
-checking `facts-tool config show` and the relevant command help, then reuse the
+Use YAML-resolved paired paths and verify the selected executable and Python
+environment. Start by checking `facts-tool config show` and the relevant command
+help, then reuse the
 same project/facts pair for native and SDK calls. Do not require explicit
 database-path flags; use `--config FILE` to select another YAML file when needed. Keep temporary acceptance
 stores outside the checkout; do not set `PYTHONPATH`, mutate global stores, or
@@ -37,7 +38,8 @@ with open_codebase(facts_db=facts_path, project_db=project_path) as cb:
 ## Answer focused questions
 
 Use native symbol discovery first, selecting an exact USR when a name is
-ambiguous; use `match` only for missing symbol evidence. Use the SDK for typed
+ambiguous; use `match` for requested AST predicates or missing/refreshed symbol
+evidence. Use the SDK for typed
 navigation (`callees`, `callers`, `bases`), schema13 expressions and field
 effects, and exact bounded definition regions:
 
@@ -59,6 +61,22 @@ Check `truncated`, `partial`, `unknown`, `provenance`, and each row's
 of complete source extraction; a limited match is not proof of full-file
 coverage. Changed, missing, invalid, cross-checkout, macro, dependent, and
 unavailable regions stay typed and reasoned.
+
+## Process one match invocation
+
+When the question requires a new AST predicate or refreshed source evidence,
+match only the selected registered TUs. Capture `--format json` and process it
+with `load_match_results` or `MatchResults.from_json`, using the
+[match results recipe](match-results.md). This reader needs no `CodeBase` or
+database paths. Keep each row's binding names and TU, including repeated header
+occurrences, and report unavailable coordinates rather than inventing them.
+Check command success and result publication flags before using the collection.
+Its `complete` flag describes the selected TUs, not full-project or body coverage.
+
+For a later persisted-store query, reopen `CodeBase` after native writes. The
+saved JSON remains the snapshot of its invocation and does not refresh itself
+when source changes. Parse structured results with the SDK; ordinary text is
+for display, and the matched-symbol index is a separate discovery view.
 
 ## Acceptance discipline
 

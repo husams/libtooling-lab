@@ -1,8 +1,9 @@
 # How to query C++ code
 
 The distribution is `facts-tool-query`; the import namespace is `facts_tool`.
-The SDK reads a facts database and its separate project database. It never
-imports, extracts, migrates, or writes either file.
+The SDK reads a facts database and its separate project database, and can read
+native match-result JSON without opening either store. It never imports,
+extracts, migrates, or writes either database.
 
 ## Required access boundary
 
@@ -17,6 +18,13 @@ To search **source code**, use native `facts-tool match --matcher` with the
 Clang dynamic AST matcher DSL, following
 [Source-symbol search](how-to-search-symbol.md). The SDK queries persisted
 evidence; it does not run Clang matchers or extract missing source facts.
+
+For the exact bindings returned by one native invocation, use
+`load_match_results("matches.json")` or `MatchResults.from_json(stdout)` after
+checking command success. Follow [match result processing](match-results.md)
+for capability checks, physical coordinates, byte ranges, and publication
+semantics. Do not reconstruct the invocation by querying a persistent index or
+guessing that `cb.match()` exists; the result reader does not execute matchers.
 
 ## Start with a concrete symbol
 
