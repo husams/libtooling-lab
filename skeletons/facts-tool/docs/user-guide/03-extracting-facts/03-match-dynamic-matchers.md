@@ -14,9 +14,52 @@ POSITIONALS:
 
 OPTIONS:
   -f, --facts FILE          SQLite facts database; defaults to facts_template when omitted
-      --matcher EXPR REQUIRED   Clang dynamic matcher expression; bind symbol, call+callee, or source+target[+site]
+      --matcher EXPR REQUIRED   Clang dynamic matcher expression; bind symbol, expression, call+callee, or source+target[+site]
+      --format text|json       Located text (default) or structured invocation results
       --relation-kind KIND      Relation kind for source/target bindings; required for relation contracts
 ```
+
+## Process located results
+
+Normal symbol output includes `source=/absolute/path:line:column`. For a
+structured collection containing only this invocation's matches, use JSON:
+
+```sh
+facts-tool match --format json \
+  --matcher 'functionDecl(hasName("main")).bind("symbol")' src/main.cpp > matches.json
+```
+
+```python
+from facts_tool import load_match_results
+
+results = load_match_results("matches.json")
+for match in results:
+    symbol = match.bindings["symbol"]
+    if symbol.location is not None:
+        print(symbol.name, symbol.location.path,
+              symbol.location.line, symbol.location.column)
+```
+
+`MatchResults.from_json(completed.stdout)` also accepts a native command's
+captured stdout. Models expose each bound node's kind, name/USR when available,
+location, byte range, and translation-unit path. A header matched from two TUs
+keeps two occurrences. Unavailable locations are `None` with an explicit reason.
+Coordinates refer to the physical expansion file, including when `#line`
+changes the compiler's presumed file name or line number.
+See the [Python match results reference](../../../python/docs/match-results.md).
+
+JSON is emitted only after facts and the discovery index publish successfully;
+a failed or cancelled invocation emits no successful result document. Compiler
+and progress messages stay on stderr. An empty successful result has `matches=[]`.
+`complete=true` means the matcher completed over the selected TUs; it does not
+establish whole-project, function-body, or outgoing-call coverage. This JSON is
+an invocation result, not another persisted database or a cached source index.
+
+Matching validates included-file registration during the same frontend pass as
+AST parsing. Multiple sources use separate Clang file managers and share one
+facts transaction, so a later failure rolls back earlier matched facts. Each
+new invocation still parses source; `symbol find` remains the fast lookup for
+previously matched identities.
 
 ## The binding contract
 
@@ -49,10 +92,11 @@ evidence, always use the public Python SDK. Never query either database
 directly, including for diagnostics. A matched definition still does not
 establish extracted body or outgoing-call coverage.
 
-A matcher expression must bind exactly one of three shapes:
+A matcher expression must bind exactly one of four shapes:
 
 - **`symbol`** - bind one declaration node to the name `"symbol"`. This is
   the shape used to find or confirm that a declaration exists.
+- **`expression`** - bind an expression node to persist opt-in expression evidence.
 - **`call`** + **`callee`** - bind a direct call expression and its callee,
   to record a `Calls` relation site.
 - **`source`** + **`target`** (and optionally **`site`**) - bind an
@@ -66,15 +110,15 @@ every accepted binding shape needs its full node set, not a partial one.
 ## Worked example: binding a symbol by name
 
 Bind every `Circle::area` declaration (interface and out-of-line
-definition) by name, and persist both:
+definition) by name, and persist both (paths and coordinates abbreviated below):
 
 ```console
 $ facts-tool match -c demo.db -f ./demo-facts.db \
     --matcher 'cxxMethodDecl(hasName("area"), ofClass(hasName("Circle"))).bind("symbol")' \
     proj/src/shapes.cpp -v 1
 facts-tool: match: starting
-symbol kind=method name=shapes::Circle::area
-symbol kind=method name=shapes::Circle::area
+symbol kind=method name=shapes::Circle::area source=/.../shapes.cpp:<line>:<column>
+symbol kind=method name=shapes::Circle::area source=/.../shapes.hpp:<line>:<column>
 facts-tool: 2 symbol(s) recorded from 1 file(s)
 facts-tool: match: complete
 ```
@@ -95,9 +139,11 @@ Write `./demo-facts.db` or an absolute path and the same command succeeds.
 supplied facts path. See
 [limitations and known issues](../07-reference/04-limitations-and-known-issues.md).
 
-This does **not** write into the facts database's `symbol` table. A
-`symbol`-bound match populates `matched_symbol_index` in the **project**
-database instead - confirmed by looking the candidate up with `symbol find`:
+A `symbol`-bound match persists symbol facts in the paired facts database and
+also populates `matched_symbol_index` in the **project** database. The existing
+SDK can read stored symbols and locations with `cb.get(usr)`; the new result
+reader identifies exactly which nodes this invocation matched. Look up the
+project discovery candidate with `symbol find`:
 
 ```console
 $ facts-tool symbol find -c demo.db --name area
@@ -314,3 +360,10 @@ expression exactly match `symbol`, `call`+`callee`, or `source`+`target`
 silently matching nothing. And if the matcher fails outright rather than
 matching nothing, check whether it needs to be scoped down to one
 function's body first, per the previous three sections.
+
+`facts_committed` and `index_committed` describe successful publication (including
+an empty no-op); they do not mean every binding became a discovery-index row.
+The index accepts eligible named symbols. Successful expression bindings can
+appear in results without becoming index rows; skipped-index diagnostics remain
+on stderr. Unsupported implicit symbol persistence still fails the invocation
+and produces no successful result document.

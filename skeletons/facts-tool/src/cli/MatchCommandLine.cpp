@@ -38,6 +38,9 @@ CLI::App *configureMatch(CLI::App &app, MatchOptions &options) {
   command->add_flag(
       "--capture-source", options.captureSource,
       "Persist the exact source region for each matched function, method, or record definition");
+  command->add_option("--format", options.format,
+                      "Result output: text with locations or structured JSON")
+      ->check(CLI::IsMember({"text", "json"}));
   command
       ->add_option("--relation-kind", options.relationKind,
                    "Relation kind for source/target bindings; required for "

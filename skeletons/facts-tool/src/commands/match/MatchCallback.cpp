@@ -2,6 +2,7 @@
 
 #include "commands/match/DirectCall.h"
 #include "commands/match/MatchContract.h"
+#include "commands/match/MatchResult.h"
 #include "commands/match/RelationPersistence.h"
 #include "commands/match/SymbolDispatch.h"
 #include "cli/Verbose.h"
@@ -49,8 +50,11 @@ void MatchCallback::run(
                     .transform([&] { return std::move(symbol); });
               })
               .transform([&](PersistedSymbol symbol) {
-                std::cout << "symbol kind=" << symbol.kind
-                          << " name=" << symbol.name << '\n';
+                if (options_.format == "text")
+                  text_ << "symbol kind=" << symbol.kind
+                        << " name=" << symbol.name
+                        << describeLocation(match.symbol, *result.Context)
+                        << '\n';
                 std::vector<MatchedSymbol> matched;
                 appendMatchedIndex(matched, std::move(symbol));
                 return matched;
@@ -64,17 +68,26 @@ void MatchCallback::run(
           }
           return captured.transform([] { return std::vector<MatchedSymbol>{}; });
         } else if constexpr (std::is_same_v<Value, RelationMatch>) {
-          return persistRelation(match, *result.Context, files_, store_);
+          return persistRelation(match, *result.Context, files_, store_, text_);
         } else {
-          return persistDirectCall(match, *result.Context, files_, store_);
+          return persistDirectCall(match, *result.Context, files_, store_, text_,
+                                   options_.format == "text");
         }
       },
       *contract);
   if (!persisted)
     error_ = persisted.error();
-  else
+  else {
+    if (options_.format == "json")
+      results_.push_back(describeMatch(result, options_.relationKind));
     matches_.insert(matches_.end(), std::make_move_iterator(persisted->begin()),
                     std::make_move_iterator(persisted->end()));
+  }
+}
+
+void MatchCallback::writeResults(const std::vector<std::string> &sources,
+                                 std::ostream &output) {
+  match::writeResults(options_, sources, std::move(results_), text_.str(), output);
 }
 
 } // namespace facts::commands::match

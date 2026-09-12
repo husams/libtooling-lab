@@ -2,7 +2,7 @@ import json
 import sys
 from pathlib import Path
 
-from facts_tool import open_codebase
+from facts_tool import MatchResults, open_codebase
 from facts_tool.queryplan import out, start, symbol
 
 facts, project = map(Path, sys.argv[1:3])
@@ -20,5 +20,18 @@ else:
         assert [row["name"] for row in result] == ["save"]
         if mode == "graph":
             assert cb.callgraphs.latest().status == "complete"
+
+    match_results = MatchResults.from_dict(
+        {
+            "schema_version": 1,
+            "matcher": "installed-smoke",
+            "sources": [],
+            "complete": True,
+            "facts_committed": True,
+            "index_committed": True,
+            "matches": [],
+        }
+    )
+    assert match_results.matches == ()
 
 print(json.dumps({"package": "facts-tool-query", "query": "pass"}))

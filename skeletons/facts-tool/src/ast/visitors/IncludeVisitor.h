@@ -8,6 +8,10 @@ namespace clang::tooling {
 class FrontendActionFactory;
 }
 
+namespace clang {
+class CompilerInstance;
+}
+
 namespace facts {
 
 struct IncludePath {
@@ -19,6 +23,9 @@ struct IncludeGraphFacts {
   std::vector<std::string> visitedSources;
   std::vector<IncludePath> edges;
 };
+
+void attachIncludedFiles(clang::CompilerInstance &compiler,
+                         IncludeGraphFacts &facts);
 
 std::unique_ptr<clang::tooling::FrontendActionFactory>
 createIncludeVisitorFactory(IncludeGraphFacts &facts);

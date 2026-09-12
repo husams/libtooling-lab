@@ -425,7 +425,10 @@ add_library(facts-commands STATIC
   src/commands/match/MatchCancellation.cpp
   src/commands/match/MatchContract.cpp
   src/commands/match/MatchExecution.cpp
+  src/commands/match/MatchFrontend.cpp
   src/commands/match/MatchPublication.cpp
+  src/commands/match/MatchResult.cpp
+  src/commands/match/MatchResultLocation.cpp
   src/commands/match/NearestCaller.cpp
   src/commands/match/RelationKinds.cpp
   src/commands/match/RelationPersistence.cpp

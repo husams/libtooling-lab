@@ -9,6 +9,8 @@ from .evidence import EvidenceQuery
 from .executor import Executor
 from .graph import GraphQuery
 from .ids import SymbolId
+from .match_models import MatchBinding, MatchLocation, MatchRange, MatchResult
+from .match_results import MatchResults, load_match_results
 from .opening import open_codebase
 from .result import Result
 
@@ -27,8 +29,14 @@ __all__ = [
     "FactsToolError",
     "GraphQuery",
     "Method",
+    "MatchBinding",
+    "MatchLocation",
+    "MatchRange",
+    "MatchResult",
+    "MatchResults",
     "Record",
     "Result",
     "SymbolId",
     "open_codebase",
+    "load_match_results",
 ]

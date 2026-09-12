@@ -1,8 +1,10 @@
 #include "commands/match/MatchExecution.h"
 
 #include "commands/FactPairValidation.h"
+#include "commands/ExtractionSetup.h"
 #include "commands/match/MatchCallback.h"
 #include "commands/match/MatchCancellation.h"
+#include "commands/match/MatchFrontend.h"
 #include "commands/match/MatchPublication.h"
 #include "platform/PlatformFlags.h"
 #include "storage/FactStore.h"
@@ -10,23 +12,24 @@
 
 #include <clang/ASTMatchers/Dynamic/Diagnostics.h>
 #include <clang/ASTMatchers/Dynamic/Parser.h>
-#include <clang/Tooling/Tooling.h>
 
 #include <exception>
 #include <filesystem>
+#include <iostream>
 #include <optional>
+#include <utility>
 
 namespace facts::commands::match {
 using Result = std::expected<int, std::string>;
 
 Result execute(const cli::MatchOptions &options,
                CompilationDatabasePtr database, FileManager &files,
-               const std::vector<std::string> &sources) {
+               const std::vector<std::string> &sources,
+               const std::string &fingerprint) {
   auto configured = configurePlatformCompilationDatabase(*database, sources);
   if (!configured)
     return std::unexpected("cannot configure translation units: " +
                            configured.error());
-  clang::tooling::ClangTool tool(**configured, sources);
   clang::ast_matchers::dynamic::Diagnostics diagnostics;
   llvm::StringRef expression(options.matcher);
   auto matcher = clang::ast_matchers::dynamic::Parser::parseMatcherExpression(
@@ -71,17 +74,36 @@ Result execute(const cli::MatchOptions &options,
     if (!finder.addDynamicMatcher(*matcher, &callback))
       return finishMatch(store, options, 1,
                          "matcher cannot run at the top level", {});
-    const auto status =
-        tool.run(clang::tooling::newFrontendActionFactory(&finder).get());
-    if (MatchCancellation::cancelled()) {
-      return finishMatch(store, options, status,
-                         "facts-tool: cancelled during match",
-                         callback.matchedSymbols(), selected,
-                         pairing ? &*pairing : nullptr);
+    for (std::size_t index = 0; index < sources.size(); ++index) {
+      const auto &source = sources[index];
+      auto frontend = runTranslationUnit(**configured, finder, source, index,
+                                          sources.size());
+      auto registered = requireRegisteredFiles(
+          files, frontend.includes.visitedSources, fingerprint);
+      if (!registered) {
+        return finishMatch(store, options, 1, registered.error(),
+                           callback.matchedSymbols(), selected,
+                           pairing ? &*pairing : nullptr);
+      }
+      if (MatchCancellation::cancelled()) {
+        return finishMatch(store, options, frontend.status,
+                           "facts-tool: cancelled during match",
+                           callback.matchedSymbols(), selected,
+                           pairing ? &*pairing : nullptr);
+      }
+      if (callback.error() || frontend.status != 0) {
+        return finishMatch(store, options, frontend.status, callback.error(),
+                           callback.matchedSymbols(), selected,
+                           pairing ? &*pairing : nullptr);
+      }
     }
-    return finishMatch(store, options, status, callback.error(),
+    return finishMatch(store, options, 0, std::nullopt,
                        callback.matchedSymbols(), selected,
-                       pairing ? &*pairing : nullptr);
+                       pairing ? &*pairing : nullptr)
+        .transform([&](int result) {
+          callback.writeResults(sources, std::cout);
+          return result;
+        });
   } catch (const std::exception &error) {
     return std::unexpected("cannot persist match evidence: " +
                            std::string{error.what()});

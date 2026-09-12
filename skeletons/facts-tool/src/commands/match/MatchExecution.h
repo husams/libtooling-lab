@@ -15,6 +15,7 @@ namespace facts::commands::match {
 
 std::expected<int, std::string>
 execute(const cli::MatchOptions &options, CompilationDatabasePtr database,
-        FileManager &files, const std::vector<std::string> &sources);
+        FileManager &files, const std::vector<std::string> &sources,
+        const std::string &fingerprint);
 
 } // namespace facts::commands::match

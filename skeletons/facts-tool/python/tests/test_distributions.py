@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from support.callgraph_data import schema12_pair
 from support.native_agent import build_native_agent_pair
+from support.native_cli_helpers import tool as current_native_tool
 
 ROOT = Path(__file__).parents[1]
 
@@ -32,11 +33,11 @@ def _python(environment: Path) -> Path:
 
 def test_wheel_and_sdist_install_and_query(
     paired_databases: tuple[Path, Path],
-    native_schema12_pair: tuple[Path, Path],
+    native_current_pair: tuple[Path, Path],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    native_tool = ROOT.parent / "build-s032" / "facts-tool"
+    native_tool = current_native_tool()
     assert native_tool.is_file(), "build the current native facts-tool first"
     monkeypatch.setenv("FACTS_TOOL_NATIVE", str(native_tool))
     dist = tmp_path / "dist"

@@ -54,19 +54,24 @@ private:
   IncludeGraphFacts &facts_;
 };
 
+void attachIncludedFilesImpl(clang::CompilerInstance &compiler,
+                             IncludeGraphFacts &facts) {
+  auto &sourceManager = compiler.getSourceManager();
+  auto main = extractFilePath(sourceManager, sourceManager.getMainFileID());
+  if (main) {
+    facts.visitedSources.push_back(std::move(*main));
+  }
+  compiler.getPreprocessor().addPPCallbacks(
+      std::make_unique<IncludeVisitor>(sourceManager, facts));
+}
+
 class IncludeAction final : public clang::PreprocessOnlyAction {
 public:
   explicit IncludeAction(IncludeGraphFacts &facts) : facts_(facts) {}
 
 protected:
   bool BeginSourceFileAction(clang::CompilerInstance &compiler) override {
-    auto &sourceManager = compiler.getSourceManager();
-    auto main = extractFilePath(sourceManager, sourceManager.getMainFileID());
-    if (main) {
-      facts_.visitedSources.push_back(std::move(*main));
-    }
-    compiler.getPreprocessor().addPPCallbacks(
-        std::make_unique<IncludeVisitor>(sourceManager, facts_));
+    attachIncludedFilesImpl(compiler, facts_);
     return true;
   }
 
@@ -88,6 +93,11 @@ private:
 };
 
 } // namespace
+
+void attachIncludedFiles(clang::CompilerInstance &compiler,
+                         IncludeGraphFacts &facts) {
+  attachIncludedFilesImpl(compiler, facts);
+}
 
 std::unique_ptr<clang::tooling::FrontendActionFactory>
 createIncludeVisitorFactory(IncludeGraphFacts &facts) {

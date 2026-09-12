@@ -3,6 +3,7 @@
 #include "commands/CompilationDatabase.h"
 
 #include <expected>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,11 @@ selectSources(const clang::tooling::CompilationDatabase &database,
 
 std::expected<std::string, std::string>
 requireCompletedRegistry(FileManager &files);
+
+std::expected<void, std::string>
+requireRegisteredFiles(FileManager &files,
+                       std::span<const std::string> visitedSources,
+                       const std::string &fingerprint);
 
 std::expected<void, std::string> requireRegisteredSources(
     FileManager &files, const clang::tooling::CompilationDatabase &database,

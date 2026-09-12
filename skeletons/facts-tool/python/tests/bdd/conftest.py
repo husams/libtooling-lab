@@ -29,9 +29,9 @@ def native_codebase() -> CodeBase:
 
 
 @pytest.fixture
-def native_schema12_codebase(native_schema12_pair: tuple[Path, Path]) -> CodeBase:
+def native_current_codebase(native_current_pair: tuple[Path, Path]) -> CodeBase:
     with open_codebase(
-        facts_db=native_schema12_pair[0], project_db=native_schema12_pair[1]
+        facts_db=native_current_pair[0], project_db=native_current_pair[1]
     ) as value:
         yield value
 

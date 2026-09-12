@@ -3,6 +3,7 @@
 #include "ast/extractors/File.h"
 #include "ast/extractors/Location.h"
 #include "commands/match/RelationKinds.h"
+#include "commands/match/MatchResult.h"
 #include "commands/match/RelationValidation.h"
 #include "commands/match/SymbolDispatch.h"
 #include "storage/FactStore.h"
@@ -21,6 +22,15 @@ clang::SourceLocation siteLocation(const RelationMatch &match) {
   if (match.declarationSite)
     return match.declarationSite->getLocation();
   return match.source.getLocation();
+}
+
+std::string describeSite(const RelationMatch &match,
+                          const clang::ASTContext &context) {
+  if (match.site)
+    return describeLocation(*match.site, context);
+  if (match.declarationSite)
+    return describeLocation(*match.declarationSite, context);
+  return describeLocation(match.source, context);
 }
 
 std::expected<void, std::string>
@@ -43,7 +53,7 @@ saveSite(Relation relation, clang::SourceLocation location,
 
 std::expected<std::vector<MatchedSymbol>, std::string>
 persistRelation(const RelationMatch &match, clang::ASTContext &context,
-                FileManager &files, FactStore &store) {
+                FileManager &files, FactStore &store, std::ostream &output) {
   return validateEndpoints(match.kind, match.source, match.target)
       .and_then(
           [&] { return persistSymbol(match.source, context, files, store); })
@@ -62,9 +72,10 @@ persistRelation(const RelationMatch &match, clang::ASTContext &context,
                     [](std::error_code error) { return error.message(); });
               }();
               return persisted.transform([&] {
-                std::cout << "relation kind=" << relationName(match.kind)
+                output << "relation kind=" << relationName(match.kind)
                           << " source=" << source.name
-                          << " target=" << target.name << '\n';
+                          << " target=" << target.name
+                          << describeSite(match, context) << '\n';
                 std::vector<MatchedSymbol> matched;
                 appendMatchedIndex(matched, std::move(source));
                 appendMatchedIndex(matched, std::move(target));

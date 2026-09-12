@@ -1,11 +1,11 @@
 from facts_tool import open_codebase
 
 
-def test_native_schema12_reader_and_existing_navigation(native_schema12_pair):
+def test_native_current_reader_and_existing_navigation(native_current_pair):
     with open_codebase(
-        facts_db=native_schema12_pair[0], project_db=native_schema12_pair[1]
+        facts_db=native_current_pair[0], project_db=native_current_pair[1]
     ) as cb:
-        assert cb.provenance.facts.schema.user_version == 12
+        assert cb.provenance.facts.schema.user_version == 13
         run = cb.callgraphs.latest()
         assert run.status == "complete" and run.path_outcome == "not-applicable"
         assert [item.qualified_name for item in cb.find("app::run").callees()] == [

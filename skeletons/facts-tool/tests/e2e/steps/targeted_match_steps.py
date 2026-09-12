@@ -244,7 +244,8 @@ def no_facts(context: FactsToolContext) -> None:
 @then("both translation units match in stored order")
 def stored_order(context: FactsToolContext) -> None:
     require(context.last_returncode == 0, context.last_output)
-    names = [line.split("name=", 1)[1] for line in context.last_output.splitlines()
+    names = [line.split("name=", 1)[1].partition(" source=")[0]
+             for line in context.last_output.splitlines()
              if line.startswith("symbol kind=")]
     require(names == ["targeted_match::caller", "targeted_match::second"], str(names))
 
@@ -252,7 +253,8 @@ def stored_order(context: FactsToolContext) -> None:
 @then("both translation units match in reverse order")
 def reverse_order(context: FactsToolContext) -> None:
     require(context.last_returncode == 0, context.last_output)
-    names = [line.split("name=", 1)[1] for line in context.last_output.splitlines()
+    names = [line.split("name=", 1)[1].partition(" source=")[0]
+             for line in context.last_output.splitlines()
              if line.startswith("symbol kind=")]
     require(names == ["targeted_match::second", "targeted_match::caller"], str(names))
 

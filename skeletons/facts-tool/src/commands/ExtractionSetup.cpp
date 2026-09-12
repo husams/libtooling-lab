@@ -5,6 +5,9 @@
 #include "storage/FileManager.h"
 
 #include <algorithm>
+#include <ranges>
+#include <set>
+#include <string_view>
 
 namespace facts::commands {
 
@@ -48,19 +51,29 @@ std::string toolchainDrift(const std::string &imported) {
 }
 } // namespace
 
+std::expected<void, std::string>
+requireRegisteredFiles(FileManager &files,
+                       std::span<const std::string> visitedSources,
+                       const std::string &fingerprint) {
+  const std::set<std::string_view> uniqueSources(visitedSources.begin(),
+                                                 visitedSources.end());
+  const auto missing = std::ranges::find_if(
+      uniqueSources,
+      [&](const auto &source) { return !files.getId(source); });
+  return missing == uniqueSources.end()
+             ? std::expected<void, std::string>{}
+             : std::expected<void, std::string>{std::unexpected(
+                   "project configuration is incomplete; run 'facts-tool "
+                   "import' to rebuild it: " +
+                   std::string{*missing} + toolchainDrift(fingerprint))};
+}
+
 std::expected<void, std::string> requireRegisteredSources(
     FileManager &files, const clang::tooling::CompilationDatabase &database,
     const std::vector<std::string> &sources, const std::string &fingerprint) {
   return discoverIncludedFiles(database, sources)
       .and_then([&](const std::vector<std::string> &included) {
-        const auto missing = std::ranges::find_if(
-            included, [&](const auto &source) { return !files.getId(source); });
-        return missing == included.end()
-                   ? std::expected<void, std::string>{}
-                   : std::expected<void, std::string>{std::unexpected(
-                         "project configuration is incomplete; run 'facts-tool "
-                         "import' to rebuild it: " +
-                         *missing + toolchainDrift(fingerprint))};
+        return requireRegisteredFiles(files, included, fingerprint);
       });
 }
 

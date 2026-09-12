@@ -77,14 +77,11 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
   if (!registry)
     return std::unexpected(registry.error());
   auto sources = selectSources(**commands, configured.sources);
-  auto registered =
-      requireRegisteredSources(**opened, **commands, sources, *registry);
-  if (!registered)
-    return std::unexpected(registered.error());
   auto factsDirectory = materializeFactsDirectory(configured.facts);
   if (!factsDirectory)
     return std::unexpected(factsDirectory.error());
-  return match::execute(configured, std::move(*commands), **opened, sources);
+  return match::execute(configured, std::move(*commands), **opened, sources,
+                       *registry);
 }
 
 } // namespace facts::commands

@@ -33,6 +33,7 @@ and refuses unsupported facts schema versions or missing FileId mappings.
 - [Relations](docs/relations.md), [views](docs/views.md), and [symbol kinds](docs/symbol-kinds.md)
 - [Database lifecycle and mapping](docs/databases.md)
 - [Results, errors, and budgets](docs/results.md)
+- [Native matcher results](docs/match-results.md)
 - [Persisted call-graph runs](docs/callgraph-runs.md)
 - [Expressions, field effects, and bounded source regions](docs/evidence-api.md)
 - [Installed agent workflow acceptance](docs/s032-progress.md)

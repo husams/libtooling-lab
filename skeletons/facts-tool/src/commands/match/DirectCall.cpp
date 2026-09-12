@@ -4,6 +4,7 @@
 #include "ast/extractors/CallSite.h"
 #include "commands/match/ArgumentOutput.h"
 #include "commands/match/NearestCaller.h"
+#include "commands/match/MatchResult.h"
 #include "commands/match/SymbolDispatch.h"
 
 #include <clang/AST/ASTContext.h>
@@ -15,7 +16,8 @@ namespace facts::commands::match {
 
 std::expected<std::vector<MatchedSymbol>, std::string>
 persistDirectCall(const DirectCallMatch &match, clang::ASTContext &context,
-                  FileManager &files, FactStore &store) {
+                  FileManager &files, FactStore &store, std::ostream &output,
+                  bool textOutput) {
   return nearestCaller(match.call, context)
       .and_then([&](const clang::FunctionDecl *caller) {
         return persistSymbol(*caller, context, files, store)
@@ -40,7 +42,11 @@ persistDirectCall(const DirectCallMatch &match, clang::ASTContext &context,
         auto linked = callgraph::linkCallGraphFacts(std::move(facts), store);
         if (!linked)
           return std::unexpected(linked.error().message);
-        printArguments(match.call, context);
+        if (textOutput) {
+          output << "call callee=" << persisted.second.name
+                 << describeLocation(match.call, context) << '\n';
+          printArguments(match.call, context, output);
+        }
         std::vector<MatchedSymbol> matched;
         appendMatchedIndex(matched, std::move(persisted.second));
         return matched;

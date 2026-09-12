@@ -5,8 +5,10 @@
 #include "commands/match/ExpressionEvidence.h"
 
 #include <clang/ASTMatchers/ASTMatchFinder.h>
+#include <llvm/Support/JSON.h>
 
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -29,6 +31,8 @@ public:
   const std::optional<std::string> &error() const { return error_; }
 
   const std::vector<MatchedSymbol> &matchedSymbols() const { return matches_; }
+  void writeResults(const std::vector<std::string> &sources,
+                    std::ostream &output);
 
 private:
   const cli::MatchOptions &options_;
@@ -37,6 +41,8 @@ private:
   bool rejectLegacyWrites_ = false;
   std::optional<std::string> error_;
   std::vector<MatchedSymbol> matches_;
+  llvm::json::Array results_;
+  std::ostringstream text_;
   SourceFingerprintCache fingerprints_;
 };
 

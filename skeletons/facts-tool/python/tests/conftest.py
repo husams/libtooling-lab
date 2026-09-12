@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from support.facts_data import add_facts
+from support.native_cli_helpers import tool as current_native_tool
 from support.project_data import add_project
 from support.schema13 import add_schema13
 
@@ -46,13 +47,16 @@ def schema13_pair(tmp_path: Path):
 
 
 @pytest.fixture
-def native_schema12_pair(tmp_path: Path) -> tuple[Path, Path]:
+def native_current_pair(tmp_path: Path) -> tuple[Path, Path]:
     source_root = Path(__file__).parent / "fixtures" / "native"
-    root = tmp_path / "native-schema12"
+    root = tmp_path / "native-current"
     root.mkdir()
     for name in ("api.hpp", "source.cpp", "generate.py"):
         shutil.copy2(source_root / name, root / name)
-    facts_tool = shutil.which("facts-tool") or "/Users/husam/.local/bin/facts-tool"
+    try:
+        facts_tool = current_native_tool()
+    except RuntimeError:
+        pytest.skip("current native facts-tool executable is required")
     compiler = "/opt/homebrew/opt/llvm/bin/clang++"
     if not Path(facts_tool).exists() or not Path(compiler).exists():
         pytest.skip("native facts-tool and Homebrew LLVM are required")

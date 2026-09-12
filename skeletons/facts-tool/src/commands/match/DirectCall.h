@@ -4,6 +4,7 @@
 #include "model/MatchedSymbol.h"
 
 #include <expected>
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -19,5 +20,6 @@ class FileManager;
 namespace facts::commands::match {
 std::expected<std::vector<MatchedSymbol>, std::string>
 persistDirectCall(const DirectCallMatch &match, clang::ASTContext &context,
-                  FileManager &files, FactStore &store);
+                  FileManager &files, FactStore &store, std::ostream &output,
+                  bool textOutput);
 }
