@@ -5,7 +5,7 @@ import re
 import shutil
 from pathlib import Path
 
-from support.native_cli_helpers import call, match, tool
+from support.native_cli_helpers import call, compiler, match, tool
 
 
 def prepare_native_pair(root: Path) -> tuple[Path, Path, Path, int, int]:
@@ -22,12 +22,12 @@ def prepare_native_pair(root: Path) -> tuple[Path, Path, Path, int, int]:
         encoding="utf-8",
     )
     project, facts = root / "project.sqlite", root / "facts.sqlite"
-    compiler = Path("/opt/homebrew/opt/llvm/bin/clang++")
+    target_compiler = compiler()
     commands = [
         {
             "directory": str(root),
             "file": str(source),
-            "arguments": [str(compiler), "-std=c++20", "-c", str(source)],
+            "arguments": [str(target_compiler), "-std=c++20", "-c", str(source)],
         }
     ]
     (root / "compile_commands.json").write_text(json.dumps(commands), encoding="utf-8")

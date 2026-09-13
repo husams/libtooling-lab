@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import shutil
 import subprocess
 from pathlib import Path
@@ -20,6 +21,30 @@ def tool() -> Path:
     if discovered:
         return Path(discovered)
     raise RuntimeError("current native facts-tool executable was not found")
+
+
+def compiler() -> Path:
+    configured = os.environ.get("FACTS_CLANGXX") or os.environ.get(
+        "FACTS_TOOL_COMPILER"
+    )
+    if configured:
+        executable = Path(configured)
+        if not executable.is_file():
+            raise RuntimeError(f"configured compiler is not a file: {executable}")
+        return executable
+    for candidate in (
+        Path("/opt/homebrew/opt/llvm/bin/clang++"),
+        Path("/usr/local/opt/llvm/bin/clang++"),
+    ):
+        if candidate.is_file():
+            return candidate
+    if platform.system() != "Darwin":
+        discovered = shutil.which("clang++")
+        if discovered:
+            return Path(discovered)
+    raise RuntimeError(
+        "target clang++ driver was not found; set FACTS_CLANGXX to its path"
+    )
 
 
 def call(executable: Path, args: list[str], root: Path) -> str:

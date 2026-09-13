@@ -45,4 +45,7 @@ def require_schema(db: sqlite3.Connection) -> None:
     for table, required in COLUMNS.items():
         missing = sorted(required - _columns(db, table))
         if missing:
-            fail("E_SCHEMA", f"variable-flow {table} lacks columns: {', '.join(missing)}")
+            fail(
+                "E_SCHEMA",
+                f"variable-flow {table} lacks columns: {', '.join(missing)}",
+            )

@@ -1,3 +1,4 @@
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -6,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from support.facts_data import add_facts
+from support.native_cli_helpers import compiler
 from support.native_cli_helpers import tool as current_native_tool
 from support.project_data import add_project
 from support.schema13 import add_schema13
@@ -56,12 +58,20 @@ def native_current_pair(tmp_path: Path) -> tuple[Path, Path]:
     try:
         facts_tool = current_native_tool()
     except RuntimeError:
+        if os.environ.get("FACTS_TOOL_NATIVE"):
+            raise
         pytest.skip("current native facts-tool executable is required")
-    compiler = "/opt/homebrew/opt/llvm/bin/clang++"
-    if not Path(facts_tool).exists() or not Path(compiler).exists():
-        pytest.skip("native facts-tool and Homebrew LLVM are required")
+    try:
+        target_compiler = compiler()
+    except RuntimeError:
+        if os.environ.get("FACTS_CLANGXX") or os.environ.get("FACTS_TOOL_COMPILER"):
+            raise
+        pytest.skip("native facts-tool and a target clang++ driver are required")
+    if not Path(facts_tool).exists():
+        pytest.skip("current native facts-tool executable is required")
     subprocess.run(
-        [sys.executable, str(root / "generate.py"), facts_tool, compiler], check=True
+        [sys.executable, str(root / "generate.py"), facts_tool, str(target_compiler)],
+        check=True,
     )
     facts, project = root / "facts.sqlite", root / "project.sqlite"
     subprocess.run(
