@@ -381,6 +381,7 @@ openStoredDatabase(const std::filesystem::path &path) {
     }
     return std::unexpected(std::move(error));
   }
+  storage::configureBusyTimeout(database);
   return StoredDatabase(database);
 }
 

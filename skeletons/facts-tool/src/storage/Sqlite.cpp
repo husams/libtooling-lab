@@ -8,6 +8,10 @@ std::error_code sqliteError(sqlite3 *database) noexcept {
   return {sqlite3_extended_errcode(database), sqliteCategory()};
 }
 
+void configureBusyTimeout(sqlite3 *database) noexcept {
+  sqlite3_busy_timeout(database, defaultBusyTimeoutMilliseconds);
+}
+
 std::expected<Statement, std::error_code> prepare(sqlite3 *database,
                                                   std::string_view sql) {
   sqlite3_stmt *raw = nullptr;

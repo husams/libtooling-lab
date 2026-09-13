@@ -37,6 +37,10 @@ enum class TransactionState { active, committed, rolledBack };
 
 std::error_code sqliteError(sqlite3 *database) noexcept;
 
+inline constexpr int defaultBusyTimeoutMilliseconds = 10000;
+
+void configureBusyTimeout(sqlite3 *database) noexcept;
+
 std::expected<Statement, std::error_code> prepare(sqlite3 *database,
                                                   std::string_view sql);
 

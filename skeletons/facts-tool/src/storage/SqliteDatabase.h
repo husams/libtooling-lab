@@ -191,7 +191,7 @@ public:
       }
       return std::unexpected(error);
     }
-    sqlite3_busy_timeout(raw, 10000);
+    configureBusyTimeout(raw);
     return Database(detail::Connection(
         raw, [](sqlite3 *database) { sqlite3_close_v2(database); }));
   }

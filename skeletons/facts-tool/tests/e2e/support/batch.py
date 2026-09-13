@@ -17,9 +17,10 @@ class BatchProject:
         self.configuration = self.root / "project.db"
         self.output = self.root / "facts"
         self.env = dict(os.environ)
-        for name in ("FACTS_TOOL_CONF", "FACTS_TOOL_CONFIG", "XDG_DATA_HOME"):
+        for name in ("FACTS_TOOL_CONF", "FACTS_TOOL_CONFIG"):
             self.env.pop(name, None)
         self.env["XDG_CONFIG_HOME"] = str(root / "no-user-defaults")
+        self.env["XDG_DATA_HOME"] = str(root / "no-user-data")
         self.yaml = self.root / ".facts-tool.yaml"
         self.yaml.write_text("extra_args: []\n")
         self.env["PATH"] = (

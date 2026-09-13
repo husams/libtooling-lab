@@ -1,5 +1,6 @@
 #include "tooling/StoredCompilationDatabase.h"
 #include "storage/FileManager.h"
+#include "storage/SqliteDatabase.h"
 #include "tooling/CompilationCommandCodec.h"
 
 #include <clang/Tooling/CompilationDatabase.h>
@@ -7,10 +8,13 @@
 #include <sqlite3.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -132,6 +136,31 @@ int main(int argc, char **argv) {
   require(!contains(arguments, "-Werror"));
   require(
       (*stored)->getCompileCommands((root / "missing.cpp").string()).empty());
+
+  // A freshness writer can briefly hold an exclusive project-database lock
+  // while another extraction loads its stored compile command.  The reader's
+  // busy timeout must wait for that writer instead of reporting a transient
+  // "database is locked" failure.
+  {
+    std::promise<void> locked;
+    auto lockedFuture = locked.get_future();
+    auto writer = std::async(std::launch::async, [&] {
+      auto opened = facts::storage::Database::open(
+          databasePath.string(), facts::storage::Database::readWrite);
+      require(opened.has_value());
+      auto transaction =
+          opened->transaction(facts::storage::TransactionMode::exclusive);
+      require(transaction.has_value());
+      locked.set_value();
+      std::this_thread::sleep_for(std::chrono::milliseconds(150));
+      require(transaction->commit().has_value());
+    });
+    lockedFuture.wait();
+    auto afterLock = facts::loadStoredCompilationDatabase(
+        databasePath.string(), requested);
+    require(afterLock.has_value());
+    writer.get();
+  }
 
   const std::vector<std::string> multipleRequested{source.string(),
                                                    secondSource.string()};
