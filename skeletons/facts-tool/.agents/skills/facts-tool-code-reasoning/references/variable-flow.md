@@ -33,10 +33,26 @@ facts-tool import -p build
 facts-tool analyse variable-flow --function 'example::process' --variable value
 ```
 
-Replace the example selectors with the requested function and variable. Both
-accept a name or exact USR. Parameters use the same `--variable` selector.
-Use `--line DECLARATION_LINE` to distinguish shadowed locals; a use-site line
-does not select the declaration. Resolve ambiguous functions by exact USR.
+Replace the example selectors with the requested function and variable.
+For an overload, include the function's parameter types in the quoted selector:
+
+```sh
+facts-tool analyse variable-flow --function 'example::process(bool, int)' --variable value
+facts-tool analyse variable-flow --function 'example::Worker::process(int) const &' --variable value
+```
+
+Use types without parameter names, default arguments, or a return type; `()`
+selects zero parameters. Include member `const`/`volatile` and `&`/`&&`
+qualifiers where applicable. Whitespace between signature tokens is ignored.
+An ambiguity diagnostic lists candidate signatures and USRs; use one of those
+exact selectors instead of guessing which overload was selected. Qualified
+names without signatures and exact USRs remain supported.
+Matching uses Clang's declared or canonical type spellings; copy a candidate
+signature when an equivalent C++ spelling does not match.
+
+The variable accepts a name or exact USR; parameters use the same `--variable`
+selector. Use `--line DECLARATION_LINE` to distinguish shadowed locals; a
+use-site line does not select the declaration.
 
 The command parses the imported source inputs; a prior `extract` or
 `analyse call-graph` run is not required. Omit source arguments to make all

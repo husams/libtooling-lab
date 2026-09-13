@@ -4,6 +4,10 @@ The variable-flow reader opens the standalone artifact produced by
 `facts-tool analyse variable-flow`; it is read-only and never invokes the
 native executable.
 
+For an overloaded function, generate the run with a quoted native selector such
+as `--function 'example::process(bool, int)'`. `run.function_selector` preserves
+that input, while `run.root_function` is the selected function's exact USR.
+
 ```python
 from facts_tool import open_variable_flow
 

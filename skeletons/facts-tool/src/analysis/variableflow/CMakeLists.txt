@@ -2,6 +2,7 @@ add_library(facts-variableflow STATIC
   Engine.cpp
   Parse.cpp
   Identity.cpp
+  Signature.cpp
   Flow.cpp
   Calls.cpp
   Effects.cpp

@@ -13,10 +13,26 @@ then select a function and variable:
 facts-tool analyse variable-flow --function 'example::process' --variable value
 ```
 
-The function and variable selectors accept a qualified name or a Clang USR.
-Use `--line` when a variable name is shadowed or ambiguous; parameters use the
-same selection rules. `--conf`, `--config`, `--extra-arg` and source selectors
-follow the existing command configuration rules.
+Select an overloaded function by its qualified name and parameter types:
+
+```sh
+facts-tool analyse variable-flow --function 'example::process(bool, int)' --variable value
+facts-tool analyse variable-flow --function 'example::Worker::process(int) const &' --variable value
+```
+
+Quote the entire selector. Include parameter types, without parameter names,
+default arguments, or a return type; use `()` for zero parameters. Member
+function `const`, `volatile`, `&`, and `&&` qualifiers distinguish overloads.
+Whitespace between signature tokens is ignored. If a selector is ambiguous,
+the diagnostic lists candidate signatures and exact USRs to choose from.
+Signatures match Clang's declared or canonical type spellings; copy a listed
+signature when an equivalent C++ spelling does not match.
+
+Existing qualified function names and exact Clang USRs remain supported.
+Variable selectors accept a name or USR. Use `--line` when a variable name is
+shadowed or ambiguous; parameters use the same selection rules. `--conf`,
+`--config`, `--extra-arg` and source selectors follow the existing command
+configuration rules.
 
 The default traversal has no call-depth cap. `--max-depth 0` keeps the graph
 inside the selected function; a positive value expands calls up to that depth

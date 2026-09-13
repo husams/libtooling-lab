@@ -6,6 +6,10 @@ standalone artifact; it does not require a `CodeBase` or a facts/project pair
 to read. See [Tracing local variables and parameters](../08-variable-flow/01-tracing-variables.md)
 for selectors, input scope, output paths, and native analysis semantics.
 
+Select overloads in the native command with a quoted signature such as
+`--function 'example::process(bool, int)'`. The reader preserves that text in
+`run.function_selector` and the resolved overload's USR in `run.root_function`.
+
 ```python
 from facts_tool import open_variable_flow
 

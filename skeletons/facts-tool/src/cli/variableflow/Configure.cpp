@@ -18,9 +18,9 @@ void configureVariableFlow(CLI::App &command, VariableFlowOptions &options) {
                        options.configurationFile);
   command
       .add_option("--function", options.function,
-                  "Function name or USR containing the variable")
+                  "Function name, signature, or USR containing the variable")
       ->required()
-      ->type_name("NAME_OR_USR");
+      ->type_name("NAME_SIGNATURE_OR_USR");
   command
       .add_option("--variable", options.variable,
                   "Variable name or USR to trace")

@@ -1,5 +1,7 @@
 #include "analysis/variableflow/Internal.h"
 
+#include "analysis/variableflow/Signature.h"
+
 #include <clang/AST/Decl.h>
 #include <clang/AST/ExprCXX.h>
 #include <clang/AST/RecursiveASTVisitor.h>
@@ -10,6 +12,7 @@
 
 #include <algorithm>
 #include <string_view>
+#include <utility>
 
 namespace facts::variableflow::detail {
 
@@ -54,6 +57,10 @@ selectFunction(const Parsed &parsed, const Request &request) {
   const auto byUsr = parsed.byUsr.find(request.function);
   if (byUsr != parsed.byUsr.end())
     candidates = byUsr->second;
+  if (candidates.empty() && request.function.find('(') != std::string::npos)
+    for (const auto &function : parsed.functions)
+      if (matchesFunctionSignature(*function->decl, request.function))
+        candidates.push_back(function.get());
   if (candidates.empty()) {
     const auto byName = parsed.byName.find(request.function);
     if (byName != parsed.byName.end())
@@ -69,8 +76,12 @@ selectFunction(const Parsed &parsed, const Request &request) {
                           [](const auto *function) { return function->usr; })
           .begin(),
       candidates.end());
-  if (candidates.size() != 1)
-    return std::unexpected("ambiguous function selector: " + request.function);
+  if (candidates.size() != 1) {
+    std::string error = "ambiguous function selector: " + request.function;
+    for (const auto *candidate : candidates)
+      error += "\n  " + describeFunction(*candidate->decl, candidate->usr);
+    return std::unexpected(std::move(error));
+  }
   return candidates.front();
 }
 

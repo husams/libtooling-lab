@@ -581,6 +581,10 @@ if(BUILD_TESTING)
   add_executable(variable-flow-test tests/variableflow/VariableFlowTest.cpp)
   target_link_libraries(variable-flow-test PRIVATE facts-variableflow)
   add_test(NAME variable-flow COMMAND variable-flow-test)
+  add_executable(variable-flow-overload-test
+                 tests/variableflow/OverloadFlowTest.cpp)
+  target_link_libraries(variable-flow-overload-test PRIVATE facts-variableflow)
+  add_test(NAME variable-flow-overload COMMAND variable-flow-overload-test)
   add_executable(variable-flow-cfg-test
                  tests/variableflow/CFGReachingTest.cpp)
   target_link_libraries(variable-flow-cfg-test PRIVATE facts-variableflow)
