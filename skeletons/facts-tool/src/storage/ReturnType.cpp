@@ -1,5 +1,6 @@
 #include "storage/Storage.h"
 #include "storage/StorageQuery.h"
+#include "storage/SymbolAllocation.h"
 
 #include <array>
 
@@ -10,6 +11,9 @@ Storage::saveReturnType(SymbolId callable, const ReturnType &type) {
   const auto ensureTarget = [&]() -> std::expected<void, std::error_code> {
     if (type.target.file != builtinFileId)
       return {};
+    if (type.target.index >= firstCompilerSymbolIndex)
+      return loadSymbolRow(SymbolNode::Symbol, type.target)
+          .transform([](Symbol) {});
     if (type.target.index == 0 || type.builtinName.empty())
       return std::unexpected(std::make_error_code(std::errc::invalid_argument));
     Symbol builtin{};

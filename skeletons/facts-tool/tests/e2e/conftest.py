@@ -72,6 +72,7 @@ pytest_plugins = (
     "steps.forced_include_path_steps",
     "steps.b027_external_callee_symbol_steps",
     "steps.b027_external_callee_failure_steps",
+    "steps.b022_call_site_invalid_usr_steps",
     "steps.implicit_allocation_target_steps",
     "steps.implicit_matrix_steps",
     "steps.implicit_stability_steps",
