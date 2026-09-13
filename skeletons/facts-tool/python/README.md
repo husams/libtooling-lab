@@ -35,6 +35,7 @@ and refuses unsupported facts schema versions or missing FileId mappings.
 - [Results, errors, and budgets](docs/results.md)
 - [Native matcher results](docs/match-results.md)
 - [Persisted call-graph runs](docs/callgraph-runs.md)
+- [Variable-flow runs](docs/variable-flow.md)
 - [Expressions, field effects, and bounded source regions](docs/evidence-api.md)
 - [Installed agent workflow acceptance](docs/s032-progress.md)
 - [Typed and fluent APIs](docs/model-api.md)

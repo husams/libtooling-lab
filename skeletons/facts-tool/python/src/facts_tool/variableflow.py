@@ -1,4 +1,5 @@
 from .variableflow_models import Boundary, Edge, Location, Node, VariableFlowRun
+from .variableflow_query import VariableFlowGraph
 from .variableflow_reader import VariableFlowReader, open_variable_flow
 
 VariableFlowBoundary = Boundary
@@ -13,6 +14,7 @@ __all__ = [
     "Node",
     "VariableFlowReader",
     "VariableFlowRun",
+    "VariableFlowGraph",
     "open_variable_flow",
     "VariableFlowBoundary",
     "VariableFlowEdge",

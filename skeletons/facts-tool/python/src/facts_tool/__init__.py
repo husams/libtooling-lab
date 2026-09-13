@@ -20,6 +20,7 @@ from .variableflow import (
     Node,
     VariableFlowBoundary,
     VariableFlowEdge,
+    VariableFlowGraph,
     VariableFlowLocation,
     VariableFlowNode,
     VariableFlowReader,
@@ -61,6 +62,7 @@ __all__ = [
     "open_variable_flow",
     "VariableFlowBoundary",
     "VariableFlowEdge",
+    "VariableFlowGraph",
     "VariableFlowLocation",
     "VariableFlowNode",
 ]

@@ -12,6 +12,10 @@ level for convenience).
 | Name | Signature | Purpose | Chapter |
 |---|---|---|---|
 | `open_codebase` | `(*, facts_db, project_db, budgets=None) -> CodeBase` | Open a paired facts/project database read-only | [02](02-opening-databases.md) |
+| `open_variable_flow` | `(path) -> VariableFlowReader` | Open a standalone variable-flow artifact read-only | [09](09-variable-flow.md) |
+| `VariableFlowReader` | `.get(run_id)`, `.runs()`, context manager, `.close()` | Read exact persisted variable-flow runs | [09](09-variable-flow.md) |
+| `VariableFlowRun` | `.nodes/.edges/.boundaries/.graph`, `.status/.assumptions/.root_variable`, `.to_dict()` | Immutable local-variable or parameter-flow evidence | [09](09-variable-flow.md) |
+| `VariableFlowGraph` | `.node/.nodes/.reads/.writes/.incoming/.outgoing/.boundaries` | Query occurrences, exact identities, and callsite-preserving links | [09](09-variable-flow.md) |
 | `CodeBase` | `.executor`, `.provenance`, `.graph`, `.callgraphs`, `.get/.find/.query`, context manager, `.close()` | The session object returned by `open_codebase` | [02](02-opening-databases.md) |
 | `Executor` | `(loader, provenance, budgets=None)`; `.run(plan, after_id=None, result_cap=None) -> Result`; `.explain(plan) -> dict` | Runs a frozen `Plan` against a paired database | [03](03-query-model.md) |
 | `Result` | `.shape/.view/.values/.scalar/.truncated/.partial/.unknown/.cursor/.provenance`; `.nodes/.rows/.paths`; `.to_dict()/.to_json()` | The outcome of running a plan | [03](03-query-model.md) |

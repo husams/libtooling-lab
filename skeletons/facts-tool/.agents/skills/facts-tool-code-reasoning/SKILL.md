@@ -1,6 +1,6 @@
 ---
 name: facts-tool-code-reasoning
-description: Use facts-tool and its public Python SDK to search and reason about C++ code using persisted evidence or native AST match results with source locations.
+description: Use facts-tool and its public Python SDK to search C++ code, trace local variables and parameters through read/write graphs, and reason from persisted evidence or native AST match results.
 ---
 
 # Facts-tool code reasoning
@@ -46,6 +46,10 @@ generation. If the SDK cannot expose evidence, report the capability gap.
    documentation does not establish that an installed release provides them.
    Preserve binding names, TU provenance, optional coordinates, and publication
    flags; a later discovery-index lookup is not the invocation result set.
+7. For local-variable or parameter reads, updates, argument flow, and returned
+   values, use `analyse variable-flow` and the public `open_variable_flow`
+   reader. Follow [tracking a local variable](references/variable-flow.md);
+   its standalone artifact is separate from the paired facts databases.
 
 ## Agent workflow
 
@@ -91,11 +95,17 @@ and worked examples; read the relevant workflow before running commands.
    [Recovery and boundaries](../../../docs/user-guide/04-call-graphs/04-recovery-and-boundaries.md)
    for `--recover-missing`. Re-query the evidence after extraction or recovery
    and report any remaining stale, missing, or unsupported information.
+4. **Track a local variable or parameter:** follow
+   [the variable-flow workflow](references/variable-flow.md) to select its
+   declaration, generate a CFG/call-flow run, and query reads, writes, and
+   call-site edges with Python. Keep traversal uncapped unless requested;
+   preserve external, depth-limit, and unsupported boundaries in the answer.
 
 Read only the guide needed for the task:
 
 - [Query C++ with Python](references/query-cpp.md)
 - [Process native match results with Python](references/match-results.md)
+- [Track local variables and parameters](references/variable-flow.md)
 - [Deploy in IPython-MCP](references/ipython-mcp.md)
 - [Create and inspect databases with the native CLI](references/native-cli.md)
 

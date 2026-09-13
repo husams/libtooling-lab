@@ -1,5 +1,8 @@
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .variableflow_query import VariableFlowGraph
 
 
 @dataclass(frozen=True)
@@ -66,6 +69,12 @@ class VariableFlowRun:
     @property
     def variable(self) -> str:
         return self.variable_selector
+
+    @property
+    def graph(self) -> "VariableFlowGraph":
+        from .variableflow_query import VariableFlowGraph
+
+        return VariableFlowGraph(self)
 
     @property
     def line(self) -> int | None:

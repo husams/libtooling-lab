@@ -54,6 +54,12 @@ an error instead of choosing an arbitrary declaration.
 
 ## Choose the API for the question
 
+For a saved local-variable or parameter-flow graph, use `open_variable_flow`
+and `run.graph`, following [variable-flow queries](variable-flow.md). Its
+standalone artifact is not a paired `CodeBase` database. Generate or refresh
+that artifact with native `analyse variable-flow`; keep its status, source
+scope, callsite IDs, and boundaries with the query results.
+
 - Declarative plans: compose `start`, `nodes`, `where`, `out`, `in_`, `path`,
   `select`, `order_by`, `distinct`, `count`, and `limit`.
 - Typed navigation: use `cb.get(ref)` and methods such as `callers`, `callees`,

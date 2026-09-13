@@ -78,6 +78,15 @@ saved JSON remains the snapshot of its invocation and does not refresh itself
 when source changes. Parse structured results with the SDK; ordinary text is
 for display, and the matched-symbol index is a separate discovery view.
 
+## Track local variables and parameters
+
+For reads, writes, argument passing, or captured return values, follow the
+[variable-flow workflow](variable-flow.md). Generate the run with native
+`analyse variable-flow`, then open its standalone artifact with public
+`open_variable_flow` and query `run.graph`. Keep the actual run ID, declaration
+identity, source locations, call-site links, and boundary reasons. Parameters
+use the same command; omit `--max-depth` unless a cap is requested.
+
 ## Acceptance discipline
 
 An isolated acceptance harness should invoke each requested query once, reuse

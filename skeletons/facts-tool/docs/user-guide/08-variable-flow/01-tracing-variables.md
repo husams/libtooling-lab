@@ -70,10 +70,25 @@ from facts_tool import open_variable_flow
 
 with open_variable_flow("flow.db") as flows:
     run = flows.get(1)  # Use the run ID printed by the command.
-    print(run.nodes)
-    print(run.edges)
-    print(run.boundaries)
+graph = run.graph
+for node in graph.reads(variable_usr=run.root_variable):
+    print(node.kind, node.location.file, node.location.line)
+for node in graph.writes(variable_usr=run.root_variable):
+    print(node.kind, node.location.file, node.location.line)
+print(run.status, run.boundaries)
 ```
+
+Updates appear in both `reads()` and `writes()`. Omit the variable filter to
+inspect accesses across the entire retained dependency slice, including
+callee parameters and copied values. `graph.incoming(node_id)` and
+`graph.outgoing(node_id)` expose adjacent edges; resolve their endpoints with
+`graph.node(edge.source)` and `graph.node(edge.target)`. Nonzero
+`edge.callsite` values identify the originating call occurrence.
+
+See the [Python variable-flow API](../../../python/docs/variable-flow.md) for
+node filters, boundary queries, immutable results, and reader errors. The
+reader does not execute analysis or refresh a graph when sources change;
+generate a new native run when current-source evidence is required.
 
 ## Graph semantics
 

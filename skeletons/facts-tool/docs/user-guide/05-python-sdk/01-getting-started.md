@@ -107,12 +107,16 @@ or a built artifact.
 
 ## First query
 
-Every session needs two SQLite files that were produced together by
+Every `CodeBase` session needs two SQLite files that were produced together by
 `facts-tool`: the facts database (symbols, relations, sites - produced by
 `extract`) and the project database (repositories, components, files -
 produced by `repo add` / `import`). Opening is always read-only; see
 [02-opening-databases.md](02-opening-databases.md) for the full pairing and
 schema-version story.
+
+Saved variable-flow graphs use the separate `open_variable_flow(path)` reader
+and need only their standalone artifact; see
+[Local-variable and parameter flow](09-variable-flow.md).
 
 ```python
 from facts_tool import open_codebase

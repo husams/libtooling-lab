@@ -74,6 +74,13 @@ pass that exact id to `cb.callgraphs.get(run_id)` in the installed SDK.
 are committed. Inspect each command's `--help` for the current binding and
 relation options.
 
+For local or parameter read/write tracking, use `analyse variable-flow` after
+importing compile commands; it parses source and does not require prior facts
+extraction. Open its separate artifact through `open_variable_flow`, following
+[the variable-flow workflow](variable-flow.md). Keep the successful run ID and
+boundary records; an ordinary call graph does not supply these variable-flow
+facts.
+
 ## Inspect and manage the project catalog
 
 ```console
