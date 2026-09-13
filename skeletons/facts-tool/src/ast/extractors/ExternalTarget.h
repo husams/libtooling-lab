@@ -29,7 +29,9 @@ visibleTarget(const clang::NamedDecl &target,
 
 inline bool compilerProvided(const clang::NamedDecl &target,
                              const clang::SourceManager &sourceManager) {
-  return llvm::isa<clang::FunctionDecl>(target) && target.isImplicit() &&
+  const auto supported = llvm::isa<clang::FunctionDecl>(target) ||
+                         llvm::isa<clang::RecordDecl>(target);
+  return supported && target.isImplicit() &&
          sourceManager.getExpansionLoc(target.getLocation()).isInvalid();
 }
 
@@ -42,9 +44,9 @@ externalSymbol(const clang::NamedDecl &target, const std::string &usr,
   symbol.usr = usr;
   symbol.qualifiedName = target.getQualifiedNameAsString();
   symbol.flags = bit(ExternalBit);
-  const auto *function = llvm::dyn_cast<clang::FunctionDecl>(&target);
-  if (function && function->isImplicit())
+  if (target.isImplicit())
     symbol.flags |= bit(ImplicitBit);
+  const auto *function = llvm::dyn_cast<clang::FunctionDecl>(&target);
   if (function && (compiler || function->getBuiltinID() != 0))
     return addCallableProperties(std::move(symbol), *function)
         .transform([](Function value) { return Symbol{std::move(value)}; })

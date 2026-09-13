@@ -13,6 +13,8 @@ Feature: Canonical source file registry
       | entries/api.h |
       | entries/app.cpp |
       | entries/library.cpp |
+      | b022_call_site_invalid_usr.cpp |
+      | b022_call_site_invalid_usr_builtin.cpp |
       | b027_std_string_external_callee.cpp |
       | b027_stream_temporary_external_callee.cpp |
       | call_graph.hpp |

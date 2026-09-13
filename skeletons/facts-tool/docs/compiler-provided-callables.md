@@ -3,7 +3,7 @@
 Explicit project-owned calls can resolve to Clang's implicit allocation and
 deallocation declarations without a physical declaration location. A valid
 generated USR is their identity. Resolution first reuses that identity, then
-prefers a usable redeclaration, and only routes an implicit `FunctionDecl`
+prefers a usable redeclaration, and only routes an implicit function or record
 without usable declaration provenance to the compiler-provided storage domain.
 There is no operator-name whitelist. Invalid USRs retain B-019 filtering;
 missing registered physical files and persistence failures remain errors.
@@ -22,7 +22,15 @@ actual USR/name, implicit/external and callable flags. Zero coordinates and no
 definition row mean no physical declaration provenance. Real Calls sites retain
 the caller's file, line and column. The native graph recognizes lightweight
 callable kinds as well as Function rows, and stops at external boundaries.
-Ordinary file-backed lightweight symbols retain their previous flag behavior.
+File-backed targets still require a registered declaration file.
+
+Compiler-generated records use the same dynamic identity domain. In particular,
+copying an x86-64 `__builtin_va_list` can require both the locationless
+`__va_list_tag` record and its implicit constructor. The record retains its
+Clang USR, struct kind, and implicit/external flags; constructor call sites keep
+the record as their exact receiver. Return-type persistence reuses an existing
+dynamic compiler symbol instead of trying to synthesize a primitive type at
+its ID. Missing targets and storage failures remain errors.
 
 ## Fresh versus populated output
 
@@ -54,6 +62,11 @@ external boundaries and the requested depth still limit interpretation.
 
 ## Regressions and validation
 
+- `b022_call_site_invalid_usr.feature`: the portable stream case and headerless
+  x86-64 `__builtin_va_list` construction, copying, and return; public-SDK
+  assertions for committed siblings, real receiver/call identities, and forced
+  re-extraction stability. `implicit-compiler-record` checks physical-record
+  resolution and missing dynamic return-target failures.
 - `external_targets.feature`: minimal headerless explicit allocation, sibling
   definitions, canonical identity, real site and native graph output.
 - `implicit_callables.feature`: scalar/array normal/aligned new; normal,
