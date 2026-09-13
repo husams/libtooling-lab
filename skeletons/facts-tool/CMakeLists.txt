@@ -250,6 +250,8 @@ add_library(facts-storage STATIC
   src/storage/Storage.cpp
   src/storage/Symbol.cpp
   src/storage/Variable.cpp
+  src/storage/variableflow/Database.cpp
+  src/storage/variableflow/Schema.cpp
 )
 target_include_directories(facts-storage
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -386,6 +388,8 @@ target_compile_definitions(
 )
 target_link_libraries(facts-platform PRIVATE facts-clang)
 
+add_subdirectory(src/analysis/variableflow)
+
 add_library(facts-symbols STATIC
   src/commands/catalog/SymbolFormat.cpp
   src/commands/catalog/SymbolQuery.cpp
@@ -486,10 +490,12 @@ add_library(facts-commands STATIC
   src/commands/analyse/RecoveryScanInputs.cpp
   src/commands/analyse/RecoveryEvidenceScanner.cpp
   src/commands/analyse/RecoveryNativeFacts.cpp
+  src/commands/variableflow/Command.cpp
 )
 target_include_directories(facts-commands PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(facts-commands PRIVATE
   facts-ast
+  facts-variableflow
   facts-storage
   facts-platform
   facts-symbols
@@ -506,6 +512,7 @@ add_library(facts-cli STATIC
   src/cli/CallGraphCommandLine.cpp
   src/cli/Dispatch.cpp
   src/cli/MatchCommandLine.cpp
+  src/cli/variableflow/Configure.cpp
   src/cli/catalog/Repository.cpp
   src/cli/catalog/Component.cpp
   src/cli/catalog/Directory.cpp
@@ -563,6 +570,31 @@ if(BUILD_TESTING)
   add_executable(call-graph-search-test tests/CallGraphSearchTest.cpp)
   target_link_libraries(call-graph-search-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph-search COMMAND call-graph-search-test)
+  add_executable(variable-flow-database-test
+                 tests/storage/VariableFlowDatabaseTest.cpp)
+  target_link_libraries(variable-flow-database-test PRIVATE facts-storage
+                                                             facts-model
+                                                             facts-sqlite)
+  add_test(NAME variable-flow-database
+           COMMAND variable-flow-database-test
+                   ${CMAKE_CURRENT_BINARY_DIR}/variable-flow-test.sqlite)
+  add_executable(variable-flow-test tests/variableflow/VariableFlowTest.cpp)
+  target_link_libraries(variable-flow-test PRIVATE facts-variableflow)
+  add_test(NAME variable-flow COMMAND variable-flow-test)
+  add_executable(variable-flow-cfg-test
+                 tests/variableflow/CFGReachingTest.cpp)
+  target_link_libraries(variable-flow-cfg-test PRIVATE facts-variableflow)
+  add_test(NAME variable-flow-cfg COMMAND variable-flow-cfg-test)
+  add_executable(variable-flow-dependency-test
+                 tests/variableflow/DependencyFlowTest.cpp)
+  target_link_libraries(variable-flow-dependency-test PRIVATE facts-variableflow)
+  add_test(NAME variable-flow-dependency COMMAND variable-flow-dependency-test)
+  add_executable(variable-flow-alias-test tests/variableflow/AliasFlowTest.cpp)
+  target_link_libraries(variable-flow-alias-test PRIVATE facts-variableflow)
+  add_test(NAME variable-flow-alias COMMAND variable-flow-alias-test)
+  add_executable(variable-flow-deep-test tests/variableflow/DeepFlowTest.cpp)
+  target_link_libraries(variable-flow-deep-test PRIVATE facts-variableflow)
+  add_test(NAME variable-flow-deep COMMAND variable-flow-deep-test)
   add_executable(
     recovery-attempts-test
     tests/recovery_attempts_test.cpp

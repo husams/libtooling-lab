@@ -7,6 +7,7 @@
 #include "commands/Match.h"
 #include "commands/analyse/CallGraphCommand.h"
 #include "commands/analyse/CallGraphEntryCommand.h"
+#include "commands/variableflow/Command.h"
 #include "commands/catalog/Commands.h"
 #include <format>
 #include <iostream>
@@ -24,6 +25,10 @@ std::string_view commandName(const CallGraphOptions &) { return "call-graph"; }
 
 std::string_view commandName(const CallGraphEntryOptions &) {
   return "call-graph-entry";
+}
+
+std::string_view commandName(const VariableFlowOptions &) {
+  return "variable-flow";
 }
 
 std::string_view commandName(const MatchOptions &) { return "match"; }
@@ -80,6 +85,13 @@ std::string commandDetails(const CallGraphEntryOptions &options) {
       options.facts, options.configuration, options.function, options.format);
 }
 
+std::string commandDetails(const VariableFlowOptions &options) {
+  return std::format("configuration='{}', function='{}', variable='{}'",
+                     options.configuration,
+                     options.function ? *options.function : "",
+                     options.variable ? *options.variable : "");
+}
+
 std::string commandDetails(const MatchOptions &options) {
   return std::format("facts='{}', requested_sources={}", options.facts,
                      options.sources.size());
@@ -109,6 +121,10 @@ std::expected<int, std::string> execute(const CallGraphOptions &options) {
 
 std::expected<int, std::string> execute(const CallGraphEntryOptions &options) {
   return commands::runCallGraphEntry(options);
+}
+
+std::expected<int, std::string> execute(const VariableFlowOptions &options) {
+  return commands::runVariableFlow(options);
 }
 
 std::expected<int, std::string> execute(const MatchOptions &options) {

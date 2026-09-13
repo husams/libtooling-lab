@@ -3,6 +3,7 @@
 #include "cli/ConfigurationOptions.h"
 #include "cli/Dispatch.h"
 #include "cli/MatchCommandLine.h"
+#include "cli/variableflow/Configure.h"
 #include "cli/Verbose.h"
 #include "cli/catalog/Configure.h"
 #include <CLI/CLI.hpp>
@@ -37,6 +38,9 @@ public:
         "line"));
     configureCallGraphEntry(*analyseCommand_->add_subcommand(
         "call-graph-entry", "Inspect one collected function entry"));
+    variableFlowCommand_ = analyseCommand_->add_subcommand(
+        "variable-flow", "Analyse variable definitions and uses");
+    configureVariableFlow(*variableFlowCommand_, variableFlow_);
     repositoryCommand_ = configureRepository(app_, repository_);
     componentCommand_ = configureComponent(app_, component_);
     directoryCommand_ = configureDirectory(app_, directory_);
@@ -83,6 +87,8 @@ public:
       return Command{std::move(callGraph_)};
     if (callGraphEntryCommand_->parsed())
       return Command{std::move(callGraphEntry_)};
+    if (variableFlowCommand_->parsed())
+      return Command{std::move(variableFlow_)};
     return importCommand_->parsed() ? Command{std::move(import_)}
                                     : Command{std::move(dependency_)};
   }
@@ -272,12 +278,14 @@ private:
   CLI::App *dependencyCommand_ = nullptr;
   CLI::App *callGraphCommand_ = nullptr;
   CLI::App *callGraphEntryCommand_ = nullptr;
+  CLI::App *variableFlowCommand_ = nullptr;
   CLI::App *matchCommand_ = nullptr;
   ExtractOptions extract_;
   ImportOptions import_;
   DependencyOptions dependency_;
   CallGraphOptions callGraph_;
   CallGraphEntryOptions callGraphEntry_;
+  VariableFlowOptions variableFlow_;
   MatchOptions match_;
   CLI::App *repositoryCommand_ = nullptr;
   CLI::App *componentCommand_ = nullptr;

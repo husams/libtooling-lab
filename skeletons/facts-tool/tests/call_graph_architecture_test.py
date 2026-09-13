@@ -50,7 +50,11 @@ def main() -> None:
             continue
         if "addToCallGraph" in path.read_text(encoding="utf-8"):
             owners.append(path)
-    require(owners == [visitor], "CallGraph traversal has multiple owners")
+    # Extraction and the opt-in variable-flow command have independent AST
+    # lifetimes; each owns exactly one Clang CallGraph construction site.
+    variable_flow_parser = root / "src/analysis/variableflow/Parse.cpp"
+    require(set(owners) == {visitor, variable_flow_parser},
+            "Clang CallGraph ownership escaped the two analysis entry points")
     typed = (root / "src/analysis/callgraph/RelationSiteContextStore.cpp")
     require("ReceiverCertainty::Exact" in typed.read_text(encoding="utf-8"),
             "relation-site context access is not typed")

@@ -40,3 +40,4 @@
 | 7.3 | Reference | [Troubleshooting](07-reference/03-troubleshooting.md) |
 | 7.4 | Reference | [Limitations and known issues](07-reference/04-limitations-and-known-issues.md) |
 | 7.5 | Reference | [In flight: F-013](07-reference/05-in-flight-f-013.md) |
+| 8.1 | Variable flow | [Tracing local variables and parameters](08-variable-flow/01-tracing-variables.md) |

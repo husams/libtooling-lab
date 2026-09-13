@@ -68,6 +68,8 @@ Feature: Canonical source file registry
       | targeted_match_two.cpp |
       | toolchain_targets.cpp |
       | undeclared_template_instances.cpp |
+      | variable_flow_calls.cpp |
+      | variable_flow_root.cpp |
       | expression_evidence.cpp |
       | expression_evidence_two.cpp |
       | expression_unavailable_one.cpp |

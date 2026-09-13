@@ -13,6 +13,19 @@ from .match_models import MatchBinding, MatchLocation, MatchRange, MatchResult
 from .match_results import MatchResults, load_match_results
 from .opening import open_codebase
 from .result import Result
+from .variableflow import (
+    Boundary,
+    Edge,
+    Location,
+    Node,
+    VariableFlowReader,
+    VariableFlowRun,
+    VariableFlowBoundary,
+    VariableFlowEdge,
+    VariableFlowLocation,
+    VariableFlowNode,
+    open_variable_flow,
+)
 
 __all__ = [
     "Budgets",
@@ -39,4 +52,15 @@ __all__ = [
     "SymbolId",
     "open_codebase",
     "load_match_results",
+    "Boundary",
+    "Edge",
+    "Location",
+    "Node",
+    "VariableFlowReader",
+    "VariableFlowRun",
+    "open_variable_flow",
+    "VariableFlowBoundary",
+    "VariableFlowEdge",
+    "VariableFlowLocation",
+    "VariableFlowNode",
 ]

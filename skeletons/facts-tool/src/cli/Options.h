@@ -76,6 +76,21 @@ struct CallGraphEntryOptions {
   std::string function;
 };
 
+struct VariableFlowOptions {
+  int verbosity = 0;
+  std::string configuration;
+  std::string configurationFile;
+  std::optional<std::string> function;
+  std::optional<std::string> variable;
+  std::optional<unsigned> line;
+  std::optional<unsigned> maxDepth;
+  std::string output;
+  bool outputProvided = false;
+  std::vector<std::string> extraArguments;
+  bool extraArgumentsProvided = false;
+  std::vector<std::string> sources;
+};
+
 struct MatchOptions {
   int verbosity = 0;
   std::string facts;
@@ -98,7 +113,8 @@ struct ConfigOptions {
 
 using Command =
     std::variant<ExtractOptions, ImportOptions, DependencyOptions,
-                 CallGraphOptions, CallGraphEntryOptions, MatchOptions,
+                 CallGraphOptions, CallGraphEntryOptions, VariableFlowOptions,
+                 MatchOptions,
                  ConfigOptions, RepositoryOptions, ComponentOptions,
                  DirectoryOptions, FileOptions, SymbolOptions>;
 
