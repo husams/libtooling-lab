@@ -5,6 +5,12 @@ declarations with Clang's dynamic AST matcher language, the same DSL used
 by `clang-query`. Pass only the expression to `--matcher`, without the
 interactive `clang-query` prefix `match` or `m`.
 
+Check the selected executable's `match --help` before choosing traversal:
+`--traversal AsIs` includes implicit AST nodes and is the unchanged default;
+`--traversal IgnoreUnlessSpelledInSource` skips nodes not spelled in source.
+Pass the option only when that executable supports it, and retain the selected
+mode with the matcher when recording a reproducible command.
+
 ## 1. Select the project and source files
 
 Confirm the executable and effective configuration with

@@ -15,9 +15,25 @@ POSITIONALS:
 OPTIONS:
   -f, --facts FILE          SQLite facts database; defaults to facts_template when omitted
       --matcher EXPR REQUIRED   Clang dynamic matcher expression; bind symbol, expression, call+callee, or source+target[+site]
+      --traversal MODE          AsIs (default) or IgnoreUnlessSpelledInSource
       --format text|json       Located text (default) or structured invocation results
       --relation-kind KIND      Relation kind for source/target bindings; required for relation contracts
 ```
+
+## Choose the traversal mode
+
+Use `--traversal AsIs` to include implicit AST nodes, or
+`--traversal IgnoreUnlessSpelledInSource` to skip nodes not spelled in source:
+
+```sh
+facts-tool match --traversal IgnoreUnlessSpelledInSource \
+  --matcher 'functionDecl(hasName("main")).bind("symbol")' src/main.cpp
+```
+
+Omitting the option keeps the existing `AsIs` behavior. Mode names are
+case-sensitive; invalid values are rejected before matching. Traversal controls
+which AST nodes are considered; the usual binding and persistence requirements
+still apply to every result.
 
 ## Process located results
 

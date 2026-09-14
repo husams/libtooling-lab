@@ -35,6 +35,12 @@ CLI::App *configureMatch(CLI::App &app, MatchOptions &options) {
                    "expression, call+callee, or source+target[+site]")
       ->required()
       ->type_name("EXPR");
+  command
+      ->add_option("--traversal", options.traversal,
+                   "AST traversal mode: AsIs or "
+                   "IgnoreUnlessSpelledInSource (default: AsIs)")
+      ->check(CLI::IsMember({"AsIs", "IgnoreUnlessSpelledInSource"}))
+      ->type_name("MODE");
   command->add_flag(
       "--capture-source", options.captureSource,
       "Persist the exact source region for each matched function, method, or record definition");
