@@ -57,6 +57,34 @@ Feature: Located matcher results for Python processing
     When a nonmatching source includes a new unregistered header
     Then matching fails with incomplete registration and preserves prior symbols
 
+  Scenario: Traversal mode controls implicit expression bindings
+    Given an isolated two-source match results fixture
+    When an implicit expression matcher runs with traversal "AsIs"
+    Then each source returns an implicit expression binding
+    When an implicit expression matcher runs with traversal "IgnoreUnlessSpelledInSource"
+    Then no implicit expression bindings are returned
+
+  Scenario: Omitted traversal preserves the AsIs default
+    Given an isolated two-source match results fixture
+    When an implicit expression matcher runs without a traversal option
+    And the same implicit expression matcher runs explicitly with traversal "AsIs"
+    Then the omitted and explicit traversal results are identical
+
+  Scenario: An empty traversal option is rejected before facts side effects
+    Given an isolated two-source match results fixture
+    When an implicit expression matcher runs with an empty traversal option
+    Then the traversal option fails before facts side effects
+
+  Scenario: An unknown traversal option is rejected before facts side effects
+    Given an isolated two-source match results fixture
+    When an implicit expression matcher runs with an unknown traversal option
+    Then the traversal option fails before facts side effects
+
+  Scenario: A missing traversal argument is rejected before facts side effects
+    Given an isolated two-source match results fixture
+    When an implicit expression matcher runs with a missing traversal argument
+    Then the traversal option fails before facts side effects
+
   Scenario Outline: Relative filename collisions remain separate during matching
     Given an isolated match fixture with colliding relative source paths
     When structured matching runs in "<order>" order

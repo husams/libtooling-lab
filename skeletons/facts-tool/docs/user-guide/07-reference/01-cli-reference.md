@@ -246,6 +246,7 @@ facts-tool match [OPTIONS] [sources...]
 | `--config` | `FILE` | - | [[config-help]] |
 | `-v`, `--verbose` | `INT [0-3]` | `1` | Verbosity |
 | `--matcher` | `EXPR` (required) | - | Clang dynamic matcher expression; bind `symbol`, `call`+`callee`, or `source`+`target`[+`site`] |
+| `--traversal` | `AsIs` or `IgnoreUnlessSpelledInSource` | `AsIs` | Include implicit AST nodes or skip nodes not spelled in source; omission preserves existing behavior |
 | `--relation-kind` | `KIND` | - | Relation kind for `source`/`target` bindings; required for relation contracts |
 
 **Exit codes**: standard contract above.

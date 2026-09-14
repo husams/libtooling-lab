@@ -10,9 +10,20 @@
 #include "tooling/StoredCompilationDatabase.h"
 
 namespace facts::commands {
-namespace {} // namespace
+namespace {
+
+bool validTraversal(const std::optional<std::string> &traversal) {
+  return !traversal || *traversal == "AsIs" ||
+         *traversal == "IgnoreUnlessSpelledInSource";
+}
+
+} // namespace
 
 std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
+  if (!validTraversal(options.traversal))
+    return std::unexpected(
+        "facts-tool: usage error: --traversal must be AsIs or "
+        "IgnoreUnlessSpelledInSource");
   if (options.relationKind) {
     auto kind = match::parseRelationKind(*options.relationKind);
     if (!kind)

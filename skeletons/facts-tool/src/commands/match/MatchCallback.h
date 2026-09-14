@@ -25,6 +25,7 @@ public:
   MatchCallback(const cli::MatchOptions &options, FileManager &files,
                 FactStore &store, bool rejectLegacyWrites = false);
   void onStartOfTranslationUnit() override { fingerprints_.clear(); }
+  std::optional<clang::TraversalKind> getCheckTraversalKind() const override;
   void
   run(const clang::ast_matchers::MatchFinder::MatchResult &result) override;
 

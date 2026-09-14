@@ -20,6 +20,15 @@ MatchCallback::MatchCallback(const cli::MatchOptions &options,
     : options_(options), files_(files), store_(store),
       rejectLegacyWrites_(rejectLegacyWrites) {}
 
+std::optional<clang::TraversalKind>
+MatchCallback::getCheckTraversalKind() const {
+  if (!options_.traversal)
+    return std::nullopt;
+  if (*options_.traversal == "AsIs")
+    return clang::TK_AsIs;
+  return clang::TK_IgnoreUnlessSpelledInSource;
+}
+
 void MatchCallback::run(
     const clang::ast_matchers::MatchFinder::MatchResult &result) {
   if (error_)

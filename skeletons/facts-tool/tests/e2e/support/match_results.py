@@ -20,13 +20,18 @@ MATCHERS = {
 
 
 def invoke(context: FactsToolContext, matcher: str, *, text: bool = False,
-           sources=None, relation: bool = False):
+           sources=None, relation: bool = False, traversal: str | None = None,
+           traversal_missing_value: bool = False):
     command = [str(context.facts_tool), "match", "--conf",
                str(context.files_database), "--facts", str(context.facts_database),
                "--matcher", matcher, "--format", "text" if text else "json"]
     if relation:
         command += ["--relation-kind", relation if isinstance(relation, str) else "Inherits"]
+    if not traversal_missing_value and traversal is not None:
+        command += ["--traversal", traversal]
     command += [str(p) for p in (sources or context.match_sources)]
+    if traversal_missing_value:
+        command += ["--traversal"]
     context.match_completed = subprocess.run(
         command, capture_output=True, text=True, cwd=context.run_root_path)
     return context.match_completed
