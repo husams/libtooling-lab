@@ -47,7 +47,10 @@ std::optional<std::string> requestedPath(clang::FileEntryRef entry) {
   if (!path.is_absolute()) {
     return std::nullopt;
   }
-  return path.lexically_normal().string();
+  // FileManager canonicalizes the physical path before trying its normalized
+  // registry alias. Collapsing '..' here would lose preceding symlinks, such
+  // as /lib -> /usr/lib in GCC's standard-library search paths.
+  return path.string();
 }
 
 std::expected<FileId, std::error_code>

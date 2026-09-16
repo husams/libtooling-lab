@@ -41,7 +41,9 @@ std::expected<fs::path, std::string> identity(const fs::path &path) {
 }
 
 fs::path resolve(const fs::path &path, const fs::path &directory) {
-  return (path.is_absolute() ? path : directory / path).lexically_normal();
+  // Preserve symlink/.. traversal until filesystem lookup. Lexical collapse
+  // can select a different file when a preceding component is a symlink.
+  return path.is_absolute() ? path : directory / path;
 }
 
 std::expected<llvm::json::Object, std::string>

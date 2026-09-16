@@ -17,9 +17,8 @@ void addCandidates(std::set<fs::path> &paths, const fs::path &root,
   if (slash == std::string::npos || slash == 0)
     return;
   const auto framework = root / (name.substr(0, slash) + ".framework");
-  paths.insert((framework / "Headers" / name.substr(slash + 1)).lexically_normal());
-  paths.insert((framework / "PrivateHeaders" / name.substr(slash + 1))
-                   .lexically_normal());
+  paths.insert(framework / "Headers" / name.substr(slash + 1));
+  paths.insert(framework / "PrivateHeaders" / name.substr(slash + 1));
 }
 } // namespace
 

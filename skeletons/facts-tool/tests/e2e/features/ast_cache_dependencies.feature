@@ -48,3 +48,13 @@ Feature: AST cache tracks compiler includes and header lookup decisions
       | header | match         |
       | source | variable-flow |
       | header | variable-flow |
+
+  Scenario: Cache fingerprints preserve physical symlink followed by parent resolution
+    Given an include search path traverses a symlink followed by its parent
+    And a persisted AST from extraction
+    Then the physically resolved header symbol is present
+    When the AST cache project runs "extract"
+    Then the persisted AST is reused
+    And the physically resolved header symbol is present
+    When the physical header behind the include path changes without a timestamp change
+    Then AST regeneration exposes the fresh symbol "CachePhysicalAfter_"

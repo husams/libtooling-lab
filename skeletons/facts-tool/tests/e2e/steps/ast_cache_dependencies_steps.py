@@ -1,4 +1,6 @@
 """Compiler-provided includes and dependency lookup changes invalidate caches."""
+import os
+
 from pytest_bdd import given, parsers, then, when
 
 from support.ast_cache_assertions import require_hit, require_miss, require_stored, require_symbol
@@ -119,3 +121,42 @@ def fresh_error(ast_cache):
     assert ast_cache.last.returncode != 0, ast_cache.last.stdout + ast_cache.last.stderr
     assert "AST_CACHE_FRESH_INPUT_FAILURE" in ast_cache.last.stderr, ast_cache.last.stderr
     assert "ast-cache: hit" not in ast_cache.last.stderr
+
+
+@given("an include search path traverses a symlink followed by its parent")
+def physical_include_path(ast_cache):
+    physical = ast_cache.root / "physical"
+    (physical / "child").mkdir(parents=True)
+    headers = physical / "headers"
+    headers.mkdir()
+    (headers / "cache_physical.hpp").write_text("struct CachePhysicalBefore {};\n", encoding="utf-8")
+    decoy = ast_cache.root / "headers"
+    decoy.mkdir()
+    (decoy / "cache_physical.hpp").write_text("struct CacheLexicalDecoy {};\n", encoding="utf-8")
+    alias = ast_cache.root / "alias"
+    alias.symlink_to(physical / "child", target_is_directory=True)
+    include = alias / ".." / "headers"
+    assert include.resolve() == headers.resolve()
+    assert os.path.normpath(include) == str(decoy)
+    ast_cache.source.write_text('#include <cache_physical.hpp>\n' + ast_cache.source.read_text(),
+                                encoding="utf-8")
+    # Runtime defaults preserve the include spelling independently of imported
+    # compile-option path normalization, which is outside the cache contract.
+    ast_cache.configure(ast_cache=True, extra_args=["-I", str(include)])
+    reimport(ast_cache)
+
+
+@then("the physically resolved header symbol is present")
+def physical_symbol(ast_cache):
+    require_symbol(ast_cache, "CachePhysicalBefore")
+
+
+@when("the physical header behind the include path changes without a timestamp change")
+def physical_header_changed(ast_cache):
+    header = ast_cache.root / "physical/headers/cache_physical.hpp"
+    before = header.stat()
+    header.write_text(header.read_text().replace("CachePhysicalBefore", "CachePhysicalAfter_"),
+                      encoding="utf-8")
+    assert header.stat().st_size == before.st_size
+    os.utime(header, ns=(before.st_atime_ns, before.st_mtime_ns))
+    ast_cache.run("extract")
