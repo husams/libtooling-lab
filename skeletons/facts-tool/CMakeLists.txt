@@ -204,6 +204,10 @@ target_include_directories(facts-model INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src
 target_link_libraries(facts-model INTERFACE facts-clang)
 
 add_library(facts-storage STATIC
+  src/storage/astcache/Artifact.cpp
+  src/storage/astcache/Connection.cpp
+  src/storage/astcache/SnapshotRead.cpp
+  src/storage/astcache/SnapshotWrite.cpp
   src/storage/CallGraphEntry.cpp
   src/storage/FactProvenance.cpp
   src/storage/ExternalReference.cpp
@@ -688,6 +692,11 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}
   )
   add_executable(project-reimport-test tests/ProjectReimportTest.cpp)
+  add_executable(ast-cache-database-test
+    tests/AstCacheDatabaseTest.cpp tests/astcache/Lifecycle.cpp
+    tests/astcache/Migration.cpp tests/astcache/Failures.cpp)
+  target_link_libraries(ast-cache-database-test PRIVATE facts-storage facts-model facts-sqlite)
+  add_test(NAME ast-cache-database COMMAND ast-cache-database-test)
   target_link_libraries(project-reimport-test PRIVATE facts-storage facts-model
                                                     facts-sqlite)
   add_test(

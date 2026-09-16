@@ -29,11 +29,11 @@ def s026_pair(context: FactsToolContext) -> None:
     prepare_pair(context)
 
 
-@then("the project has version one and the exact four-field matched index")
+@then("the project has version two and the exact four-field matched index")
 def exact_schema(context: FactsToolContext) -> None:
     columns = query(context.files_database, "SELECT name FROM pragma_table_info('matched_symbol_index')")
     require(columns == [("usr",), ("qualified_name",), ("file_id",), ("kind",)], str(columns))
-    require(query(context.files_database, "SELECT schema_version FROM project_registry") == [(1,)], "wrong version")
+    require(query(context.files_database, "SELECT schema_version FROM project_registry") == [(2,)], "wrong version")
     require(query(context.files_database, "SELECT * FROM matched_symbol_index") == [], "migration backfilled index")
 
 

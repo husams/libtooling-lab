@@ -1,14 +1,16 @@
 """Compiler-provided includes and dependency lookup changes invalidate caches."""
 import os
+import sqlite3
 
 from pytest_bdd import given, parsers, then, when
 
-from support.ast_cache_assertions import require_hit, require_miss, require_stored, require_symbol
+from support.ast_cache_assertions import require_hit, require_miss, require_stored, require_symbol, require_dependency_hit
 from support.database import query
 
 
 def reimport(project, *arguments):
     project.write_commands(*arguments)
+    project.commit_inputs()
     project.run("import")
     project.succeed()
 
@@ -26,7 +28,10 @@ def forced_include(ast_cache):
 @when(parsers.parse('the forced include consumer "{family}" runs with fresh output'))
 def fresh_forced_consumer(ast_cache, family):
     ast_cache.forced_family = family
-    ast_cache.forced_conf = ast_cache.root / "forced-project.sqlite" if family == "import" else ast_cache.conf
+    ast_cache.forced_conf = ast_cache.conf
+    if family == "import":
+        with sqlite3.connect(ast_cache.conf) as database:
+            database.execute("DELETE FROM file WHERE name IN ('forced.hpp', 'forced_nested.hpp')")
     ast_cache.forced_facts = ast_cache.root / "forced-facts.sqlite"
     substitutions = {str(ast_cache.conf): str(ast_cache.forced_conf),
                      str(ast_cache.facts): str(ast_cache.forced_facts)}
@@ -36,7 +41,7 @@ def fresh_forced_consumer(ast_cache, family):
 
 @then("the cached include graph retains the compiler forced header")
 def forced_graph(ast_cache):
-    require_hit(ast_cache)
+    require_dependency_hit(ast_cache)
     rows = query(ast_cache.forced_conf, "SELECT id FROM file WHERE name='forced.hpp'")
     assert len(rows) == 1, rows
     nested = query(ast_cache.forced_conf, "SELECT id FROM file WHERE name='forced_nested.hpp'")
@@ -62,6 +67,7 @@ def search_directories(ast_cache):
 def shadow_header(ast_cache):
     (ast_cache.root / "first/search.hpp").write_text("struct CacheSearchShadow {};\n",
                                                     encoding="utf-8")
+    ast_cache.commit_inputs()
     ast_cache.run("import")
     ast_cache.succeed()
     ast_cache.run("extract")
@@ -79,6 +85,7 @@ def optional_header(ast_cache):
 def optional_available(ast_cache):
     (ast_cache.root / "optional.hpp").write_text("struct CacheOptionalAvailable {};\n",
                                                 encoding="utf-8")
+    ast_cache.commit_inputs()
     ast_cache.run("import")
     ast_cache.succeed()
     ast_cache.run("extract")
@@ -94,6 +101,7 @@ def response_arguments(ast_cache):
 @when("the compiler response file enables a different source declaration and is reimported")
 def response_changed(ast_cache):
     (ast_cache.root / "compile.rsp").write_text("-DCACHE_VALUE=7 -DCACHE_MODE=1\n", encoding="utf-8")
+    ast_cache.commit_inputs()
     ast_cache.run("import")
     ast_cache.succeed()
     ast_cache.run("extract")
@@ -108,11 +116,12 @@ def lookup_changed(ast_cache, symbol):
     require_hit(ast_cache)
 
 
-@when(parsers.parse('the cached "{input_kind}" acquires a compile error and "{family}" runs'))
+@when(parsers.parse('the cached "{input_kind}" acquires a committed compile error and "{family}" runs'))
 def compile_error(ast_cache, input_kind, family):
     path = ast_cache.source if input_kind == "source" else ast_cache.header
     with path.open("a", encoding="utf-8") as file:
         file.write("\n#error AST_CACHE_FRESH_INPUT_FAILURE\n")
+    ast_cache.commit_inputs()
     ast_cache.run(family)
 
 
@@ -151,7 +160,7 @@ def physical_symbol(ast_cache):
     require_symbol(ast_cache, "CachePhysicalBefore")
 
 
-@when("the physical header behind the include path changes without a timestamp change")
+@when("the physical header behind the include path is committed without a timestamp change")
 def physical_header_changed(ast_cache):
     header = ast_cache.root / "physical/headers/cache_physical.hpp"
     before = header.stat()
@@ -159,4 +168,5 @@ def physical_header_changed(ast_cache):
                       encoding="utf-8")
     assert header.stat().st_size == before.st_size
     os.utime(header, ns=(before.st_atime_ns, before.st_mtime_ns))
+    ast_cache.commit_inputs()
     ast_cache.run("extract")

@@ -4,7 +4,8 @@ from pytest_bdd import given, parsers, then, when
 
 from support.ast_cache import AstCacheProject
 from support.ast_cache_assertions import (fact_snapshot, require_consumer_result,
-                                          require_hit, require_miss, require_stored)
+                                          require_hit, require_miss, require_stored,
+                                          require_consumer_cache_hit)
 
 
 @pytest.fixture
@@ -77,6 +78,7 @@ def complete(ast_cache, family):
 def untouched(ast_cache):
     ast_cache.succeed()
     assert "ast-cache:" not in ast_cache.last.stderr, ast_cache.last.stderr
+    assert "dependency-cache:" not in ast_cache.last.stderr, ast_cache.last.stderr
     assert ast_cache.snapshot_cache() == ast_cache.cache_before
 
 
@@ -85,6 +87,7 @@ def no_directory(ast_cache):
     ast_cache.succeed()
     assert not ast_cache.cache.exists()
     assert "ast-cache:" not in ast_cache.last.stderr, ast_cache.last.stderr
+    assert "dependency-cache:" not in ast_cache.last.stderr, ast_cache.last.stderr
 
 
 @then("only the configured AST cache directory is populated")
@@ -103,3 +106,8 @@ def default_directory(ast_cache):
 def disabled_consumer(ast_cache, family):
     ast_cache.configure(ast_cache=False)
     ast_cache.run(family)
+
+
+@then("the configured cache is reused by the command")
+def consumer_cache_reused(ast_cache):
+    require_consumer_cache_hit(ast_cache)

@@ -39,12 +39,15 @@ settings for commands that parse translation units.
 
 AST-consuming commands (`extract`, `match`, `analyse call-graph --recover-missing`,
 and `analyse variable-flow`) populate and reuse the cache. Import include
-discovery and `analyse dependency` also reuse includes from an existing
-valid AST; on a miss they retain preprocessing-only behavior, so these
-operations do not start rejecting source files for C++ parsing errors.
-Cache reuse depends on the source, headers, effective compiler arguments,
-and Clang compatibility. Stale or unreadable entries are rebuilt when an
-AST is needed. Disabling the cache leaves existing cache files available for
+discovery records dependencies in the project database during preprocessing.
+`analyse dependency` reuses those database records without loading an AST;
+missing records retain preprocessing-only behavior, so these operations do
+not start rejecting source files for C++ parsing errors. Metadata uses typed
+SQLite tables, with no JSON sidecar. An existing entry is refreshed when a
+recorded repository HEAD commit changes; uncommitted edits do not invalidate
+it. Effective compiler arguments and Clang version select the cache entry.
+Sources without a tracked Git commit use normal parsing. Stale or unreadable
+entries are rebuilt when an AST is needed. Disabling the cache leaves existing cache files available for
 a later enabled run. `config show` prints `ast_cache`, `ast_cache_dir`, and
 their separate `*_source` provenance without creating a cache directory.
 

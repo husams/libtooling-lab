@@ -14,6 +14,7 @@ namespace facts::astcache::detail {
 
 std::unique_ptr<clang::ASTUnit> loadAST(const Entry &entry);
 std::expected<void, std::string> storeAST(const Entry &entry,
-                                        clang::ASTUnit &unit);
+                                        clang::ASTUnit &unit,
+                                        const Snapshot &snapshot);
 
 } // namespace facts::astcache::detail

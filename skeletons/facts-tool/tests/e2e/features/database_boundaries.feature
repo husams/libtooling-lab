@@ -21,6 +21,11 @@ Feature: Facts and file storage boundaries
     And no facts table stores opaque packed flags
     And the files database contains only these tables
       | table             |
+      | ast_cache_artifact |
+      | ast_cache_include |
+      | ast_cache_input |
+      | ast_cache_revision |
+      | ast_cache_snapshot |
       | clone             |
       | component         |
       | directory         |

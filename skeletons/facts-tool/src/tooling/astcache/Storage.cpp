@@ -1,24 +1,20 @@
 #include "tooling/astcache/Storage.h"
 
-#include <clang/Basic/Diagnostic.h>
-#include <clang/Basic/DiagnosticOptions.h>
+#include "tooling/astcache/Serialization.h"
+
 #include <clang/Frontend/ASTUnit.h>
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/Serialization/PCHContainerOperations.h>
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/LockFileManager.h>
-#include <llvm/Support/VirtualFileSystem.h>
 
 #include <system_error>
 
 namespace facts::astcache::detail {
 
 std::unique_ptr<clang::ASTUnit> loadAST(const Entry &entry) {
-  // Validate and deserialize under the same nonblocking lock as writers: the
-  // AST bytes cannot be replaced between the digest check and Clang's open.
+  // Validate and deserialize under the same nonblocking lock as writers.
   llvm::LockFileManager lock(entry.ast.string());
   auto acquired = lock.tryLock();
   if (!acquired) {
@@ -27,41 +23,12 @@ std::unique_ptr<clang::ASTUnit> loadAST(const Entry &entry) {
   }
   if (!*acquired || !validEntry(entry))
     return nullptr;
-  // A cache failure must not enter the command's diagnostic consumer: parsing
-  // remains the authoritative fallback, including its original diagnostics.
-  auto diagnosticOptions = std::make_shared<clang::DiagnosticOptions>();
-  auto filesystem = llvm::vfs::createPhysicalFileSystem();
-  if (filesystem->setCurrentWorkingDirectory(entry.working_directory.string()))
-    return nullptr;
-  const auto diagnostics = clang::CompilerInstance::createDiagnostics(
-      *filesystem, *diagnosticOptions, new clang::IgnoringDiagConsumer, true);
-  clang::FileSystemOptions fileOptions;
-  fileOptions.WorkingDir = entry.working_directory.string();
-  // ASTReader keeps a reference to its container reader for lazy reads after
-  // this function returns, so the owner must outlive every returned ASTUnit.
-  static const clang::RawPCHContainerReader reader;
-#if LLVM_VERSION_MAJOR >= 22
-  auto unit = clang::ASTUnit::LoadFromASTFile(
-      entry.ast.string(), reader,
-      clang::ASTUnit::LoadEverything, std::move(filesystem),
-      std::move(diagnosticOptions), diagnostics, fileOptions,
-      clang::HeaderSearchOptions{});
-#else
-  // LLVM 21 takes the VFS after the optional load flags. Pass it explicitly
-  // so cached ASTs retain the compilation directory on both API versions.
-  auto unit = clang::ASTUnit::LoadFromASTFile(
-      entry.ast.string(), reader, clang::ASTUnit::LoadEverything,
-      std::move(diagnosticOptions), diagnostics, fileOptions,
-      clang::HeaderSearchOptions{}, nullptr, false,
-      clang::CaptureDiagsKind::None, false, false, std::move(filesystem));
-#endif
-  if (!unit || unit->getDiagnostics().hasErrorOccurred())
-    return nullptr;
-  return unit;
+  return loadSerialized(entry.ast, entry.working_directory);
 }
 
 std::expected<void, std::string> storeAST(const Entry &entry,
-                                        clang::ASTUnit &unit) {
+                                        clang::ASTUnit &unit,
+                                        const Snapshot &snapshot) {
   std::error_code error;
   std::filesystem::create_directories(entry.ast.parent_path(), error);
   if (error)
@@ -82,14 +49,14 @@ std::expected<void, std::string> storeAST(const Entry &entry,
   const auto cleanup =
       llvm::make_scope_exit([&] { llvm::sys::fs::remove(temporary); });
 #endif
-  if (unit.Save(temporary))
-    return std::unexpected("AST serialization failed");
+  if (auto saved = saveSerialized(unit, temporary.str().str()); !saved)
+    return std::unexpected(saved.error());
   std::filesystem::rename(temporary.str().str(), entry.ast, error);
   if (error)
     return std::unexpected(error.message());
-  // The manifest commits last and hashes the AST too, so readers reject an
-  // interrupted write or mismatched concurrent writer rather than load it.
-  return writeMetadata(entry, unit);
+  // Publish snapshot and artifact metadata together only after the AST is
+  // complete. Generation and digest reject an interrupted replacement.
+  return writeMetadata(entry, snapshot);
 }
 
 } // namespace facts::astcache::detail

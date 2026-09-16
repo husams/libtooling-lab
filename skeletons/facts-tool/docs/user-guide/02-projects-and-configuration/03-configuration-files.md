@@ -82,9 +82,11 @@ facts_template: "{project_root}/.index/{relative_path}/{filename}.db"
 Enable `ast_cache: true` to reuse a translation unit's serialized Clang AST
 on later `extract`, `match`, `analyse call-graph --recover-missing`, and
 `analyse variable-flow` runs. These commands create an entry when an AST must
-be parsed. Import include discovery and `analyse dependency` can reuse a valid
-cached AST's includes; when there is no entry they continue preprocessing without
-requiring a successful full C++ parse.
+be parsed. Import records included files and their relationships during its
+preprocessing pass, in typed tables in the project database. Subsequent import
+and `analyse dependency` commands reuse that metadata without opening an AST.
+Missing or stale records are rebuilt through preprocessing, without requiring
+a successful full C++ parse. There are no JSON cache sidecars.
 
 `ast_cache_dir` accepts an absolute path, a project-root-relative path, or
 a path beginning with `~/` (expanded using `HOME`). Relative paths always
@@ -97,9 +99,11 @@ Both cache settings merge independently across YAML tiers, including when
 `--conf` or `FACTS_TOOL_CONF` selects a direct database. To temporarily
 disable reuse, select a file containing `ast_cache: false`; the effective
 cache directory can still come from a lower tier. Existing entries remain
-available when caching is enabled again. The cache validates source/header
-inputs, compiler arguments and Clang compatibility before reuse, and
-rebuilds stale or unreadable entries when a full AST is requested.
+available when caching is enabled again. Repository HEAD commit changes
+refresh existing records; uncommitted edits do not. The source must be tracked
+in Git, otherwise normal parsing is used. Compiler arguments and Clang
+compatibility select the entry, and missing or damaged ASTs are rebuilt when
+requested. See [cache behavior](../../ast-cache.md) for the commit policy.
 
 ## Template placeholders
 

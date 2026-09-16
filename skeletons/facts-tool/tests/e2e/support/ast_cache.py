@@ -7,6 +7,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from support.ast_cache_git import commit_inputs, initialize_repository
+
 HEADER = """#pragma once
 struct HeaderBefore { int value; };
 inline int cache_adjust(int value) { return value + 1; }
@@ -44,15 +46,15 @@ class AstCacheProject:
     def create(cls, context, root):
         root = root.resolve()
         root.mkdir(parents=True, exist_ok=True)
-        (root / ".git").mkdir()
         (root / "cache.hpp").write_text(HEADER, encoding="utf-8")
         (root / "cache.cpp").write_text(SOURCE, encoding="utf-8")
         environment = {key: value for key, value in os.environ.items()
-                       if not key.startswith(("FACTS_TOOL_", "XDG_"))}
+                       if not key.startswith(("FACTS_TOOL_", "XDG_", "GIT_"))}
         environment["XDG_CONFIG_HOME"] = str(root / "user-config")
         environment["XDG_DATA_HOME"] = str(root / "user-data")
         project = cls(context.facts_tool, context.compiler, root, environment,
                       root / ".facts-tool" / "ast-cache")
+        initialize_repository(root, environment)
         project.write_commands()
         project.run("import")
         project.succeed()
@@ -116,7 +118,11 @@ class AstCacheProject:
         sources = [] if family == "show" else [str(self.source)]
         return [str(self.tool), *families[family], *options, *map(str, extra), *sources]
 
+    def commit_inputs(self, *, allow_empty=False):
+        return commit_inputs(self.root, self.environment, allow_empty=allow_empty)
+
     def run(self, family, *extra, command=None, cwd=None):
+        self.last_family = family
         self.last = subprocess.run(command or self.command(family, *extra), cwd=cwd or self.root,
                                    env=self.environment, text=True, capture_output=True,
                                    timeout=60, check=False)

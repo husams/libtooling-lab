@@ -186,6 +186,10 @@ passes **all** of the following, checked in this order:
 
 Editing only a header is enough to make every translation unit that
 includes it stale, even though none of those TUs' own files changed.
+With `ast_cache: true`, this facts-index check can request extraction while
+the repository commit remains unchanged. That extraction traverses the saved
+AST and its original source buffers: uncommitted edits do not refresh the AST.
+Disable caching to extract working-tree edits before committing them.
 Any other source - one whose closure fails any rule, or one `extract` has
 never seen before - is stale and gets extracted normally.
 
@@ -202,8 +206,9 @@ If every requested source is up to date, `extract` prints one line and
 exits 0 without opening or creating the output database and without
 running the AST-extraction pass that would actually record facts.
 Resolving registered sources still discovers each selected source's included
-headers before the freshness check. With AST caching enabled, a valid cached
-AST supplies those includes; otherwise the source is preprocessed. The
+headers before the freshness check. With AST caching enabled, valid dependency
+metadata in the project database supplies those includes without loading an
+AST; otherwise the source is preprocessed. The
 `[n/m] Processing file` block still prints for multiple sources. The subsequent
 AST extraction that would record facts is skipped:
 

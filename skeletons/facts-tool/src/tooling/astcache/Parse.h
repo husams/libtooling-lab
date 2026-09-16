@@ -12,7 +12,8 @@ class ClangTool;
 }
 
 namespace facts::astcache::detail {
-int parseWithLookups(clang::tooling::ClangTool &tool,
-                     std::vector<std::unique_ptr<clang::ASTUnit>> &units,
-                     std::vector<std::string> &lookupNames);
+struct RevisionObservations;
+int parsePersistent(clang::tooling::ClangTool &tool,
+                    std::vector<std::unique_ptr<clang::ASTUnit>> &units,
+                    RevisionObservations *observations = nullptr);
 } // namespace facts::astcache::detail
