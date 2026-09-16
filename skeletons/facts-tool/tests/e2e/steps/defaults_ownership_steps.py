@@ -31,23 +31,23 @@ def initialize(defaults, mode):
     elif mode == "repeat":
         defaults.results = [register(defaults, defaults.cwd, "first"),
                             register(defaults, defaults.cwd, "second")]
-    elif mode == "collision":
+    elif mode == "shared-root":
         defaults.results = [register(defaults, defaults.cwd, "first"),
                             register(defaults, defaults.other, "second")]
     else:
         with concurrent.futures.ThreadPoolExecutor(2) as executor:
-            second = defaults.other if mode == "concurrent-collision" else defaults.cwd
+            second = defaults.other if mode == "concurrent-shared-root" else defaults.cwd
             futures = [executor.submit(register, defaults, cwd, name)
                        for cwd, name in [(defaults.cwd, "first"), (second, "second")]]
             defaults.results = [f.result() for f in futures]
     defaults.mode = mode
 
-@then("database ownership is serialized and never adopted")
+@then("database sharing is serialized and unrelated databases are never adopted")
 def ownership(defaults):
     results = defaults.results
     codes = sorted(r.returncode for r in results)
-    expected = {"existing": [3], "repeat": [0, 0], "collision": [0, 3],
-                "concurrent": [0, 0], "concurrent-collision": [0, 3]}
+    expected = {"existing": [3], "repeat": [0, 0], "shared-root": [0, 0],
+                "concurrent": [0, 0], "concurrent-shared-root": [0, 0]}
     assert codes == expected[defaults.mode], [(r.returncode, r.stderr) for r in results]
     for r in results:
         if r.returncode:
@@ -57,5 +57,10 @@ def ownership(defaults):
     else:
         with sqlite3.connect(defaults.owned_db) as db:
             owners = db.execute("SELECT project_root FROM generated_conf_owner").fetchall()
-        assert len(owners) == 1 and owners[0][0] in map(str, [defaults.cwd, defaults.other])
+            components = db.execute(
+                "SELECT name FROM component WHERE kind='external' AND path != '/'"
+            ).fetchall()
+        roots = [defaults.cwd, defaults.other] if "shared-root" in defaults.mode else [defaults.cwd]
+        assert set(owners) == {(str(root),) for root in roots}
+        assert set(components) == {("first",), ("second",)}
     assert {p.name for p in defaults.owned_db.parent.iterdir()} == {"same.db"}

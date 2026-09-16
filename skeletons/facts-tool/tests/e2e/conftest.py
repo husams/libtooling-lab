@@ -109,6 +109,7 @@ pytest_plugins = (
     "steps.catalog_file_symbol_steps",
     "steps.project_import_steps",
     "steps.import_colliding_relative_sources_steps",
+    "steps.import_multiple_repositories_steps",
     "steps.record_steps",
     "steps.references_steps",
     "steps.stored_compilation_steps",

@@ -16,10 +16,20 @@ void ownership() {
   assert(two.get());
   assert(facts::config::ensureOwnedDatabase(value));
   value.projectRoot = box.root / "other";
-  assert(!facts::config::ensureOwnedDatabase(value));
+  assert(facts::config::ensureOwnedDatabase(value));
+  assert(facts::config::ensureOwnedDatabase(value));
+  sqlite3 *db = nullptr;
+  assert(sqlite3_open(value.database.c_str(), &db) == SQLITE_OK);
+  sqlite3_stmt *statement = nullptr;
+  assert(sqlite3_prepare_v2(db, "SELECT count(*) FROM generated_conf_owner",
+                            -1, &statement, nullptr) == SQLITE_OK);
+  assert(sqlite3_step(statement) == SQLITE_ROW);
+  assert(sqlite3_column_int(statement, 0) == 2);
+  sqlite3_finalize(statement);
+  sqlite3_close(db);
   value.templateText = "unowned.db";
   value.database = *facts::config::renderDatabasePath(value);
-  sqlite3 *db = nullptr;
+  db = nullptr;
   assert(sqlite3_open(value.database.c_str(), &db) == SQLITE_OK);
   assert(sqlite3_exec(db, "CREATE TABLE original(value)", nullptr, nullptr, nullptr) == SQLITE_OK);
   sqlite3_close(db);

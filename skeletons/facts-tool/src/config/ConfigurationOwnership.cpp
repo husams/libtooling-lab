@@ -41,16 +41,18 @@ std::expected<void, std::string> ensureOwnedDatabase(const Resolved &resolved) {
     return finish(message);
   }
   const bool hasOwner = status == SQLITE_ROW;
-  const std::string existing = hasOwner
-      ? reinterpret_cast<const char *>(sqlite3_column_text(statement, 0)) : "";
   sqlite3_finalize(statement);
   const auto collision = "generated conf path collision: " + resolved.database.string() +
                          "; use --conf to select an existing database explicitly";
-  if ((hasOwner && resolved.projectRoot.string() != existing) || (existed && !hasOwner)) {
+  if (existed && !hasOwner) {
     sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr); return finish(collision);
   }
-  if (!hasOwner) {
-    if (sqlite3_prepare_v2(db, "INSERT INTO generated_conf_owner VALUES(?)", -1,
+  // A shared configuration can deliberately map several repositories to one
+  // catalog. Record each root without treating the first one as exclusive.
+  // The marker still prevents implicitly adopting an unrelated database.
+  {
+    if (sqlite3_prepare_v2(db, "INSERT INTO generated_conf_owner VALUES(?) "
+                             "ON CONFLICT(project_root) DO NOTHING", -1,
                            &statement, nullptr) != SQLITE_OK) {
       const auto message = std::string(sqlite3_errmsg(db));
       sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr);
