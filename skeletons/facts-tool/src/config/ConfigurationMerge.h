@@ -14,9 +14,9 @@ struct MergeContext {
   std::optional<Tier> user;
 };
 
-// conf_root/conf_template/facts_template take the highest-precedence tier
-// that sets them (configFile > project > user > built-in default already in
-// base). extra_args is a fixed-order concatenation: user, then project, then
+// Scalar keys, including ast_cache/ast_cache_dir, take the highest-precedence
+// tier that sets them (configFile > project > user > built-in default already
+// in base). extra_args is a fixed-order concatenation: user, then project, then
 // configFile, regardless of which tier "wins" for the scalar keys.
 Resolved mergeTiers(Resolved base, const MergeContext &context);
 

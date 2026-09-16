@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tooling/astcache/Options.h"
+
 #include <expected>
 #include <filesystem>
 #include <optional>
@@ -29,6 +31,9 @@ struct Resolved {
   std::string templateSource;
   std::string factsTemplateSource;
   std::string extraArgumentsSource;
+  astcache::Options astCache;
+  std::string astCacheSource;
+  std::string astCacheDirectorySource;
   std::vector<std::string> discovery;
 };
 
@@ -40,12 +45,14 @@ struct Tier {
   std::optional<std::string> confTemplate;
   std::optional<std::string> factsTemplate;
   std::optional<std::vector<std::string>> extraArgs;
+  std::optional<bool> astCache;
+  std::optional<std::string> astCacheDirectory;
 };
 
 // Parses one YAML file. When applyPathSettings is false (a direct --conf /
-// FACTS_TOOL_CONF override is active) conf_root/conf_template/facts_template
-// are left unpopulated and unvalidated, but the document structure and
-// extra_args are always validated.
+// FACTS_TOOL_CONF override is active) conf_root/conf_template are left
+// unpopulated and unvalidated. The document structure, facts_template,
+// extra_args and AST cache settings are always validated.
 std::expected<Tier, std::string> readTier(const std::filesystem::path &path,
                                           bool applyPathSettings);
 

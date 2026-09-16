@@ -8,6 +8,7 @@ namespace configuration_test { void argumentOverrides(); }
 
 int main() {
   configuration_test::schema();
+  configuration_test::astCache();
   configuration_test::paths();
   configuration_test::discovery();
   configuration_test::arguments();

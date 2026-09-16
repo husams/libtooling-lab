@@ -1,6 +1,8 @@
 #ifndef FACTS_TOOL_COMMANDS_INCLUDED_FILES_H
 #define FACTS_TOOL_COMMANDS_INCLUDED_FILES_H
 
+#include "tooling/astcache/Options.h"
+
 #include <expected>
 #include <span>
 #include <string>
@@ -26,11 +28,13 @@ struct DiscoveredIncludes {
 
 std::expected<DiscoveredIncludes, std::string> discoverIncludedFilesPerSource(
     const clang::tooling::CompilationDatabase &compilations,
-    std::span<const std::string> selectedSources);
+    std::span<const std::string> selectedSources,
+    const astcache::Options &cache = {});
 
 std::expected<std::vector<std::string>, std::string>
 discoverIncludedFiles(const clang::tooling::CompilationDatabase &compilations,
-                      std::span<const std::string> selectedSources);
+                      std::span<const std::string> selectedSources,
+    const astcache::Options &cache = {});
 
 } // namespace facts::commands
 

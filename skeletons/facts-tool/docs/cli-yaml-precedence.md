@@ -7,8 +7,8 @@ Compiler extras override matching YAML options while retaining unrelated default
 
 ## Supported option matrix
 
-The YAML schema contains exactly four keys. It has no boolean or numeric
-settings and no YAML defaults for verbosity, selectors, source lists, matcher
+The YAML schema contains six keys, including the boolean `ast_cache`.
+There are no YAML defaults for verbosity, selectors, source lists, matcher
 expressions, traversal depth, or compilation-database directories.
 
 | YAML setting | CLI override | Commands | Omitted CLI / built-in behavior |
@@ -20,6 +20,8 @@ expressions, traversal depth, or compilation-database directories.
 | `facts_template` | `-o`, `--output` | `extract`, `analyse dependency` | Render the YAML facts path; no built-in facts template. |
 | `facts_template` | `-f`, `--facts` | `symbol list` / `ls`, `show`, `browser`; group or leaf | Render a project-scoped YAML template; source-dependent templates require an explicit facts path. |
 | `extra_args` | repeated `--extra-arg` | `import`, `extract`, `analyse dependency` | Use merged YAML tokens; the built-in list is empty. |
+| `ast_cache` | YAML only | Every command that parses translation units | Disabled by default; selected file > project > user > built-in, including explicit `false`. |
+| `ast_cache_dir` | YAML only | Every command that parses translation units; `config show` | Defaults to `<project_root>/.facts-tool/ast-cache`; relative directories anchor to project root and `~/` expands `HOME`. |
 
 `--config` selects a YAML file and overrides `FACTS_TOOL_CONFIG` as the
 selector on commands accepting configuration options. That selected file
@@ -40,8 +42,8 @@ Explicit path values must not silently become omission because they equal a
 default-like string. Empty `--conf`, `--config`, `--output`, and `--facts`
 values are errors; they never request YAML fallback.
 For repeatable arguments, whitespace-only fragments yield no overrides and leave YAML defaults intact.
-False and zero override cases apply only where a CLI option has a supported
-YAML counterpart; none of the current YAML fields has a boolean/numeric type.
+An explicit YAML `ast_cache: false` overrides a lower-tier `true`.
+Cache keys have no CLI enable/disable or directory overrides.
 
 Without CLI extras, YAML lists concatenate user, project, then selected file.
 With CLI extras, shell-tokenize the fragments once and remove only matching

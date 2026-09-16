@@ -201,11 +201,11 @@ never seen before - is stale and gets extracted normally.
 If every requested source is up to date, `extract` prints one line and
 exits 0 without opening or creating the output database and without
 running the AST-extraction pass that would actually record facts.
-Resolving registered sources still preprocesses every selected source
-first regardless of the outcome - the `[n/m] Processing file` block always
-prints, since that same pass is also how the freshness check discovers
-each source's included headers - only the Clang parse and fact extraction
-that would follow it is skipped:
+Resolving registered sources still discovers each selected source's included
+headers before the freshness check. With AST caching enabled, a valid cached
+AST supplies those includes; otherwise the source is preprocessed. The
+`[n/m] Processing file` block still prints for multiple sources. The subsequent
+AST extraction that would record facts is skipped:
 
 ```text
 facts-tool: 2 source(s) up to date; nothing to extract

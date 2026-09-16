@@ -1,6 +1,7 @@
 #pragma once
 
 #include "analysis/variableflow/Model.h"
+#include "tooling/astcache/Options.h"
 
 #include <clang/AST/Decl.h>
 #include <clang/AST/Stmt.h>
@@ -40,7 +41,8 @@ struct Parsed {
 };
 
 std::expected<Parsed, std::string> parse(clang::tooling::CompilationDatabase &,
-                                         const std::vector<std::string> &);
+                                        const std::vector<std::string> &,
+                                        const astcache::Options &);
 
 std::string usrFor(const clang::NamedDecl &, std::string_view tu);
 std::string functionName(const clang::FunctionDecl &);

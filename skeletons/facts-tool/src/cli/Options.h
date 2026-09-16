@@ -1,5 +1,6 @@
 #pragma once
 #include "cli/catalog/Options.h"
+#include "tooling/astcache/Options.h"
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -19,6 +20,7 @@ struct ExtractOptions {
   bool extraArgumentsProvided = false;
   bool force = false;
   std::vector<std::string> sources;
+  astcache::Options astCache;
 };
 
 struct ImportOptions {
@@ -33,6 +35,7 @@ struct ImportOptions {
   std::vector<std::string> extraArguments;
   bool extraArgumentsProvided = false;
   std::vector<std::string> sources;
+  astcache::Options astCache;
 };
 
 struct DependencyOptions {
@@ -46,6 +49,7 @@ struct DependencyOptions {
   std::vector<std::string> extraArguments;
   bool extraArgumentsProvided = false;
   std::vector<std::string> sources;
+  astcache::Options astCache;
 };
 
 struct CallGraphOptions {
@@ -65,6 +69,7 @@ struct CallGraphOptions {
   std::optional<std::string> target;
   std::optional<std::string> pathMode;
   bool recoverMissing = false;
+  astcache::Options astCache;
 };
 
 struct CallGraphEntryOptions {
@@ -89,6 +94,7 @@ struct VariableFlowOptions {
   std::vector<std::string> extraArguments;
   bool extraArgumentsProvided = false;
   std::vector<std::string> sources;
+  astcache::Options astCache;
 };
 
 struct MatchOptions {
@@ -104,6 +110,7 @@ struct MatchOptions {
   std::optional<std::string> relationKind;
   bool captureSource = false;
   std::vector<std::string> sources;
+  astcache::Options astCache;
 };
 
 struct ConfigOptions {

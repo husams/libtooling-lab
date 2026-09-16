@@ -30,6 +30,7 @@ resolveInputs(const cli::VariableFlowOptions &options) {
                                     options.configurationFile, false, true);
   if (!resolved)
     return std::unexpected(resolved.error());
+  resolved->astCache.verbosity = options.verbosity;
   const auto requested = normalizeSourceSelectors(options.sources);
   auto database = ::facts::loadStoredCompilationDatabase(
       resolved->database.string(), requested);
@@ -113,8 +114,9 @@ runVariableFlow(const cli::VariableFlowOptions &options) {
         auto &[inputs, arguments] = prepared;
         auto adjusted =
             appendExtraArguments(std::move(inputs.database), arguments);
-        auto graph =
-            variableflow::analyse(*adjusted, inputs.sources, request(options));
+        auto graph = variableflow::analyse(*adjusted, inputs.sources,
+                                          request(options),
+                                          inputs.configuration.astCache);
         if (!graph)
           return std::expected<int, std::string>{
               std::unexpected(graph.error())};

@@ -106,11 +106,12 @@ registeredFileCount(FileManager &files) {
 // enumerate fixed databases, whose getAllCompileCommands() is empty.
 std::expected<std::vector<std::string>, std::string>
 discoverRegistryFiles(const CompilationDatabase &stored,
-                      const std::vector<std::string> &sources) {
+                      const std::vector<std::string> &sources,
+                      const astcache::Options &cache) {
   return discoverCompilationFiles(stored, sources)
       .and_then([&](CompilationFiles discovered) {
         reportDiagnostics(discovered.diagnostics);
-        return discoverIncludedFiles(stored, sources)
+        return discoverIncludedFiles(stored, sources, cache)
             .transform([identities = std::move(discovered.files)](
                            std::vector<std::string> included) mutable {
               std::ranges::move(included, std::back_inserter(identities));
@@ -143,8 +144,9 @@ requireResolvableIdentities(FileManager &files,
 // discovered and stored here, so extraction only ever reads it.
 std::expected<std::size_t, std::string>
 registerFiles(FileManager &files, const CompilationDatabase &stored,
-              const std::vector<std::string> &sources) {
-  return discoverRegistryFiles(stored, sources)
+              const std::vector<std::string> &sources,
+              const astcache::Options &cache) {
+  return discoverRegistryFiles(stored, sources, cache)
       .and_then([&](std::vector<std::string> identities) {
         return files.addBulk(identities)
             .transform_error([](std::error_code error) {
@@ -201,7 +203,8 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
               return cli::runStage(
                          options.verbosity, "import", "register files",
                          [&] {
-                           return registerFiles(files, *applied, sources);
+                           return registerFiles(files, *applied, sources,
+                                                options.astCache);
                          })
                   .and_then(
                       [&](std::size_t) { return registeredFileCount(files); })
@@ -246,6 +249,8 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
   auto configured = options;
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = resolved->extraArguments;
+  configured.astCache = resolved->astCache;
+  configured.astCache.verbosity = options.verbosity;
   configured.sources = normalizeSourceSelectors(options.sources);
   const bool sourceTemplate =
       resolved->factsTemplate.find("{relative_path}") != std::string::npos ||

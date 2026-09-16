@@ -1,7 +1,7 @@
 # Configuration files
 
 `facts-tool` resolves the paths to its two databases, and its compiler
-arguments, through a layered configuration model rather than requiring
+arguments and AST cache settings, through a layered configuration model rather than requiring
 every flag on every invocation. This chapter documents that model in full:
 the precedence order, every configurable key, template placeholders,
 environment variables, and the XDG paths involved. Every claim here is
@@ -32,19 +32,18 @@ order, highest precedence first:
 4. **Built-in defaults**: `conf_root` = `$XDG_DATA_HOME/facts-tool` or
    `$HOME/.local/share/facts-tool`; `conf_template` =
    `{relative_path}/{filename}.db`; `facts_template` = none (must come from
-   YAML or an explicit `-o`/`-f`); `extra_args` = `[]`.
+   YAML or an explicit `-o`/`-f`); `extra_args` = `[]`; `ast_cache` = `false`;
+   `ast_cache_dir` = `<project_root>/.facts-tool/ast-cache`.
 
 A missing file at any YAML tier is not an error - it's simply skipped. An
 **existing but invalid** file at *any* tier, however, **is** a
 configuration error (exit code 3), even if a higher tier would have won
 anyway; every tier is still checked and reported for diagnostics.
 
-## The four YAML keys
+## YAML keys
 
-The YAML schema is exactly four keys. There are no booleans or numeric
-settings in YAML, and nothing else is YAML-configurable - verbosity,
-source selectors, matcher expressions, and traversal depth are all
-CLI-only.
+The YAML schema contains six keys. Verbosity, source selectors, matcher
+expressions, and traversal depth remain CLI-only.
 
 | Key | Meaning |
 |---|---|
@@ -52,6 +51,8 @@ CLI-only.
 | `conf_template` | Template for the generated project database filename |
 | `facts_template` | Template for the generated facts database filename |
 | `extra_args` | A list of compiler arguments merged into every extraction/import/match/dependency run |
+| `ast_cache` | Enable persisted AST reuse, using an unquoted `true` or `false`; disabled by default |
+| `ast_cache_dir` | Cache directory; defaults to `<project_root>/.facts-tool/ast-cache` |
 
 Example user-level file (`~/.config/facts-tool/config.yaml`):
 
@@ -65,6 +66,8 @@ Example user-level file (`~/.config/facts-tool/config.yaml`):
 conf_root: ~/.cache/facts
 conf_template: "{project_name}/project.db"
 facts_template: "~/.cache/facts/{project_name}/facts.db"
+ast_cache: true
+ast_cache_dir: .facts-tool/ast-cache
 ```
 
 A project-level file overriding just one key (`facts_template`), placed at
@@ -73,6 +76,30 @@ A project-level file overriding just one key (`facts_template`), placed at
 ```yaml
 facts_template: "{project_root}/.index/{relative_path}/{filename}.db"
 ```
+
+## Persisted AST cache
+
+Enable `ast_cache: true` to reuse a translation unit's serialized Clang AST
+on later `extract`, `match`, `analyse call-graph --recover-missing`, and
+`analyse variable-flow` runs. These commands create an entry when an AST must
+be parsed. Import include discovery and `analyse dependency` can reuse a valid
+cached AST's includes; when there is no entry they continue preprocessing without
+requiring a successful full C++ parse.
+
+`ast_cache_dir` accepts an absolute path, a project-root-relative path, or
+a path beginning with `~/` (expanded using `HOME`). Relative paths always
+anchor to the project root, including when the selected YAML file lives
+elsewhere or the command runs from a project subdirectory. This setting
+does not support template placeholders. Directory resolution and
+`config show` do not create the directory.
+
+Both cache settings merge independently across YAML tiers, including when
+`--conf` or `FACTS_TOOL_CONF` selects a direct database. To temporarily
+disable reuse, select a file containing `ast_cache: false`; the effective
+cache directory can still come from a lower tier. Existing entries remain
+available when caching is enabled again. The cache validates source/header
+inputs, compiler arguments and Clang compatibility before reuse, and
+rebuilds stale or unreadable entries when a full AST is requested.
 
 ## Template placeholders
 

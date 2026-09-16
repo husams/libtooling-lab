@@ -663,11 +663,15 @@ conf: "/Users/husam/.cache/facts/cli-demo/project.db"
 conf_root: "~/.cache/facts"
 conf_template: {project_name}/project.db
 facts_template: ~/.cache/facts/{project_name}/facts.db
+ast_cache: false
+ast_cache_dir: ".../cli-demo/.facts-tool/ast-cache"
 source: generated
 conf_root_source: /Users/husam/.config/facts-tool/config.yaml
 conf_template_source: /Users/husam/.config/facts-tool/config.yaml
 facts_template_source: /Users/husam/.config/facts-tool/config.yaml
 extra_args_source: built-in
+ast_cache_source: built-in
+ast_cache_dir_source: built-in
 extra_args:
 discovery:
 - .../cli-demo/.facts-tool.yaml [absent]

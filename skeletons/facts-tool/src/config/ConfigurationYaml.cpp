@@ -1,4 +1,5 @@
 #include "config/Configuration.h"
+#include "config/ConfigurationAstCacheYaml.h"
 #include "config/ConfigurationPlaceholders.h"
 #include "config/ConfigurationShape.h"
 #include "config/ConfigurationYamlEvents.h"
@@ -87,7 +88,7 @@ std::expected<Tier, std::string> readTier(const std::filesystem::path &path,
         return std::unexpected("duplicate or invalid configuration key");
       const auto key = entry.first.Scalar();
       if (key != "conf_root" && key != "conf_template" && key != "facts_template" &&
-          key != "extra_args")
+          key != "extra_args" && key != "ast_cache" && key != "ast_cache_dir")
         return std::unexpected("unknown configuration key: " + key);
       // facts_template governs the separate facts database and stays in
       // effect regardless of a direct --conf/FACTS_TOOL_CONF override,
@@ -109,6 +110,14 @@ std::expected<Tier, std::string> readTier(const std::filesystem::path &path,
         if (auto valid = templateSyntax(key, entry.second.Scalar()); !valid)
           return std::unexpected(valid.error());
         tier.factsTemplate = entry.second.Scalar();
+      } else if (key == "ast_cache") {
+        auto enabled = detail::astCacheEnabled(entry.second);
+        if (!enabled) return std::unexpected(enabled.error());
+        tier.astCache = *enabled;
+      } else if (key == "ast_cache_dir") {
+        if (auto valid = scalar(entry.second, key); !valid)
+          return std::unexpected(valid.error());
+        tier.astCacheDirectory = entry.second.Scalar();
       } else {
         if (!entry.second || entry.second.IsNull() || !entry.second.IsSequence())
           return std::unexpected("extra_args must be a sequence of strings");

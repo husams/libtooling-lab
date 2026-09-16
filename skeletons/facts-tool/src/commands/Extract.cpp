@@ -6,9 +6,9 @@
 #include "commands/ExtraArguments.h"
 #include "commands/ExtractionFreshness.h"
 #include "commands/ExtractionSetup.h"
+#include "commands/ExtractTranslationUnits.h"
 #include "commands/FactPairValidation.h"
 
-#include "ast/FactExtractor.h"
 #include "ast/Indexing.h"
 #include "cli/Verbose.h"
 #include "config/GitFileCommit.h"
@@ -197,7 +197,8 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
   return runExtractStage(options, "resolve registered sources",
                          [&] {
                            return requireRegisteredSources(files, *database,
-                                                           sources, *registry);
+                                                           sources, *registry,
+                                                           options.astCache);
                          })
       .and_then([&](DiscoveredIncludes discovered) {
         config::GitCommitResolver commitResolver;
@@ -229,7 +230,6 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
           return std::expected<int, std::string>{
               std::unexpected(configured.error())};
         }
-        clang::tooling::ClangTool tool(**configured, stale);
 
         // Deferred until every applicable check above has passed, so a
         // facts_template default never creates a directory ahead of a
@@ -259,8 +259,8 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         }
         const auto toolResult =
             runExtractStage(options, "Clang parse and AST extraction", [&] {
-              return tool.run(
-                  createFactExtractorFactory(files, store, indexing).get());
+              return extractTranslationUnits(**configured, stale, files, store,
+                                             indexing, options.astCache);
             });
         const auto result = toolResult != 0       ? toolResult
                             : indexing.complete() ? 0
@@ -372,6 +372,8 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
         "facts-tool: usage error: -o/--output must not be empty");
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = std::move(resolved->extraArguments);
+  configured.astCache = resolved->astCache;
+  configured.astCache.verbosity = options.verbosity;
   return runExtractResolved(configured);
 }
 

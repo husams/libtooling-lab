@@ -1,4 +1,5 @@
 #include "config/ConfigurationMerge.h"
+#include "config/ConfigurationAstCache.h"
 
 #include <array>
 
@@ -65,6 +66,7 @@ Resolved mergeTiers(Resolved base, const MergeContext &context) {
   mergeConfTemplate(base, context);
   mergeFactsTemplate(base, context);
   mergeExtraArgs(base, context);
+  mergeAstCache(base, context);
   return base;
 }
 

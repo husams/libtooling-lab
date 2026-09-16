@@ -1,3 +1,6 @@
 .codex/
 *.db
 **.sqlite
+
+# Persistent ASTs are local build artifacts.
+.facts-tool/ast-cache/
