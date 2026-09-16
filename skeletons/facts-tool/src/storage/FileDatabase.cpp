@@ -21,36 +21,25 @@
 namespace facts {
 namespace {
 
-std::expected<void, std::error_code>
-currentMigratePlaceholderRepository(storage::Database &database,
-                                    const ProjectConfiguration &configuration) {
-  const std::array configurations{&configuration};
-  return database
-      .executeBulk(
-          "UPDATE repository SET name=?1,remote_url=?2 "
-          "WHERE name='facts-tool' AND NOT EXISTS("
-          "SELECT 1 FROM repository replacement WHERE replacement.name=?1) "
-          "AND EXISTS(SELECT 1 FROM clone WHERE "
-          "clone.repository_id=repository.id AND clone.path=?3)",
-          configurations,
-          [](sqlite3_stmt *statement, const ProjectConfiguration *candidate) {
-            return storage::bindParameters(statement, candidate->repositoryName,
-                                           candidate->remoteUrl,
-                                           candidate->activeClone.path);
-          },
-          {.atomic = false})
-      .transform([](const storage::BulkResult &) {});
-}
-
 std::expected<std::int64_t, std::error_code>
 currentUpsertRepository(storage::Database &database,
                         const ProjectConfiguration &configuration) {
+  // A checkout already belongs to one repository even if its imported name
+  // changes (for example, a directory fallback becomes a git remote name).
+  // Reuse that identity so the component/directory/file upserts below retain
+  // their IDs. With no registered checkout, the name still joins new clones
+  // to an existing repository. A rename colliding with another repository
+  // fails atomically rather than assigning the checkout to two repositories.
   auto ids = storage::detail::toItlibGenerator(database.query(
-      "INSERT INTO repository(name,remote_url) VALUES(?1,?2) "
+      "INSERT INTO repository(id,name,remote_url) "
+      "VALUES((SELECT repository_id FROM clone WHERE path=?1),?2,?3) "
+      "ON CONFLICT(id) DO UPDATE SET name=excluded.name,"
+      "remote_url=excluded.remote_url "
       "ON CONFLICT(name) DO UPDATE SET remote_url=excluded.remote_url "
       "RETURNING id",
       [](const storage::Row &row) { return row.get<std::int64_t>(0); },
-      configuration.repositoryName, configuration.remoteUrl));
+      configuration.activeClone.path, configuration.repositoryName,
+      configuration.remoteUrl));
   return storage::detail::collectOne(std::move(ids));
 }
 
@@ -259,9 +248,7 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
     return std::unexpected(transaction.error());
   }
 
-  return currentMigratePlaceholderRepository(database_, configuration)
-      .and_then(
-          [&] { return currentUpsertRepository(database_, configuration); })
+  return currentUpsertRepository(database_, configuration)
       .and_then([&](std::int64_t repositoryId) {
         std::map<ProjectFileKey, PriorCompileOptions> priorOptions;
         return currentUpsertClone(database_, repositoryId,

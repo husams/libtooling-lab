@@ -682,6 +682,14 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_BINARY_DIR}/project-configuration.sqlite
             ${CMAKE_CURRENT_SOURCE_DIR}
   )
+  add_executable(project-reimport-test tests/ProjectReimportTest.cpp)
+  target_link_libraries(project-reimport-test PRIVATE facts-storage facts-model
+                                                    facts-sqlite)
+  add_test(
+    NAME project-reimport
+    COMMAND project-reimport-test
+            ${CMAKE_CURRENT_BINARY_DIR}/project-reimport.sqlite
+  )
   add_executable(configuration-test tests/ConfigurationTest.cpp
     tests/configuration/Schema.cpp tests/configuration/Paths.cpp
     tests/configuration/Discovery.cpp tests/configuration/Arguments.cpp

@@ -96,6 +96,15 @@ split one compilation database across multiple named components.
 
 ## Re-importing an existing project
 
+Re-importing the same checkout updates its existing records. The clone path
+identifies its repository even if the detected name changes, for example
+after adding a git remote to a checkout previously named after its directory.
+Existing components, directories, and source files retain their IDs when
+their paths are unchanged; each source keeps one compile-command entry,
+with the latest imported compiler options replacing the previous options.
+A repository-name change that conflicts with another registered repository
+is rejected without changing the project records.
+
 `-f`/`--facts` on `import` exists specifically for **re-import** of an
 existing, non-empty project: an existing non-empty project without an
 explicit facts path or facts template rejects mutations with an actionable
