@@ -1,6 +1,7 @@
 #include "storage/ProjectSchema.h"
 
 #include "storage/ProjectSchemaInternal.h"
+#include "storage/astcache/Schema.h"
 
 namespace facts {
 namespace {
@@ -47,6 +48,13 @@ project_schema::Result migrateProjectSchema(sqlite3 *database) {
             .and_then([&](int value) {
               return value == 0 ? createIndex(database)
                                 : project_schema::Result{};
+            })
+            .and_then([&] { return project_schema::version(database); })
+            .and_then([&](int value) {
+              return value == 1
+                  ? storage::execute(database, storage::astcache::schemaSql)
+                        .transform_error([](auto error) { return error.message(); })
+                  : project_schema::Result{};
             })
             .and_then([&] {
               return transaction.commit().transform_error(

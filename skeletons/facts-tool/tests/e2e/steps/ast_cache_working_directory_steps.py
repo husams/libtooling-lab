@@ -17,6 +17,7 @@ def nested_include_project(ast_cache):
     ast_cache.configure(tier="explicit", ast_cache=True,
                         ast_cache_dir=str(ast_cache.root / "configured-asts"),
                         extra_args=["-I", "relative-includes"])
+    ast_cache.commit_inputs()
     ast_cache.run("import")
     ast_cache.succeed()
 

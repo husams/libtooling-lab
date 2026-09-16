@@ -3,6 +3,9 @@
 #include "tooling/astcache/Includes.h"
 #include "tooling/astcache/Metadata.h"
 #include "tooling/astcache/Parse.h"
+#include "tooling/astcache/RevisionObserver.h"
+#include "tooling/astcache/Revisions.h"
+#include "tooling/astcache/Snapshot.h"
 #include "tooling/astcache/Storage.h"
 
 #include <clang/Frontend/ASTUnit.h>
@@ -22,15 +25,30 @@ int parse(const clang::tooling::CompilationDatabase &database,
           const std::string &source,
           std::vector<std::unique_ptr<clang::ASTUnit>> &units,
           const Options &options, clang::DiagnosticConsumer *diagnostics,
-          bool clearAdjusters, std::vector<std::string> &lookupNames) {
+          bool clearAdjusters,
+          detail::RevisionObservations *observations = nullptr) {
   clang::tooling::ClangTool tool(database, {source});
   if (clearAdjusters)
     tool.clearArgumentsAdjusters();
   if (diagnostics)
     tool.setDiagnosticConsumer(diagnostics);
-  if (options.enabled)
-    return detail::parseWithLookups(tool, units, lookupNames);
-  return tool.buildASTs(units);
+  return options.enabled ? detail::parsePersistent(tool, units, observations)
+                         : tool.buildASTs(units);
+}
+
+std::expected<void, std::string>
+persist(const detail::Entry &entry, clang::ASTUnit &unit,
+        const detail::RevisionObservations &observations) {
+  return detail::captureSnapshot(entry, unit.getSourceManager(),
+                                 unit.getPreprocessor(), includesFromAST(unit))
+      .and_then([&](const Snapshot &snapshot) {
+        return detail::validateObservedRevisions(observations)
+            .and_then([&]() -> std::expected<void, std::string> {
+              if (!detail::currentSnapshot(snapshot))
+                return std::unexpected("Git commit changed while capturing AST metadata");
+              return detail::storeAST(entry, unit, snapshot);
+            });
+      });
 }
 
 int buildOne(const clang::tooling::CompilationDatabase &database,
@@ -38,12 +56,9 @@ int buildOne(const clang::tooling::CompilationDatabase &database,
              std::vector<std::unique_ptr<clang::ASTUnit>> &units,
              const Options &options, clang::DiagnosticConsumer *diagnostics,
              bool clearAdjusters) {
-  std::vector<std::string> lookupNames;
   if (!options.enabled)
-    return parse(database, source, units, options, diagnostics, clearAdjusters,
-                 lookupNames);
-  auto entry = detail::locateEntry(database, source, options.directory,
-                                    clearAdjusters);
+    return parse(database, source, units, options, diagnostics, clearAdjusters);
+  auto entry = detail::locateEntry(database, source, options, clearAdjusters);
   if (entry) {
     if (auto loaded = detail::loadAST(*entry)) {
       report(options, "hit", source);
@@ -52,14 +67,24 @@ int buildOne(const clang::tooling::CompilationDatabase &database,
     }
   }
   report(options, "miss", source);
+  std::vector<Revision> revisions;
+  if (entry) {
+    auto initial = detail::captureRevisions(entry->source, {});
+    if (initial)
+      revisions = std::move(*initial);
+    else {
+      report(options, "unavailable", initial.error());
+      entry = std::unexpected(initial.error());
+    }
+  }
+  detail::RevisionObservations observations;
   const auto before = units.size();
   const int status = parse(database, source, units, options, diagnostics,
-                           clearAdjusters, lookupNames);
+                           clearAdjusters, entry ? &observations : nullptr);
   if (entry && status == 0 && units.size() == before + 1 &&
       !units.back()->getDiagnostics().hasErrorOccurred() &&
-      units.back()->getDiagnostics().getNumWarnings() == 0) {
-    entry->lookup_names = std::move(lookupNames);
-    const auto stored = detail::storeAST(*entry, *units.back());
+      detail::currentRevisions(revisions)) {
+    const auto stored = persist(*entry, *units.back(), observations);
     if (stored)
       report(options, "stored", source);
     else
@@ -91,14 +116,15 @@ cachedIncludes(const clang::tooling::CompilationDatabase &database,
                const std::string &source, const Options &options) {
   if (!options.enabled)
     return std::nullopt;
-  const auto entry = detail::locateEntry(database, source, options.directory);
+  const auto entry = detail::locateEntry(database, source, options);
   if (!entry)
     return std::nullopt;
-  auto unit = detail::loadAST(*entry);
-  if (!unit)
+  const auto snapshot = detail::readCurrentSnapshot(*entry);
+  if (!snapshot || !*snapshot)
     return std::nullopt;
-  report(options, "hit", source);
-  return includesFromAST(*unit);
+  if (options.verbosity >= 1)
+    llvm::errs() << "dependency-cache: hit " << source << '\n';
+  return detail::includesFromSnapshot(**snapshot);
 }
 
 } // namespace facts::astcache

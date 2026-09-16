@@ -4,7 +4,7 @@ Feature: Matched symbol index
 
   Scenario: Project schema migration creates the exact empty index
     Given an S-026 matcher project pair
-    Then the project has version one and the exact four-field matched index
+    Then the project has version two and the exact four-field matched index
 
   Scenario: Version-zero project migration preserves facts metadata
     Given an S-026 matcher project pair

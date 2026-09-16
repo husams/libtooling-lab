@@ -13,11 +13,11 @@ Feature: Reuse persisted Clang ASTs across native commands
     Then the persisted AST is reused
     And cold and warm extraction facts are identical
 
-  Scenario Outline: Native commands reuse an AST persisted by extraction
+  Scenario Outline: Native commands reuse persisted ASTs or project dependency metadata
     Given AST caching is enabled
     And a persisted AST from extraction
     When the AST cache project runs "<family>"
-    Then the persisted AST is reused
+    Then the configured cache is reused by the command
     And the cached "<family>" result is complete
 
     Examples:

@@ -9,17 +9,17 @@ from support.ast_cache_assertions import (require_hit, require_miss, require_sto
 
 @when(parsers.parse('the AST cache input "{input_kind}" changes'))
 def change_input(ast_cache, input_kind):
-    if input_kind == "source":
+    if input_kind == "source commit":
         with ast_cache.source.open("a", encoding="utf-8") as source:
             source.write("\nint cache_source_changed() { return 2; }\n")
-    elif input_kind == "header":
+    elif input_kind == "header commit":
         with ast_cache.header.open("a", encoding="utf-8") as header:
             header.write("\nstruct CacheHeaderChanged { int other; };\n")
     elif input_kind == "compiler arguments":
         ast_cache.write_commands("-DCACHE_MODE=1")
         ast_cache.run("import")
         ast_cache.succeed()
-    elif input_kind == "header content with preserved size and timestamp":
+    elif input_kind == "header commit with preserved size and timestamp":
         before = ast_cache.header.stat()
         ast_cache.header.write_text(
             ast_cache.header.read_text(encoding="utf-8").replace("HeaderBefore", "HeaderAfter_"),
@@ -28,6 +28,8 @@ def change_input(ast_cache, input_kind):
         os.utime(ast_cache.header, ns=(before.st_atime_ns, before.st_mtime_ns))
     else:
         raise AssertionError(input_kind)
+    if input_kind != "compiler arguments":
+        ast_cache.commit_inputs()
     ast_cache.run("extract")
 
 

@@ -53,7 +53,12 @@ def identity_shapes(context: FactsToolContext) -> None:
 @given("the S-026 project is reset to schema version zero")
 def version_zero(context: FactsToolContext) -> None:
     with sqlite3.connect(context.files_database) as connection:
-        connection.executescript("DROP TABLE matched_symbol_index;"
+        connection.executescript("DROP TABLE ast_cache_artifact;"
+                                 "DROP TABLE ast_cache_revision;"
+                                 "DROP TABLE ast_cache_include;"
+                                 "DROP TABLE ast_cache_input;"
+                                 "DROP TABLE ast_cache_snapshot;"
+                                 "DROP TABLE matched_symbol_index;"
                                  "UPDATE project_registry SET schema_version=0;"
                                  "PRAGMA user_version=37;")
 
@@ -70,7 +75,7 @@ def reopen_version_zero(context: FactsToolContext) -> None:
 def migrated_version_zero(context: FactsToolContext) -> None:
     require(context.s026_migration.returncode == 0, context.s026_migration.stdout + context.s026_migration.stderr)
     with sqlite3.connect(context.files_database) as connection:
-        require(connection.execute("SELECT schema_version FROM project_registry").fetchone() == (1,), "migration version")
+        require(connection.execute("SELECT schema_version FROM project_registry").fetchone() == (2,), "migration version")
         require(connection.execute("PRAGMA user_version").fetchone() == (37,), "facts user_version changed")
         require(connection.execute("SELECT count(*) FROM matched_symbol_index").fetchone() == (0,), "migration backfilled")
 
@@ -78,7 +83,7 @@ def migrated_version_zero(context: FactsToolContext) -> None:
 @when("an S-026 newer project schema is queried")
 def query_newer(context: FactsToolContext) -> None:
     with sqlite3.connect(context.files_database) as connection:
-        connection.execute("UPDATE project_registry SET schema_version=2")
+        connection.execute("UPDATE project_registry SET schema_version=3")
     context.s026_newer_before = context.files_database.read_bytes()
     context.s026_newer = run([str(context.facts_tool), "symbol", "find", "-v", "0", "--conf",
                               str(context.files_database), "--name", "anything"])
@@ -87,5 +92,5 @@ def query_newer(context: FactsToolContext) -> None:
 @then("the unsupported project schema is reported without database writes")
 def newer_rejected(context: FactsToolContext) -> None:
     output = context.s026_newer.stdout + context.s026_newer.stderr
-    require(context.s026_newer.returncode == 1 and "unsupported-project-schema: 2" in output, output)
+    require(context.s026_newer.returncode == 1 and "unsupported-project-schema: 3" in output, output)
     require(context.files_database.read_bytes() == context.s026_newer_before, "newer schema was written")

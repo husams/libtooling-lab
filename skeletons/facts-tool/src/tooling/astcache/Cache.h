@@ -26,8 +26,8 @@ int buildASTs(const clang::tooling::CompilationDatabase &database,
               clang::DiagnosticConsumer *diagnostics = nullptr,
               bool clearAdjusters = false);
 
-// Preprocessing commands can reuse an existing AST without requiring a source
-// to be semantically valid on a cache miss.
+// Reconstruct preprocessing metadata from the project database. This does not
+// open or deserialize the optional AST artifact.
 std::optional<IncludeGraphFacts>
 cachedIncludes(const clang::tooling::CompilationDatabase &database,
                const std::string &source, const Options &options);

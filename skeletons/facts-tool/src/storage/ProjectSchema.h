@@ -7,7 +7,7 @@ struct sqlite3;
 
 namespace facts {
 
-inline constexpr int currentProjectSchemaVersion = 1;
+inline constexpr int currentProjectSchemaVersion = 2;
 
 std::expected<void, std::string> migrateProjectSchema(sqlite3 *database);
 std::expected<void, std::string>

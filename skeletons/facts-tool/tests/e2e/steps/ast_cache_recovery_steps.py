@@ -3,12 +3,14 @@ import json
 
 from pytest_bdd import given, then, when
 
+from support.ast_cache_git import initialize_repository
 from support.recovery import edge_names, graph, prepare, seed_match, success
 
 
 @given("a recovery project has AST caching enabled and a warmed recovery scan")
 def warm_recovery(context):
     prepare(context)
+    initialize_repository(context.run_root_path / "recovery", context.recovery_env)
     cache = context.run_root_path / "recovery-asts"
     config = context.run_root_path / "recovery-cache.yaml"
     config.write_text(json.dumps({"ast_cache": True, "ast_cache_dir": str(cache)}),

@@ -15,7 +15,8 @@ gap. The native writer owns pairing, invalidation, and history invariants.
 Source of truth for both schemas: `src/storage/Schema.h` (facts database),
 `src/storage/FileSchema.h` (project database's base tables), and
 `src/storage/ProjectSchemaMigration.cpp` (project database's `schema_version`
-1 migration, `matched_symbol_index`).
+1 migration, `matched_symbol_index`), and `src/storage/astcache/Schema.h`
+(project schema version 2, relational cache metadata).
 
 ## Facts database
 
@@ -114,6 +115,16 @@ unrelated `project_registry.schema_version`.
 | `file` | `id PK CHECK(id >= 1)`, `directory_id` -> `directory(id)` cascade, `name`, `mtime`, `md5`, `compile_options`, `driver`, `working_directory`, `indexed` default `0`, `indexed_at`, `facts_db`, `git_commit`, `args_overridden` default `0`, `UNIQUE(directory_id, name)` | `id` is the FileId the facts database's `SymbolId`s reference |
 | `project_registry` | `id PK CHECK(id = 1)`, `complete` default `0`, `fingerprint` default `''`, `file_count` default `0`, `schema_version` default `0` | Single row; `import` writes it, extraction consumes it as the completeness gate |
 | `matched_symbol_index` | `(usr, file_id) PK` -> `file(id)` cascade, `qualified_name`, `kind`; index `matched_symbol_name(qualified_name, kind)` | Added at `project_registry.schema_version = 1`. Populated **only** by `match`, never by `extract`. Exactly four data columns - no more are ever added to preserve the match-only contract. |
+| `ast_cache_snapshot` | `key PK`, `source`, `working_directory`, `generation` | Per-compilation dependency snapshot, initially collected during import preprocessing |
+| `ast_cache_input` | `(snapshot_key, path) PK` | Files seen by the preprocessor |
+| `ast_cache_include` | `(snapshot_key, source, target) PK` | Include relationships, retained independently of binary ASTs |
+| `ast_cache_revision` | `(snapshot_key, path) PK`, `commit_hash` | Repository root and HEAD commit; existing snapshots refresh when a recorded commit changes |
+| `ast_cache_artifact` | `snapshot_key PK`, `path`, `digest`, `generation` | Binary AST integrity and dependency generation; a changed snapshot invalidates the artifact record |
+
+The cache tables are added at `project_registry.schema_version = 2`. Import
+migrates older projects without replacing existing IDs or compile commands.
+Metadata uses typed columns rather than serialized JSON. The `.ast` binary
+stays in `ast_cache_dir`. See [persistent AST cache](../../ast-cache.md).
 
 `matched_symbol_index` is a match-only discovery index: a hit is a real
 candidate, but a miss never proves a symbol is absent from source, and an

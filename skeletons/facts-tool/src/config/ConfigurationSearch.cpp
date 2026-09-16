@@ -19,6 +19,7 @@ std::expected<Resolved, std::string> generate(Resolved value) {
   }
   return renderDatabasePath(value).transform([&](auto path) {
     value.database = std::move(path);
+    value.astCache.database = value.database;
     return value;
   });
 }
@@ -42,6 +43,7 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
   if (partial) *partial = value;
   const auto useDirect = [&](Resolved resolved) {
     resolved.database = (detail::cwd() / direct).lexically_normal();
+    resolved.astCache.database = resolved.database;
     resolved.source = request.direct.empty() ? "FACTS_TOOL_CONF" : "--conf";
     return resolved;
   };

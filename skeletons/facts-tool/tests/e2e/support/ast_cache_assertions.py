@@ -32,6 +32,7 @@ def require_stored(project):
     files = project.ast_files()
     assert files, f"No serialized AST in {project.cache}: {project.last.stderr}"
     assert all(path.stat().st_size > 100 for path in files)
+    assert not list(project.cache.rglob("*.json")), "AST cache wrote legacy JSON metadata"
 
 
 def require_symbol(project, name):
@@ -50,3 +51,17 @@ def require_consumer_result(project, family):
         flow = project.root / "flow.sqlite"
         assert query(flow, "SELECT status FROM variable_flow_run ORDER BY run_id DESC LIMIT 1") == [("complete",)]
         assert query(flow, "SELECT * FROM variable_flow_node")
+
+
+def require_dependency_hit(project):
+    project.succeed()
+    assert "dependency-cache: hit" in project.last.stderr, project.last.stderr
+    assert "dependency-cache: miss" not in project.last.stderr, project.last.stderr
+    assert "ast-cache:" not in project.last.stderr, project.last.stderr
+
+
+def require_consumer_cache_hit(project):
+    if project.last_family in ("import", "dependency"):
+        require_dependency_hit(project)
+    else:
+        require_hit(project)

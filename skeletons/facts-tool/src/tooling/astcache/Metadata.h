@@ -1,9 +1,12 @@
 #pragma once
 
+#include "model/AstCache.h"
+#include "tooling/astcache/Options.h"
+
 #include <expected>
 #include <filesystem>
+#include <optional>
 #include <string>
-#include <vector>
 
 namespace clang {
 class ASTUnit;
@@ -15,18 +18,20 @@ class CompilationDatabase;
 namespace facts::astcache::detail {
 struct Entry {
   std::filesystem::path ast;
-  std::filesystem::path metadata;
+  std::filesystem::path database;
   std::filesystem::path source;
   std::filesystem::path working_directory;
-  std::vector<std::string> lookup_names;
+  std::string key;
 };
 
 std::expected<Entry, std::string>
 locateEntry(const clang::tooling::CompilationDatabase &database,
-            const std::string &source, const std::filesystem::path &directory,
+            const std::string &source, const Options &options,
             bool clearAdjusters = false);
 
+std::expected<std::optional<Snapshot>, std::string>
+readCurrentSnapshot(const Entry &entry);
 bool validEntry(const Entry &entry);
 std::expected<void, std::string> writeMetadata(const Entry &entry,
-                                             clang::ASTUnit &unit);
+                                             const Snapshot &snapshot);
 } // namespace facts::astcache::detail

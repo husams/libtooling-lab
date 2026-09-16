@@ -1,11 +1,12 @@
 #include "tooling/astcache/Metadata.h"
-#include "tooling/astcache/ExternalInputs.h"
 #include "tooling/astcache/FileIdentity.h"
+#include "tooling/astcache/FingerprintArguments.h"
 
 #include <clang/Basic/Version.h>
 #include <clang/Tooling/ArgumentsAdjusters.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <cstdlib>
+#include <string_view>
 
 namespace facts::astcache::detail {
 namespace {
@@ -26,48 +27,58 @@ parseArguments(const clang::tooling::CompileCommand &command,
 
 std::string entryKey(const clang::tooling::CompileCommand &command,
                      const fs::path &cwd, const fs::path &source,
-                     bool clearAdjusters, llvm::json::Array external) {
-  llvm::json::Array arguments;
-  for (const auto &argument : command.CommandLine)
-    arguments.push_back(argument);
-  llvm::json::Object environment;
+                     bool clearAdjusters) {
+  std::string bytes;
+  const auto append = [&](std::string_view value) {
+    bytes += std::to_string(value.size());
+    bytes += ':';
+    bytes += value;
+  };
+  append("project-db-git-commit-v1");
+  append(clang::getClangFullVersion());
+  append(source.string());
+  append(cwd.string());
+  append(source.string());
+  append(clearAdjusters ? "clear" : "default");
+  append(std::to_string(command.CommandLine.size()));
+  for (const auto &argument : fingerprintArguments(command.CommandLine, source, cwd))
+    append(argument);
   for (const auto *name : {"CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH",
                            "OBJC_INCLUDE_PATH", "SDKROOT", "PATH",
-                           "MACOSX_DEPLOYMENT_TARGET", "SOURCE_DATE_EPOCH"})
-    environment[name] = std::getenv(name) ? std::getenv(name) : "";
-  return digest(serialize(llvm::json::Object{
-      {"schema", Schema}, {"compiler", clang::getClangFullVersion()},
-      {"source", source.string()}, {"directory", cwd.string()},
-      {"filename", command.Filename},
-      {"arguments", std::move(arguments)}, {"external_inputs", std::move(external)},
-      {"environment", std::move(environment)}, {"clear_adjusters", clearAdjusters}}));
+                           "MACOSX_DEPLOYMENT_TARGET", "SOURCE_DATE_EPOCH"}) {
+    append(name);
+    append(std::getenv(name) ? std::getenv(name) : "");
+  }
+  return digest(bytes);
 }
 } // namespace
 
 std::expected<Entry, std::string>
 locateEntry(const clang::tooling::CompilationDatabase &database,
-            const std::string &source, const fs::path &directory,
+            const std::string &source, const Options &options,
             bool clearAdjusters) {
-  if (directory.empty())
+  if (options.directory.empty())
     return std::unexpected("AST cache directory is empty");
-  const auto cacheDirectory = identity(directory);
-  if (!cacheDirectory)
-    return std::unexpected(cacheDirectory.error());
+  if (options.database.empty())
+    return std::unexpected("AST cache project database is empty");
+  std::error_code error;
+  const auto cacheDirectory = fs::absolute(options.directory, error);
+  if (error)
+    return std::unexpected(error.message());
+  const auto projectDatabase = fs::absolute(options.database, error);
+  if (error)
+    return std::unexpected(error.message());
   const auto commands = database.getCompileCommands(source);
   if (commands.size() != 1)
     return std::unexpected("AST caching requires one compile command per TU");
   auto command = commands.front();
   command.CommandLine = parseArguments(command, clearAdjusters);
-  return identity(command.Directory).and_then([&](const fs::path &cwd) {
-    return identity(resolve(source, cwd)).and_then([&](const fs::path &input) {
-      return externalInputs(command, cwd)
-          .transform([&](llvm::json::Array external) {
-            const auto name = entryKey(command, cwd, input, clearAdjusters,
-                                       std::move(external));
-            return Entry{*cacheDirectory / (name + ".ast"),
-                         *cacheDirectory / (name + ".json"), input, cwd, {}};
-          });
-    });
-  });
+  const auto cwd = fs::absolute(command.Directory, error);
+  if (error)
+    return std::unexpected(error.message());
+  const auto input = resolve(source, cwd);
+  const auto name = entryKey(command, cwd, input, clearAdjusters);
+  return Entry{cacheDirectory / (name + ".ast"), projectDatabase, input, cwd,
+               name};
 }
 } // namespace facts::astcache::detail
