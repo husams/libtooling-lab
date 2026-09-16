@@ -116,8 +116,8 @@ class AstCacheProject:
         sources = [] if family == "show" else [str(self.source)]
         return [str(self.tool), *families[family], *options, *map(str, extra), *sources]
 
-    def run(self, family, *extra, command=None):
-        self.last = subprocess.run(command or self.command(family, *extra), cwd=self.root,
+    def run(self, family, *extra, command=None, cwd=None):
+        self.last = subprocess.run(command or self.command(family, *extra), cwd=cwd or self.root,
                                    env=self.environment, text=True, capture_output=True,
                                    timeout=60, check=False)
         return self.last

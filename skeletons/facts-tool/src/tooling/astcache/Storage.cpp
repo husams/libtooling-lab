@@ -7,6 +7,7 @@
 #include <clang/Serialization/PCHContainerOperations.h>
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/SmallString.h>
+#include <llvm/Config/llvm-config.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/LockFileManager.h>
 #include <llvm/Support/VirtualFileSystem.h>
@@ -39,11 +40,21 @@ std::unique_ptr<clang::ASTUnit> loadAST(const Entry &entry) {
   // ASTReader keeps a reference to its container reader for lazy reads after
   // this function returns, so the owner must outlive every returned ASTUnit.
   static const clang::RawPCHContainerReader reader;
+#if LLVM_VERSION_MAJOR >= 22
   auto unit = clang::ASTUnit::LoadFromASTFile(
       entry.ast.string(), reader,
       clang::ASTUnit::LoadEverything, std::move(filesystem),
       std::move(diagnosticOptions), diagnostics, fileOptions,
       clang::HeaderSearchOptions{});
+#else
+  // LLVM 21 takes the VFS after the optional load flags. Pass it explicitly
+  // so cached ASTs retain the compilation directory on both API versions.
+  auto unit = clang::ASTUnit::LoadFromASTFile(
+      entry.ast.string(), reader, clang::ASTUnit::LoadEverything,
+      std::move(diagnosticOptions), diagnostics, fileOptions,
+      clang::HeaderSearchOptions{}, nullptr, false,
+      clang::CaptureDiagsKind::None, false, false, std::move(filesystem));
+#endif
   if (!unit || unit->getDiagnostics().hasErrorOccurred())
     return nullptr;
   return unit;
@@ -65,7 +76,12 @@ std::expected<void, std::string> storeAST(const Entry &entry,
   if (auto created = llvm::sys::fs::createUniqueFile(
           entry.ast.string() + ".%%%%%%.tmp", temporary))
     return std::unexpected(created.message());
+#if LLVM_VERSION_MAJOR >= 22
   const llvm::scope_exit cleanup([&] { llvm::sys::fs::remove(temporary); });
+#else
+  const auto cleanup =
+      llvm::make_scope_exit([&] { llvm::sys::fs::remove(temporary); });
+#endif
   if (unit.Save(temporary))
     return std::unexpected("AST serialization failed");
   std::filesystem::rename(temporary.str().str(), entry.ast, error);
