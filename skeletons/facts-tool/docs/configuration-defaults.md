@@ -86,9 +86,13 @@ project root when relative, never to the directory holding the YAML file
 that declared it) and anchors there. For example
 `conf_template: "{project_root}/.index/project.db"` yields
 `<root>/.index/project.db` directly, and a literal
-`conf_template: "/srv/index/{filename}.db"` yields `/srv/index/<name>.db`. A generated database records its owning
-project, so a collision is rejected. Use `--conf PATH` or `FACTS_TOOL_CONF`
-for an existing database and to bypass generated naming and ownership;
+`conf_template: "/srv/index/{filename}.db"` yields `/srv/index/<name>.db`. A generated database records the
+project roots that use it. Multiple repositories may share the same generated
+database by resolving to the same path, for example with a shared absolute
+`conf_template: "/srv/index/workspace/project.db"`. Import updates the selected
+repository's compile commands and preserves the other repositories' commands.
+Use `--conf PATH` or `FACTS_TOOL_CONF`
+to select a database directly and bypass generated naming and ownership;
 `--conf` beats `FACTS_TOOL_CONF`, and conf-only catalog commands skip YAML
 entirely under either. A symbol command with an omitted `--facts` still
 loads YAML to resolve its independent `facts_template`. Compiler consumers (import, extract,
@@ -129,8 +133,10 @@ template, even one a higher tier overrides, and even when substitution of
 braces, backslashes, NUL/newline (including inside a substituted
 `{user}`/`{project_root}`/`{project_name}`/`${ENV_NAME}` value), and
 canonical symlink escapes are rejected before creation. Parents are
-rechecked immediately before opening. Concurrent creators serialize; unowned
-existing databases and different project owners are rejected.
+rechecked immediately before opening. Concurrent creators serialize, including
+creators from different project roots sharing a generated database. Existing
+databases without a generated ownership record are rejected; select those
+explicitly with `--conf PATH` or `FACTS_TOOL_CONF`.
 
 `extra_args` entries are complete compiler tokens. Repeatable CLI
 `--extra-arg` values are shell-tokenized once, preserving duplicates and
