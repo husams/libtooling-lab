@@ -19,6 +19,7 @@ loadRecoveryContext(const cli::CallGraphOptions &options) {
   RecoveryContext context;
   context.project = options.configuration;
   context.verbosity = options.verbosity;
+  context.astCache = options.astCache;
   context.aliases = std::move(snapshot->labels);
   for (auto &file : *files)
     context.files.emplace(file.id, std::move(file));

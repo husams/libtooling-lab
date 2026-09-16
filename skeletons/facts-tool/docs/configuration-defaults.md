@@ -20,10 +20,33 @@ Relative `XDG_CONFIG_HOME` is an error. Empty selectors/overrides fail.
 conf_root: ~/.local/share/facts-tool
 conf_template: "{relative_path}/{filename}.db"
 facts_template: "{project_root}/.index/{relative_path}/{filename}.db"
+ast_cache: true
+ast_cache_dir: .facts-tool/ast-cache
 extra_args:
   - -std=c++23
   - -Iinclude with spaces
 ```
+
+`ast_cache` enables persisted Clang ASTs and defaults to `false`. It accepts
+only the unquoted booleans `true` and `false`. `ast_cache_dir` is a nonempty
+string and defaults to `<project_root>/.facts-tool/ast-cache`; relative paths
+anchor to the project root, absolute paths are used directly, and a leading
+`~/` expands against `HOME`. It is a directory path, not a placeholder
+template. Each cache key independently follows selected-file > project >
+user > built-in precedence; an explicit `false` overrides a lower-tier
+`true`. Direct `--conf` and `FACTS_TOOL_CONF` overrides do not bypass these
+settings for commands that parse translation units.
+
+AST-consuming commands (`extract`, `match`, `analyse call-graph --recover-missing`,
+and `analyse variable-flow`) populate and reuse the cache. Import include
+discovery and `analyse dependency` also reuse includes from an existing
+valid AST; on a miss they retain preprocessing-only behavior, so these
+operations do not start rejecting source files for C++ parsing errors.
+Cache reuse depends on the source, headers, effective compiler arguments,
+and Clang compatibility. Stale or unreadable entries are rebuilt when an
+AST is needed. Disabling the cache leaves existing cache files available for
+a later enabled run. `config show` prints `ast_cache`, `ast_cache_dir`, and
+their separate `*_source` provenance without creating a cache directory.
 
 `conf_root`/`conf_template` generate the project configuration database name;
 `facts_template` supplies the default `-o`/`--facts` path for `extract`,
@@ -170,3 +193,5 @@ validation. Help, and symbol/catalog commands given an explicit
 defaults.
 
 Configuration errors exit 3; usage errors exit 2 and runtime failures exit 1.
+
+See [persistent AST caching](ast-cache.md) for command behavior and cache validity.

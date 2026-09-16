@@ -1,4 +1,5 @@
 #include "commands/Dependency.h"
+#include "commands/PreprocessTranslationUnit.h"
 
 #include "ast/visitors/IncludeVisitor.h"
 #include "cli/Options.h"
@@ -95,16 +96,19 @@ registerFiles(FileManager &files, const CompilationDatabase &database,
 
 std::expected<IncludeGraphFacts, std::string>
 collectIncludes(const CompilationDatabase &database,
-                const std::vector<std::string> &sources) {
+                const std::vector<std::string> &sources,
+                const astcache::Options &cache) {
   return configurePlatformCompilationDatabase(database, sources)
       .and_then([&](auto configured)
                     -> std::expected<IncludeGraphFacts, std::string> {
         IncludeGraphFacts facts;
-        clang::tooling::ClangTool tool(*configured, sources);
-        const auto result = tool.run(createIncludeVisitorFactory(facts).get());
-        if (result != 0) {
-          return std::unexpected(
-              "dependency analysis failed while parsing sources");
+        for (const auto &source : sources) {
+          auto included = preprocessTranslationUnit(*configured, source, cache);
+          if (!included)
+            return std::unexpected(included.error());
+          std::ranges::move(included->visitedSources,
+                            std::back_inserter(facts.visitedSources));
+          std::ranges::move(included->edges, std::back_inserter(facts.edges));
         }
         return facts;
       });
@@ -196,7 +200,7 @@ std::expected<int, std::string> analyse(const cli::DependencyOptions &options,
       .and_then([&](std::vector<std::string> registered) {
         return runDependencyStage(
                    options, "collect includes",
-                   [&] { return collectIncludes(*database, options.sources); })
+                   [&] { return collectIncludes(*database, options.sources, options.astCache); })
             .and_then([&, registered = std::move(registered)](
                           IncludeGraphFacts facts) mutable {
               return runDependencyStage(options, "register included files",
@@ -276,6 +280,8 @@ runDependency(const cli::DependencyOptions &options) {
         "facts-tool: usage error: -o/--output must not be empty");
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = std::move(resolved->extraArguments);
+  configured.astCache = resolved->astCache;
+  configured.astCache.verbosity = options.verbosity;
   return runDependencyStage(configured, "validate sources",
                             [&] { return validateSources(configured); })
       .and_then([&] {

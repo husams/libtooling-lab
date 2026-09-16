@@ -1,12 +1,16 @@
 #include "commands/match/MatchFrontend.h"
+#include "tooling/astcache/Cache.h"
+#include "tooling/astcache/Includes.h"
 
 #include <clang/ASTMatchers/ASTMatchFinder.h>
+#include <clang/Frontend/ASTUnit.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendAction.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <iterator>
 #include <memory>
 #include <string>
 #include <utility>
@@ -61,13 +65,41 @@ void announceProgress(std::size_t index, std::size_t total,
                  << clang::tooling::getAbsolutePath(source) << ".\n";
 }
 
+MatchFrontendResult matchCachedTranslationUnit(
+    const clang::tooling::CompilationDatabase &database,
+    clang::ast_matchers::MatchFinder &finder, const std::string &source,
+    const astcache::Options &astCache) {
+  std::vector<std::unique_ptr<clang::ASTUnit>> units;
+  MatchFrontendResult result;
+  result.status = astcache::buildASTs(database, {source}, units, astCache);
+  if (result.status != 0 || units.empty()) {
+    result.status = result.status == 0 ? 1 : result.status;
+    return result;
+  }
+  for (const auto &unit : units) {
+    auto includes = astcache::includesFromAST(*unit);
+    result.includes.visitedSources.insert(
+        result.includes.visitedSources.end(),
+        std::make_move_iterator(includes.visitedSources.begin()),
+        std::make_move_iterator(includes.visitedSources.end()));
+    result.includes.edges.insert(
+        result.includes.edges.end(),
+        std::make_move_iterator(includes.edges.begin()),
+        std::make_move_iterator(includes.edges.end()));
+    finder.matchAST(unit->getASTContext());
+  }
+  return result;
+}
+
 } // namespace
 
 MatchFrontendResult runTranslationUnit(
     const clang::tooling::CompilationDatabase &database,
     clang::ast_matchers::MatchFinder &finder, const std::string &source,
-    std::size_t index, std::size_t total) {
+    std::size_t index, std::size_t total, const astcache::Options &astCache) {
   announceProgress(index, total, source);
+  if (astCache.enabled)
+    return matchCachedTranslationUnit(database, finder, source, astCache);
   IncludeGraphFacts includes;
   clang::tooling::ClangTool tool(database, std::vector<std::string>{source});
   auto factory = std::make_unique<MatchActionFactory>(finder, includes);

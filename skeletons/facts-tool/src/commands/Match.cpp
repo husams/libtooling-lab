@@ -38,18 +38,21 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
     // A supplied --facts path historically names the combined imported
     // project/facts database; preserve that contract when --conf is omitted.
     configured.configuration = configured.facts;
-  } else {
-    auto resolved = loadConfiguration(options.configuration,
-                                      options.configurationFile, false, true);
-    if (!resolved)
-      return std::unexpected(resolved.error());
-    configured.configuration = resolved->database.string();
-    if (!configured.factsProvided) {
-      auto facts = resolveFactsOutput(*resolved, configured.sources);
-      if (!facts)
-        return std::unexpected(facts.error());
-      configured.facts = facts->string();
-    }
+  }
+  auto resolved = loadConfiguration(configured.configuration,
+                                    configured.configurationFile, false, true);
+  if (!resolved)
+    return std::unexpected(resolved.error());
+  configured.configuration = resolved->database.string();
+  if (configured.factsProvided && !explicitConfiguration)
+    configured.facts = configured.configuration;
+  configured.astCache = resolved->astCache;
+  configured.astCache.verbosity = options.verbosity;
+  if (!configured.factsProvided) {
+    auto facts = resolveFactsOutput(*resolved, configured.sources);
+    if (!facts)
+      return std::unexpected(facts.error());
+    configured.facts = facts->string();
   }
   if (configured.facts.empty())
     return std::unexpected(

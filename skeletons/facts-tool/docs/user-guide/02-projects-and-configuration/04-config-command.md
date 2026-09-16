@@ -4,7 +4,7 @@
 for the configuration model described in
 [03-configuration-files](03-configuration-files.md). It prints the fully
 resolved values for this invocation - every database path, every template,
-every `extra_args` entry - along with which tier supplied each one, and it
+every `extra_args` entry, and AST cache settings - along with which tier supplied each one, and it
 does this **without creating any storage**: no database file, no directory,
 no side effect of any kind. Run it any time a generated path looks
 unexpected, before you assume something is broken.
@@ -43,11 +43,15 @@ conf: "/Users/husam/.cache/facts/cli-demo/project.db"
 conf_root: "~/.cache/facts"
 conf_template: {project_name}/project.db
 facts_template: ~/.cache/facts/{project_name}/facts.db
+ast_cache: false
+ast_cache_dir: ".../scratchpad/cli-demo/.facts-tool/ast-cache"
 source: generated
 conf_root_source: /Users/husam/.config/facts-tool/config.yaml
 conf_template_source: /Users/husam/.config/facts-tool/config.yaml
 facts_template_source: /Users/husam/.config/facts-tool/config.yaml
 extra_args_source: built-in
+ast_cache_source: built-in
+ast_cache_dir_source: built-in
 extra_args:
 discovery:
 - .../scratchpad/cli-demo/.facts-tool.yaml [absent]
@@ -60,13 +64,15 @@ Each field:
   [03-configuration-files](03-configuration-files.md#project-identity)).
 - **`conf`** - the actual resolved project database path this invocation
   would use.
-- **`conf_root` / `conf_template` / `facts_template` / `extra_args`** -
-  the resolved value of each of the four YAML keys.
+- **`conf_root` / `conf_template` / `facts_template` / `extra_args` /
+  `ast_cache` / `ast_cache_dir`** - the resolved value of each YAML key.
+  The cache directory is an absolute path, even when YAML supplies a
+  relative directory. Resolving it does not create any cache files.
 - **`source`** - where the `conf` path itself came from. `generated` means
   built from `conf_root` + `conf_template`; an explicit `--conf` shows
   `--conf` (as below); setting the `FACTS_TOOL_CONF` environment variable
   shows `FACTS_TOOL_CONF`.
-- **`*_source`** - for each of the four keys, exactly which file (or
+- **`*_source`** - for each key, exactly which file (or
   `built-in`, or `--conf`) supplied the value that won.
 - **`discovery`** - every YAML file location that was checked, in
   precedence order, tagged `[found]`, `[absent]`, or `[invalid]`. An
@@ -92,7 +98,8 @@ An explicit `--conf` value takes over `conf`, and resets `conf_root`/
 generate anything - but it does **not** affect `facts_template`, which is
 independently resolved and still comes from the user config file. This
 matches the per-key merge model: `--conf` only ever overrides the one key
-it corresponds to.
+it corresponds to. AST cache settings also retain their independently
+resolved YAML values and provenance under a direct database override.
 
 ## Live demonstration: three-tier YAML precedence
 

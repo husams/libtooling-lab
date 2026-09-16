@@ -42,6 +42,7 @@ struct Sandbox {
   }
 };
 void schema();
+void astCache();
 void paths();
 void discovery();
 void arguments();

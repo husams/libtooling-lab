@@ -70,8 +70,9 @@ requireRegisteredFiles(FileManager &files,
 
 std::expected<DiscoveredIncludes, std::string> requireRegisteredSources(
     FileManager &files, const clang::tooling::CompilationDatabase &database,
-    const std::vector<std::string> &sources, const std::string &fingerprint) {
-  return discoverIncludedFilesPerSource(database, sources)
+    const std::vector<std::string> &sources, const std::string &fingerprint,
+    const astcache::Options &cache) {
+  return discoverIncludedFilesPerSource(database, sources, cache)
       .and_then([&](DiscoveredIncludes discovered)
                     -> std::expected<DiscoveredIncludes, std::string> {
         return requireRegisteredFiles(files, discovered.merged, fingerprint)

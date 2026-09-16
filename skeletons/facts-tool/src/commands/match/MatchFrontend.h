@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast/visitors/IncludeVisitor.h"
+#include "tooling/astcache/Options.h"
 
 #include <cstddef>
 #include <string>
@@ -23,6 +24,6 @@ struct MatchFrontendResult {
 MatchFrontendResult runTranslationUnit(
     const clang::tooling::CompilationDatabase &database,
     clang::ast_matchers::MatchFinder &finder, const std::string &source,
-    std::size_t index, std::size_t total);
+    std::size_t index, std::size_t total, const astcache::Options &astCache);
 
 } // namespace facts::commands::match

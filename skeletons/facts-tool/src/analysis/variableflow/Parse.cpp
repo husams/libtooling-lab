@@ -1,6 +1,7 @@
 #include "analysis/variableflow/Internal.h"
 
 #include "platform/PlatformFlags.h"
+#include "tooling/astcache/Cache.h"
 
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Analysis/CallGraph.h>
@@ -50,15 +51,16 @@ std::string normalized(std::string source) {
 
 std::expected<void, std::string>
 parseOne(clang::tooling::CompilationDatabase &database,
-         const std::string &source, Parsed &parsed) {
+         const std::string &source, Parsed &parsed,
+         const astcache::Options &astCache) {
   const std::vector<std::string> selected{source};
   const auto configured =
       facts::configurePlatformCompilationDatabase(database, selected);
   if (!configured)
     return std::unexpected(configured.error());
-  clang::tooling::ClangTool tool(**configured, selected);
   std::vector<std::unique_ptr<clang::ASTUnit>> units;
-  if (tool.buildASTs(units) != 0 || units.empty())
+  if (astcache::buildASTs(**configured, selected, units, astCache) != 0 ||
+      units.empty())
     return std::unexpected("cannot build AST for source: " + source);
   for (auto &unit : units) {
     auto &context = unit->getASTContext();
@@ -82,7 +84,8 @@ parseOne(clang::tooling::CompilationDatabase &database,
 
 std::expected<Parsed, std::string>
 parse(clang::tooling::CompilationDatabase &database,
-      const std::vector<std::string> &requested) {
+      const std::vector<std::string> &requested,
+      const astcache::Options &astCache) {
   Parsed parsed;
   std::vector<std::string> sources = requested;
   if (sources.empty())
@@ -90,7 +93,7 @@ parse(clang::tooling::CompilationDatabase &database,
   std::ranges::sort(sources);
   sources.erase(std::ranges::unique(sources).begin(), sources.end());
   for (const auto &source : sources) {
-    if (auto result = parseOne(database, source, parsed); !result)
+    if (auto result = parseOne(database, source, parsed, astCache); !result)
       return std::unexpected(result.error());
   }
   return parsed;

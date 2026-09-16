@@ -25,10 +25,13 @@ inline void configurationOptions(CLI::App &command, std::string &direct,
       "override matching compiler options and retain unrelated YAML defaults, without rewriting YAML files. Without CLI extras, YAML "
       "tokens concatenate user, then project, then selected file. Built-ins: "
       "XDG_DATA_HOME/facts-tool or HOME/.local/share/facts-tool, "
-      "conf_template={relative_path}/{filename}.db, and extra_args=[]. "
+      "conf_template={relative_path}/{filename}.db, extra_args=[], "
+      "ast_cache=false, and ast_cache_dir=<project_root>/.facts-tool/ast-cache. "
       "Placeholders in conf_template/facts_template: {project_root}, "
       "{project_name}, {relative_path}, {filename}, {user}, and ${ENV_NAME}. "
       "facts_template supplies --output/-o, --facts/-f when omitted. "
+      "ast_cache enables persisted AST reuse for every parsing command; "
+      "ast_cache_dir is absolute, project-root-relative, or begins with ~/. "
       "Use config show for per-key provenance without mutation.");
 }
 } // namespace facts::cli

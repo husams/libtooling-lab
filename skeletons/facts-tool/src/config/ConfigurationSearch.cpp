@@ -1,4 +1,5 @@
 #include "config/Configuration.h"
+#include "config/ConfigurationAstCache.h"
 #include "config/ConfigurationDiscovery.h"
 #include "config/ConfigurationMerge.h"
 
@@ -35,7 +36,9 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
                  .storageRootSource = "built-in",
                  .templateSource = "built-in",
                  .factsTemplateSource = "built-in",
-                 .extraArgumentsSource = "built-in"};
+                 .extraArgumentsSource = "built-in",
+                 .astCacheSource = "built-in",
+                 .astCacheDirectorySource = "built-in"};
   if (partial) *partial = value;
   const auto useDirect = [&](Resolved resolved) {
     resolved.database = (detail::cwd() / direct).lexically_normal();
@@ -83,7 +86,12 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
 
   value = detail::mergeTiers(std::move(value), context);
   if (partial) *partial = value;
-  return direct.empty() ? generate(std::move(value)) : useDirect(std::move(value));
+  return detail::resolveAstCache(std::move(value))
+      .and_then([&](Resolved resolved) -> std::expected<Resolved, std::string> {
+        if (partial) *partial = resolved;
+        return direct.empty() ? generate(std::move(resolved))
+                              : useDirect(std::move(resolved));
+      });
 }
 
 } // namespace facts::config

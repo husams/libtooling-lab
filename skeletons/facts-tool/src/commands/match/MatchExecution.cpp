@@ -77,7 +77,7 @@ Result execute(const cli::MatchOptions &options,
     for (std::size_t index = 0; index < sources.size(); ++index) {
       const auto &source = sources[index];
       auto frontend = runTranslationUnit(**configured, finder, source, index,
-                                          sources.size());
+                                          sources.size(), options.astCache);
       auto registered = requireRegisteredFiles(
           files, frontend.includes.visitedSources, fingerprint);
       if (!registered) {

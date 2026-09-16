@@ -72,7 +72,8 @@ inline std::string keyError(const std::string &reason, const std::filesystem::pa
   const auto split = reason.find(' ');
   const auto key = reason.substr(0, split);
   const bool setting = key == "conf_root" || key == "conf_template" ||
-                       key == "facts_template" || key == "extra_args";
+                       key == "facts_template" || key == "extra_args" ||
+                       key == "ast_cache" || key == "ast_cache_dir";
   return settingError(setting ? key : "configuration", path.string(),
                       setting ? reason.substr(split + 1) : reason, discovery);
 }

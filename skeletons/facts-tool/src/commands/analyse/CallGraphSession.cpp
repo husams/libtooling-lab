@@ -11,10 +11,11 @@ resolveGraphSession(cli::CallGraphOptions options) {
   if (configured || options.facts.empty()) {
     auto resolved =
         loadConfiguration(options.configuration, options.configurationFile,
-                          false, options.facts.empty());
+                          false, options.recoverMissing || options.facts.empty());
     if (!resolved)
       return std::unexpected(resolved.error());
     options.configuration = resolved->database.string();
+    options.astCache = resolved->astCache;
     if (options.facts.empty()) {
       auto facts = resolveFactsOutput(*resolved, {});
       if (!facts)
@@ -22,6 +23,7 @@ resolveGraphSession(cli::CallGraphOptions options) {
       options.facts = facts->string();
     }
   }
+  options.astCache.verbosity = options.verbosity;
   std::error_code error;
   auto facts = std::filesystem::weakly_canonical(options.facts, error);
   if (error)

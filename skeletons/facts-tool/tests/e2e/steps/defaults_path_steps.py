@@ -1,4 +1,6 @@
 import json
+import os
+import pwd
 import subprocess
 from pytest_bdd import given, when, then, parsers
 from support.facts_template import FactsTemplateProject
@@ -91,8 +93,12 @@ def anchored_to_project_root(defaults):
 def template_with_token(defaults, template):
     defaults.env["FACTS_TOOL_TEST_TOKEN"] = "envtoken"
     defaults.write(conf_root="store", conf_template=template)
+    # Minimal CI/container environments may omit both user variables. The
+    # documented placeholder then uses the effective user's passwd entry.
+    user = (defaults.env.get("USER") or defaults.env.get("LOGNAME")
+            or pwd.getpwuid(os.geteuid()).pw_name)
     filled = template.replace("{project_name}", defaults.cwd.name) \
-        .replace("{user}", defaults.env.get("USER") or defaults.env.get("LOGNAME") or "") \
+        .replace("{user}", user) \
         .replace("${FACTS_TOOL_TEST_TOKEN}", "envtoken") \
         .replace("{filename}", defaults.cwd.name)
     defaults.expected_path = defaults.cwd / "store" / filled

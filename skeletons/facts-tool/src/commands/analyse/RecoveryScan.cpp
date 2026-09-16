@@ -2,6 +2,7 @@
 #include "commands/analyse/CallGraphRecoveryInternal.h"
 #include "commands/analyse/RecoveryCompilation.h"
 #include "cli/Verbose.h"
+#include "tooling/astcache/Cache.h"
 #include <clang/Basic/DiagnosticOptions.h>
 #include <clang/Frontend/TextDiagnosticPrinter.h>
 #include <clang/Tooling/Tooling.h>
@@ -56,11 +57,10 @@ prepareRecoveryScan(RecoveryContext &context,
   } else {
     RecoveryCompilation database(candidate);
     const std::vector<std::string> sources{candidate.source.string()};
-    clang::tooling::ClangTool tool(database, sources);
-    tool.clearArgumentsAdjusters();
     scan->diagnostics = std::make_shared<CapturedDiagnostics>();
-    tool.setDiagnosticConsumer(&scan->diagnostics->printer);
-    scan->status = tool.buildASTs(scan->units);
+    scan->status = astcache::buildASTs(database, sources, scan->units,
+                                     context.astCache,
+                                     &scan->diagnostics->printer, true);
     if (scan->units.empty())
       scan->status = 1;
     for (const auto &unit : scan->units)

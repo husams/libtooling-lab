@@ -15,4 +15,4 @@ add_library(facts-variableflow STATIC
   Reaching.cpp
 )
 target_include_directories(facts-variableflow PUBLIC ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(facts-variableflow PUBLIC facts-clang PRIVATE facts-platform)
+target_link_libraries(facts-variableflow PUBLIC facts-clang PRIVATE facts-platform facts-ast-cache)

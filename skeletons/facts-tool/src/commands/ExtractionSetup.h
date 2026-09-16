@@ -36,6 +36,7 @@ requireRegisteredFiles(FileManager &files,
 // what it just discovered.
 std::expected<DiscoveredIncludes, std::string> requireRegisteredSources(
     FileManager &files, const clang::tooling::CompilationDatabase &database,
-    const std::vector<std::string> &sources, const std::string &fingerprint);
+    const std::vector<std::string> &sources, const std::string &fingerprint,
+    const astcache::Options &cache = {});
 
 } // namespace facts::commands

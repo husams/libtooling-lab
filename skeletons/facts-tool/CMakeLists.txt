@@ -276,6 +276,7 @@ target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang
                                             facts-sqlite facts-config)
 
 add_library(facts-config STATIC
+  src/config/ConfigurationAstCache.cpp
   src/config/ConfigurationPaths.cpp
   src/config/ConfigurationSearch.cpp
   src/config/ConfigurationMerge.cpp
@@ -388,6 +389,7 @@ target_compile_definitions(
 )
 target_link_libraries(facts-platform PRIVATE facts-clang)
 
+add_subdirectory(src/tooling/astcache)
 add_subdirectory(src/analysis/variableflow)
 
 add_library(facts-symbols STATIC
@@ -433,6 +435,8 @@ add_library(facts-commands STATIC
   src/commands/FactPairValidationStorage.cpp
   src/commands/Configuration.cpp
   src/commands/Dependency.cpp
+  src/commands/ExtractTranslationUnits.cpp
+  src/commands/PreprocessTranslationUnit.cpp
   src/commands/Extract.cpp
   src/commands/ExtractionSetup.cpp
   src/commands/IncludedFiles.cpp
@@ -503,6 +507,7 @@ target_link_libraries(facts-commands PRIVATE
   facts-tooling
   facts-config
   facts-extraction-freshness
+  facts-ast-cache
   facts-clang
 )
 
@@ -693,6 +698,7 @@ if(BUILD_TESTING)
   add_executable(configuration-test tests/ConfigurationTest.cpp
     tests/configuration/Schema.cpp tests/configuration/Paths.cpp
     tests/configuration/Discovery.cpp tests/configuration/Arguments.cpp
+    tests/configuration/AstCache.cpp
     tests/configuration/ArgumentOverrides.cpp
     tests/configuration/Ownership.cpp tests/configuration/Safety.cpp
     tests/configuration/Policies.cpp

@@ -5,6 +5,7 @@
 #include "commands/analyse/RecoveryEvidence.h"
 #include "storage/catalog/Records.h"
 #include "tooling/StoredCompilationReader.h"
+#include "tooling/astcache/Options.h"
 
 #include <filesystem>
 #include <map>
@@ -37,6 +38,7 @@ struct RecoveryContext {
   std::map<FileId, std::string> closureDigests;
   recovery::InputDigestCache digests;
   std::map<FileId, std::shared_ptr<RecoveryScan>> scans;
+  astcache::Options astCache;
 };
 
 std::expected<RecoveryContext, std::string>

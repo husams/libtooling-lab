@@ -17,10 +17,10 @@ that addresses some of this but is not yet on `main`.
   `complete=true truncated=0` text output - those describe a CLI surface
   that **no longer exists on main**; don't use them as a reference for
   current behavior. See [call graphs](../04-call-graphs/01-overview.md).
-- **The YAML configuration schema is exactly four keys** (`conf_root`,
-  `conf_template`, `facts_template`, `extra_args`) - no booleans, no
-  numbers, and nothing else (verbosity, selectors, matcher expressions,
-  depth) is YAML-configurable. This is intentional, not an oversight.
+- **The YAML configuration schema contains six keys** (`conf_root`,
+  `conf_template`, `facts_template`, `extra_args`, `ast_cache`,
+  `ast_cache_dir`). Verbosity, selectors, matcher expressions and depth
+  are configured on the CLI.
 - **`import` always creates its own component** from the compilation
   database directory's basename, and never reuses an existing component of
   the same name even when told to via `--component NAME=PATH`. See "Catalog
