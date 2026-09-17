@@ -52,8 +52,11 @@ graphs; the existing [coverage contract](call-graph.md) remains applicable.
 A known declaration-only call target keeps its canonical symbol identity and
 exact call site in an external-reference record. Extracting its definition from
 another registered component reuses that identity, retains callers and sites,
-and removes the resolved external boundary. An indirect call has no guessed
-target symbol ID and remains explicitly unresolved.
+and removes the resolved external boundary. A call through an automatic local
+function pointer initialized directly from a function can retain that target
+when the pointer has no modifying or escaping
+uses. Other indirect calls have no guessed target symbol ID and remain
+explicitly unresolved.
 
 Numeric IDs are scoped to a validated project/facts pair. An incompatible pair
 reports `incompatible-symbol-universe`; independently imported databases must
@@ -78,7 +81,7 @@ and must be equal. The external ID equals `destination_id`; its other six
 fields reference the corresponding `relation_site` key. Deletion cascades
 prevent dangling references. No per-root graph table is introduced.
 
-Observed indirect calls are kept separately as source call sites in
+Unresolved indirect calls are kept separately as source call sites in
 `callgraph_unresolved_site(source_id, file_id, offset, line, col)`. This evidence
 has no destination field and cannot invent an external target. Regeneration
 replaces prior call and unresolved-site evidence for the collected bodies.

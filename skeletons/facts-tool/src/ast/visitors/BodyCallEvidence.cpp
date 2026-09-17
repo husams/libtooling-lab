@@ -1,6 +1,7 @@
 #include "ast/visitors/BodyVisitor.h"
 
 #include "ast/StoreExtracted.h"
+#include "ast/extractors/CallSite.h"
 #include "ast/extractors/File.h"
 #include "ast/extractors/Location.h"
 #include "ast/extractors/NamedDecl.h"
@@ -13,29 +14,46 @@
 namespace facts {
 
 bool BodyVisitor::VisitCallExpr(clang::CallExpr *expression) {
-  if (expression == nullptr || expression->getDirectCallee() != nullptr) {
-    return true;
+  if (expression && !expression->getDirectCallee())
+    indirectCalls_.push_back(expression);
+  return true;
+}
+
+void BodyVisitor::captureIndirectCalls() {
+  for (const auto *expression : indirectCalls_) {
+    const auto *target =
+        extractIndirectCallTarget(*expression, owner_, indirectContext_);
+    if (target) {
+      captureInvocation(extractCallSite(owner_, *target, *expression,
+                                        context_.getSourceManager(), files_,
+                                        store_));
+    } else {
+      stageUnresolvedCall(*expression);
+    }
   }
-  if (!expression->isTypeDependent() && !expression->isValueDependent())
-    reportUnsupportedSemantic("indirect-call", expression->getExprLoc(),
+}
+
+void BodyVisitor::stageUnresolvedCall(const clang::CallExpr &expression) {
+  if (!expression.isTypeDependent() && !expression.isValueDependent())
+    reportUnsupportedSemantic("indirect-call", expression.getExprLoc(),
                               context_.getSourceManager(), files_, store_);
   auto location =
-      extractLocation(context_.getSourceManager(), expression->getExprLoc());
+      extractLocation(context_.getSourceManager(), expression.getExprLoc());
   if (!location) {
     if (!isFilteredExtraction(location.error())) {
       status_.record(std::unexpected(
           IndexingError{"cannot extract unresolved call site: " +
                         std::string{extractionErrorName(location.error())}}));
     }
-    return true;
+    return;
   }
-  auto file = resolveFile(context_.getSourceManager(), expression->getExprLoc(),
+  auto file = resolveFile(context_.getSourceManager(), expression.getExprLoc(),
                           files_);
   if (!file) {
     status_.record(std::unexpected(
         IndexingError{"cannot resolve unresolved call site file: " +
                       file.error().message()}));
-    return true;
+    return;
   }
   auto usr = extractUsr(referenceOwner(owner_));
   if (!usr) {
@@ -44,23 +62,22 @@ bool BodyVisitor::VisitCallExpr(clang::CallExpr *expression) {
           IndexingError{"cannot identify unresolved call site owner: " +
                         std::string{extractionErrorName(usr.error())}}));
     }
-    return true;
+    return;
   }
   auto source = store_.findId(*usr);
   if (!source) {
     status_.record(std::unexpected(
         IndexingError{"cannot look up unresolved call site owner: " +
                       source.error().message()}));
-    return true;
+    return;
   }
   if (!*source) {
     status_.record(std::unexpected(
         IndexingError{"unresolved call site owner was not persisted"}));
-    return true;
+    return;
   }
   store_.stageUnresolvedCallSite(
       UnresolvedCallSite{**source, *file, *location});
-  return true;
 }
 
 IndexingResult BodyVisitor::stageEvidence() {

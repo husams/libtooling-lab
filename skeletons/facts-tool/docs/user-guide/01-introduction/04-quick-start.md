@@ -214,16 +214,13 @@ The two sources are listed twice because the run resolves the registered
 source set before handing it to the Clang tool, and all of this output goes
 to standard error rather than standard output.
 
-The `facts-tool: coverage.unsupported_semantics kind=implicit-cleanup
-site=...` lines cover implicit destructor calls the extractor couldn't
-attribute a precise call-site column to (mostly deep in libc++ internals,
-occasionally a project lambda's own implicit cleanup). This is routine noise
-on any real C++ translation unit that includes the standard library. It does
-not affect the exit code or the recorded symbol count, and `-v 0` does not
-suppress it; only the `facts-tool: extract:` stage lines respond to
-verbosity. See
+The transcript above predates the fix for false cleanup warnings from
+bodyless compiler-generated constructors. Current `coverage.unsupported_semantics`
+notices identify unresolved call targets or implicit cleanup coverage gaps,
+not missing source columns. They do not fail extraction, but do identify
+missing call edges, and still print at `-v 0`. See
 [03-extracting-facts/01-extract](../03-extracting-facts/01-extract.md#verbosity-levels)
-for what each level actually changes.
+for the supported cases and verbosity contract.
 
 ## 5. Look up a symbol
 

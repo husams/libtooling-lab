@@ -210,10 +210,12 @@ about:
   successful extraction of that whole file. Treat any all-or-nothing
   zero-symbol extraction result as a signal to check for this pattern before
   assuming a project-wide extraction failure.
-- **`coverage.unsupported_semantics kind=implicit-cleanup` notices** (see
-  [Extracting Facts](01-extract.md)) are routine noise on any translation
-  unit that includes the standard library. They print at every verbosity
-  level, `-v 0` included, and they do not indicate a failure.
+- **`coverage.unsupported_semantics` notices** (see
+  [Extracting Facts](01-extract.md)) identify unresolved indirect calls or
+  implicit cleanup coverage gaps. They print at every verbosity level,
+  `-v 0` included, without failing extraction. Bodyless trivial constructors
+  do not produce cleanup notices. Do not assume a successful exit means the
+  call graph has complete coverage.
 
 If you hit a case that does not match this chapter, verify current behavior
 against a fresh extraction before reporting it as a defect - several

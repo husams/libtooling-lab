@@ -8,9 +8,10 @@ from steps.recovery_cpp_reuse_steps import _variant, recover_and_repeat
 def diagnostic_body(context):
     _variant(context, '#pragma message("S021_FRONTEND")\n#include <vector>\n'
              'int value() { return 1; }\n'
+             'int indirect(int (*call)()) { return call(); }\n'
              'int bridge() { std::vector<int> v{1,2,3}; int s = 0; '
-             'for (int x : v) s += x; int (*call)() = value; '
-             'return s + call(); }\n')
+             'for (int x : v) s += x; '
+             'return s + indirect(value); }\n')
 
 
 @then(parsers.parse("S-021 validation output respects verbosity {level:d}"))

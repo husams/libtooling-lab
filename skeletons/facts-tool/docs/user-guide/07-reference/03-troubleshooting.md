@@ -137,10 +137,13 @@ stdout at any level.
   reason='invalid USR'`.
 
 `facts-tool: coverage.unsupported_semantics kind=implicit-cleanup site=...`
-appears once per implicit-destructor call site the extractor could not
-attribute a precise source column to. It is routine noise for any TU that
-includes the standard library (31 lines for a two-file demo) and does not
-affect the exit code or the recorded symbol count.
+means an implicit destructor target could not be resolved, or CFG construction
+failed for a function requiring cleanup analysis. It is not a source-column warning.
+`kind=indirect-call` means no supported exact target was established for that
+call. Both preserve successful extraction of other facts, but indicate missing
+call edges. Bodyless trivial constructors no longer cause false cleanup
+notices. After upgrading, run `extract --force` to refresh existing facts;
+validated cached ASTs remain reusable.
 
 For `analyse call-graph` specifically: without `-v`, stderr never carries
 more than one line even on failure; with `-v`, that same line is present

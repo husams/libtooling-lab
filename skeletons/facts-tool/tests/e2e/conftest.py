@@ -71,6 +71,7 @@ pytest_plugins = (
     "steps.call_graph_interrupt_steps",
     "steps.s022_call_graph_steps",
     "steps.s022_review_steps",
+    "steps.unsupported_semantics_steps",
     "steps.call_graph_query_steps",
     "steps.common_steps",
     "steps.configuration_defaults_steps",
