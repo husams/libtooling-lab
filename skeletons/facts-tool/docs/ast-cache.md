@@ -21,7 +21,7 @@ Configuration inspection does not create the directory.
 | `extract` | Traverses the AST prepared by import, including on the first extraction. Parses and saves a replacement only when the cache is missing or stale. |
 | `match` | Runs the matcher against the shared saved AST. |
 | `analyse variable-flow` | Builds its analysis from saved ASTs. |
-| `analyse call-graph --recover-missing` | Reuses saved ASTs for recovery scans. |
+| `analyse call-graph --recover-missing` | Reuses saved ASTs and their saved dependency inputs for recovery scans. |
 | `analyse dependency` | Reads the saved dependencies without loading an AST; preprocesses and refreshes missing or stale records. |
 | Queries and catalog operations | Do not load or create ASTs. |
 
@@ -39,12 +39,28 @@ Dependency discovery remains preprocessing-only on a miss. Missing, corrupt,
 or stale ASTs are repaired when import or an AST consumer next needs them.
 Existing extraction freshness checks still apply: use `extract --force` to
 request extraction even when the facts database is already current.
+An up-to-date extraction checks saved dependencies and index state without
+loading an AST. Relative and absolute source selectors resolve to the same
+stored compilation; repeated selectors process each selected TU once.
 
 Verbose output (`-v 1`) distinguishes `dependency-cache` events from
 `ast-cache: miss`, `ast-cache: stored`, and `ast-cache: hit`. Dependency analysis
 reads only SQLite metadata on a hit. Warm import also reads the AST bytes to
 verify integrity, without deserializing them. Disabled caching performs no
 cache reads or writes and does not populate the metadata tables.
+
+Verbose output also reports actual frontend work as `frontend: ast-parse`,
+`frontend: dependency-scan`, `frontend: include-reconstruction`, or
+`frontend: driver-probe`. A prepared, valid cache should produce none of
+these events on a subsequent command. An `unavailable` command-selection
+diagnostic includes the source selector and the actual matching command count.
+
+GNU compiler include-path discovery is persisted in the project database when
+caching is enabled. Import prepares this result so subsequent processes avoid
+running the GNU driver again for the same compiler and probe context. Compiler
+identity, probe options, and relevant environment changes select a new result;
+missing or damaged records are probed again. This discovery cache is separate
+from the Git commit policy for translation-unit contents.
 
 ## Project database metadata
 
@@ -77,6 +93,10 @@ The cache directory stores Clang's serialized AST. It does not cache a command's
 query result. AST extraction, match selection, and analysis still run on a hit.
 Extraction consumes one TU at a time to avoid retaining a project's entire
 AST collection in memory.
+Cache hits retain metadata and Git checks, AST integrity validation/loading
+where needed, and command-specific analysis. Extraction freshness still checks
+registered file state; recovery retains its content-digest and availability
+checks. Avoiding dependency discovery does not remove these correctness checks.
 
 The cache key includes the source, compilation directory, compiler version,
 effective command arguments and relevant environment.
@@ -115,3 +135,5 @@ metadata and atomic database publication. Plain cache records live in
 `model/AstCache.h`. Command adapters select and consume results without owning
 cache formats. Native E2E BDD scenarios under `tests/e2e/features/ast_cache*`
 exercise separate processes against the real executable and SQLite outputs.
+The [multi-TU performance harness](performance/ast-cache-reuse.md) measures
+all consumers and verifies that warm runs do not repeat frontend work.

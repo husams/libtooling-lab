@@ -50,14 +50,14 @@ std::expected<DiscoveredIncludes, std::string> discoverIncludedFilesPerSource(
     const clang::tooling::CompilationDatabase &compilations,
     std::span<const std::string> selectedSources,
     const astcache::Options &cache, IncludeDiscovery discovery) {
-  return configurePlatformCompilationDatabase(compilations, selectedSources)
+  return configurePlatformCompilationDatabase(compilations, selectedSources, cache)
       .transform_error([](std::string error) {
         return "cannot resolve included files: " + std::move(error);
       })
       .and_then([&](auto configured)
                     -> std::expected<DiscoveredIncludes, std::string> {
         DiscoveredIncludes result;
-        IncludeGraphFacts merged;
+        std::vector<std::string> merged;
         for (std::size_t index = 0; index < selectedSources.size(); ++index) {
           const auto &source = selectedSources[index];
           announceProgress(index, selectedSources.size(), source);
@@ -71,14 +71,11 @@ std::expected<DiscoveredIncludes, std::string> discoverIncludedFilesPerSource(
           owned.erase(std::ranges::unique(owned).begin(), owned.end());
           result.perSource.emplace(source, std::move(owned));
           std::ranges::move(facts.visitedSources,
-                            std::back_inserter(merged.visitedSources));
-          std::ranges::move(facts.edges, std::back_inserter(merged.edges));
+                            std::back_inserter(merged));
         }
-        std::ranges::sort(merged.visitedSources);
-        merged.visitedSources.erase(
-            std::ranges::unique(merged.visitedSources).begin(),
-            merged.visitedSources.end());
-        result.merged = std::move(merged.visitedSources);
+        std::ranges::sort(merged);
+        merged.erase(std::ranges::unique(merged).begin(), merged.end());
+        result.merged = std::move(merged);
         return result;
       });
 }

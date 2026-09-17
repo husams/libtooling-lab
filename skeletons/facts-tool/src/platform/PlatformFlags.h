@@ -1,6 +1,8 @@
 #ifndef FACTS_TOOL_PLATFORMFLAGS_H
 #define FACTS_TOOL_PLATFORMFLAGS_H
 
+#include "tooling/astcache/Options.h"
+
 #include <expected>
 #include <memory>
 #include <span>
@@ -15,7 +17,8 @@ namespace facts {
 std::expected<std::unique_ptr<clang::tooling::CompilationDatabase>, std::string>
 configurePlatformCompilationDatabase(
     const clang::tooling::CompilationDatabase &database,
-    std::span<const std::string> sources);
+    std::span<const std::string> sources,
+    const astcache::Options &cache = {});
 
 // The part of this machine that decides which headers a compile command sees:
 // the resource directory, the SDK root and the Clang the tool links against.

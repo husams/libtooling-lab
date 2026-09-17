@@ -50,6 +50,26 @@ def run(ast_cache, family):
     ast_cache.run(family)
 
 
+@when("current extraction runs twice without forcing")
+def current_extraction(ast_cache):
+    command = ast_cache.command("extract")
+    command.remove("--force")
+    ast_cache.current_extractions = [
+        ast_cache.run("extract", command=command) for _ in range(2)
+    ]
+
+
+@then("current extraction reuses dependencies without loading or rebuilding an AST")
+def current_extraction_skips_frontend(ast_cache):
+    for result in ast_cache.current_extractions:
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "up to date; nothing to extract" in result.stderr, result.stderr
+        assert "dependency-cache: hit" in result.stderr, result.stderr
+        assert "ast-cache:" not in result.stderr, result.stderr
+        assert "frontend:" not in result.stderr, result.stderr
+    assert ast_cache.snapshot_cache() == ast_cache.cache_before
+
+
 @when("AST caching is disabled after the cache was populated")
 def disable_populated(ast_cache):
     ast_cache.configure(ast_cache=False)

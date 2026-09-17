@@ -55,7 +55,7 @@ parseOne(clang::tooling::CompilationDatabase &database,
          const astcache::Options &astCache) {
   const std::vector<std::string> selected{source};
   const auto configured =
-      facts::configurePlatformCompilationDatabase(database, selected);
+      facts::configurePlatformCompilationDatabase(database, selected, astCache);
   if (!configured)
     return std::unexpected(configured.error());
   std::vector<std::unique_ptr<clang::ASTUnit>> units;

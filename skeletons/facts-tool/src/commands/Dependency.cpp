@@ -8,6 +8,7 @@
 #include "commands/ConfigurationSupport.h"
 #include "commands/DatabasePaths.h"
 #include "commands/ExtraArguments.h"
+#include "commands/ExtractionSetup.h"
 #include "commands/FactPairValidation.h"
 #include "model/Dependency.h"
 #include "platform/PlatformFlags.h"
@@ -69,7 +70,7 @@ void sortUnique(std::vector<Value> &values) {
 }
 
 std::expected<CompilationDatabasePtr, std::string>
-requireStoredCommands(CompilationDatabasePtr database) {
+requireDependencyCommands(CompilationDatabasePtr database) {
   if (database->getAllCompileCommands().empty()) {
     return std::unexpected(
         "project configuration contains no stored compile commands");
@@ -98,7 +99,7 @@ std::expected<IncludeGraphFacts, std::string>
 collectIncludes(const CompilationDatabase &database,
                 const std::vector<std::string> &sources,
                 const astcache::Options &cache) {
-  return configurePlatformCompilationDatabase(database, sources)
+  return configurePlatformCompilationDatabase(database, sources, cache)
       .and_then([&](auto configured)
                     -> std::expected<IncludeGraphFacts, std::string> {
         IncludeGraphFacts facts;
@@ -305,11 +306,12 @@ runDependency(const cli::DependencyOptions &options) {
       })
       .and_then([&](CompilationDatabasePtr database) {
         return runDependencyStage(configured, "validate stored commands", [&] {
-          return requireStoredCommands(std::move(database));
+          return requireDependencyCommands(std::move(database));
         });
       })
       .and_then([&](CompilationDatabasePtr database) {
         return runDependencyStage(configured, "analyse dependency graph", [&] {
+          configured.sources = selectSources(*database, configured.sources);
           return analyse(configured, std::move(database));
         });
       });

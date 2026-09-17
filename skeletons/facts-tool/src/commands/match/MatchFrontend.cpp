@@ -1,4 +1,5 @@
 #include "commands/match/MatchFrontend.h"
+#include "tooling/FrontendActivity.h"
 #include "tooling/astcache/Cache.h"
 
 #include <clang/ASTMatchers/ASTMatchFinder.h>
@@ -90,6 +91,7 @@ MatchFrontendResult runTranslationUnit(
   announceProgress(index, total, source);
   if (astCache.enabled)
     return matchCachedTranslationUnit(database, finder, source, astCache);
+  reportFrontendActivity(astCache.verbosity, "ast-parse", source);
   IncludeGraphFacts includes;
   clang::tooling::ClangTool tool(database, std::vector<std::string>{source});
   auto factory = std::make_unique<MatchActionFactory>(finder, includes);

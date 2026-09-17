@@ -13,6 +13,13 @@ Feature: Reuse persisted Clang ASTs across native commands
     Then the persisted AST is reused
     And cold and warm extraction facts are identical
 
+  Scenario: Repeated current extraction skips AST loading and all frontend work
+    Given AST caching is enabled
+    And a persisted AST from extraction
+    When current extraction runs twice without forcing
+    Then current extraction reuses dependencies without loading or rebuilding an AST
+    And cold and warm extraction facts are identical
+
   Scenario Outline: Native commands reuse persisted ASTs or project dependency metadata
     Given AST caching is enabled
     And a persisted AST from extraction

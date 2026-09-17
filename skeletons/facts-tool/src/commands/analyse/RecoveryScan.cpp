@@ -60,7 +60,8 @@ prepareRecoveryScan(RecoveryContext &context,
     scan->diagnostics = std::make_shared<CapturedDiagnostics>();
     scan->status = astcache::buildASTs(database, sources, scan->units,
                                      context.astCache,
-                                     &scan->diagnostics->printer, true);
+                                     &scan->diagnostics->printer, true,
+                                     &scan->includes);
     if (scan->units.empty())
       scan->status = 1;
     for (const auto &unit : scan->units)

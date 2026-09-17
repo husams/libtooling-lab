@@ -26,7 +26,7 @@ Result execute(const cli::MatchOptions &options,
                CompilationDatabasePtr database, FileManager &files,
                const std::vector<std::string> &sources,
                const std::string &fingerprint) {
-  auto configured = configurePlatformCompilationDatabase(*database, sources);
+  auto configured = configurePlatformCompilationDatabase(*database, sources, options.astCache);
   if (!configured)
     return std::unexpected("cannot configure translation units: " +
                            configured.error());

@@ -23,7 +23,8 @@ RecoveryEntry makeEntry(const RecoveryContext &context, FileId id,
     if (auto command = decodeStoredCommand(found->second, context.aliases)) {
       const std::vector<std::string> sources{found->second.path.string()};
       RecoveryCompilation stored(*command);
-      auto configured = configurePlatformCompilationDatabase(stored, sources);
+      auto configured =
+          configurePlatformCompilationDatabase(stored, sources, context.astCache);
       if (!configured) {
         entry.reason = configured.error();
         return entry;

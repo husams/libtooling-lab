@@ -2,6 +2,7 @@
 
 #include "ast/FactExtractor.h"
 #include "ast/visitors/Traversal.h"
+#include "tooling/FrontendActivity.h"
 #include "tooling/astcache/Cache.h"
 
 #include <clang/Frontend/ASTUnit.h>
@@ -14,6 +15,8 @@ int extractTranslationUnits(const clang::tooling::CompilationDatabase &database,
                             IndexingStatus &status,
                             const astcache::Options &cache) {
   if (!cache.enabled) {
+    for (const auto &source : sources)
+      reportFrontendActivity(cache.verbosity, "ast-parse", source);
     clang::tooling::ClangTool tool(database, sources);
     return tool.run(createFactExtractorFactory(files, store, status).get());
   }

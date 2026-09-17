@@ -9,6 +9,7 @@ from support.scenario import FactsToolContext
 pytest_plugins = (
     "steps.ast_cache_steps",
     "steps.ast_cache_import_commands_steps",
+    "steps.ast_cache_selector_steps",
     "steps.ast_cache_relative_command_steps",
     "steps.ast_cache_metadata_steps",
     "steps.ast_cache_commit_policy_steps",

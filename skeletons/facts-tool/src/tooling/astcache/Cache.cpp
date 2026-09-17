@@ -1,6 +1,7 @@
 #include "tooling/astcache/Cache.h"
 
 #include "storage/astcache/Database.h"
+#include "tooling/FrontendActivity.h"
 #include "tooling/astcache/Includes.h"
 #include "tooling/astcache/Metadata.h"
 #include "tooling/astcache/Parse.h"
@@ -31,6 +32,7 @@ int parse(const clang::tooling::CompilationDatabase &database,
           const Options &options, clang::DiagnosticConsumer *diagnostics,
           bool clearAdjusters,
           detail::RevisionObservations *observations = nullptr) {
+  reportFrontendActivity(options.verbosity, "ast-parse", source);
   clang::tooling::ClangTool tool(database, {source});
   if (clearAdjusters)
     tool.clearArgumentsAdjusters();
@@ -100,6 +102,8 @@ int buildOne(const clang::tooling::CompilationDatabase &database,
     }
   }
   report(options, "miss", source);
+  if (!entry)
+    report(options, "unavailable", entry.error());
   std::vector<Revision> revisions;
   if (entry) {
     auto initial = detail::captureRevisions(entry->source, {});
@@ -116,8 +120,10 @@ int buildOne(const clang::tooling::CompilationDatabase &database,
                            clearAdjusters, entry ? &observations : nullptr);
   IncludeGraphFacts parsed;
   if (includes || (entry && status == 0 && units.size() == before + 1))
-    for (auto index = before; index < units.size(); ++index)
+    for (auto index = before; index < units.size(); ++index) {
+      reportFrontendActivity(options.verbosity, "include-reconstruction", source);
       appendIncludes(parsed, includesFromAST(*units[index]));
+    }
   if (entry && status == 0 && units.size() == before + 1 &&
       !units.back()->getDiagnostics().hasErrorOccurred() &&
       detail::currentRevisions(revisions)) {

@@ -70,7 +70,9 @@ locateEntry(const clang::tooling::CompilationDatabase &database,
     return std::unexpected(error.message());
   const auto commands = database.getCompileCommands(source);
   if (commands.size() != 1)
-    return std::unexpected("AST caching requires one compile command per TU");
+    return std::unexpected("AST caching requires one compile command per TU: " +
+                           source + " resolved to " +
+                           std::to_string(commands.size()) + " commands");
   auto command = commands.front();
   command.CommandLine = parseArguments(command, clearAdjusters);
   // Recovery freezes the already adjusted command before passing it here.
@@ -81,7 +83,9 @@ locateEntry(const clang::tooling::CompilationDatabase &database,
   const auto cwd = fs::absolute(command.Directory, error);
   if (error)
     return std::unexpected(error.message());
-  const auto input = resolve(source, cwd);
+  // Use the selected command's identity, not the spelling of a CLI selector.
+  // Relative CLI paths use the invocation cwd, which can differ from cwd.
+  const auto input = resolve(command.Filename, cwd);
   const auto name = entryKey(command, cwd, input, clearAdjusters);
   return Entry{cacheDirectory / (name + ".ast"), projectDatabase, input, cwd,
                name};
