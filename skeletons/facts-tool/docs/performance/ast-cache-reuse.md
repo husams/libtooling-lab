@@ -117,3 +117,91 @@ subprocess interval.
 Compare medians only when both runs use the same scale, compiler/runtime,
 build optimization and idle host. A faster number never overrides a failed
 zero-work or semantic check.
+
+## Validation: 2026-09-17
+
+Both complete scale runs passed: **338 recorded command invocations**, including
+196 measured runs and **216 strict warm-cache checks**. Every warm check reported
+zero source preprocessing, AST parsing, dependency scans, AST include reconstruction,
+external GNU probes, cache misses and cache rewrites. Exact AST/dependency hit counts
+matched the selected TU count; unchanged extraction loaded zero ASTs.
+
+The [machine-readable evidence](ast-cache-validation-2026-09-17.json) retains
+all labeled samples, phase timings when available, work/hit/mutation/status counters,
+identities, scale footprints and summaries without bulky AST metadata or scratch paths.
+
+The frozen candidate was built with GCC 14.2 in **Debug with `-O0`**, linked
+against Clang 21.1.8, and exercised with GNU C++ 13.3.0 on Linux x86-64. No
+project builds or E2E suites ran concurrently; shared-host scheduling was not
+controlled. These are synthetic validation-build measurements, not optimized
+production estimates or RHEL qualification. The candidate binary SHA-256 is
+`9eb727d59c8ea487bbf93e40d2ab9f7c9536fb1bf55db6f28474ea7d2d6ed661`.
+
+Each scale used 64 shared template declarations, two project headers and
+44 transitive external headers. Compile commands used a separate build directory
+and relative filenames; consumers covered absolute/relative/dot-relative paths,
+nested invocation directories, duplicate/overlapping selectors and all sources.
+
+| TUs | Unique input files | AST artifacts | Serialized AST bytes | Cold import (s) |
+| ---: | ---: | ---: | ---: | ---: |
+| 16 | 62 | 16 | 33,686,464 | 3.865 |
+| 32 | 78 | 32 | 67,372,904 | 9.517 |
+
+Cold import parsed each TU exactly once and ran one GNU probe per project.
+Source, shared-header and empty-commit changes each caused one new parse per
+TU during import; the immediate consumers were warm. Across both scales this
+means 48 initial AST preparations and 144 commit-refresh preparations, with
+no separate dependency preprocessing passes during those imports. All 36
+recovery invocations started from a verified zero-run seed/destination and
+produced exactly complete run 1. Full expected chain coverage was checked
+after the first recovery consumer and after every timing iteration.
+
+The following values are whole-process seconds from seven measured samples
+per command/mode, after one excluded warmup. Cache-disabled runs are positive
+controls against the same binary. With seven samples, nearest-rank p95 is the
+maximum observed sample; these values do not establish population tail latency.
+
+### 16 translation units
+
+| Command | Cached median | Cached p95 | Disabled median | Disabled p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Repeated import | 0.397 | 0.594 | 0.338 | 0.514 |
+| Forced extract | 4.919 | 8.342 | 7.104 | 7.753 |
+| Unchanged extract | 0.115 | 0.155 | 0.371 | 0.739 |
+| Match | 1.038 | 1.580 | 2.448 | 3.731 |
+| Variable flow | 1.870 | 2.313 | 3.027 | 3.552 |
+| Call-graph recovery | 13.364 | 17.867 | 14.232 | 17.709 |
+| Dependency analysis | 0.172 | 0.467 | 0.366 | 0.659 |
+
+### 32 translation units
+
+| Command | Cached median | Cached p95 | Disabled median | Disabled p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Repeated import | 0.651 | 0.948 | 0.686 | 1.100 |
+| Forced extract | 11.431 | 14.303 | 12.929 | 15.525 |
+| Unchanged extract | 0.159 | 0.283 | 0.577 | 1.300 |
+| Match | 1.734 | 3.706 | 4.195 | 7.155 |
+| Variable flow | 3.728 | 4.855 | 5.258 | 7.584 |
+| Call-graph recovery | 40.588 | 52.281 | 45.428 | 53.490 |
+| Dependency analysis | 0.392 | 0.759 | 0.663 | 1.168 |
+
+Cache reuse does not eliminate command analysis or metadata/artifact checks.
+Repeated import was slightly slower with caching in the 16-TU median, and
+32-TU cached recovery still took 40.588 seconds median while emitting no
+front-end work. The evidence therefore supports elimination of repeated
+parsing/discovery, not a guarantee that every command or sample becomes faster.
+
+The preserved PR #88 baseline reproduced two real preprocessing passes for
+a relative forced extraction, one for relative dependency analysis, eight
+for duplicate/overlapping forced extraction, and an external GNU probe on
+every warm process. These observations use source pragma diagnostics and a
+real driver wrapper independently of the new telemetry. The corrected
+selector and repeated-consumer checks observe zero such work.
+
+An earlier provisional 16-TU run was rejected when the exact-hit assertion
+exposed stale SQLite WAL state in the benchmark restoration. Every Python
+SQLite connection is now explicitly closed, restoration uses a fresh owned
+destination and SQLite backup, and each recovery invocation verifies fresh
+run 1. The corrected three-repetition smoke passed 113 invocations before
+both full scale runs were repeated. All figures above and in the evidence
+file exclude the rejected trial.
