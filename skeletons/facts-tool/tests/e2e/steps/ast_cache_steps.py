@@ -35,8 +35,12 @@ def custom(ast_cache):
 
 @given("a persisted AST from extraction")
 def persisted(ast_cache):
+    warmed = bool(ast_cache.ast_files())
     ast_cache.run("extract")
-    require_stored(ast_cache)
+    if warmed:
+        require_hit(ast_cache)
+    else:
+        require_stored(ast_cache)
     ast_cache.baseline = fact_snapshot(ast_cache)
     ast_cache.cache_before = ast_cache.snapshot_cache()
 
@@ -62,6 +66,12 @@ def cold(ast_cache):
 @then("the persisted AST is reused")
 def reused(ast_cache):
     require_hit(ast_cache)
+
+
+@then("the import-prepared AST is reused for the first extraction")
+def first_extraction(ast_cache):
+    require_hit(ast_cache)
+    ast_cache.baseline = fact_snapshot(ast_cache)
 
 
 @then("cold and warm extraction facts are identical")

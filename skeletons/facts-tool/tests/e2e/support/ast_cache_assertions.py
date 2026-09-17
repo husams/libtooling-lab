@@ -57,7 +57,11 @@ def require_dependency_hit(project):
     project.succeed()
     assert "dependency-cache: hit" in project.last.stderr, project.last.stderr
     assert "dependency-cache: miss" not in project.last.stderr, project.last.stderr
-    assert "ast-cache:" not in project.last.stderr, project.last.stderr
+    if project.last_family == "import":
+        assert "ast-cache: miss" not in project.last.stderr, project.last.stderr
+        assert "ast-cache: stored" not in project.last.stderr, project.last.stderr
+    else:
+        assert "ast-cache:" not in project.last.stderr, project.last.stderr
 
 
 def require_consumer_cache_hit(project):

@@ -15,7 +15,7 @@ class CompilationDatabase;
 
 namespace facts::commands {
 
-// One preprocessing pass over every selected source, kept in both shapes
+// Include metadata for every selected source, kept in both shapes
 // callers need it in: the merged, deduplicated union (registration
 // validation) and each source's own transitive include set (the freshness
 // check and index-state marking), so nothing gets preprocessed twice.
@@ -26,15 +26,19 @@ struct DiscoveredIncludes {
   std::unordered_map<std::string, std::vector<std::string>> perSource;
 };
 
+enum class IncludeDiscovery { Dependencies, PrepareAST };
+
 std::expected<DiscoveredIncludes, std::string> discoverIncludedFilesPerSource(
     const clang::tooling::CompilationDatabase &compilations,
     std::span<const std::string> selectedSources,
-    const astcache::Options &cache = {});
+    const astcache::Options &cache = {},
+    IncludeDiscovery discovery = IncludeDiscovery::Dependencies);
 
 std::expected<std::vector<std::string>, std::string>
 discoverIncludedFiles(const clang::tooling::CompilationDatabase &compilations,
                       std::span<const std::string> selectedSources,
-    const astcache::Options &cache = {});
+                      const astcache::Options &cache = {},
+                      IncludeDiscovery discovery = IncludeDiscovery::Dependencies);
 
 } // namespace facts::commands
 

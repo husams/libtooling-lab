@@ -2,6 +2,7 @@
 
 #include "commands/PreprocessTranslationUnit.h"
 #include "platform/PlatformFlags.h"
+#include "tooling/astcache/Cache.h"
 
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
@@ -28,12 +29,27 @@ void announceProgress(std::size_t index, std::size_t total,
   }
 }
 
+std::expected<IncludeGraphFacts, std::string> discoverSourceIncludes(
+    const clang::tooling::CompilationDatabase &database,
+    const std::string &source, const astcache::Options &cache,
+    IncludeDiscovery discovery) {
+  if (!cache.enabled || discovery == IncludeDiscovery::Dependencies)
+    return preprocessTranslationUnit(database, source, cache);
+  IncludeGraphFacts includes;
+  if (astcache::prepareAST(database, source, includes, cache) != 0)
+    return std::unexpected("cannot prepare imported source: " +
+                           clang::tooling::getAbsolutePath(source) +
+                           " failed to preprocess; fix the compile commands "
+                           "and import again");
+  return includes;
+}
+
 } // namespace
 
 std::expected<DiscoveredIncludes, std::string> discoverIncludedFilesPerSource(
     const clang::tooling::CompilationDatabase &compilations,
     std::span<const std::string> selectedSources,
-    const astcache::Options &cache) {
+    const astcache::Options &cache, IncludeDiscovery discovery) {
   return configurePlatformCompilationDatabase(compilations, selectedSources)
       .transform_error([](std::string error) {
         return "cannot resolve included files: " + std::move(error);
@@ -45,7 +61,8 @@ std::expected<DiscoveredIncludes, std::string> discoverIncludedFilesPerSource(
         for (std::size_t index = 0; index < selectedSources.size(); ++index) {
           const auto &source = selectedSources[index];
           announceProgress(index, selectedSources.size(), source);
-          auto preprocessed = preprocessTranslationUnit(*configured, source, cache);
+          auto preprocessed =
+              discoverSourceIncludes(*configured, source, cache, discovery);
           if (!preprocessed)
             return std::unexpected(std::move(preprocessed.error()));
           auto facts = std::move(*preprocessed);
@@ -69,8 +86,9 @@ std::expected<DiscoveredIncludes, std::string> discoverIncludedFilesPerSource(
 std::expected<std::vector<std::string>, std::string>
 discoverIncludedFiles(const clang::tooling::CompilationDatabase &compilations,
                       std::span<const std::string> selectedSources,
-                      const astcache::Options &cache) {
-  return discoverIncludedFilesPerSource(compilations, selectedSources, cache)
+                      const astcache::Options &cache, IncludeDiscovery discovery) {
+  return discoverIncludedFilesPerSource(compilations, selectedSources, cache,
+                                       discovery)
       .transform([](DiscoveredIncludes discovered) {
         return std::move(discovered.merged);
       });

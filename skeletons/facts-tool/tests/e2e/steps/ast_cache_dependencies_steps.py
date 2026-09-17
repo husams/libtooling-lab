@@ -69,7 +69,8 @@ def shadow_header(ast_cache):
                                                     encoding="utf-8")
     ast_cache.commit_inputs()
     ast_cache.run("import")
-    ast_cache.succeed()
+    require_miss(ast_cache)
+    require_stored(ast_cache)
     ast_cache.run("extract")
 
 
@@ -87,7 +88,8 @@ def optional_available(ast_cache):
                                                 encoding="utf-8")
     ast_cache.commit_inputs()
     ast_cache.run("import")
-    ast_cache.succeed()
+    require_miss(ast_cache)
+    require_stored(ast_cache)
     ast_cache.run("extract")
 
 
@@ -103,14 +105,15 @@ def response_changed(ast_cache):
     (ast_cache.root / "compile.rsp").write_text("-DCACHE_VALUE=7 -DCACHE_MODE=1\n", encoding="utf-8")
     ast_cache.commit_inputs()
     ast_cache.run("import")
-    ast_cache.succeed()
+    require_miss(ast_cache)
+    require_stored(ast_cache)
+    ast_cache.refreshed_by_import = True
     ast_cache.run("extract")
 
 
 @then(parsers.parse('the changed include lookup exposes "{symbol}"'))
 def lookup_changed(ast_cache, symbol):
-    require_miss(ast_cache)
-    require_stored(ast_cache)
+    require_hit(ast_cache)
     require_symbol(ast_cache, symbol)
     ast_cache.run("extract")
     require_hit(ast_cache)

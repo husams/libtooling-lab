@@ -73,6 +73,11 @@ locateEntry(const clang::tooling::CompilationDatabase &database,
     return std::unexpected("AST caching requires one compile command per TU");
   auto command = commands.front();
   command.CommandLine = parseArguments(command, clearAdjusters);
+  // Recovery freezes the already adjusted command before passing it here.
+  // Share import's existing key when applying the default adjusters would
+  // leave those arguments unchanged; the control flag is not a compiler input.
+  if (clearAdjusters && command.CommandLine == parseArguments(command, false))
+    clearAdjusters = false;
   const auto cwd = fs::absolute(command.Directory, error);
   if (error)
     return std::unexpected(error.message());

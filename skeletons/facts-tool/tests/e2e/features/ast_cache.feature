@@ -70,7 +70,7 @@ Feature: Reuse persisted Clang ASTs across native commands
   Scenario: A persisted AST retains its compilation directory across CLI invocations
     Given an explicitly configured AST cache project with relative nested includes
     When the AST cache project runs "extract"
-    Then the cold AST is persisted
+    Then the import-prepared AST is reused for the first extraction
     And the original nested include symbols and registered header paths are retained
     When warm extraction runs from another process directory using absolute selectors
     Then the persisted AST is reused

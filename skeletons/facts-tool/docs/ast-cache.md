@@ -17,24 +17,34 @@ Configuration inspection does not create the directory.
 
 | Command | Cache behavior |
 | --- | --- |
-| `extract` | Saves parsed TUs and traverses loaded ASTs on subsequent extraction. |
+| `import` | Parses each cache miss once, saving the AST and collecting dependency metadata during that parse. Reuses both at the same Git commit. |
+| `extract` | Traverses the AST prepared by import, including on the first extraction. Parses and saves a replacement only when the cache is missing or stale. |
 | `match` | Runs the matcher against the shared saved AST. |
 | `analyse variable-flow` | Builds its analysis from saved ASTs. |
 | `analyse call-graph --recover-missing` | Reuses saved ASTs for recovery scans. |
-| `import` | Collects dependencies during preprocessing and stores them in the project database. Reuses them at the same Git commit. |
 | `analyse dependency` | Reads the saved dependencies without loading an AST; preprocesses and refreshes missing or stale records. |
 | Queries and catalog operations | Do not load or create ASTs. |
 
-Import and dependency discovery use preprocessing-only behavior on a miss.
-They can therefore still accept code whose preprocessing succeeds but whose
-C++ semantic analysis would fail. Commands that build an AST populate the
-shared cache. Existing extraction freshness checks still apply: use `extract
---force` to request extraction even when the facts database is already current.
+Enable caching before import to pay the parsing and dependency discovery cost
+during import. The first `extract`, `match`, or analysis then consumes that
+prepared cache without preprocessing the source or rescanning its dependencies.
+Import processes one translation unit at a time and does not extract semantic
+facts. An unchanged reimport checks the saved metadata and artifact integrity
+without deserializing the AST or rewriting it.
+
+With caching disabled, import retains its preprocessing-only behavior. If an
+enabled import cannot build an AST because of C++ semantic errors, it falls
+back to preprocessing for file registration; no invalid AST is published.
+Dependency discovery remains preprocessing-only on a miss. Missing, corrupt,
+or stale ASTs are repaired when import or an AST consumer next needs them.
+Existing extraction freshness checks still apply: use `extract --force` to
+request extraction even when the facts database is already current.
 
 Verbose output (`-v 1`) distinguishes `dependency-cache` events from
-`ast-cache: miss`, `ast-cache: stored`, and `ast-cache: hit`. A dependency hit
-does not open or deserialize an AST. Disabled caching performs no cache reads
-or writes and does not populate the metadata tables.
+`ast-cache: miss`, `ast-cache: stored`, and `ast-cache: hit`. Dependency analysis
+reads only SQLite metadata on a hit. Warm import also reads the AST bytes to
+verify integrity, without deserializing them. Disabled caching performs no
+cache reads or writes and does not populate the metadata tables.
 
 ## Project database metadata
 
@@ -55,6 +65,11 @@ for a different generation invalidates the old AST record in the same
 transaction. Re-importing unchanged dependencies preserves it. The binary
 AST remains `<ast_cache_dir>/<compile-fingerprint>.ast`; legacy JSON sidecars
 are ignored and legacy entries are rebuilt when needed.
+
+When a commit changes, import replaces the AST and dependency generation
+together so the next consumer can immediately reuse the refreshed artifact.
+Existing valid dependency metadata can also repair a missing or corrupt AST
+without a separate dependency preprocessing pass.
 
 ## Boundaries
 
@@ -85,6 +100,7 @@ Sources without a tracked Git commit use normal preprocessing and parsing.
 
 Invalid or unreadable entries fall back to parsing. Failed parses are never
 published. Cache storage failures do not fail an otherwise successful command.
+Import still saves dependency metadata when the AST directory is unavailable.
 Time-dependent builtin macro values follow the saved AST until its commit
 changes. Compiler diagnostics are produced when a TU is parsed.
 Concurrent access uses a per-entry lock and atomic file replacement; a busy

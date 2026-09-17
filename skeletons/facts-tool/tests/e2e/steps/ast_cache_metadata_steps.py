@@ -5,10 +5,12 @@ import sqlite3
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from support.ast_cache_assertions import require_hit, require_miss, require_stored, require_symbol
+from support.ast_cache_assertions import (require_consumer_cache_hit, require_consumer_result,
+                                          require_hit, require_miss, require_stored, require_symbol)
 from support.ast_cache_metadata import (MetadataObservation, downgrade_project, registry_records,
-                                        require_dependency_hit, require_dependency_stored,
-                                        require_include_fact, require_normalized_inputs, snapshot)
+                                        require_dependency_hit, require_import_stored,
+                                        require_imported_artifact, require_include_fact,
+                                        require_normalized_inputs, snapshot)
 from support.database import query
 
 
@@ -20,28 +22,30 @@ def cache_metadata():
 @given("dependency metadata has been imported into the project database")
 def imported(ast_cache, cache_metadata):
     ast_cache.run("import")
-    require_dependency_stored(ast_cache)
+    require_import_stored(ast_cache)
     require_normalized_inputs(ast_cache)
+    require_stored(ast_cache)
+    require_imported_artifact(ast_cache)
     cache_metadata.rows = snapshot(ast_cache)
+    cache_metadata.artifacts = ast_cache.snapshot_cache()
 
 
 @then("import stores normalized input, include, and Git revision rows")
 def normalized(ast_cache):
-    require_dependency_stored(ast_cache)
+    require_import_stored(ast_cache)
     require_normalized_inputs(ast_cache)
 
 
-@then("import creates neither serialized ASTs nor JSON sidecars")
-def no_import_artifacts(ast_cache):
-    assert not ast_cache.ast_files()
-    assert not tuple(ast_cache.cache.rglob("*.json"))
-    assert not query(ast_cache.conf, "SELECT * FROM ast_cache_artifact")
+@then("import creates a serialized AST with matching database metadata and no JSON sidecars")
+def import_artifacts(ast_cache):
+    require_imported_artifact(ast_cache)
 
 
 @then("the unchanged dependency metadata is reused without preprocessing")
 def unchanged(ast_cache, cache_metadata):
     require_dependency_hit(ast_cache)
     assert snapshot(ast_cache) == cache_metadata.rows
+    assert ast_cache.snapshot_cache() == cache_metadata.artifacts
 
 
 @given("the committed source reports each preprocessing pass")
@@ -57,6 +61,7 @@ def one_preprocessing_pass(ast_cache, cache_metadata):
     diagnostics = ast_cache.last.stderr
     assert diagnostics.count("warning: CACHE_IMPORT_PREPROCESS_PROBE") == 1, diagnostics
     cache_metadata.rows = snapshot(ast_cache)
+    cache_metadata.artifacts = ast_cache.snapshot_cache()
 
 
 @then("reimport emits no preprocessing probe warning")
@@ -69,6 +74,33 @@ def uncommitted_error(ast_cache):
     with ast_cache.source.open("a", encoding="utf-8") as source:
         source.write("\n#error CACHE_METADATA_MUST_NOT_PREPROCESS\n")
     ast_cache.run("import")
+
+
+@then(parsers.parse('the first "{family}" consumer reuses the imported cache without rescanning or rewriting it'))
+def first_consumer(ast_cache, cache_metadata, family):
+    require_consumer_cache_hit(ast_cache)
+    require_consumer_result(ast_cache, family)
+    diagnostics = ast_cache.last.stderr
+    assert "AST_CACHE_UNCOMMITTED_INPUT" not in diagnostics, diagnostics
+    assert "warning: CACHE_IMPORT_PREPROCESS_PROBE" not in diagnostics, diagnostics
+    assert "dependency-cache: miss" not in diagnostics, diagnostics
+    assert "dependency-cache: stored" not in diagnostics, diagnostics
+    assert "ast-cache: stored" not in diagnostics, diagnostics
+    assert snapshot(ast_cache) == cache_metadata.rows
+    assert ast_cache.snapshot_cache() == cache_metadata.artifacts
+
+
+@then("import repairs the serialized AST without a separate dependency preprocessing pass")
+def repaired_import(ast_cache, cache_metadata):
+    require_miss(ast_cache)
+    require_stored(ast_cache)
+    require_imported_artifact(ast_cache)
+    diagnostics = ast_cache.last.stderr
+    assert "dependency-cache: miss" not in diagnostics, diagnostics
+    assert diagnostics.count("warning: CACHE_IMPORT_PREPROCESS_PROBE") == 1, diagnostics
+    after = snapshot(ast_cache)
+    for table in ("ast_cache_snapshot", "ast_cache_input", "ast_cache_include", "ast_cache_revision"):
+        assert after[table] == cache_metadata.rows[table]
 
 
 @given(parsers.parse('the serialized AST is "{condition}" but database metadata remains intact'))
@@ -101,19 +133,20 @@ def commit_reimport(ast_cache, cache_metadata):
     ast_cache.run("import")
 
 
-@then("the refreshed dependency snapshot does not validate the previous AST")
+@then("import replaces the previous AST with the refreshed dependency generation")
 def new_generation(ast_cache, cache_metadata):
-    require_dependency_stored(ast_cache)
+    require_import_stored(ast_cache)
     require_normalized_inputs(ast_cache)
+    require_stored(ast_cache)
+    require_imported_artifact(ast_cache)
     after = snapshot(ast_cache)
     assert after["ast_cache_snapshot"][0][3] != cache_metadata.rows["ast_cache_snapshot"][0][3]
-    assert not after["ast_cache_artifact"], after
+    assert after["ast_cache_artifact"][0][3] != cache_metadata.rows["ast_cache_artifact"][0][3]
 
 
-@then("extraction regenerates the AST with the newly committed symbol")
+@then("extraction reuses the imported AST with the newly committed symbol")
 def fresh_extraction(ast_cache):
-    require_miss(ast_cache)
-    require_stored(ast_cache)
+    require_hit(ast_cache)
     require_symbol(ast_cache, "cache_metadata_new_commit")
 
 
@@ -143,6 +176,35 @@ def no_metadata(ast_cache):
 @given("the AST cache project has no Git repository")
 def no_git(ast_cache):
     shutil.rmtree(ast_cache.root / ".git")
+
+
+@given("the committed source preprocesses successfully but has a C++ semantic error")
+def semantic_error(ast_cache):
+    with ast_cache.source.open("a", encoding="utf-8") as source:
+        source.write("\nint cache_invalid_semantics = CACHE_UNDECLARED_IDENTIFIER;\n")
+    ast_cache.commit_inputs()
+
+
+@then("import preserves dependency metadata without publishing an invalid AST")
+def import_semantic_error(ast_cache):
+    ast_cache.succeed()
+    require_normalized_inputs(ast_cache)
+    assert not ast_cache.ast_files()
+    assert not query(ast_cache.conf, "SELECT * FROM ast_cache_artifact")
+    assert "ast-cache: stored" not in ast_cache.last.stderr, ast_cache.last.stderr
+
+
+@then("the unavailable AST directory retains its original contents")
+def retained_blocker(ast_cache):
+    assert ast_cache.cache.read_text(encoding="utf-8") == "existing user file"
+
+
+@then("extraction reports the semantic error without a cache hit")
+def extract_semantic_error(ast_cache):
+    assert ast_cache.last.returncode != 0, ast_cache.last.stdout + ast_cache.last.stderr
+    assert "CACHE_UNDECLARED_IDENTIFIER" in ast_cache.last.stderr, ast_cache.last.stderr
+    assert "ast-cache: hit" not in ast_cache.last.stderr, ast_cache.last.stderr
+    assert not ast_cache.ast_files()
 
 
 @given(parsers.parse("the imported project database has legacy schema version {version:d}"))

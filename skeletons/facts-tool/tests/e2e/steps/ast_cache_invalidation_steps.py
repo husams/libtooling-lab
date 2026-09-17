@@ -18,7 +18,9 @@ def change_input(ast_cache, input_kind):
     elif input_kind == "compiler arguments":
         ast_cache.write_commands("-DCACHE_MODE=1")
         ast_cache.run("import")
-        ast_cache.succeed()
+        require_miss(ast_cache)
+        require_stored(ast_cache)
+        ast_cache.refreshed_by_import = True
     elif input_kind == "header commit with preserved size and timestamp":
         before = ast_cache.header.stat()
         ast_cache.header.write_text(
@@ -35,8 +37,11 @@ def change_input(ast_cache, input_kind):
 
 @then(parsers.parse('AST regeneration exposes the fresh symbol "{symbol}"'))
 def fresh_symbol(ast_cache, symbol):
-    require_miss(ast_cache)
-    require_stored(ast_cache)
+    if getattr(ast_cache, "refreshed_by_import", False):
+        require_hit(ast_cache)
+    else:
+        require_miss(ast_cache)
+        require_stored(ast_cache)
     require_symbol(ast_cache, symbol)
     ast_cache.run("extract")
     require_hit(ast_cache)

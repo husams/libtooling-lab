@@ -1,6 +1,7 @@
 #include "tooling/astcache/Storage.h"
 
 #include "tooling/astcache/Serialization.h"
+#include "tooling/astcache/Snapshot.h"
 
 #include <clang/Frontend/ASTUnit.h>
 #include <llvm/ADT/ScopeExit.h>
@@ -13,7 +14,8 @@
 
 namespace facts::astcache::detail {
 
-std::unique_ptr<clang::ASTUnit> loadAST(const Entry &entry) {
+std::unique_ptr<clang::ASTUnit> loadAST(const Entry &entry,
+                                      IncludeGraphFacts *includes) {
   // Validate and deserialize under the same nonblocking lock as writers.
   llvm::LockFileManager lock(entry.ast.string());
   auto acquired = lock.tryLock();
@@ -21,9 +23,27 @@ std::unique_ptr<clang::ASTUnit> loadAST(const Entry &entry) {
     llvm::consumeError(acquired.takeError());
     return nullptr;
   }
-  if (!*acquired || !validEntry(entry))
+  if (!*acquired)
     return nullptr;
-  return loadSerialized(entry.ast, entry.working_directory);
+  const auto snapshot = readValidEntry(entry);
+  if (!snapshot)
+    return nullptr;
+  auto unit = loadSerialized(entry.ast, entry.working_directory);
+  if (unit && includes)
+    *includes = includesFromSnapshot(*snapshot);
+  return unit;
+}
+
+std::optional<IncludeGraphFacts> preparedIncludes(const Entry &entry) {
+  llvm::LockFileManager lock(entry.ast.string());
+  auto acquired = lock.tryLock();
+  if (!acquired) {
+    llvm::consumeError(acquired.takeError());
+    return std::nullopt;
+  }
+  if (!*acquired)
+    return std::nullopt;
+  return readValidEntry(entry).transform(includesFromSnapshot);
 }
 
 std::expected<void, std::string> storeAST(const Entry &entry,

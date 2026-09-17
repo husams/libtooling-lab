@@ -1,5 +1,6 @@
 #include "commands/Match.h"
 
+#include "commands/CompilationDatabase.h"
 #include "commands/ConfigurationSupport.h"
 #include "commands/DatabasePaths.h"
 #include "commands/ExtractionSetup.h"
@@ -80,7 +81,8 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
              ? "; pass --conf <project db> for a separate project database, "
                "or omit --facts to use facts_template"
              : ""));
-  auto commands = requireStoredCommands(std::move(*loaded));
+  auto commands = requireStoredCommands(
+      appendExtraArguments(std::move(*loaded), resolved->extraArguments));
   if (!commands)
     return std::unexpected(commands.error());
   auto opened =

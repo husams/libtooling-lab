@@ -4,7 +4,7 @@ import json
 from pytest_bdd import given, then
 
 from support.ast_cache_assertions import require_symbol
-from support.ast_cache_metadata import require_dependency_stored, snapshot
+from support.ast_cache_metadata import require_import_stored, snapshot
 from support.database import file_snapshot
 
 
@@ -27,7 +27,7 @@ def relative_compile_command(ast_cache):
     command["arguments"].insert(2, "-Iheaders")
     database.write_text(json.dumps(commands), encoding="utf-8")
     ast_cache.run("import")
-    require_dependency_stored(ast_cache)
+    require_import_stored(ast_cache)
     rows = snapshot(ast_cache)["ast_cache_snapshot"]
     assert len(rows) == 1, rows
     ast_cache.relative_snapshot_key = rows[0][0]
