@@ -120,11 +120,16 @@ unrelated `project_registry.schema_version`.
 | `ast_cache_include` | `(snapshot_key, source, target) PK` | Include relationships, retained independently of binary ASTs |
 | `ast_cache_revision` | `(snapshot_key, path) PK`, `commit_hash` | Repository root and HEAD commit; existing snapshots refresh when a recorded commit changes |
 | `ast_cache_artifact` | `snapshot_key PK`, `path`, `digest`, `generation` | Binary AST integrity and dependency generation; a changed snapshot invalidates the artifact record |
+| `driver_include_probe` | `key PK`, `include_count`, `digest` | Optional GNU include-search result keyed by compiler identity and probe context |
+| `driver_include_path` | `(probe_key, position) PK`, `path` | Ordered include-search paths; references `driver_include_probe(key)` with cascade deletion |
 
 The cache tables are added at `project_registry.schema_version = 2`. Import
 migrates older projects without replacing existing IDs or compile commands.
 Metadata uses typed columns rather than serialized JSON. The `.ast` binary
 stays in `ast_cache_dir`. See [persistent AST cache](../../ast-cache.md).
+The two optional driver-discovery tables are created lazily after a successful
+GNU probe with caching enabled. They do not change the project schema version;
+missing, incomplete, or corrupt discovery records trigger a fresh probe.
 
 `matched_symbol_index` is a match-only discovery index: a hit is a real
 candidate, but a miss never proves a symbol is absent from source, and an

@@ -204,6 +204,7 @@ target_include_directories(facts-model INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src
 target_link_libraries(facts-model INTERFACE facts-clang)
 
 add_library(facts-storage STATIC
+  src/storage/driverprobe/Database.cpp
   src/storage/astcache/Artifact.cpp
   src/storage/astcache/Connection.cpp
   src/storage/astcache/SnapshotRead.cpp
@@ -384,6 +385,7 @@ target_link_libraries(facts-ast
 
 add_library(facts-platform STATIC
   src/platform/DriverIncludes.cpp
+  src/platform/DriverProbeKey.cpp
   src/platform/PlatformFlags.cpp
   src/platform/ResourceDirectory.cpp
 )
@@ -391,7 +393,7 @@ target_include_directories(facts-platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
 target_compile_definitions(
   facts-platform PRIVATE FACTS_LINKED_CLANG_CPP="$<TARGET_FILE:clang-cpp>"
 )
-target_link_libraries(facts-platform PRIVATE facts-clang)
+target_link_libraries(facts-platform PRIVATE facts-clang facts-storage)
 
 add_subdirectory(src/tooling/astcache)
 add_subdirectory(src/analysis/variableflow)
@@ -676,6 +678,9 @@ if(BUILD_TESTING)
   )
   add_executable(platform-flags-test tests/PlatformFlagsTest.cpp)
   target_link_libraries(platform-flags-test PRIVATE facts-platform facts-clang)
+  add_executable(driver-probe-cache-test tests/DriverProbeCacheTest.cpp)
+  target_link_libraries(driver-probe-cache-test PRIVATE facts-platform facts-storage facts-clang)
+  add_test(NAME driver-probe-cache COMMAND driver-probe-cache-test)
   add_test(
     NAME platform-flags
     COMMAND platform-flags-test

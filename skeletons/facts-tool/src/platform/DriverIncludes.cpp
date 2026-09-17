@@ -1,4 +1,7 @@
 #include "platform/DriverIncludes.h"
+#include "platform/DriverProbeKey.h"
+#include "storage/driverprobe/Database.h"
+#include "tooling/FrontendActivity.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -49,7 +52,7 @@ resolveDriver(const clang::tooling::CompileCommand &command) {
 bool takesSeparateValue(std::string_view option) {
   constexpr std::array options{"--target",       "-target",   "--gcc-toolchain",
                                "-gcc-toolchain", "--sysroot", "-isysroot",
-                               "-stdlib"};
+                               "-stdlib", "-B"};
   return std::ranges::find(options, option) != options.end();
 }
 
@@ -57,7 +60,8 @@ bool isJoinedProbeOption(std::string_view option) {
   constexpr std::array prefixes{
       "--target=",       "-target=",   "--gcc-toolchain=",
       "-gcc-toolchain=", "--sysroot=", "-stdlib="};
-  return option == "-m32" || option == "-m64" ||
+  return option.starts_with("-m") || option.starts_with("-B") ||
+         option.starts_with("-isysroot") ||
          std::ranges::any_of(prefixes, [&](std::string_view prefix) {
            return option.starts_with(prefix);
          });
@@ -81,29 +85,21 @@ Arguments executableProbeOptions(const Arguments &options) {
   Arguments supported;
   for (std::size_t index = 0; index < options.size(); ++index) {
     const std::string_view option(options[index]);
-    if ((option == "--sysroot" || option == "-isysroot") &&
+    if ((option == "--sysroot" || option == "-isysroot" || option == "-B") &&
         index + 1 < options.size()) {
       supported.push_back(options[index]);
       supported.push_back(options[++index]);
-    } else if (option.starts_with("--sysroot=") || option == "-m32" ||
-               option == "-m64") {
+    } else if (option.starts_with("--sysroot=") || option.starts_with("-m") ||
+               option.starts_with("-isysroot") || option.starts_with("-B")) {
       supported.push_back(options[index]);
     }
   }
   return supported;
 }
 
-std::string cacheKey(const std::filesystem::path &driver,
-                     const Arguments &options) {
-  std::ostringstream key;
-  key << driver.string();
-  for (const auto &option : options)
-    key << '\x1f' << option;
-  return key.str();
-}
-
 std::expected<std::string, std::string>
-runDriverProbe(const std::filesystem::path &driver, const Arguments &options) {
+runDriverProbe(const std::filesystem::path &driver, const Arguments &options,
+                const std::filesystem::path &directory) {
   llvm::SmallString<128> outputPath;
   llvm::SmallString<128> errorPath;
   int output = -1;
@@ -121,7 +117,12 @@ runDriverProbe(const std::filesystem::path &driver, const Arguments &options) {
   llvm::sys::fs::closeFile(error);
   llvm::FileRemover removeError(errorPath);
 
-  Arguments owned{driver.string()};
+  // LLVM's process API has no working-directory option. The fixed script
+  // changes only the child's directory; every path/option is a separate argv
+  // value and is never interpreted as shell text.
+  Arguments owned{"/bin/sh", "-c", "cd \"$1\" && shift && exec \"$@\"",
+                  "facts-driver-probe", std::filesystem::absolute(directory).string(),
+                  std::filesystem::absolute(driver).string()};
   owned.insert(owned.end(), options.begin(), options.end());
   owned.insert(owned.end(), {"-E", "-x", "c++", "-", "-v"});
   llvm::SmallVector<llvm::StringRef> arguments;
@@ -134,7 +135,7 @@ runDriverProbe(const std::filesystem::path &driver, const Arguments &options) {
   std::string executionError;
   bool executionFailed = false;
   const int result = llvm::sys::ExecuteAndWait(
-      driver.string(), arguments, std::nullopt, redirects, 0, 0,
+      "/bin/sh", arguments, std::nullopt, redirects, 0, 0,
       &executionError, &executionFailed);
   auto diagnostics = llvm::MemoryBuffer::getFile(errorPath);
   const std::string text =
@@ -154,8 +155,8 @@ runDriverProbe(const std::filesystem::path &driver, const Arguments &options) {
 
 bool isCxxLibraryDirectory(const std::filesystem::path &path) {
   const auto value = path.generic_string();
-  return value.find("/include/c++/") != std::string::npos ||
-         value.ends_with("/include/c++");
+  return value.find("/include/") != std::string::npos &&
+         (value.find("/c++/") != std::string::npos || value.ends_with("/c++"));
 }
 
 std::expected<IncludePaths, std::string>
@@ -164,14 +165,17 @@ parseIncludeSearch(const std::filesystem::path &driver,
   std::istringstream lines(diagnostics);
   std::string line;
   bool collecting = false;
+  bool complete = false;
   IncludePaths includes;
   while (std::getline(lines, line)) {
     if (line.find("#include <...> search starts here:") != std::string::npos) {
       collecting = true;
       continue;
     }
-    if (collecting && line.find("End of search list.") != std::string::npos)
+    if (collecting && line.find("End of search list.") != std::string::npos) {
+      complete = true;
       break;
+    }
     if (!collecting)
       continue;
     const auto first = line.find_first_not_of(" \t");
@@ -185,6 +189,9 @@ parseIncludeSearch(const std::filesystem::path &driver,
     if (isCxxLibraryDirectory(include))
       includes.push_back(std::move(include));
   }
+  if (!complete)
+    return std::unexpected("GNU driver probe produced an incomplete include search list for " +
+                           driver.string() + "\n" + diagnostics);
   if (includes.empty())
     return std::unexpected(
         "GNU driver probe produced no C++ include paths for " +
@@ -192,25 +199,74 @@ parseIncludeSearch(const std::filesystem::path &driver,
   return includes;
 }
 
+struct ProbeMemory {
+  std::mutex mutex;
+  std::map<std::string, IncludePaths> entries;
+};
+
+ProbeMemory &probeMemory() {
+  static ProbeMemory memory;
+  return memory;
+}
+
+std::string memoryKey(std::string_view key, const astcache::Options &options) {
+  return std::string(options.enabled ? "enabled:" : "disabled:") +
+         std::to_string(options.database.string().size()) + ":" +
+         options.database.string() + std::string(key);
+}
+
+IncludePaths rememberIncludes(std::string key, IncludePaths includes) {
+  auto &memory = probeMemory();
+  const std::lock_guard lock(memory.mutex);
+  if (memory.entries.size() >= 128)
+    memory.entries.erase(memory.entries.begin());
+  return memory.entries.emplace(std::move(key), std::move(includes)).first->second;
+}
+
+std::optional<IncludePaths> cachedProbeIncludes(std::string_view key,
+                                               const astcache::Options &options) {
+  const auto localKey = memoryKey(key, options);
+  auto &memory = probeMemory();
+  {
+    const std::lock_guard lock(memory.mutex);
+    if (const auto found = memory.entries.find(localKey); found != memory.entries.end())
+      return found->second;
+  }
+  if (!options.enabled || options.database.empty())
+    return std::nullopt;
+  auto stored = storage::driverprobe::read(options.database, key);
+  if (!stored || !*stored)
+    return std::nullopt;
+  return rememberIncludes(localKey, std::move(**stored));
+}
+
+IncludePaths publishProbeIncludes(std::string_view key, IncludePaths includes,
+                                  const astcache::Options &options) {
+  if (options.enabled && !options.database.empty())
+    (void)storage::driverprobe::write(options.database, key, includes);
+  return rememberIncludes(memoryKey(key, options), std::move(includes));
+}
+
 std::expected<IncludePaths, std::string>
-discoverIncludes(const clang::tooling::CompileCommand &command) {
+discoverIncludes(const clang::tooling::CompileCommand &command,
+                 const astcache::Options &cacheOptions) {
   return resolveDriver(command).and_then([&](const auto &driver) {
-    const auto options = toolchainOptions(command.CommandLine);
-    const auto key = cacheKey(driver, options);
-    static std::mutex mutex;
-    static std::map<std::string, std::expected<IncludePaths, std::string>>
-        cache;
-    {
-      const std::lock_guard lock(mutex);
-      if (const auto found = cache.find(key); found != cache.end())
-        return found->second;
-    }
-    auto discovered = runDriverProbe(driver, executableProbeOptions(options))
-                          .and_then([&](const auto &diagnostics) {
-                            return parseIncludeSearch(driver, diagnostics);
-                          });
-    const std::lock_guard lock(mutex);
-    return cache.emplace(key, discovered).first->second;
+    const auto directory = std::filesystem::absolute(command.Directory);
+    const auto options = resolveProbeOptions(toolchainOptions(command.CommandLine),
+                                             directory);
+    return driverProbeKey(driver, directory, options)
+        .and_then([&](const auto &key) -> std::expected<IncludePaths, std::string> {
+          if (auto cached = cachedProbeIncludes(key, cacheOptions))
+            return std::move(*cached);
+          reportFrontendActivity(cacheOptions.verbosity, "driver-probe", driver.string());
+          return runDriverProbe(driver, executableProbeOptions(options), directory)
+              .and_then([&](const auto &diagnostics) {
+                return parseIncludeSearch(driver, diagnostics);
+              })
+              .transform([&](auto includes) {
+                return publishProbeIncludes(key, std::move(includes), cacheOptions);
+              });
+        });
   });
 }
 
@@ -273,7 +329,8 @@ appendIncludes(clang::tooling::CompileCommand command,
 std::expected<clang::tooling::CompileCommand, std::string>
 configureCommand(clang::tooling::CompileCommand command,
                  const std::filesystem::path &resourceDirectory,
-                 const std::optional<std::filesystem::path> &sdkRoot) {
+                 const std::optional<std::filesystem::path> &sdkRoot,
+                 const astcache::Options &cache) {
   if (command.CommandLine.empty())
     return std::unexpected("compile command has no target driver: " +
                            command.Filename);
@@ -285,7 +342,7 @@ configureCommand(clang::tooling::CompileCommand command,
                                {"-isysroot", sdkRoot->string()});
   if (!isGnuCxxDriver(command.CommandLine.front()))
     return command;
-  return discoverIncludes(command).transform(
+  return discoverIncludes(command, cache).transform(
       [&](const auto &includes) { return appendIncludes(command, includes); });
 }
 

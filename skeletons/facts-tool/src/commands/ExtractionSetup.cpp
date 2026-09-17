@@ -22,7 +22,34 @@ requireStoredCommands(CompilationDatabasePtr database) {
 std::vector<std::string>
 selectSources(const clang::tooling::CompilationDatabase &database,
               const std::vector<std::string> &requested) {
-  return requested.empty() ? database.getAllFiles() : requested;
+  std::vector<std::string> sources;
+  std::set<std::string> seen;
+  const auto append = [&](const std::filesystem::path &path) {
+    auto identity = std::filesystem::absolute(path).lexically_normal().string();
+    if (seen.insert(identity).second)
+      sources.push_back(std::move(identity));
+  };
+  const auto appendCommand = [&](const auto &command) {
+    const std::filesystem::path source(command.Filename);
+    append(source.is_absolute()
+               ? source
+               : std::filesystem::path(command.Directory) / source);
+  };
+  if (requested.empty()) {
+    for (const auto &command : database.getAllCompileCommands())
+      appendCommand(command);
+    return sources;
+  }
+  for (const auto &candidate : requested) {
+    const auto commands = database.getCompileCommands(candidate);
+    if (commands.empty()) {
+      append(candidate);
+      continue;
+    }
+    for (const auto &command : commands)
+      appendCommand(command);
+  }
+  return sources;
 }
 
 std::expected<std::string, std::string>

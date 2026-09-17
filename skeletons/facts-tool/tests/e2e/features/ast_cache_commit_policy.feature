@@ -27,7 +27,7 @@ Feature: Git commits define the AST and dependency cache refresh boundary
     When Git HEAD advances without changing the translation unit inputs
     Then the new commit rebuilds the AST with unchanged semantic facts
 
-  Scenario: Missing AST storage falls back to parsing without rescanning dependencies
+  Scenario: Missing AST storage falls back to parsing without a separate dependency scan
     Given a persisted AST from extraction
     When the persisted AST file disappears before extraction
     Then the missing AST is rebuilt while dependency metadata is reused

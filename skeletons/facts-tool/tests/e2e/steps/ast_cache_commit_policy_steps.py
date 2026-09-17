@@ -148,8 +148,9 @@ def commit_optional_external_header(ast_cache):
     commit_inputs(external, ast_cache.environment)
     assert git(ast_cache.root, ast_cache.environment, "rev-parse", "HEAD") == source_head
     ast_cache.run("import")
-    ast_cache.succeed()
-    assert "dependency-cache: miss" in ast_cache.last.stderr, ast_cache.last.stderr
+    require_miss(ast_cache)
+    require_stored(ast_cache)
+    ast_cache.refreshed_by_import = True
     ast_cache.run("extract")
 
 

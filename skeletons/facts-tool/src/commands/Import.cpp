@@ -111,7 +111,8 @@ discoverRegistryFiles(const CompilationDatabase &stored,
   return discoverCompilationFiles(stored, sources)
       .and_then([&](CompilationFiles discovered) {
         reportDiagnostics(discovered.diagnostics);
-        return discoverIncludedFiles(stored, sources, cache)
+        return discoverIncludedFiles(stored, sources, cache,
+                                     IncludeDiscovery::PrepareAST)
             .transform([identities = std::move(discovered.files)](
                            std::vector<std::string> included) mutable {
               std::ranges::move(included, std::back_inserter(identities));
@@ -167,6 +168,36 @@ registerFiles(FileManager &files, const CompilationDatabase &stored,
       });
 }
 
+std::expected<std::size_t, std::string>
+registerImportedFiles(FileManager &files, const CompilationDatabase &applied,
+                      const std::vector<std::string> &sources,
+                      const cli::ImportOptions &options) {
+  if (!options.astCache.enabled)
+    return registerFiles(files, applied, sources, options.astCache);
+  // Warm the exact command later consumers read: import normalizes arguments
+  // and selects one deterministic command per source. Scope this read to the
+  // incoming sources so another repository in the same database is untouched.
+  // Explicit import arguments are already stored. Append only the YAML
+  // defaults they do not override, without adding the explicit arguments twice.
+  return tokenizeExtraArguments(options.extraArguments)
+      .transform([&](const std::vector<std::string> &explicitArguments) {
+        auto defaults =
+            overrideArguments(options.defaultExtraArguments, explicitArguments);
+        defaults.resize(defaults.size() - explicitArguments.size());
+        return defaults;
+      })
+      .and_then([&](const std::vector<std::string> &defaults) {
+        return loadStoredCompilationDatabase(options.configuration, sources)
+            .transform([&](CompilationDatabasePtr stored) {
+              return appendExtraArguments(std::move(stored), defaults);
+            });
+      })
+      .and_then([&](CompilationDatabasePtr stored) {
+        return registerFiles(files, *stored, stored->getAllFiles(),
+                             options.astCache);
+      });
+}
+
 std::expected<int, std::string> import(const cli::ImportOptions &options,
                                        std::vector<ProjectComponent> components,
                                        CompilationDatabasePtr database,
@@ -203,8 +234,8 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
               return cli::runStage(
                          options.verbosity, "import", "register files",
                          [&] {
-                           return registerFiles(files, *applied, sources,
-                                                options.astCache);
+                           return registerImportedFiles(files, *applied, sources,
+                                                        options);
                          })
                   .and_then(
                       [&](std::size_t) { return registeredFileCount(files); })

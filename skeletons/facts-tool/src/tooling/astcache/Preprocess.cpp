@@ -1,6 +1,7 @@
 #include "tooling/astcache/Preprocess.h"
 
 #include "storage/astcache/Database.h"
+#include "tooling/FrontendActivity.h"
 #include "tooling/astcache/Metadata.h"
 #include "tooling/astcache/PreprocessAction.h"
 #include "tooling/astcache/RevisionObserver.h"
@@ -43,6 +44,7 @@ void publish(const detail::Entry &entry,
 int preprocess(const clang::tooling::CompilationDatabase &database,
                const std::string &source, IncludeGraphFacts &includes,
                const Options &options) {
+  reportFrontendActivity(options.verbosity, "dependency-scan", source);
   // A separate Clang FileManager prevents relative names in different
   // compilation directories from sharing stale file information.
   clang::tooling::ClangTool tool(database, {source});

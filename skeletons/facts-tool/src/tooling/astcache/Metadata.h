@@ -31,7 +31,7 @@ locateEntry(const clang::tooling::CompilationDatabase &database,
 
 std::expected<std::optional<Snapshot>, std::string>
 readCurrentSnapshot(const Entry &entry);
-bool validEntry(const Entry &entry);
+std::optional<Snapshot> readValidEntry(const Entry &entry);
 std::expected<void, std::string> writeMetadata(const Entry &entry,
                                              const Snapshot &snapshot);
 } // namespace facts::astcache::detail

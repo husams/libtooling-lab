@@ -224,7 +224,7 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         const auto &stale = partitioned.stale;
 
         auto configured = runExtractStage(options, "configure Clang tool", [&] {
-          return configurePlatformCompilationDatabase(*database, stale);
+          return configurePlatformCompilationDatabase(*database, stale, options.astCache);
         });
         if (!configured) {
           return std::expected<int, std::string>{

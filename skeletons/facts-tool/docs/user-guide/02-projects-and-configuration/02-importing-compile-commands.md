@@ -5,6 +5,15 @@ directory used to build each source file - get into the project database.
 Every later `extract`, `match`, or `analyse` run against a source file
 depends on that file having a stored compile command from a prior `import`.
 
+With `ast_cache: true` in your YAML configuration, import also prepares a
+serialized Clang AST for each eligible translation unit and records its
+dependencies in the project database during the same parse. The first
+`extract`, `match`, or analysis can then reuse that AST without preprocessing
+the source or rescanning dependencies. Unchanged reimports reuse the saved
+AST and metadata; new Git commits or compiler contexts refresh them. See
+[Persistent AST cache](../../ast-cache.md) for configuration and the deliberate
+same-commit reuse policy for uncommitted edits.
+
 ## Two ways to supply compile commands
 
 ```console

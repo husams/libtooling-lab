@@ -56,6 +56,16 @@ IncludeGraphFacts includesFromAST(clang::ASTUnit &unit) {
   const std::filesystem::path cwd(unit.getFileSystemOpts().WorkingDir);
   if (const auto main = filePath(manager, manager.getMainFileID(), cwd))
     facts.visitedSources.push_back(*main);
+  // Compiler forced includes can originate in <built-in>, so their directive
+  // has no physical source edge. Still register every parsed file, matching
+  // the complete input set persisted in a dependency snapshot.
+  for (auto info = manager.fileinfo_begin(); info != manager.fileinfo_end();
+       ++info) {
+    const auto &buffer = *info->second;
+    if (buffer.OrigEntry)
+      if (const auto path = canonicalPath(*buffer.OrigEntry, cwd))
+        facts.visitedSources.push_back(*path);
+  }
   auto *record = unit.getPreprocessor().getPreprocessingRecord();
   if (!record)
     return facts;

@@ -1,6 +1,7 @@
 """Project-database observations for native dependency-cache acceptance tests."""
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 import subprocess
 from dataclasses import dataclass, field
@@ -44,13 +45,19 @@ def require_dependency_hit(project):
     assert "dependency-cache: hit" in diagnostics, diagnostics
     assert "dependency-cache: miss" not in diagnostics, diagnostics
     assert "dependency-cache: stored" not in diagnostics, diagnostics
-    assert "ast-cache:" not in diagnostics, diagnostics
+    if project.last_family == "import":
+        assert "ast-cache: miss" not in diagnostics, diagnostics
+        assert "ast-cache: stored" not in diagnostics, diagnostics
+    else:
+        assert "ast-cache:" not in diagnostics, diagnostics
 
 
-def require_dependency_stored(project):
+def require_import_stored(project):
     project.succeed()
-    assert project.last.stderr.count("dependency-cache: miss") == 1, project.last.stderr
-    assert project.last.stderr.count("dependency-cache: stored") == 1, project.last.stderr
+    assert project.last.stderr.count("ast-cache: miss") == 1, project.last.stderr
+    assert project.last.stderr.count("ast-cache: stored") == 1, project.last.stderr
+    assert "dependency-cache: miss" not in project.last.stderr, project.last.stderr
+    assert "dependency-cache: stored" not in project.last.stderr, project.last.stderr
 
 
 def require_normalized_inputs(project):
@@ -69,6 +76,19 @@ def require_normalized_inputs(project):
     for table in ("ast_cache_input", "ast_cache_include", "ast_cache_revision"):
         assert len(rows[table]) == len(set(rows[table])), rows[table]
     assert not query(project.conf, "PRAGMA foreign_key_check")
+
+
+def require_imported_artifact(project):
+    project.succeed()
+    rows = snapshot(project)
+    assert len(rows["ast_cache_artifact"]) == 1, rows
+    key, path, digest, generation = rows["ast_cache_artifact"][0]
+    artifact = Path(path)
+    assert artifact in project.ast_files(), path
+    assert artifact.stat().st_size > 100
+    assert hashlib.sha256(artifact.read_bytes()).hexdigest() == digest
+    assert (key, str(project.source), str(project.root), generation) in rows["ast_cache_snapshot"]
+    assert not tuple(project.cache.rglob("*.json"))
 
 
 def require_include_fact(project):

@@ -4,6 +4,8 @@
 #include "tooling/astcache/FileIdentity.h"
 #include "tooling/astcache/Snapshot.h"
 
+#include <utility>
+
 namespace facts::astcache::detail {
 
 std::expected<std::optional<Snapshot>, std::string>
@@ -16,18 +18,20 @@ readCurrentSnapshot(const Entry &entry) {
       });
 }
 
-bool validEntry(const Entry &entry) {
-  const auto snapshot = readCurrentSnapshot(entry);
+std::optional<Snapshot> readValidEntry(const Entry &entry) {
+  auto snapshot = readCurrentSnapshot(entry);
   if (!snapshot || !*snapshot)
-    return false;
+    return std::nullopt;
   const auto artifact = storage::astcache::readArtifact(entry.database, entry.key);
   if (!artifact || !*artifact || (*artifact)->path != entry.ast.string() ||
       (*artifact)->generation != (*snapshot)->generation)
-    return false;
+    return std::nullopt;
   // Git commits decide freshness. Hash only the serialized artifact to reject
   // corruption; worktree file contents are never read during validation.
   const auto hash = readDigest(entry.ast);
-  return hash && *hash == (*artifact)->digest;
+  if (!hash || *hash != (*artifact)->digest)
+    return std::nullopt;
+  return std::move(*snapshot);
 }
 
 std::expected<void, std::string> writeMetadata(const Entry &entry,

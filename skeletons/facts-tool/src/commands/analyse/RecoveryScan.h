@@ -1,5 +1,6 @@
 #pragma once
 #include "analysis/callgraph/CallGraphQuery.h"
+#include "ast/visitors/IncludeVisitor.h"
 #include "commands/analyse/RecoveryAttempts.h"
 #include "commands/analyse/RecoveryEvidenceScanner.h"
 #include <clang/Frontend/ASTUnit.h>
@@ -16,6 +17,7 @@ struct RecoveryScan {
   // destroyed after them.
   std::shared_ptr<CapturedDiagnostics> diagnostics;
   std::vector<std::unique_ptr<clang::ASTUnit>> units;
+  IncludeGraphFacts includes;
   RecoveryBodyFacts facts;
   std::vector<recovery::RegisteredInput> inputs;
   std::string registry;
