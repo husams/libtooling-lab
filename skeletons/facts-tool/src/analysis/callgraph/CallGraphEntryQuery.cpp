@@ -1,4 +1,5 @@
 #include "analysis/callgraph/CallGraphEntryQuery.h"
+#include "analysis/callgraph/CallGraphNodes.h"
 
 #include "storage/SqliteDatabase.h"
 #include "storage/catalog/Database.h"
@@ -64,10 +65,15 @@ loadCallGraphEntry(const std::string &path, SymbolId symbol) {
                     if (!refs) {
                       return std::unexpected(refs.error());
                     }
-                    return EntryRecord{entries.empty()
-                                           ? std::nullopt
-                                           : std::optional{entries.front()},
-                                       std::move(*refs), false};
+                    return loadCallGraphPointerCalls(database, symbol)
+                        .transform([&](auto pointerCalls) {
+                          return EntryRecord{
+                              entries.empty()
+                                  ? std::nullopt
+                                  : std::optional{entries.front()},
+                              std::move(*refs), false, "unknown",
+                              std::move(pointerCalls)};
+                        });
                   });
             });
       })

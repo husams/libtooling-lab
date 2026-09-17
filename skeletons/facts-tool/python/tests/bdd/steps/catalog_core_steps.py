@@ -6,9 +6,9 @@ from facts_tool.queryplan import out, start, symbol
 from .matrix import run_matrix
 
 
-@then("all 23 persisted relation mappings are available")
+@then("all 24 persisted relation mappings are available")
 def relations_available(cb):
-    assert len(RELATION_NAMES) == 23
+    assert len(RELATION_NAMES) == 24
 
     def query(database, native):
         source = "app::run" if native else "fixture::relationSource"

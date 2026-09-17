@@ -17,4 +17,9 @@ std::expected<void, std::string>
 insertCallGraphRunRows(storage::Database &database, std::int64_t runId,
                        const CallGraphRunRecord &record);
 
+std::expected<void, std::string>
+insertCallGraphRunPointerRows(
+    storage::Database &database, std::int64_t runId,
+    const std::vector<callgraph::QueryPointerCall> &calls);
+
 } // namespace facts::commands

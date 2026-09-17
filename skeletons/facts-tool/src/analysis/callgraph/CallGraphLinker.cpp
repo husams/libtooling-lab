@@ -56,7 +56,8 @@ IndexingResult linkCallGraphFacts(CallGraphFacts facts, FactStore &store) {
                   relations.end());
   std::ranges::sort(sites, {}, siteKey);
   sites.erase(std::ranges::unique(sites, {}, siteKey).begin(), sites.end());
-  if (relations.empty() && facts.entries.empty() && facts.unresolved.empty())
+  if (relations.empty() && facts.entries.empty() && facts.unresolved.empty() &&
+      facts.pointerCalls.empty())
     return {};
   const auto entries =
       facts.entries | std::views::transform([](SymbolId id) {
@@ -65,7 +66,7 @@ IndexingResult linkCallGraphFacts(CallGraphFacts facts, FactStore &store) {
       std::ranges::to<std::vector>();
   return store
       .addCallGraphFacts(relations, sites, externalReferences, entries,
-                         facts.unresolved)
+                         facts.unresolved, facts.pointerCalls)
       .transform_error([](std::error_code error) {
         return IndexingError{"cannot persist call graph facts: " +
                              error.message()};

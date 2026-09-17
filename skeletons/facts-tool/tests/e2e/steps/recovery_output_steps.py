@@ -25,12 +25,12 @@ def validation_output(context, level):
     assert not [row for row in run_info["recovery"] if row[1] == "attempted"], run_info
     assert "symbol(s) recorded" not in result.stderr, result.stderr
     message = "recovery-validation: temporary facts only; user facts unchanged"
+    assert "coverage.unsupported_semantics kind=indirect-call" not in result.stderr, result.stderr
     if level == 0:
         assert message not in result.stderr, result.stderr
         assert "coverage.unsupported_semantics" not in result.stderr, result.stderr
         assert "facts-tool: trace:" not in result.stderr, result.stderr
     else:
         assert message in result.stderr, result.stderr
-        assert "coverage.unsupported_semantics kind=indirect-call" in result.stderr
         if level == 3:
             assert "facts-tool: trace: ast node" in result.stderr, result.stderr

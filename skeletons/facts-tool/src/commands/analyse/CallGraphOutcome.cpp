@@ -58,6 +58,7 @@ CallGraphRunRecord makeCallGraphRunRecord(
   if (result.target)
     record.target = std::pair{result.target->id, result.target->usr};
   record.edges = result.traversal.edges;
+  record.pointerCalls = result.pointerCalls;
   record.frontier = result.traversal.frontier;
   record.truncationReason = result.traversal.reason;
   if (recovery)

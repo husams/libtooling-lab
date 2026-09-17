@@ -6,6 +6,7 @@
 #include "model/ExternalReference.h"
 #include "model/ExpressionEvidence.h"
 #include "model/MatchedSymbol.h"
+#include "model/PointerCallSite.h"
 #include "model/Relation.h"
 #include "model/RelationSite.h"
 #include "model/ReturnType.h"
@@ -102,9 +103,14 @@ public:
                     std::span<const RelationSite> sites,
                     std::span<const ExternalReference> references,
                     std::span<const CallGraphEntry> entries,
-                    std::span<const UnresolvedCallSite> unresolved = {});
+                    std::span<const UnresolvedCallSite> unresolved = {},
+                    std::span<const PointerCallSite> pointerCalls = {});
   std::expected<void, std::error_code>
   addUnresolvedCallSites(std::span<const UnresolvedCallSite> sites);
+  std::expected<void, std::error_code>
+  addPointerCallSites(std::span<const PointerCallSite> sites);
+  std::expected<void, std::error_code>
+  clearPointerCallSites(std::span<const SymbolId> callers);
   std::expected<void, std::error_code>
   clearUnresolvedCallSites(std::span<const SymbolId> callers);
   std::expected<void, std::error_code>

@@ -63,7 +63,8 @@ runCallGraphEntry(const cli::CallGraphEntryOptions &options) {
                                [&](const auto &edge) {
                                  return edge.source == (*selected)->id;
                                }) &&
-                  (*selected)->unresolved == 0;
+                  (*selected)->unresolved == 0 &&
+                  (*selected)->pointerCalls == 0;
               if (coverage) {
                 const auto traversal = callgraph::traverseCallGraph(
                     graph, {*selected}, std::nullopt, &*coverage);

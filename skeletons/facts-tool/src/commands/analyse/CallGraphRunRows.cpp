@@ -94,6 +94,6 @@ insertCallGraphRunRows(storage::Database &database, std::int64_t runId,
             runId, row.translationUnit, row.outcome, text(row.diagnostic));
         !inserted)
       return inserted;
-  return {};
+  return insertCallGraphRunPointerRows(database, runId, record.pointerCalls);
 }
 } // namespace facts::commands

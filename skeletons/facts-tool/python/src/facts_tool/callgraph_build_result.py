@@ -35,6 +35,7 @@ def make_run(
         pages[2],
         pages[3],
         pages[4],
+        pages[5],
         provenance,
         flags[0],
         flags[1],

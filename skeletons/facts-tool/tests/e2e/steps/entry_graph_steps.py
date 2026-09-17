@@ -77,8 +77,13 @@ def missing(context):
 def indirect(context):
     entry = lookup(context, "indirect")
     require(entry["entry_available"] and entry["external_targets"] == [], str(entry))
-    require(entry["coverage"]["unresolved_targets"], str(entry))
-    require(entry["is_leaf"] is False, "unresolved calls were reported as a leaf")
+    require(entry["coverage"]["unresolved_targets"] == 0 and
+            entry["coverage"]["pointer_calls"] == 1, str(entry))
+    pointers = entry["pointer_calls"]
+    require(len(pointers) == 1 and pointers[0]["kind"] == "pointer-call" and
+            pointers[0]["signature"] == "int (*)()" and
+            pointers[0]["target"]["name"].endswith("callback"), str(pointers))
+    require(entry["is_leaf"] is False, "pointer calls were reported as a leaf")
 
 
 @then("S-027 freshness and graph truncation remain separate from entries")

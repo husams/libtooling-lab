@@ -85,14 +85,25 @@ public:
                     std::span<const RelationSite> sites,
                     std::span<const ExternalReference> references,
                     std::span<const CallGraphEntry> entries,
-                    std::span<const UnresolvedCallSite> unresolved = {}) {
+                    std::span<const UnresolvedCallSite> unresolved = {},
+                    std::span<const PointerCallSite> pointerCalls = {}) {
     return storage_.addCallGraphFacts(relations, sites, references, entries,
-                                      unresolved);
+                                      unresolved, pointerCalls);
   }
 
   std::expected<void, std::error_code>
   addUnresolvedCallSites(std::span<const UnresolvedCallSite> sites) {
     return storage_.addUnresolvedCallSites(sites);
+  }
+
+  std::expected<void, std::error_code>
+  addPointerCallSites(std::span<const PointerCallSite> sites) {
+    return storage_.addPointerCallSites(sites);
+  }
+
+  std::expected<void, std::error_code>
+  clearPointerCallSites(std::span<const SymbolId> callers) {
+    return storage_.clearPointerCallSites(callers);
   }
 
   std::expected<void, std::error_code>
@@ -256,6 +267,18 @@ public:
     return std::exchange(callableInvocations_, {});
   }
 
+  void stagePointerCallSite(PointerCallSite site) {
+    pointerCallSites_.push_back(std::move(site));
+  }
+
+  const std::vector<PointerCallSite> &pointerCallSites() const {
+    return pointerCallSites_;
+  }
+
+  std::vector<PointerCallSite> takePointerCallSites() {
+    return std::exchange(pointerCallSites_, {});
+  }
+
   void stageUnresolvedCallSite(UnresolvedCallSite site) {
     unresolvedCallSites_.push_back(std::move(site));
   }
@@ -285,6 +308,7 @@ private:
   std::vector<SymbolId> callGraphEntries_;
   std::vector<callgraph::CallFact> callableInvocations_;
   std::vector<UnresolvedCallSite> unresolvedCallSites_;
+  std::vector<PointerCallSite> pointerCallSites_;
   int verbosity_ = 0;
 };
 

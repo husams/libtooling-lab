@@ -1,7 +1,7 @@
 Feature: Committed entries into the shared function graph
   Scenario: Callable semantics survive entry publication and repeated extraction
     Given the S-022 multi-component corpus is extracted
-    Then S-027 entries preserve S-022 invocations and unresolved diagnostics
+    Then S-027 entries preserve S-022 invocations and typed pointer evidence
 
   Scenario: Shared callees, cycles and generated leaves retain one identity
     Given an extracted S-027 application component
@@ -19,7 +19,7 @@ Feature: Committed entries into the shared function graph
     When the S-027 library component is extracted
     Then the S-027 external identity resolves without losing callers or sites
 
-  Scenario: Indirect calls and entry availability do not imply completeness
+  Scenario: Pointer calls retain typed invocation evidence and entry availability
     Given an extracted S-027 application component
     Then S-027 indirect calls have no guessed external identity
     And S-027 freshness and graph truncation remain separate from entries
@@ -83,8 +83,8 @@ Feature: Committed entries into the shared function graph
 
   Scenario: Regenerated function bodies replace obsolete call evidence
     Given an extracted S-027 application component
-    Then S-027 regenerated bodies replace obsolete calls and unresolved sites
+    Then S-027 regenerated bodies replace obsolete calls and pointer sites
 
-  Scenario: Entry command help and output match the recorded pre-change snapshot
+  Scenario: Entry command help and output match the recorded contract snapshot
     Given an extracted S-027 application component
     Then the call-graph-entry help and outputs are byte-identical to the snapshot

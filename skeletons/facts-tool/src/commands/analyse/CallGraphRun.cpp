@@ -5,6 +5,10 @@
 #include "commands/analyse/CallGraphOutcome.h"
 #include "commands/analyse/CallGraphResult.h"
 
+#include <algorithm>
+#include <iterator>
+#include <unordered_set>
+
 namespace facts::commands {
 namespace {
 std::unexpected<std::string> usage(const std::string &message) {
@@ -67,6 +71,13 @@ queryCallGraph(const cli::CallGraphOptions &options,
     result.traversal = std::move(search.traversal);
     result.paths = std::move(search.paths);
   }
+  const std::unordered_set<SymbolId> reached(result.traversal.nodes.begin(),
+                                             result.traversal.nodes.end());
+  std::ranges::copy_if(graph.pointerCalls,
+                      std::back_inserter(result.pointerCalls),
+                      [&](const auto &call) {
+                        return reached.contains(call.site.source);
+                      });
   return result;
 }
 

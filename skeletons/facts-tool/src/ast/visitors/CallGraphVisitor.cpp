@@ -20,6 +20,7 @@ IndexingResult CallGraphVisitor::run() {
   facts.calls = store_.takeCallableInvocations();
   facts.entries = store_.takeCallGraphEntries();
   facts.unresolved = store_.takeUnresolvedCallSites();
+  facts.pointerCalls = store_.takePointerCallSites();
   for (const auto &entry : graph) {
     const auto *node = entry.second.get();
     if (node == graph.getRoot())

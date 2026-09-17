@@ -47,3 +47,14 @@ CALLGRAPH_COLUMNS = {
         "diagnostic",
     },
 }
+
+POINTER_CALL_COLUMNS = {
+    "callgraph_pointer_call_site": {
+        "source_id", "target_id", "file_id", "offset", "line", "col",
+        "signature", "expression",
+    },
+    "callgraph_run_pointer_call_site": {
+        "run_id", "source_id", "target_id", "file_id", "offset", "line", "col",
+        "signature", "expression", "target_name", "target_usr",
+    },
+}

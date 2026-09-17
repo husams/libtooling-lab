@@ -7,7 +7,10 @@ from .callgraph_decode import edge, root, symbol, target
 from .callgraph_frontier import decode as decode_frontier
 from .callgraph_models import CallGraphSymbol
 from .callgraph_outcomes import path_flags
+from .callgraph_page import CallGraphPage
 from .callgraph_page_build import make_page
+from .callgraph_pointer import decode as decode_pointer_call
+from .callgraph_pointer import CallGraphPointerCall, pointer_calls
 from .callgraph_recovery import decode as decode_recovery
 from .callgraph_result import CallGraphRun
 from .paths import FileResolver
@@ -70,10 +73,23 @@ def decode_run(
         make_page(tuple(values), facts, table, run_id, offsets[name], bound, rows)
         for values, table, name, rows in specs
     )
+    pointer_page: CallGraphPage[CallGraphPointerCall] = CallGraphPage((), 0, None)
+    if provenance.facts.schema.user_version >= 14:
+        start = cursors.get("pointer_calls", 0)
+        rows = pointer_calls(facts, run_id, bound + 1, start)
+        pointer_page = make_page(
+            tuple(decode_pointer_call(item, files) for item in rows[:bound]),
+            facts,
+            "callgraph_run_pointer_call_site",
+            run_id,
+            start,
+            bound,
+            rows,
+        )
     return make_run(
         row,
         components,
-        pages,
+        (*pages, pointer_page),
         provenance,
         (target_exists, target_was_reached, self_path_exists),
     )

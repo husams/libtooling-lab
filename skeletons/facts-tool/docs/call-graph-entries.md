@@ -32,12 +32,13 @@ Exact qualified names or USRs select entries; `root-not-found` and
 The lookup opens existing stores read-only and does not generate evidence.
 
 The JSON object includes `schema_version: 1`, decimal-string `symbol_id`, `usr`,
-`entry_available`, `graph_node_ref`, `is_leaf`, `external_targets`, and `coverage`.
+`entry_available`, `graph_node_ref`, `is_leaf`, `external_targets`,
+`pointer_calls`, and `coverage`.
 
 | Stored evidence | `entry_available` | `graph_node_ref` | `is_leaf` |
 |---|---|---|---|
 | Fully collected body with outgoing calls | true | symbol ID | false |
-| Fully collected body without outgoing or unresolved calls | true | symbol ID | true |
+| Fully collected body without function, pointer, or unresolved calls | true | symbol ID | true |
 | Known symbol without committed generation | false | null | null |
 
 A narrow symbol or call match does not certify the caller's entire body. A
@@ -52,11 +53,22 @@ graphs; the existing [coverage contract](call-graph.md) remains applicable.
 A known declaration-only call target keeps its canonical symbol identity and
 exact call site in an external-reference record. Extracting its definition from
 another registered component reuses that identity, retains callers and sites,
-and removes the resolved external boundary. A call through an automatic local
-function pointer initialized directly from a function can retain that target
-when the pointer has no modifying or escaping
-uses. Other indirect calls have no guessed target symbol ID and remain
-explicitly unresolved.
+and removes the resolved external boundary.
+
+Function-pointer invocations are ordinary `pointer-call` facts. Each site keeps
+its caller, canonical callable type (for example `void (*)()`), callee
+expression, and source location. When the operand identifies a variable,
+parameter, or field, the real value symbol is retained and relation kind 24
+(`PointerCalls`) links the caller to that value. Its identity is separate from
+any function address stored in the value. Factory-return, array-selection, and
+conditional expressions retain typed sites with no invented target symbol.
+
+A proven local pointer target can additionally have an exact `Calls` edge.
+Pointer calls appear in the entry's `pointer_calls` list and count, make
+`is_leaf` false, and do not contribute to `unresolved_targets` or external
+function targets. They produce no `coverage.unsupported_semantics` notice.
+Function traversal follows known function edges; it never traverses a pointer
+variable as a function.
 
 Numeric IDs are scoped to a validated project/facts pair. An incompatible pair
 reports `incompatible-symbol-universe`; independently imported databases must
@@ -81,10 +93,17 @@ and must be equal. The external ID equals `destination_id`; its other six
 fields reference the corresponding `relation_site` key. Deletion cascades
 prevent dangling references. No per-root graph table is introduced.
 
-Unresolved indirect calls are kept separately as source call sites in
-`callgraph_unresolved_site(source_id, file_id, offset, line, col)`. This evidence
-has no destination field and cannot invent an external target. Regeneration
-replaces prior call and unresolved-site evidence for the collected bodies.
+Schema 14 adds
+`callgraph_pointer_call_site(source_id, target_id, file_id, offset, line, col,
+signature, expression)`, keyed by caller and source occurrence. `target_id`
+is nullable and identifies the pointer value declaration when one is available.
+Regeneration atomically replaces pointer relations, sites, and prior unresolved
+records for each collected body. Existing unresolved evidence for other
+unclassified calls remains in `callgraph_unresolved_site`.
+
+The schema upgrade adds empty pointer-evidence tables and invalidates old
+function entries. It cannot reconstruct pointer types from legacy source
+coordinates. Run `extract --force` after upgrading to regenerate facts; validated cached ASTs can be replayed when enabled. Historical call-graph runs remain intact.
 
 Migration from schema 10 preserves existing symbols, IDs, relations, and sites.
 New evidence tables start empty; migration alone cannot prove generation or

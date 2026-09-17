@@ -2,12 +2,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from .callgraph_frontier import CallGraphFrontier
-from .callgraph_models import (
-    CallGraphEdge,
-    CallGraphRoot,
-    CallGraphTarget,
-)
+from .callgraph_models import CallGraphEdge, CallGraphRoot, CallGraphTarget
 from .callgraph_page import CallGraphPage
+from .callgraph_pointer import CallGraphPointerCall
 from .callgraph_recovery import CallGraphRecovery
 from .callgraph_serialization import page_dict
 from .provenance import PairProvenance
@@ -36,6 +33,7 @@ class CallGraphRun:
     edges: CallGraphPage[CallGraphEdge]
     frontier: CallGraphPage[CallGraphFrontier]
     recovery: CallGraphPage[CallGraphRecovery]
+    pointer_calls: CallGraphPage[CallGraphPointerCall]
     provenance: PairProvenance
     target_exists: bool = False
     target_was_reached: bool = False
@@ -83,6 +81,7 @@ class CallGraphRun:
                 self.edges,
                 self.frontier,
                 self.recovery,
+                self.pointer_calls,
             )
         )
 
@@ -92,7 +91,7 @@ class CallGraphRun:
 
     def to_dict(self) -> dict[str, Any]:
         value = self.__dict__.copy()
-        names = ("roots", "targets", "edges", "frontier", "recovery")
+        names = ("roots", "targets", "edges", "frontier", "recovery", "pointer_calls")
         value.update({name: page_dict(value[name]) for name in names})
         value["components"] = list(self.components)
         value["provenance"] = self.provenance.to_dict()

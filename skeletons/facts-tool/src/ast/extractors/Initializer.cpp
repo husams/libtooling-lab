@@ -23,17 +23,6 @@ std::string printedExpression(const clang::Expr &expression,
   return text;
 }
 
-std::string initializerExpression(const clang::Expr &expression,
-                                  const clang::ASTContext &context,
-                                  const clang::SourceManager &sourceManager) {
-  bool invalid = false;
-  const auto text = clang::Lexer::getSourceText(
-      clang::CharSourceRange::getTokenRange(expression.getSourceRange()),
-      sourceManager, context.getLangOpts(), &invalid);
-  return !invalid && !text.empty() ? text.str()
-                                   : printedExpression(expression, context);
-}
-
 std::optional<EvaluatedValue>
 evaluatedValue(const clang::Expr &expression,
                const clang::QualType &declaredType,
@@ -81,6 +70,17 @@ evaluatedValue(const clang::Expr &expression,
 
 } // namespace
 
+std::string extractExpressionText(const clang::Expr &expression,
+                                  const clang::ASTContext &context,
+                                  const clang::SourceManager &sourceManager) {
+  bool invalid = false;
+  const auto text = clang::Lexer::getSourceText(
+      clang::CharSourceRange::getTokenRange(expression.getSourceRange()),
+      sourceManager, context.getLangOpts(), &invalid);
+  return !invalid && !text.empty() ? text.str()
+                                   : printedExpression(expression, context);
+}
+
 std::optional<Initializer>
 extractInitializer(const clang::Expr *expression,
                    const clang::QualType &declaredType,
@@ -90,7 +90,7 @@ extractInitializer(const clang::Expr *expression,
     return std::nullopt;
   }
   return Initializer{
-      .expression = initializerExpression(*expression, context, sourceManager),
+      .expression = extractExpressionText(*expression, context, sourceManager),
       .evaluated = evaluatedValue(*expression, declaredType, context),
   };
 }

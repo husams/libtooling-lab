@@ -1,6 +1,7 @@
 #include "analysis/callgraph/CallGraphNodes.h"
 
 #include <string>
+#include <tuple>
 
 namespace facts::callgraph {
 catalog::Result<std::vector<QueryNode>>
@@ -22,15 +23,17 @@ loadCallGraphNodes(catalog::Database &database) {
                      row.integer(11),
                      row.get<bool>(12),
                      static_cast<unsigned>(row.integer(7)),
-                     row.get<bool>(13)};
+                     row.get<bool>(13),
+                     row.get<unsigned>(14)};
   };
-  auto load = [&](std::string unresolved, std::string evidence) {
+  auto load = [&](std::string unresolved, std::string evidence,
+                  std::string pointerCalls) {
     return catalog::query(
         database,
         "SELECT s.id,s.qualified_name,s.usr,s.is_definition,s.is_external,"
         "s.line,s.col," +
             unresolved + ",d.file_id,d.offset,d.size,s.kind,s.is_implicit," +
-            evidence +
+            evidence + "," + pointerCalls +
             " "
             "FROM symbol s "
             "LEFT JOIN definition d "
@@ -43,19 +46,26 @@ loadCallGraphNodes(catalog::Database &database) {
              database,
              "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' "
              "AND name='callgraph_unresolved_site'), EXISTS(SELECT 1 FROM "
-             "sqlite_master WHERE type='table' AND name='callgraph_entry')",
+             "sqlite_master WHERE type='table' AND name='callgraph_entry'),"
+             "EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND "
+             "name='callgraph_pointer_call_site')",
              [](const storage::Row &row) {
-               return std::pair<bool, bool>{row.integer(0) != 0,
-                                            row.integer(1) != 0};
+               return std::tuple{row.integer(0) != 0, row.integer(1) != 0,
+                                  row.integer(2) != 0};
              })
       .and_then([&](const auto &tables) {
-        return load(tables.front().first
+        const auto [unresolved, entries, pointerCalls] = tables.front();
+        return load(unresolved
                         ? "(SELECT COUNT(*) FROM callgraph_unresolved_site u "
                           "WHERE u.source_id=s.id)"
                         : "0",
-                    tables.front().second
+                    entries
                         ? "EXISTS(SELECT 1 FROM callgraph_entry e WHERE "
                           "e.symbol_id=s.id)"
+                        : "0",
+                    pointerCalls
+                        ? "(SELECT COUNT(*) FROM callgraph_pointer_call_site p "
+                          "WHERE p.source_id=s.id)"
                         : "0");
       });
 }

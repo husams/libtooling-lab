@@ -72,6 +72,7 @@ Feature: Canonical source file registry
       | undeclared_template_instances.cpp |
       | unsupported_semantics/defaulted_cleanup.cpp |
       | unsupported_semantics/local_function_pointers.cpp |
+      | unsupported_semantics/pointer_call_shapes.cpp |
       | unsupported_semantics/standard_library_cleanup.cpp |
       | unsupported_semantics/unresolved_function_pointers.cpp |
       | variable_flow_calls.cpp |

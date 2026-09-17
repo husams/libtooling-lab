@@ -57,7 +57,8 @@ Storage::addCallGraphFacts(std::span<const Relation> relations,
                            std::span<const RelationSite> sites,
                            std::span<const ExternalReference> references,
                            std::span<const CallGraphEntry> entries,
-                           std::span<const UnresolvedCallSite> unresolved) {
+                           std::span<const UnresolvedCallSite> unresolved,
+                           std::span<const PointerCallSite> pointerCalls) {
   if (!std::ranges::all_of(references, validExternal) ||
       !std::ranges::all_of(entries, [](const auto &entry) {
         return entry.symbolId != SymbolId{} &&
@@ -77,6 +78,7 @@ Storage::addCallGraphFacts(std::span<const Relation> relations,
       .and_then([&] { return addCallGraphExternalReferences(references); })
       .and_then([&] { return addCallGraphEntries(entries); })
       .and_then([&] { return addUnresolvedCallSites(unresolved); })
+      .and_then([&] { return addPointerCallSites(pointerCalls); })
       .and_then([&] { return commit(*transaction); });
 }
 

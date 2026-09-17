@@ -62,6 +62,9 @@ Storage::clearCallGraphFacts(std::span<const SymbolId> callers) {
       }));
   if (!relations)
     return std::unexpected(relations.error());
+  auto pointerCalls = clearPointerCallSites(callers);
+  if (!pointerCalls)
+    return std::unexpected(pointerCalls.error());
   auto unresolved = clearUnresolvedCallSites(callers);
   if (!unresolved)
     return std::unexpected(unresolved.error());

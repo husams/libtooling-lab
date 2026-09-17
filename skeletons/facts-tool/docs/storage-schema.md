@@ -37,7 +37,7 @@ On open, `storage/SchemaMigration.cpp` detects legacy packed flags and applies
 versioned upgrades inside the storage connection's `BEGIN IMMEDIATE`
 transaction. Existing identities and facts are preserved. The complete fresh
 schema is defined by `storage/Schema.h`; fresh databases are created directly
-at SQLite `user_version = 13` without packed persisted flags.
+at SQLite `user_version = 14` without packed persisted flags.
 
 The version-8-to-9 migration adds `callable_return_type`, keyed by `symbol_id`
 with a cascading foreign key to `symbol`. Its nonempty `canonical_type` text
@@ -111,3 +111,20 @@ macro, implicit, and unavailable regions retain an explicit reason. These
 tables are append-only by versioned identity, and the match transaction rolls
 back all new evidence on matcher failure or cancellation. The access and
 capture matrix is documented in [expression-evidence.md](expression-evidence.md).
+
+## Version 14: pointer-call evidence
+
+`callgraph_pointer_call_site` stores caller, nullable pointer-value symbol,
+source location, canonical callable type (`signature`), and callee expression.
+Known value operands also have a `PointerCalls` relation (kind 24) and a
+`relation_site`. Pointer invocations do not require a concrete function target,
+do not become external function stubs, and do not produce unsupported notices.
+
+`callgraph_run_pointer_call_site` snapshots the reached callers' pointer
+invocations, including available operand names and USRs. Historical snapshots
+survive regeneration of current symbol and pointer-call facts.
+
+The migration preserves identities and historical runs, adds empty tables,
+and invalidates previous function entries. Regenerate existing facts with
+`extract --force`; compatible AST caches remain reusable. Fresh extraction
+replaces old unresolved rows with typed pointer-call evidence.

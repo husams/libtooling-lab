@@ -105,14 +105,16 @@ Specific caveats:
   project (or not yet extracted) records a `callgraph_external_reference`
   row and is reported as `complete`, with no frontier row - distinct from a
   budget stop.
-- **Indirect/unresolved calls have no destination row at all.** They are
-  recorded separately in `callgraph_unresolved_site`, with no destination
-  field - the traversal never invents an external target for an indirect
-  call.
-- **Runtime callees the static analysis cannot see (function pointers,
-  `std::function`, virtual calls through an unproven receiver) never
-  appear as edges** unless Clang's own call-graph construction could
-  statically resolve them; the analysis is source/AST-level, never runtime.
+- **Function-pointer calls retain typed evidence.** `PointerCalls` (kind 24)
+  links the caller to the actual pointer variable, parameter, or field when
+  known. `callgraph_pointer_call_site` also retains the canonical callable type,
+  expression and location. Expression-only operands keep a nullable target.
+  These sites are separate from external functions and unresolved diagnostics.
+- **Pointer-call evidence identifies how a call is made.** An additional exact
+  `Calls` edge is available when local analysis proves the function target.
+  Pointer operands are not traversed as function bodies. Virtual calls and
+  `std::function::operator()` can retain known declared callees independently
+  of the eventual runtime implementation.
 - **Budgets are opt-in and default to unbounded.** Without `--max-depth`/
   `--max-nodes`/`--max-edges`/`--time-limit-ms`, traversal continues across
   every registered component and library edge until a cycle, a reused

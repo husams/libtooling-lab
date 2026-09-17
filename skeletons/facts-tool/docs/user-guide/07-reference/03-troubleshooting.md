@@ -139,9 +139,9 @@ stdout at any level.
 `facts-tool: coverage.unsupported_semantics kind=implicit-cleanup site=...`
 means an implicit destructor target could not be resolved, or CFG construction
 failed for a function requiring cleanup analysis. It is not a source-column warning.
-`kind=indirect-call` means no supported exact target was established for that
-call. Both preserve successful extraction of other facts, but indicate missing
-call edges. Bodyless trivial constructors no longer cause false cleanup
+Function-pointer calls are recorded as typed `pointer-call` facts without
+unsupported/unresolved notices. Other unclassified calls and cleanup gaps can
+still preserve successful extraction while leaving missing function edges. Bodyless trivial constructors no longer cause false cleanup
 notices. After upgrading, run `extract --force` to refresh existing facts;
 validated cached ASTs remain reusable.
 

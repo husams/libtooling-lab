@@ -54,6 +54,7 @@ private:
   captureInvocation(ExtractionResult<std::optional<callgraph::CallFact>> fact);
   void schedule(const clang::FunctionDecl &decl);
   void captureIndirectCalls();
+  void stagePointerCall(const clang::CallExpr &expression);
   void stageUnresolvedCall(const clang::CallExpr &expression);
   IndexingResult flushNestedBodies();
   IndexingResult persistInvocations();

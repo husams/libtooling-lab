@@ -15,7 +15,7 @@ def entry(context, name):
     return json.loads(result.stdout)
 
 
-@then("S-027 entries preserve S-022 invocations and unresolved diagnostics")
+@then("S-027 entries preserve S-022 invocations and typed pointer evidence")
 def callable_entries(context):
     before = graph(context, "s022_fixture::run")
     kinds = {edge["semantic_kind"] for edge, _ in named_edges(before)
@@ -26,14 +26,16 @@ def callable_entries(context):
             str(generated))
     unresolved = entry(context, "unresolved")
     require(unresolved["entry_available"] and unresolved["is_leaf"] is False and
-            unresolved["coverage"]["unresolved_targets"] == 1, str(unresolved))
+            unresolved["coverage"]["unresolved_targets"] == 0 and
+            unresolved["coverage"]["pointer_calls"] == 1 and
+            len(unresolved["pointer_calls"]) == 1, str(unresolved))
     root = context.fixture_root / "s022"
     result = run([str(context.facts_tool), "extract", "-v", "0", "--force",
                   "--conf", str(context.files_database_path), "--output",
                   str(context.facts_database_path), str(root / "beta/service.cpp"),
                   str(root / "alpha/entry.cpp")])
     require(result.returncode == 0, result.stdout + result.stderr)
-    require("coverage.unsupported_semantics kind=indirect-call" in result.stderr,
+    require("coverage.unsupported_semantics kind=indirect-call" not in result.stderr,
             result.stderr)
     after = graph(context, "s022_fixture::run")
     require(after["edges"] == before["edges"], "entry regeneration changed invocation edges")

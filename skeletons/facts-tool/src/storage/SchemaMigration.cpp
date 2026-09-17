@@ -448,11 +448,49 @@ CREATE INDEX IF NOT EXISTS idx_source_region_symbol
 PRAGMA user_version=13;
 )sql";
 
+inline constexpr auto pointerCallMigrationSql = R"sql(
+-- A pointer invocation is complete typed evidence even when no one value
+-- declaration represents its callee expression. target_id identifies the
+-- variable, parameter, or field being invoked, not its runtime function.
+CREATE TABLE IF NOT EXISTS callgraph_pointer_call_site (
+  source_id INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+  target_id INTEGER REFERENCES symbol(id) ON DELETE CASCADE,
+  file_id   INTEGER NOT NULL,
+  offset    INTEGER NOT NULL,
+  line      INTEGER NOT NULL,
+  col       INTEGER NOT NULL,
+  signature TEXT NOT NULL CHECK(signature <> ''),
+  expression TEXT NOT NULL CHECK(expression <> ''),
+  PRIMARY KEY (source_id, file_id, offset)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_callgraph_pointer_call_target
+  ON callgraph_pointer_call_site(target_id);
+
+-- Snapshot pointer invocations reached in this run. Historical names and
+-- signatures remain available if the mutable symbol facts are regenerated.
+CREATE TABLE IF NOT EXISTS callgraph_run_pointer_call_site (
+  run_id INTEGER NOT NULL REFERENCES callgraph_run(run_id) ON DELETE CASCADE,
+  source_id INTEGER NOT NULL,
+  target_id INTEGER,
+  file_id INTEGER NOT NULL,
+  offset INTEGER NOT NULL,
+  line INTEGER NOT NULL,
+  col INTEGER NOT NULL,
+  signature TEXT NOT NULL CHECK(signature <> ''),
+  expression TEXT NOT NULL CHECK(expression <> ''),
+  target_name TEXT,
+  target_usr TEXT,
+  PRIMARY KEY (run_id, source_id, file_id, offset)
+) WITHOUT ROWID;
+
+PRAGMA user_version=14;
+)sql";
+
 } // namespace
 
 std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
   return schemaVersion(database).and_then([database](int current) {
-    if (current > 13) {
+    if (current > 14) {
       return std::expected<void, std::error_code>{std::unexpected(
           std::make_error_code(std::errc::operation_not_supported))};
     }
@@ -561,7 +599,7 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
         })
         .and_then([database] {
           // Run history does not depend on the symbol tables, so a store that
-          // only ever received graph runs still migrates to version 13.
+          // only ever received graph runs still migrates to the current schema.
           return schemaVersion(database).and_then([database](int version) {
             return version < 12 ? execute(database, callGraphRunMigrationSql)
                                 : std::expected<void, std::error_code>{};
@@ -572,6 +610,21 @@ std::expected<void, std::error_code> migrateSchema(sqlite3 *database) {
             return version < 13
                        ? execute(database, expressionEvidenceMigrationSql)
                        : std::expected<void, std::error_code>{};
+          });
+        })
+        .and_then([database] {
+          return schemaVersion(database).and_then([database](int version) {
+            if (version >= 14)
+              return std::expected<void, std::error_code>{};
+            return hasColumn(database, "callgraph_entry", "symbol_id")
+                .and_then([database](bool existing) {
+                  return existing
+                             ? execute(database, "DELETE FROM callgraph_entry")
+                             : std::expected<void, std::error_code>{};
+                })
+                .and_then([database] {
+                  return execute(database, pointerCallMigrationSql);
+                });
           });
         });
   });

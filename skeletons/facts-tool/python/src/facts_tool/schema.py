@@ -9,7 +9,7 @@ from .schema_catalog import (
     PROJECT_TABLES,
     PROVENANCE_TABLE,
 )
-from .schema_graph import CALLGRAPH_COLUMNS, CALLGRAPH_TABLES
+from .schema_graph import CALLGRAPH_COLUMNS, CALLGRAPH_TABLES, POINTER_CALL_COLUMNS
 
 
 @dataclass(frozen=True)
@@ -41,13 +41,13 @@ def inspect_schema(db: sqlite3.Connection, role: str) -> SchemaIdentity:
     required = FACTS_TABLES if role == "facts" else PROJECT_TABLES
     version = _scalar(db, "PRAGMA user_version")
     facts_shape = {"symbol", "relation"} <= set(tables)
-    if role == "facts" and facts_shape and version not in (10, 11, 12, 13):
+    if role == "facts" and facts_shape and version not in (10, 11, 12, 13, 14):
         fail(
             "E_SCHEMA",
             "facts schema user_version "
-            f"{version} is unsupported; need 10, 11, 12, or 13",
+            f"{version} is unsupported; need 10, 11, 12, 13, or 14",
         )
-    if role == "facts" and version in (12, 13):
+    if role == "facts" and version in (12, 13, 14):
         missing_graph = sorted(CALLGRAPH_TABLES - set(tables))
         if missing_graph:
             fail(
@@ -62,7 +62,7 @@ def inspect_schema(db: sqlite3.Connection, role: str) -> SchemaIdentity:
             absent = sorted(CALLGRAPH_COLUMNS[table] - actual)
             if absent:
                 fail("E_SCHEMA", f"facts.{table} lacks columns: " + ", ".join(absent))
-    if role == "facts" and version == 13:
+    if role == "facts" and version in (13, 14):
         missing_evidence = sorted((EVIDENCE_TABLES | {PROVENANCE_TABLE}) - set(tables))
         if missing_evidence:
             fail(
@@ -75,6 +75,14 @@ def inspect_schema(db: sqlite3.Connection, role: str) -> SchemaIdentity:
                 str(row[1]) for row in db.execute(f'PRAGMA table_info("{table}")')
             }
             absent = sorted(COLUMNS[table] - actual)
+            if absent:
+                fail("E_SCHEMA", f"facts.{table} lacks columns: " + ", ".join(absent))
+    if role == "facts" and version == 14:
+        for table, columns in POINTER_CALL_COLUMNS.items():
+            actual = {
+                str(row[1]) for row in db.execute(f'PRAGMA table_info("{table}")')
+            }
+            absent = sorted(columns - actual)
             if absent:
                 fail("E_SCHEMA", f"facts.{table} lacks columns: " + ", ".join(absent))
     missing = sorted(required - set(tables))

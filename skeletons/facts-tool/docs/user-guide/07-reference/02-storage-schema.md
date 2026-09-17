@@ -20,7 +20,7 @@ Source of truth for both schemas: `src/storage/Schema.h` (facts database),
 
 ## Facts database
 
-Fresh facts databases are created directly at SQLite `user_version = 12`.
+Fresh facts databases are created directly at SQLite `user_version = 14`.
 Migration on open (`storage/SchemaMigration.cpp`, inside `BEGIN IMMEDIATE`)
 preserves existing rows and identities; it never invents historical data -
 for example a migrated `is_volatile` reads `0` meaning *unknown*, not
@@ -63,16 +63,17 @@ The common row every declaration shares.
 | `relation_site` | `(source_id, destination_id, kind, position, file_id, offset) PK` -> `relation` cascade | One occurrence's exact `line`/`col`/`offset`, plus `receiver_type_id` and `certainty` (nullable, added at schema 8) |
 | `callgraph_entry` | `symbol_id PK` -> `symbol(id)` cascade, `graph_node_ref` (`CHECK symbol_id = graph_node_ref`) | One row per function whose call evidence has been fully committed at least once (schema 11+) |
 | `callgraph_external_reference` | `(source_id, destination_id, kind, position, file_id, offset) PK` -> `relation_site` cascade, `external_symbol_id` (`CHECK = destination_id`) | A relation site pointing at a retained external symbol until a compatible project definition is found (schema 11+) |
-| `callgraph_unresolved_site` | `(source_id, file_id, offset) PK` -> `symbol(id)` cascade, `line`, `col` | An indirect/unresolved call site with **no** destination field - "cannot invent an external target" (schema 11+) |
+| `callgraph_unresolved_site` | `(source_id, file_id, offset) PK` -> `symbol(id)` cascade, `line`, `col` | Call evidence with no classified target or typed pointer-call representation (schema 11+) |
+| `callgraph_pointer_call_site` | `(source_id, file_id, offset) PK`, `target_id` nullable, `line`, `col`, `signature`, `expression` | Typed pointer invocation; source and optional called variable reference `symbol(id)` with cascade (schema 14+) |
 | `facts_project_provenance` | `file_id PK`, `path`, `universe_key` | Canonical registered path + semantic-universe key per FileId (schema 11+); the native writer's stronger identity evidence for rejecting incompatible pairs |
 
-**`relation` kind values** (23 total; full list with Python names in
+**`relation` kind values** (24 total; full list with Python names in
 `python/docs/relations.md`): `calls=1`, `inherits=2`, `contains=3`,
 `specializes=4`, `instantiates=5`, `overrides=6`, `uses=7`, `field_of=8`,
 `method_of=9`, `construct_value/temp/heap/copy/move=10-14`,
 `factory_construct=15`, `destroy=16`, `friend=17`, `dispatch_calls=18`,
 `alias_of=19`, `of_type=20`, `return_type=21`, `param_type=22`,
-`template_argument_type=23`. `Calls` (1) is a statically-selected callee;
+`template_argument_type=23`, `pointer_calls=24` (alias `pointer-call`). `Calls` (1) is a statically-selected callee;
 `DispatchCalls` (18) is a conservative virtual-dispatch target. A proven
 concrete by-value receiver gets `certainty=exact` on its site; pointer,
 reference, implicit, or otherwise unproven receivers get
@@ -80,7 +81,15 @@ reference, implicit, or otherwise unproven receivers get
 column is an integer, `1` for exact and `2` for possible, and it is `NULL`
 when no receiver was recorded.
 
-### Call-graph run tables (schema 12)
+`PointerCalls` identifies invocation through the recorded variable or parameter.
+Its canonical callable type and source expression live in
+`callgraph_pointer_call_site`; expression-only calls have no target symbol.
+These sites are separate from external-function references and unresolved sites.
+Migration to schema 14 preserves symbols and run history, invalidates cached
+call-graph entries, and requires extraction to populate pointer evidence. Use
+`extract --force` when the source index would otherwise skip unchanged files.
+
+### Call-graph run tables (schema 12+, pointer snapshots in schema 14)
 
 One row-set per `analyse call-graph` invocation that reaches traversal.
 **Append-only** - a run is never rewritten or deleted by a later invocation.
@@ -91,6 +100,7 @@ One row-set per `analyse call-graph` invocation that reaches traversal.
 | `callgraph_run_root` | `(run_id, symbol_id) PK` -> `callgraph_run` cascade, `usr` | Selected roots (every definition-backed root for `--all`) |
 | `callgraph_run_target` | `(run_id, symbol_id) PK` -> `callgraph_run` cascade, `usr` | The `--to` target, when given |
 | `callgraph_run_edge` | `(run_id, source_id, destination_id, kind, position, file_id, offset) PK` -> `callgraph_run` cascade, `depth`, `cycle CHECK IN (0,1)` | Only the `relation_site` rows actually reached; `kind` is `1` (`Calls`) or `18` (`DispatchCalls`) |
+| `callgraph_run_pointer_call_site` | `(run_id, source_id, file_id, offset) PK` -> `callgraph_run` cascade, `target_id` nullable, `line`, `col`, `signature`, `expression`, `target_name`, `target_usr` | Pointer invocations of reached callers, including immutable operand identity and signature snapshots (schema 14+) |
 | `callgraph_run_frontier` | `run_id` -> `callgraph_run` cascade, `symbol_id`, `reason` | Discovered-but-not-admitted endpoints (`max_depth`, `max_nodes`, `max_edges`, `time_limit`, `cancelled`) |
 | `callgraph_run_recovery` | `(run_id, tu_file_id) PK` -> `callgraph_run` cascade, `outcome CHECK IN ('attempted','failed','reused','suppressed')`, `diagnostic` | One row per translation unit a `--recover-missing` run attempted |
 
@@ -160,7 +170,7 @@ before a writer added them reads back as "not indexed" instead of failing.
 | 10 -> 11 | `facts_project_provenance`; `callgraph_entry`; `callgraph_external_reference`; `callgraph_unresolved_site` | See [call-graph-entries.md](../../call-graph-entries.md) |
 | 11 -> 12 | `callgraph_run`, `callgraph_run_root`, `callgraph_run_target`, `callgraph_run_edge`, `callgraph_run_frontier`, `callgraph_run_recovery` | Append-only run history. A schema-11 store gains these tables the next time any command opens it read/write, even before recording a symbol or a run. |
 
-Fresh databases on main are created directly at `user_version = 12`. Schema
+Fresh databases on main are created directly at `user_version = 14`. Schema
 `13` (opt-in expression/field-access/source-region evidence) exists only on
 an unmerged branch - see [in-flight F-013](05-in-flight-f-013.md).
 

@@ -13,8 +13,8 @@ Feature: Cross-component callable semantics
   Scenario: distinguishes exact and possible virtual dispatch
     Then static targets and dispatch expansions retain receiver certainty
 
-  Scenario: exposes raw relations and unsupported frontend semantics
-    Then exposes raw relation kinds and unsupported frontend semantics
+  Scenario: exposes raw relations and typed pointer call semantics
+    Then exposes raw relation kinds and typed pointer call semantics
 
   Scenario: separates explicit and implicit cleanup occurrences
     Then mixed cleanup and destructor subobjects retain site semantics

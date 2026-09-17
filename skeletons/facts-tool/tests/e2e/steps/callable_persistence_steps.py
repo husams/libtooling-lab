@@ -51,7 +51,7 @@ def migrated_callables(context, version):
     # bookkeeping.
     context.run_tool(force=True)
     assert snapshot(context.facts_database_path) == before
-    assert query(context.facts_database_path, "PRAGMA user_version") == [(13,)]
+    assert query(context.facts_database_path, "PRAGMA user_version") == [(14,)]
     context.run_tool(force=True)
     assert snapshot(context.facts_database_path) == before
 

@@ -13,13 +13,14 @@ using Query = std::pair<std::string_view, std::string_view>;
 std::expected<std::set<FileId>, std::error_code>
 relevantFiles(Database &database, std::span<const FileId> selected) {
   std::set<FileId> result(selected.begin(), selected.end());
-  constexpr std::array<Query, 6> queries{
+  constexpr std::array<Query, 7> queries{
       {{"symbol", "((id >> 32) & 4294967295)"},
        {"definition", "file_id"},
        {"relation_site", "file_id"},
        {"include_dependency", "src_file_id"},
        {"include_dependency", "dst_file_id"},
-       {"callgraph_unresolved_site", "file_id"}}};
+       {"callgraph_unresolved_site", "file_id"},
+       {"callgraph_pointer_call_site", "file_id"}}};
   for (const auto &[table, column] : queries) {
     bool present = false;
     try {

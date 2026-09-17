@@ -15,8 +15,8 @@ factsSchemaVersion(storage::Database &database) {
       });
   try {
     for (auto version : rows) {
-      // Version 13 adds opt-in expression/source evidence tables.
-      if (version > 13) {
+      // Version 14 adds typed pointer-call evidence and run snapshots.
+      if (version > 14) {
         return std::unexpected(
             "incompatible-symbol-universe: unsupported facts schema version");
       }
@@ -46,13 +46,14 @@ std::expected<bool, std::string> factsTableExists(storage::Database &database,
 std::expected<std::set<FileId>, std::string>
 usedFactFiles(storage::Database &database) {
   std::set<FileId> result;
-  const std::array<std::pair<const char *, const char *>, 12> tables{
+  const std::array<std::pair<const char *, const char *>, 13> tables{
       {{"symbol", "((id >> 32) & 4294967295)"},
        {"definition", "file_id"},
        {"relation_site", "file_id"},
        {"include_dependency", "src_file_id"},
        {"include_dependency", "dst_file_id"},
        {"callgraph_unresolved_site", "file_id"},
+       {"callgraph_pointer_call_site", "file_id"},
        {"callgraph_external_reference", "((source_id >> 32) & 4294967295)"},
        {"callgraph_external_reference",
         "((destination_id >> 32) & 4294967295)"},

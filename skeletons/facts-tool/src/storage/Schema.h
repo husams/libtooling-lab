@@ -286,6 +286,23 @@ CREATE TABLE IF NOT EXISTS callgraph_unresolved_site (
   PRIMARY KEY (source_id, file_id, offset)
 ) WITHOUT ROWID;
 
+-- A pointer invocation is complete typed evidence even when no one value
+-- declaration represents its callee expression. target_id identifies the
+-- variable, parameter, or field being invoked, not its runtime function.
+CREATE TABLE IF NOT EXISTS callgraph_pointer_call_site (
+  source_id INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+  target_id INTEGER REFERENCES symbol(id) ON DELETE CASCADE,
+  file_id   INTEGER NOT NULL,
+  offset    INTEGER NOT NULL,
+  line      INTEGER NOT NULL,
+  col       INTEGER NOT NULL,
+  signature TEXT NOT NULL CHECK(signature <> ''),
+  expression TEXT NOT NULL CHECK(expression <> ''),
+  PRIMARY KEY (source_id, file_id, offset)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_callgraph_pointer_call_target
+  ON callgraph_pointer_call_site(target_id);
+
 -- Every persisted non-builtin file id is paired with its canonical source
 -- identity and semantic universe before facts are published.
 CREATE TABLE IF NOT EXISTS facts_project_provenance (
@@ -346,6 +363,23 @@ CREATE TABLE IF NOT EXISTS callgraph_run_edge (
   PRIMARY KEY (run_id, source_id, destination_id, kind, position, file_id, offset)
 ) WITHOUT ROWID;
 
+-- Snapshot pointer invocations reached in this run. Historical names and
+-- signatures remain available if the mutable symbol facts are regenerated.
+CREATE TABLE IF NOT EXISTS callgraph_run_pointer_call_site (
+  run_id INTEGER NOT NULL REFERENCES callgraph_run(run_id) ON DELETE CASCADE,
+  source_id INTEGER NOT NULL,
+  target_id INTEGER,
+  file_id INTEGER NOT NULL,
+  offset INTEGER NOT NULL,
+  line INTEGER NOT NULL,
+  col INTEGER NOT NULL,
+  signature TEXT NOT NULL CHECK(signature <> ''),
+  expression TEXT NOT NULL CHECK(expression <> ''),
+  target_name TEXT,
+  target_usr TEXT,
+  PRIMARY KEY (run_id, source_id, file_id, offset)
+) WITHOUT ROWID;
+
 -- Discovered-but-unexpanded nodes for depth/node/edge/time/cancelled stops.
 CREATE TABLE IF NOT EXISTS callgraph_run_frontier (
   run_id    INTEGER NOT NULL REFERENCES callgraph_run(run_id) ON DELETE CASCADE,
@@ -404,7 +438,7 @@ CREATE TABLE IF NOT EXISTS source_region (
 CREATE INDEX IF NOT EXISTS idx_source_region_symbol
   ON source_region(symbol_id, file_id, offset);
 
-PRAGMA user_version=13;
+PRAGMA user_version=14;
 
 )sql";
 

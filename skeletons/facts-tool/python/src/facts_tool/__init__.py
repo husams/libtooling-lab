@@ -1,6 +1,7 @@
 from .budgets import Budgets
 from .callgraph_models import CallGraphEdge, CallGraphSite, CallGraphSymbol
 from .callgraph_page import CallGraphPage
+from .callgraph_pointer import CallGraphPointerCall
 from .callgraph_result import CallGraphRun
 from .codebase import CodeBase
 from .entity import Callable, Entity, Method, Record
@@ -34,6 +35,7 @@ __all__ = [
     "CallGraphEdge",
     "CallGraphRun",
     "CallGraphPage",
+    "CallGraphPointerCall",
     "CallGraphSite",
     "CallGraphSymbol",
     "CodeBase",

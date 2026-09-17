@@ -5,6 +5,7 @@
 #include "ast/extractors/File.h"
 #include "ast/extractors/Location.h"
 #include "ast/extractors/NamedDecl.h"
+#include "ast/extractors/PointerCallSite.h"
 #include "ast/extractors/UnsupportedSemantics.h"
 #include "storage/FactStore.h"
 
@@ -21,16 +22,32 @@ bool BodyVisitor::VisitCallExpr(clang::CallExpr *expression) {
 
 void BodyVisitor::captureIndirectCalls() {
   for (const auto *expression : indirectCalls_) {
+    const auto pointerCall = isPointerCall(*expression);
+    if (pointerCall)
+      stagePointerCall(*expression);
     const auto *target =
         extractIndirectCallTarget(*expression, owner_, indirectContext_);
     if (target) {
       captureInvocation(extractCallSite(owner_, *target, *expression,
                                         context_.getSourceManager(), files_,
                                         store_));
-    } else {
+    } else if (!pointerCall) {
       stageUnresolvedCall(*expression);
     }
   }
+}
+
+void BodyVisitor::stagePointerCall(const clang::CallExpr &expression) {
+  auto fact = extractPointerCallSite(owner_, expression, context_, files_, store_);
+  if (!fact) {
+    if (!isFilteredExtraction(fact.error()))
+      status_.record(std::unexpected(
+          IndexingError{"cannot extract pointer call site: " +
+                        std::string{extractionErrorName(fact.error())}}));
+    return;
+  }
+  if (*fact)
+    store_.stagePointerCallSite(std::move(**fact));
 }
 
 void BodyVisitor::stageUnresolvedCall(const clang::CallExpr &expression) {
