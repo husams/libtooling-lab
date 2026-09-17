@@ -965,9 +965,9 @@ if(BUILD_TESTING)
       ${FACTS_E2E_CLANG_DRIVER_ARGUMENT}
       --output-root ${CMAKE_CURRENT_BINARY_DIR}/e2e-artifacts
   )
-  # The suite parses every fixture once per scenario; a slower box needs well
-# over the 120s this used to allow.
-set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 600)
+  # The complete suite parses every fixture per scenario and can take over
+  # ten minutes on the supported LLVM/GCC toolchain.
+  set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 900)
   # Test assertions include required operations; execute them in release builds too.
   get_property(FACTS_LOCAL_TARGETS DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
   foreach(FACTS_TEST_TARGET IN LISTS FACTS_LOCAL_TARGETS)
