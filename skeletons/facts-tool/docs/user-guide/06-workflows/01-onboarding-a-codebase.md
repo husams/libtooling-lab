@@ -95,10 +95,11 @@ facts-tool: 15412 symbol(s) recorded from 769 file(s)
 **What this tells you:** extracting 212 of the project's own `.cpp` files
 still visits 769 files in total, because every header reachable from them
 (including libc++ and Clang's own headers) is parsed too, and it takes
-about six minutes wall-clock on this machine. `coverage.unsupported_semantics`
-notices at `-v 0` are diagnostics about cleanup paths the extractor cannot
-fully model (for example destructors inside libc++ templates), not
-failures. See
+about six minutes wall-clock on this machine. This historical log predates
+the fix for false cleanup notices from bodyless compiler-generated constructors.
+Current `coverage.unsupported_semantics` notices at `-v 0` identify unresolved
+call or cleanup targets without failing extraction; they indicate call-graph
+coverage gaps that can matter to downstream analysis. See
 [What Gets Extracted](../03-extracting-facts/02-what-gets-extracted.md)
 and [Extract](../03-extracting-facts/01-extract.md).
 

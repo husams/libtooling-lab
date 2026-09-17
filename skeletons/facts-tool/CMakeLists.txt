@@ -330,6 +330,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/Reference.cpp
   src/ast/extractors/CallableSite.cpp
   src/ast/extractors/CallSite.cpp
+  src/ast/extractors/IndirectCallTarget.cpp
   src/ast/extractors/DestructorCalls.cpp
   src/ast/extractors/UnsupportedSemantics.cpp
   src/ast/extractors/ReceiverContext.cpp
@@ -567,6 +568,10 @@ if(BUILD_TESTING)
   add_executable(call-graph-test tests/CallGraphTest.cpp)
   target_link_libraries(call-graph-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph COMMAND call-graph-test)
+  add_executable(indirect-call-target-test tests/IndirectCallTargetTest.cpp)
+  target_link_libraries(indirect-call-target-test PRIVATE
+    facts-ast facts-storage facts-model facts-clang facts-sqlite)
+  add_test(NAME indirect-call-target COMMAND indirect-call-target-test)
   add_executable(call-graph-budget-test tests/CallGraphBudgetTest.cpp)
   target_link_libraries(call-graph-budget-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph-budget COMMAND call-graph-budget-test)

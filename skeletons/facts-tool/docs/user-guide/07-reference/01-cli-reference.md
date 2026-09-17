@@ -162,14 +162,13 @@ what `--force` overrides. If every requested source is up to date,
 everything from `configure Clang tool` onward is skipped and `extract`
 prints `facts-tool: N source(s) up to date; nothing to extract` instead.
 
-An ordinary C++ file that includes the standard library also prints
 `facts-tool: coverage.unsupported_semantics kind=implicit-cleanup site=...`
-once per implicit-destructor call site the extractor could not attribute a
-precise source column to (usually libc++ internals) - 31 of them for this
-two-file demo. These lines are **not** verbosity-gated: they appear at
-`-v 0` as well. They are routine and do not affect the exit code or the
-recorded symbol count. Everything `extract` writes, including the final
-`N symbol(s) recorded` summary, goes to stderr, not stdout.
+reports an unresolved implicit destructor target or failed CFG construction
+for a function requiring cleanup analysis. `kind=indirect-call` reports an unresolved call
+target. These coverage gaps do not fail extraction; notices appear at `-v 0`
+as well. Standard-library includes alone do not require these notices.
+Everything `extract` writes, including the final `N symbol(s) recorded`
+summary, goes to stderr, not stdout.
 
 ## `import`
 

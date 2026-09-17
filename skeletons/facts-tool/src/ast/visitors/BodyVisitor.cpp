@@ -43,6 +43,7 @@ std::vector<RelationSite> relationSites(const std::vector<UseFact> &facts) {
 } // namespace
 
 bool BodyVisitor::dataTraverseStmtPre(clang::Stmt *statement) {
+  indirectContext_.ancestors.push_back(statement);
   if (const auto *call = llvm::dyn_cast<clang::CallExpr>(statement)) {
     referenceContext_.enter(*call);
   }
@@ -50,6 +51,7 @@ bool BodyVisitor::dataTraverseStmtPre(clang::Stmt *statement) {
 }
 
 bool BodyVisitor::dataTraverseStmtPost(clang::Stmt *statement) {
+  indirectContext_.ancestors.pop_back();
   if (llvm::isa<clang::CallExpr>(statement)) {
     referenceContext_.leave();
   }
@@ -141,6 +143,7 @@ bool BodyVisitor::TraverseLambdaExpr(clang::LambdaExpr *expression) {
 }
 
 bool BodyVisitor::VisitDeclRefExpr(clang::DeclRefExpr *expression) {
+  observeIndirectReference(*expression, indirectContext_);
   capture(*expression, *expression->getDecl(), expression->getExprLoc());
   return true;
 }
@@ -182,6 +185,7 @@ IndexingResult BodyVisitor::persistUses() {
 }
 
 IndexingResult BodyVisitor::flush() {
+  captureIndirectCalls();
   return flushNestedBodies()
       .and_then([&] { return persistUses(); })
       .and_then([&] { return persistInvocations(); })

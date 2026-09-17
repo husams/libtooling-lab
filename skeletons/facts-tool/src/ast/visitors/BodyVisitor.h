@@ -3,6 +3,7 @@
 
 #include "analysis/callgraph/CallGraphTypes.h"
 #include "ast/Indexing.h"
+#include "ast/extractors/IndirectCallTarget.h"
 #include "ast/extractors/Reference.h"
 
 #include <clang/AST/RecursiveASTVisitor.h>
@@ -52,6 +53,8 @@ private:
   void
   captureInvocation(ExtractionResult<std::optional<callgraph::CallFact>> fact);
   void schedule(const clang::FunctionDecl &decl);
+  void captureIndirectCalls();
+  void stageUnresolvedCall(const clang::CallExpr &expression);
   IndexingResult flushNestedBodies();
   IndexingResult persistInvocations();
   IndexingResult persistUses();
@@ -60,11 +63,13 @@ private:
   const clang::FunctionDecl &owner_;
   clang::ASTContext &context_;
   ReferenceContext referenceContext_;
+  IndirectCallContext indirectContext_;
   FileManager &files_;
   FactStore &store_;
   IndexingStatus &status_;
   std::vector<UseFact> facts_;
   std::vector<callgraph::CallFact> invocationFacts_;
+  std::vector<const clang::CallExpr *> indirectCalls_;
   std::vector<PendingBody> pendingBodies_;
   std::unordered_set<const clang::Stmt *> scheduledBodies_;
 };

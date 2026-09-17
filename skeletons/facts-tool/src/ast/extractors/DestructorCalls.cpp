@@ -53,11 +53,18 @@ ExtractionResult<std::vector<callgraph::CallFact>>
 extractDestructorCalls(const clang::FunctionDecl &caller,
                        clang::ASTContext &context, FileManager &files,
                        FactStore &store) {
+  // Clang can reference a trivial defaulted special member without creating
+  // its body (for example, Widget() in make_unique<Widget>()). It has no
+  // cleanup work; passing that null body to buildCFG would report a spurious
+  // coverage gap. Nontrivial functions still require a successfully built CFG.
+  const auto *body = caller.getBody();
+  if (!body && caller.isTrivial())
+    return std::vector<callgraph::CallFact>{};
   clang::CFG::BuildOptions options;
   options.AddImplicitDtors = true;
   options.AddTemporaryDtors = true;
   auto graph = clang::CFG::buildCFG(
-      &caller, const_cast<clang::Stmt *>(caller.getBody()), &context, options);
+      &caller, const_cast<clang::Stmt *>(body), &context, options);
   if (!graph) {
     reportUnsupportedSemantic("implicit-cleanup", caller.getLocation(),
                               context.getSourceManager(), files, store);

@@ -70,6 +70,10 @@ Feature: Canonical source file registry
       | targeted_match_two.cpp |
       | toolchain_targets.cpp |
       | undeclared_template_instances.cpp |
+      | unsupported_semantics/defaulted_cleanup.cpp |
+      | unsupported_semantics/local_function_pointers.cpp |
+      | unsupported_semantics/standard_library_cleanup.cpp |
+      | unsupported_semantics/unresolved_function_pointers.cpp |
       | variable_flow_calls.cpp |
       | variable_flow_root.cpp |
       | expression_evidence.cpp |

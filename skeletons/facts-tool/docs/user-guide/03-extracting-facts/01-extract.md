@@ -81,7 +81,8 @@ Clang's own `[N/M] Processing file ...` progress lines, the
 including `-v 0`. All of this goes to standard error, not standard output;
 `extract` writes nothing to standard output at all.
 
-A worked run at `-v 2` against a 2-file, 2-header C++17 project (abstract
+A historical run, captured before the bodyless-constructor cleanup fix, at
+`-v 2` against a 2-file, 2-header C++17 project (abstract
 `Shape` with `Circle`/`Square`, a function template, and a lambda):
 
 ```console
@@ -120,17 +121,26 @@ The sources are listed twice because the run resolves the registered source
 set first and then hands the same list to the Clang tool; the second pass is
 the one that actually parses.
 
-`coverage.unsupported_semantics kind=implicit-cleanup site=...` lines are
-emitted for every implicit destructor call the call-graph pass could not
-attribute a precise call-site column for. Most of them point into libc++
-internals (`duration.h`, `tuple`, `hash.h`, `no_destroy.h`), but the same
-notice fires for project code too - in this run one line pointed directly at
-the lambda `[](double value){ return shapes::doubled(value); }` at
-`main.cpp:25:41`. This is routine noise on any real C++ translation unit that
-includes the standard library. It does not affect the exit code or the
-recorded symbol count, and it is not a failure to investigate. Note that
-`-v 0` does **not** silence these notices; redirect standard error if you
-need a genuinely quiet run.
+`coverage.unsupported_semantics` reports a scoped call-graph coverage gap.
+It does not change the exit code or abort extraction, but the missing edge can
+matter to downstream analysis. Notices still appear at `-v 0`.
+
+- `kind=indirect-call`: no supported exact target was established. Automatic
+  local function pointers initialized directly from a function are resolved
+  when their uses cannot modify or escape the pointer. Parameters, mutable
+  globals, reassigned pointers, and escaped pointers remain unresolved.
+- `kind=implicit-cleanup`: an actual implicit destructor target could not be
+  resolved, or CFG construction failed for a function requiring cleanup
+  analysis. A failed CFG can hide multiple cleanup edges in that function.
+
+Bodyless trivial compiler-generated constructors no longer produce false
+cleanup notices. Standard-library includes alone do not imply a coverage gap.
+The cleanup notices in the historical transcript above should not be treated
+as required output. Virtual calls with a declared callee follow the existing
+virtual-dispatch analysis; they are not all classified as indirect calls.
+
+After upgrading, use `extract --force` to regenerate already-indexed facts
+with these improvements. The validated cached AST can still be reused.
 
 ## Exit codes
 
