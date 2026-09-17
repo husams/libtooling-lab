@@ -1,4 +1,5 @@
 #include "analysis/callgraph/CallGraphEntryQuery.h"
+#include "analysis/callgraph/CallGraphPointerCallJson.h"
 
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/raw_ostream.h>
@@ -34,7 +35,7 @@ std::string renderCallGraphEntryJson(const QueryNode &node,
                                      const EntryRecord &record,
                                      const CoverageReport *coverage) {
   const auto available = record.entry.has_value();
-  const auto leaf = available && record.leaf;
+  const auto leaf = available && record.leaf && record.pointerCalls.empty();
   llvm::json::Array targets;
   for (const auto &target : record.externalTargets) {
     targets.push_back(llvm::json::Object{
@@ -52,8 +53,12 @@ std::string renderCallGraphEntryJson(const QueryNode &node,
                             {"line", target.line},
                             {"column", target.column}}}});
   }
+  llvm::json::Array pointerCalls;
+  for (const auto &call : record.pointerCalls)
+    pointerCalls.push_back(pointerCallJson(call));
   auto evidence = coverageJson(node, coverage);
   evidence["unresolved_targets"] = node.unresolved;
+  evidence["pointer_calls"] = node.pointerCalls;
   const auto availability = coverage ? definitionAvailability(*coverage, node)
                             : node.definition ? "available"
                             : node.external   ? "external-unavailable"
@@ -74,6 +79,7 @@ std::string renderCallGraphEntryJson(const QueryNode &node,
       {"is_leaf",
        available ? llvm::json::Value(leaf) : llvm::json::Value(nullptr)},
       {"external_targets", std::move(targets)},
+      {"pointer_calls", std::move(pointerCalls)},
       {"pair",
        llvm::json::Object{{"state", coverage ? "validated" : "unavailable"}}},
       {"definition_availability", availability},

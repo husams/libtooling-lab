@@ -125,13 +125,17 @@ the one that actually parses.
 It does not change the exit code or abort extraction, but the missing edge can
 matter to downstream analysis. Notices still appear at `-v 0`.
 
-- `kind=indirect-call`: no supported exact target was established. Automatic
-  local function pointers initialized directly from a function are resolved
-  when their uses cannot modify or escape the pointer. Parameters, mutable
-  globals, reassigned pointers, and escaped pointers remain unresolved.
-- `kind=implicit-cleanup`: an actual implicit destructor target could not be
-  resolved, or CFG construction failed for a function requiring cleanup
-  analysis. A failed CFG can hide multiple cleanup edges in that function.
+Function-pointer calls are recorded as `pointer-call` evidence with the
+canonical pointer/reference type, callee expression, location, and value
+symbol when available. Parameters, reassigned pointers, and escaped pointers
+are valid pointer calls and do not produce unsupported/unresolved notices.
+A statically proven function target also retains its exact `Calls` edge.
+Known functions without extracted definitions retain ordinary external-call
+classification.
+
+`kind=implicit-cleanup` means an actual implicit destructor target could not
+be resolved, or CFG construction failed for a function requiring cleanup
+analysis. A failed CFG can hide multiple cleanup edges in that function.
 
 Bodyless trivial compiler-generated constructors no longer produce false
 cleanup notices. Standard-library includes alone do not imply a coverage gap.

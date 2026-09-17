@@ -158,7 +158,7 @@ def previous_schema(context: FactsToolContext):
 @then("the upgrade preserves existing identities and unrelated facts")
 def verify_upgrade(context: FactsToolContext):
     require(unrelated_facts(context) == context.before_upgrade, "upgrade changed unrelated facts")
-    require(query(context.facts_database_path, "PRAGMA user_version") == [(13,)],
+    require(query(context.facts_database_path, "PRAGMA user_version") == [(14,)],
             "return-type schema migration did not advance to version 12")
     # Only the facts database's schema was rewound above; the project
     # database still records this source as indexed into this same facts

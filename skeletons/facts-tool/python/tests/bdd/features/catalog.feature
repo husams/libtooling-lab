@@ -3,7 +3,7 @@ Feature: Facts and project catalogs
     Given a valid paired facts and project database
 
   Scenario: Publish every relation kind
-    Then all 23 persisted relation mappings are available
+    Then all 24 persisted relation mappings are available
 
   Scenario: Query ordered parameters and defaults
     When I query run parameters

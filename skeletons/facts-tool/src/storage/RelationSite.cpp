@@ -34,6 +34,7 @@ bool validRelationSite(const RelationSite &site) {
   const auto siteBacked = site.kind == RelationKind::Uses ||
                           site.kind == RelationKind::Calls ||
                           site.kind == RelationKind::DispatchCalls ||
+                          site.kind == RelationKind::PointerCalls ||
                           site.kind == RelationKind::Overrides;
   return siteBacked && site.source != SymbolId{} &&
          site.destination != SymbolId{} && site.file != builtinFileId &&

@@ -27,7 +27,7 @@ def add_facts(db: sqlite3.Connection) -> None:
         (ids["cycle_b"], ids["cycle_a"], 1, 0),
         *(
             (ids["relation_source"], ids["relation_target"], kind, 0)
-            for kind in range(1, 24)
+            for kind in range(1, 25)
         ),
     )
     db.executemany("INSERT INTO relation VALUES(?,?,?,?,'none',0,0,0,1)", edges)

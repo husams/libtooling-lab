@@ -42,4 +42,4 @@ def explain_result(world):
     for _, value in world["explain"]:
         assert value["provenance"]["facts"]["schema"]["user_version"] == 10
         assert value["budgets"]["max_depth"] == 32
-        assert len(value["relations"]) == 23 and "file" in value["views"]
+        assert len(value["relations"]) == 24 and "file" in value["views"]

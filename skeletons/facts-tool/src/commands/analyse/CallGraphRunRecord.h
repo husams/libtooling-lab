@@ -39,6 +39,7 @@ struct CallGraphRunRecord {
   std::vector<std::pair<SymbolId, std::string>> roots;
   std::optional<std::pair<SymbolId, std::string>> target;
   std::vector<callgraph::TraversedEdge> edges;
+  std::vector<callgraph::QueryPointerCall> pointerCalls;
   std::vector<callgraph::FrontierNode> frontier;
   std::vector<RunRecoveryRow> recovery;
 };

@@ -62,6 +62,8 @@ inline std::string_view relationKindName(RelationKind kind) {
     return "param_type";
   case RelationKind::TemplateArgumentType:
     return "template_argument_type";
+  case RelationKind::PointerCalls:
+    return "pointer-call";
   }
   return "unknown";
 }

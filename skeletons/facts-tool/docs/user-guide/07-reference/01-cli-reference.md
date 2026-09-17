@@ -164,8 +164,8 @@ prints `facts-tool: N source(s) up to date; nothing to extract` instead.
 
 `facts-tool: coverage.unsupported_semantics kind=implicit-cleanup site=...`
 reports an unresolved implicit destructor target or failed CFG construction
-for a function requiring cleanup analysis. `kind=indirect-call` reports an unresolved call
-target. These coverage gaps do not fail extraction; notices appear at `-v 0`
+for a function requiring cleanup analysis. Function-pointer calls are recorded
+as typed `pointer-call` facts without unsupported/unresolved notices. These coverage gaps do not fail extraction; notices appear at `-v 0`
 as well. Standard-library includes alone do not require these notices.
 Everything `extract` writes, including the final `N symbol(s) recorded`
 summary, goes to stderr, not stdout.

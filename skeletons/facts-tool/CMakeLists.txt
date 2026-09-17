@@ -214,6 +214,7 @@ add_library(facts-storage STATIC
   src/storage/ExternalReference.cpp
   src/storage/ExpressionEvidence.cpp
   src/storage/UnresolvedCallSite.cpp
+  src/storage/PointerCallSite.cpp
   src/storage/catalog/Database.cpp
   src/storage/catalog/Repository.cpp
   src/storage/catalog/RepositoryRegistration.cpp
@@ -331,6 +332,7 @@ add_library(facts-ast STATIC
   src/ast/extractors/CallableSite.cpp
   src/ast/extractors/CallSite.cpp
   src/ast/extractors/IndirectCallTarget.cpp
+  src/ast/extractors/PointerCallSite.cpp
   src/ast/extractors/DestructorCalls.cpp
   src/ast/extractors/UnsupportedSemantics.cpp
   src/ast/extractors/ReceiverContext.cpp
@@ -360,6 +362,8 @@ add_library(facts-ast STATIC
   src/analysis/callgraph/CallGraphContext.cpp
   src/analysis/callgraph/CallGraphRequest.cpp
   src/analysis/callgraph/CallGraphQuery.cpp
+  src/analysis/callgraph/CallGraphPointerCalls.cpp
+  src/analysis/callgraph/CallGraphPointerCallJson.cpp
   src/analysis/callgraph/CallGraphScope.cpp
   src/analysis/callgraph/CallGraphTraversal.cpp
   src/analysis/callgraph/CallGraphTraversalEngine.cpp
@@ -476,6 +480,7 @@ add_library(facts-commands STATIC
   src/commands/analyse/CallGraphCompletion.cpp
   src/commands/analyse/CallGraphRunStore.cpp
   src/commands/analyse/CallGraphRunRows.cpp
+  src/commands/analyse/CallGraphRunPointerRows.cpp
   src/commands/analyse/CallGraphRecoveryState.cpp
   src/commands/analyse/CallGraphRecovery.cpp
   src/commands/analyse/CallGraphRecoveryPass.cpp
@@ -500,6 +505,7 @@ add_library(facts-commands STATIC
   src/commands/analyse/RecoveryScan.cpp
   src/commands/analyse/RecoveryScanInputs.cpp
   src/commands/analyse/RecoveryEvidenceScanner.cpp
+  src/commands/analyse/RecoveryPointerEvidence.cpp
   src/commands/analyse/RecoveryNativeFacts.cpp
   src/commands/variableflow/Command.cpp
 )
@@ -572,6 +578,19 @@ if(BUILD_TESTING)
   target_link_libraries(indirect-call-target-test PRIVATE
     facts-ast facts-storage facts-model facts-clang facts-sqlite)
   add_test(NAME indirect-call-target COMMAND indirect-call-target-test)
+  add_executable(pointer-call-test tests/PointerCallTest.cpp)
+  target_link_libraries(pointer-call-test PRIVATE
+    facts-ast facts-storage facts-model facts-clang facts-sqlite)
+  add_test(NAME pointer-call COMMAND pointer-call-test)
+  add_executable(pointer-call-query-test tests/PointerCallQueryTest.cpp)
+  target_link_libraries(pointer-call-query-test PRIVATE
+    facts-ast facts-storage facts-model facts-clang facts-sqlite)
+  add_test(NAME pointer-call-query COMMAND pointer-call-query-test
+    ${CMAKE_CURRENT_BINARY_DIR}/pointer-call-query-test.sqlite)
+  add_executable(recovery-pointer-evidence-test tests/RecoveryPointerEvidenceTest.cpp)
+  target_link_libraries(recovery-pointer-evidence-test PRIVATE
+    facts-commands facts-ast facts-storage facts-model facts-clang facts-sqlite)
+  add_test(NAME recovery-pointer-evidence COMMAND recovery-pointer-evidence-test)
   add_executable(call-graph-budget-test tests/CallGraphBudgetTest.cpp)
   target_link_libraries(call-graph-budget-test PRIVATE facts-ast facts-storage)
   add_test(NAME call-graph-budget COMMAND call-graph-budget-test)
@@ -732,6 +751,7 @@ if(BUILD_TESTING)
     tests/storage/FreshSchemaTest.cpp
     tests/storage/ReturnTypeTest.cpp
     tests/storage/CallGraphMigrationTest.cpp
+    tests/storage/PointerCallSiteTest.cpp
     tests/storage/LegacySchemaMigrationTest.cpp
     tests/storage/StorageSchemaTestMain.cpp
     tests/storage/StorageSchemaTestSupport.cpp
@@ -945,9 +965,9 @@ if(BUILD_TESTING)
       ${FACTS_E2E_CLANG_DRIVER_ARGUMENT}
       --output-root ${CMAKE_CURRENT_BINARY_DIR}/e2e-artifacts
   )
-  # The suite parses every fixture once per scenario; a slower box needs well
-# over the 120s this used to allow.
-set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 600)
+  # The complete suite parses every fixture per scenario and can take over
+  # ten minutes on the supported LLVM/GCC toolchain.
+  set_tests_properties(facts-tool-e2e PROPERTIES TIMEOUT 900)
   # Test assertions include required operations; execute them in release builds too.
   get_property(FACTS_LOCAL_TARGETS DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
   foreach(FACTS_TEST_TARGET IN LISTS FACTS_LOCAL_TARGETS)

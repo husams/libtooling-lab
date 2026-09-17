@@ -11,6 +11,7 @@ struct CallGraphResult {
   const callgraph::QueryNode *target = nullptr;
   callgraph::TraversalResult traversal;
   std::vector<callgraph::QueryPath> paths;
+  std::vector<callgraph::QueryPointerCall> pointerCalls;
 };
 
 std::expected<CallGraphResult, std::string>

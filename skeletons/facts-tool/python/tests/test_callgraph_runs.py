@@ -21,6 +21,7 @@ def test_schema12_run_reader_is_bounded_and_read_only(paired_databases):
         assert [run.run_id for run in second] == [2]
         assert second[0].roots.total == 0 and second[0].roots.complete
         run = cb.callgraphs.get(1, limit=1)
+        assert run.pointer_calls.total == 0 and run.pointer_calls.complete
         assert run.status == "complete" and run.path_found
         assert run.target_reached and run.self_path
         assert run.path_outcome == "found" and run.edges.total == 4

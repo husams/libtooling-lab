@@ -11,7 +11,7 @@ std::string renderCallGraphEntryText(const QueryNode &node,
                                      const EntryRecord &record,
                                      const CoverageReport *coverage) {
   const auto available = record.entry.has_value();
-  const auto leaf = available && record.leaf;
+  const auto leaf = available && record.leaf && record.pointerCalls.empty();
   const auto availability = coverage ? definitionAvailability(*coverage, node)
                             : node.definition ? "available"
                             : node.external   ? "external-unavailable"
@@ -25,10 +25,19 @@ std::string renderCallGraphEntryText(const QueryNode &node,
       available ? id(record.entry->graphNodeRef) : "null",
       available ? (leaf ? "true" : "false") : "null");
   output += std::format(
-      "external_targets={} pair={} definition_availability={} "
+      "external_targets={} pointer_calls={} pair={} definition_availability={} "
       "extraction_coverage={} freshness={} unresolved_targets={}\n",
-      record.externalTargets.size(), coverage ? "validated" : "unavailable",
+      record.externalTargets.size(), record.pointerCalls.size(),
+      coverage ? "validated" : "unavailable",
       availability, extraction, freshness, node.unresolved);
+  for (const auto &call : record.pointerCalls)
+    output += std::format(
+        "pointer-call target={} usr={} signature={} expression={} "
+        "site={}:{}:{} offset={}\n",
+        call.site.target ? id(*call.site.target) : "null",
+        call.target ? call.target->usr : "", call.site.signature,
+        call.site.expression, call.site.file, call.site.location.line,
+        call.site.location.column, call.site.location.offset);
   return output;
 }
 

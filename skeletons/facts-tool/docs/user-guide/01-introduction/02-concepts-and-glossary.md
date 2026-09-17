@@ -95,7 +95,7 @@ line, and column; only the callee itself has no location.
 ## Relations and sites
 
 A **relation** is a directed, typed edge between two symbols - for example
-`Calls`, `Inherits`, `Overrides`, or `OfType`. There are 23 relation kinds
+`Calls`, `Inherits`, `Overrides`, or `OfType`. There are 24 relation kinds
 in total, covering calls, inheritance, containment, specialization,
 instantiation, overriding, type usage, construction variants, destruction,
 friendship, and dispatch. Edge rows carry the source symbol, destination

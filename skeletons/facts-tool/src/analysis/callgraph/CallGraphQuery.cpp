@@ -68,7 +68,11 @@ QueryResult loadCallGraph(const std::string &path) {
           return loadEdges(database).and_then([&](auto edges) -> QueryResult {
             if (!std::ranges::all_of(edges, validContext))
               return std::unexpected("invalid relation-site receiver context");
-            return QueryGraph{std::move(nodes), std::move(edges)};
+            return loadCallGraphPointerCalls(database).transform(
+                [&](auto pointerCalls) {
+                  return QueryGraph{std::move(nodes), std::move(edges),
+                                     std::move(pointerCalls)};
+                });
           });
         });
       });

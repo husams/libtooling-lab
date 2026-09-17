@@ -78,7 +78,7 @@ and column, even though the callee itself has zero declaration coordinates.
 
 ## Relations
 
-`extract` records 23 relation kinds, each edge carrying source, destination,
+`extract` records 24 relation kinds, each edge carrying source, destination,
 kind, position, access, virtual-base, implicit, lexical, and count fields. A
 separate, finer-grained `relation_site` table records every source
 occurrence of an edge (file/line/column/offset, plus receiver type and
@@ -105,6 +105,7 @@ certainty for calls).
 | 21 | `return_type` | - |
 | 22 | `param_type` | - |
 | 23 | `template_argument_type` | - |
+| 24 | `pointer_calls` (`pointer-call`) | caller to invoked variable, parameter, or field; typed expression-only sites are stored without a target relation |
 
 ### Calls vs. dispatch calls, and certainty
 
@@ -211,8 +212,9 @@ about:
   zero-symbol extraction result as a signal to check for this pattern before
   assuming a project-wide extraction failure.
 - **`coverage.unsupported_semantics` notices** (see
-  [Extracting Facts](01-extract.md)) identify unresolved indirect calls or
-  implicit cleanup coverage gaps. They print at every verbosity level,
+  [Extracting Facts](01-extract.md)) identify unclassified call or implicit cleanup
+  coverage gaps. Typed function-pointer calls are retained as `pointer-call`
+  evidence and do not produce these notices. They print at every verbosity level,
   `-v 0` included, without failing extraction. Bodyless trivial constructors
   do not produce cleanup notices. Do not assume a successful exit means the
   call graph has complete coverage.

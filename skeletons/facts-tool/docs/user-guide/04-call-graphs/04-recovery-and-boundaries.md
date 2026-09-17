@@ -130,11 +130,15 @@ These budget-and-cancellation frontier semantics apply uniformly to
 `DispatchCalls` (see [Overview](01-overview.md#virtual-dispatch-dispatchcalls))
 is a conservative over-approximation of what a virtual call could invoke -
 it can list targets that are never actually reached for a given object's
-real dynamic type. An indirect or otherwise unresolved call target has **no
-destination row at all**: it is recorded separately in
+real dynamic type. Pointer invocations retain ordinary `pointer-call` facts:
+the callable type, source expression, location, and optional called value
+symbol. They do not increment unresolved targets or produce unsupported
+notices. Function traversal follows any proven function edges, while the
+run preserves pointer evidence separately in `pointer_calls`.
+
+Other unclassified call evidence remains in
 `callgraph_unresolved_site(source_id, file_id, offset, line, col)`, with no
-destination field, because the tool cannot invent an external target for a
-call it cannot resolve.
+invented external-function target.
 
 Put together, a call-graph run answers "what does the stored evidence show
 this traversal reaching," never "what will actually execute at runtime for

@@ -54,4 +54,4 @@ def child_row_count(facts, run_id):
                      (run_id,))[0][0]
                for table in ("callgraph_run_root", "callgraph_run_target",
                              "callgraph_run_edge", "callgraph_run_frontier",
-                             "callgraph_run_recovery"))
+                             "callgraph_run_recovery", "callgraph_run_pointer_call_site"))

@@ -29,10 +29,10 @@ class CallGraphReader:
         )
 
     def _require_supported(self) -> None:
-        if self.provenance.facts.schema.user_version not in (12, 13):
+        if self.provenance.facts.schema.user_version not in (12, 13, 14):
             fail(
                 "E_CAPABILITY",
-                "persisted call graph runs require facts schema 12 or 13",
+                "persisted call graph runs require facts schema 12, 13, or 14",
             )
 
     def list(
@@ -74,7 +74,7 @@ class CallGraphReader:
             fail("E_SOURCE", "run_id must be a positive integer")
         if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
             fail("E_LIMIT", "offset must be a non-negative integer")
-        names = {"roots", "targets", "edges", "frontier", "recovery"}
+        names = {"roots", "targets", "edges", "frontier", "recovery", "pointer_calls"}
         if cursors is None:
             page_cursors = dict.fromkeys(names, offset)
         else:

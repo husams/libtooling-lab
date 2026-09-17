@@ -3,6 +3,7 @@
 #include "storage/catalog/Component.h"
 #include "storage/catalog/File.h"
 
+#include <algorithm>
 #include <ranges>
 #include <set>
 
@@ -21,6 +22,11 @@ std::set<FileId> referencedFiles(const QueryGraph &graph) {
   }
   for (const auto &edge : graph.edges)
     result.insert(edge.file);
+  for (const auto &call : graph.pointerCalls) {
+    result.insert(call.site.file);
+    if (call.site.target)
+      result.insert(call.site.target->file);
+  }
   return result;
 }
 } // namespace
@@ -55,22 +61,9 @@ loadCoverage(const std::string &path, const std::string &factsPath,
                    file.indexed, file.mtime, file.indexedAt, file.factsDb,
                    !file.driver.empty()});
             }
-            const auto missingNode =
-                std::ranges::find_if(graph.nodes, [&](const auto &node) {
-                  return !knownFile(report, node.id.file);
-                });
-            const auto missingEdge =
-                std::ranges::find_if(graph.edges, [&](const auto &edge) {
-                  return !knownFile(report, edge.file);
-                });
-            const auto missingDefinition =
-                std::ranges::find_if(graph.nodes, [&](const auto &node) {
-                  return node.definitionLocation &&
-                         !knownFile(report, node.definitionLocation->file);
-                });
-            if (missingNode != graph.nodes.end() ||
-                missingEdge != graph.edges.end() ||
-                missingDefinition != graph.nodes.end())
+            if (!std::ranges::all_of(factsFiles, [&](FileId id) {
+                  return knownFile(report, id);
+                }))
               return std::unexpected(
                   "project/facts pair has unmatched file identities");
             // A file recovery has never touched is always a candidate; one

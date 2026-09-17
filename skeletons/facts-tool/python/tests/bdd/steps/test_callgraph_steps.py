@@ -3,7 +3,7 @@ from pytest_bdd import given, scenarios, then, when
 scenarios("../features/callgraph.feature")
 
 
-@given("a current native schema13 pair", target_fixture="cb")
+@given("a current native schema14 pair", target_fixture="cb")
 def current_native_pair(native_current_codebase):
     return native_current_codebase
 
@@ -20,5 +20,5 @@ def read_graph_and_navigation(cb, world):
 
 @then("graph provenance and relation navigation are distinct")
 def verify_graph_and_navigation(world):
-    assert world["graph"] == ("complete", 13)
+    assert world["graph"] == ("complete", 14)
     assert world["navigation"] == (["app::save"], ["app::run"])

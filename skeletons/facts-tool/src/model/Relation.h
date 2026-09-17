@@ -6,8 +6,8 @@
 // whether or not it has one; an edge list costs nothing for the symbols that
 // have no edges.
 //
-// The kinds are the twenty already proven in cpp-indexer's `edge_kind` table,
-// with the same names and the same numbering, so a row here is a row there. The
+// The first twenty kinds match cpp-indexer's `edge_kind` table, with the same
+// names and numbering. Additional kinds extend that stable prefix. The
 // direction is per kind and not always parent-to-child — `Contains` runs from
 // the scope down, `MethodOf` runs from the member up — so each one says which
 // way it points.
@@ -58,7 +58,8 @@ enum class RelationKind : std::uint8_t {
   // — is flags on the thing that uses it, not nodes in this graph.
   ReturnType = 21,     // source function returns destination
   ParamType,           // source function takes destination, at position
-  TemplateArgumentType // source instance was given destination, at position
+  TemplateArgumentType, // source instance was given destination, at position
+  PointerCalls = 24     // source invokes the callable value in destination
 };
 
 // What an edge carries beyond its two ends is kind-specific — a base clause has

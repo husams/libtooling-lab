@@ -150,9 +150,9 @@ A call target whose declaration is known but whose definition is not in the
 project (or has not yet been extracted) is a **complete stop, not a
 truncation**. It is reported as `status='complete'` with no frontier row -
 the traversal genuinely finished at that node, it just did not have a body
-to descend into. This is distinct from a budget stop, and distinct from an
-indirect/unresolved call, which has no destination row at all and is
-recorded separately. See
+to descend into. Pointer invocations are recorded separately as `pointer-call` evidence with
+the callable signature, expression, and optional value symbol. They are neither
+external-function boundaries nor unresolved-target notices. See
 [Recovery and Boundaries](04-recovery-and-boundaries.md) for exactly how
 boundaries are recorded and how `--recover-missing` can resolve some of
 them.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pytest_bdd import given, then
 
-from support.database import file_snapshot, require
+from support.database import file_snapshot, query, require
 from support.scenario import FactsToolContext
 from support.s022 import (definition_available, definition_path, graph,
                            named_edges, run, source_path)
@@ -80,10 +80,18 @@ def dispatch_certainty(context: FactsToolContext) -> None:
     require(all(edge["receiver_type_id"] is None for edge, _ in possible), str(possible))
 
 
-@then("exposes raw relation kinds and unsupported frontend semantics")
+@then("exposes raw relation kinds and typed pointer call semantics")
 def compatibility_and_coverage(context: FactsToolContext) -> None:
     document = graph(context, "s022_fixture::run")
     require(all(edge["kind"] in {1, 18} for edge in document["edges"]), str(document["edges"]))
-    require("coverage.unsupported_semantics kind=indirect-call" in context.last_output and
-            "entry.cpp:39:42" in context.last_output and
-            "service.hpp:30:" in context.last_output, context.last_output)
+    require("coverage.unsupported_semantics kind=indirect-call" not in context.last_output,
+            context.last_output)
+    pointers = query(context.facts_database_path,
+                     "SELECT source.qualified_name,site.line,site.col,site.signature "
+                     "FROM callgraph_pointer_call_site AS site "
+                     "JOIN symbol AS source ON source.id=site.source_id")
+    require({("s022_fixture::unresolved", 39, 42, "int (*)()"),
+             ("s022_fixture::headerIndirect", 30, 53, "int (*)()")} <= set(pointers),
+            str(pointers))
+    require(not query(context.facts_database_path, "SELECT * FROM callgraph_unresolved_site"),
+            "typed pointer calls left unresolved sites")

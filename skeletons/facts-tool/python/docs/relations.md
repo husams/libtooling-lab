@@ -28,6 +28,10 @@ Stored relations use source-to-destination direction unless `in_` or
 | 21 | `return_type` | callable to returned type |
 | 22 | `param_type` | callable to parameter type by position |
 | 23 | `template_argument_type` | instance to supplied type by position |
+| 24 | `pointer_calls` | caller to invoked pointer variable, parameter, or field |
+
+`pointer-call` is an alias for `pointer_calls`. This relation identifies the
+invoked operand; it does not claim a known runtime function target.
 
 Hyphenated persisted spellings are accepted aliases. SDK-only joins are
 `has_parameter`, `has_template_parameter`, `has_template_argument`,

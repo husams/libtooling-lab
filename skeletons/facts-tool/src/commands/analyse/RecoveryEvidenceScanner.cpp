@@ -1,6 +1,7 @@
 #include "commands/analyse/RecoveryEvidenceScanner.h"
 #include "commands/analyse/CallGraphRecoveryInternal.h"
 #include "commands/analyse/RecoveryScan.h"
+#include "commands/analyse/RecoveryPointerEvidence.h"
 #include "storage/catalog/File.h"
 
 namespace facts::commands {
@@ -12,6 +13,13 @@ void collectRecoveryScanBodies(const RecoveryContext &context,
     scan.error = graph.error();
     return;
   }
+  auto pointerCalls = collectRecoveryPointerEvidence(context, *graph);
+  if (!pointerCalls) {
+    scan.facts.unsupported = true;
+    scan.error = pointerCalls.error();
+    return;
+  }
+  scan.facts.pointerCalls = std::move(*pointerCalls);
   std::map<SymbolId, std::string> usrs;
   for (const auto &node : graph->nodes) {
     usrs[node.id] = node.usr;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "model/ReceiverCertainty.h"
+#include "model/PointerCallSite.h"
 #include "model/Relation.h"
 
 #include <cstdint>
@@ -30,6 +31,7 @@ struct QueryNode {
   bool implicit = false;
   unsigned unresolved = 0;
   bool bodyEvidence = false;
+  unsigned pointerCalls = 0;
 };
 
 struct QueryEdge {
@@ -47,9 +49,22 @@ struct QueryEdge {
   std::optional<SymbolId> receiverId;
 };
 
+struct PointerCallTarget {
+  SymbolId id;
+  std::string name;
+  std::string usr;
+};
+
+// The operand is a variable, parameter or field, never a callee function.
+struct QueryPointerCall {
+  PointerCallSite site;
+  std::optional<PointerCallTarget> target;
+};
+
 struct QueryGraph {
   std::vector<QueryNode> nodes;
   std::vector<QueryEdge> edges;
+  std::vector<QueryPointerCall> pointerCalls;
 };
 
 using QueryResult = std::expected<QueryGraph, std::string>;

@@ -3,6 +3,7 @@
 
 #include "commands/analyse/CallGraphRecoveryInternal.h"
 #include "commands/analyse/RecoveryEvidenceScanner.h"
+#include "commands/analyse/RecoveryPointerEvidence.h"
 #include "storage/catalog/File.h"
 
 #include <algorithm>
@@ -65,6 +66,9 @@ std::expected<RecoveryEvidence, std::string> validateRecoveryEvidence(
   auto facts = scanRecoveryBody(context, candidate);
   if (!facts || facts->unsupported)
     return std::unexpected(facts ? "unsupported call evidence" : facts.error());
+  const auto pointerCalls = collectRecoveryPointerEvidence(context, graph);
+  if (!pointerCalls)
+    return std::unexpected(pointerCalls.error());
   std::vector<SymbolId> valid;
   for (const auto &usr : candidate.entry.relatedUsrs) {
     const auto node =
@@ -76,6 +80,12 @@ std::expected<RecoveryEvidence, std::string> validateRecoveryEvidence(
       return std::unexpected(checked.error());
     if (auto checked = validateCalls(context, graph, *node, *facts); !checked)
       return std::unexpected(checked.error());
+    const auto expectedPointers = facts->pointerCalls.find(usr);
+    const auto persistedPointers = pointerCalls->find(usr);
+    if (expectedPointers == facts->pointerCalls.end() ||
+        persistedPointers == pointerCalls->end() ||
+        expectedPointers->second != persistedPointers->second)
+      return std::unexpected("persisted pointer-call evidence changed");
     valid.push_back(node->id);
   }
   return makeRecoveryEvidence(valid);

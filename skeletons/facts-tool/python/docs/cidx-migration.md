@@ -14,7 +14,7 @@ copies the declarative design, not indexing APIs or cidx storage assumptions.
 | `exists`, `none`, `all` | implemented | bounded relation evidence |
 | `at_least`, `exactly` | implemented | count with unknown handling |
 | target-set constructors | implemented | USR/name/spelling targets |
-| `out`, `in_` | implemented | all 23 stored relations |
+| `out`, `in_` | implemented | all 24 stored relations |
 | `sites` | implemented | full relation-site keys |
 | set operations | implemented | compatible logical domains |
 | `select`, `distinct`, `order_by` | implemented | deterministic rows |

@@ -327,7 +327,7 @@ anything to `"symbol"`.
 
 The `source`+`target` shape binds an arbitrary relation between two
 **declarations**; `--relation-kind` is required, since the matcher alone
-does not say which of the 23 relation kinds you mean. Bind the expression
+does not say which of the 24 relation kinds you mean. Bind the expression
 itself to the optional `site` name, not to `source`/`target`. This example
 records a `Uses` relation from `totalArea` to the range-for loop variable
 `item`, scoped to one function:

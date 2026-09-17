@@ -1,6 +1,7 @@
 #pragma once
 
 #include "model/Relation.h"
+#include "model/PointerCallSite.h"
 #include "model/RelationSite.h"
 #include "model/SymbolId.h"
 #include "model/UnresolvedCallSite.h"
@@ -39,6 +40,7 @@ struct CallGraphFacts {
   std::vector<CallFact> dispatches;
   std::vector<SymbolId> entries;
   std::vector<UnresolvedCallSite> unresolved;
+  std::vector<PointerCallSite> pointerCalls;
 };
 
 } // namespace facts::callgraph

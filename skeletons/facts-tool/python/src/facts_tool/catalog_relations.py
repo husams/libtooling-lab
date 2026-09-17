@@ -22,6 +22,7 @@ RELATION_NAMES = (
     "return_type",
     "param_type",
     "template_argument_type",
+    "pointer_calls",
 )
 RELATION_IDS = {name: index for index, name in enumerate(RELATION_NAMES, 1)}
 PSEUDO_RELATIONS = {
@@ -48,6 +49,9 @@ ALIASES = {
     "return-type": "return_type",
     "param-type": "param_type",
     "template-argument-type": "template_argument_type",
+    "pointer-call": "pointer_calls",
+    "pointer_call": "pointer_calls",
+    "pointer-calls": "pointer_calls",
 }
 
 

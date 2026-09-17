@@ -116,15 +116,25 @@ void global_pointer() { global(); }
                   "JOIN symbol s ON s.id=r.source_id "
                   "WHERE s.qualified_name='" + std::string{caller} + "'");
   };
+  const auto pointerSites = [&](std::string_view caller) {
+    return scalar(database,
+                  "SELECT COUNT(*) FROM callgraph_pointer_call_site r "
+                  "JOIN symbol s ON s.id=r.source_id "
+                  "WHERE s.qualified_name='" + std::string{caller} + "'");
+  };
 
   for (const auto name : {"simple", "constant", "read_copy", "nested",
                           "separate", "by_value"}) {
     require(targetSites(name) == 1, std::string{name} + " lost exact target");
     require(unresolved(name) == 0,
             std::string{name} + " retained unresolved evidence");
+    require(pointerSites(name) == 1,
+            std::string{name} + " lost pointer-call evidence");
   }
   require(targetSites("wrappers") == 3 && unresolved("wrappers") == 0,
           "wrapped calls lost exact sites");
+  require(pointerSites("wrappers") == 3,
+          "wrapped calls lost pointer-call evidence");
   for (const auto name : {"parameter", "assigned", "later_assignment", "branch",
                           "address", "reference", "alias", "conditional_alias",
                           "explicit_alias", "cast_alias", "assembly_output",
@@ -133,8 +143,10 @@ void global_pointer() { global(); }
                           "conditional", "pointer_copy", "dynamic",
                           "global_pointer"}) {
     require(targetSites(name) == 0, std::string{name} + " guessed an exact target");
-    require(unresolved(name) == 1,
-            std::string{name} + " lost unresolved evidence");
+    require(unresolved(name) == 0,
+            std::string{name} + " retained unresolved evidence");
+    require(pointerSites(name) == 1,
+            std::string{name} + " lost pointer-call evidence");
   }
   sqlite3_close(database);
 }

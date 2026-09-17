@@ -27,6 +27,7 @@ struct EntryRecord {
   std::vector<ExternalTarget> externalTargets;
   bool leaf = false;
   std::string aggregateCoverage = "unknown";
+  std::vector<QueryPointerCall> pointerCalls;
 };
 
 std::expected<EntryRecord, std::string>

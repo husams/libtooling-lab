@@ -48,7 +48,7 @@ bool verifyVersionSevenMigration(const std::filesystem::path &path) {
                "failed to open migrated version-seven database"))
     return false;
   const auto valid =
-      require(scalar(database, "PRAGMA user_version") == 13,
+      require(scalar(database, "PRAGMA user_version") == 14,
               "version-seven migration was not recorded") &&
       require(scalar(database, "SELECT COUNT(*) FROM pragma_table_info("
                                "'relation_site')") == 10,
@@ -68,7 +68,7 @@ bool verifyVersionSevenMigration(const std::filesystem::path &path) {
               "migration introduced a table") &&
       require(scalar(database, "SELECT COUNT(*) FROM sqlite_master WHERE "
                                "type='table' AND name LIKE 'callgraph_run%'") ==
-                  6,
+                  7,
               "version-twelve run tables were not created");
   sqlite3_close(database);
   return valid;

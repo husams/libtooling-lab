@@ -10,14 +10,14 @@ facts-tool: call graph run <run_id> <status>
 ```
 
 - and persists the full traversal (roots, targets, edges, frontier,
-recovery attempts) as one **append-only run** across six
-`callgraph_run*` tables. There is no text/JSON/Mermaid renderer anymore.
+recovery attempts, and pointer-call evidence) as one **append-only run**
+across seven `callgraph_run*` tables in schema 14. There is no text/JSON/Mermaid renderer anymore.
 `CodeBase.callgraphs` (a `CallGraphReader`) is the read-only SDK surface
 over those tables.
 
 This capability - the schema-12 callgraph-run reader described in this
 entire chapter - **shipped to main in PR #76** (Backlog story S-029). It is
-gated to facts schema **12 only**; opening a schema-10 or schema-11
+available for facts schemas **12, 13, and 14**; opening a schema-10 or schema-11
 database and calling any `cb.callgraphs.*` method fails `E_CAPABILITY`.
 Nothing in this chapter recomputes, replays, or re-derives a traversal -
 every method here only reads rows a prior `analyse call-graph` invocation
@@ -62,7 +62,7 @@ class CallGraphReader:
 `limit` must be a positive `int` (not `bool`); `after`/`offset`/each
 `cursors` value must be a non-negative `int` (not `bool`); an unknown
 cursor collection key fails `E_LIMIT`; a nonexistent `run_id` fails
-`E_SOURCE`. All three methods first check the facts schema is exactly 12:
+`E_SOURCE`. All three methods first check the facts schema is 12, 13, or 14:
 
 ```python
 with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
@@ -80,14 +80,14 @@ cb.callgraphs.latest()
 ```
 
 ```text
-E_CAPABILITY: persisted call graph runs require facts schema 12
+E_CAPABILITY: persisted call graph runs require facts schema 12, 13, or 14
 ```
 
 ### `list()` gives child collections at most one item each
 
 `list()` calls `get(run_id, limit=1)` internally for every run header it
 returns - every run's `roots`, `targets`, `edges`, `frontier`, and
-`recovery` pages in a `list()` result are truncated to at most one item
+`recovery` and `pointer_calls` pages in a `list()` result are truncated to at most one item
 each, even if the run actually contains more. Verified:
 
 ```python
@@ -140,6 +140,7 @@ class CallGraphRun:
     edges: CallGraphPage[CallGraphEdge]
     frontier: CallGraphPage[CallGraphFrontier]
     recovery: CallGraphPage[CallGraphRecovery]
+    pointer_calls: CallGraphPage[CallGraphPointerCall]
     provenance: PairProvenance
     target_exists: bool
     target_was_reached: bool
@@ -253,7 +254,7 @@ class CallGraphEdge:
 
 `kind_id` is hard-restricted to `{1: "calls", 18: "dispatch_calls"}` - any
 other persisted relation kind in a `callgraph_run_edge` row would fail
-`E_SCHEMA` when decoded. A call-graph run can therefore only ever surface
+`E_SCHEMA` when decoded. A call-graph run's `edges` collection therefore surfaces
 plain calls and virtual-dispatch calls, never (for example) `uses` or
 `construct_value` edges, even if a future native writer started persisting
 those under the same tables. `semantic_kind` is a title-cased,
@@ -286,6 +287,30 @@ actually joined to the persisted edge; an edge without matching site
 evidence gets a bare `CallGraphSite` with `enriched=False` and
 `line=column=receiver_type_id=certainty=None`.
 
+## Pointer invocations
+
+Schema 14 adds `run.pointer_calls`, a bounded page of `CallGraphPointerCall`
+records for callers reached by the run. Function traversal never follows the
+pointer operand as though it were a function.
+
+```python
+for call in run.pointer_calls:
+    print(call.kind, call.source_id, call.target_name, call.signature)
+    print(call.expression, call.file, call.line, call.column)
+```
+
+Each record has `source_id`, nullable `target_id`, `target_name`, and `target_usr`,
+plus `signature`, `expression`, `file_id`, `file`, `line`, `column`, and `offset`.
+`kind` is `"pointer-call"`. The target identifies the invoked pointer declaration;
+when the operand is an expression without a declaration, its target fields are
+`None`. The signature is Clang's canonical callable pointer type.
+
+The run preserves this information in `callgraph_run_pointer_call_site`, so
+later extraction cannot alter the saved pointer signature, operand identity, or
+location. File paths are resolved from the paired project database as usual.
+Use `cursors={"pointer_calls": next_cursor}` to page independently. This page
+is empty when reading a schema-12 or schema-13 database.
+
 ## Paging one collection independently
 
 ```python
@@ -310,7 +335,7 @@ while True:
 `CallGraphPage[T]` exposes `.items`, `.total`, `.next_cursor`,
 `.complete`/`.truncated` properties, and `__iter__`/`__len__`/`__getitem__`.
 `get(run_id, limit=1, cursors={"edges": N})` pages the `edges` collection
-independently of `roots`/`targets`/`frontier`/`recovery`, which otherwise
+independently of `roots`/`targets`/`frontier`/`recovery`/`pointer_calls`, which otherwise
 all default to the same `offset`/cursor.
 
 ## Frontier / boundaries and recovery diagnostics
@@ -398,12 +423,13 @@ for these; a `None` here is a real "no location known" fact, not a bug.
 
 ## Relation-kind mapping, restated
 
-A call-graph run's edges cover exactly two of the 23 stored relations:
+A call-graph run's edges cover exactly two of the 24 stored relations:
 `calls` (kind id 1) and `dispatch_calls` (kind id 18). Every other stored
 relation - `inherits`, `uses`, `field_of`, `construct_*`, `of_type`, and so
 on - is available through ordinary relation navigation (see
 [05-relations-and-graph-queries.md](05-relations-and-graph-queries.md)) but
-never through a persisted call-graph run.
+never through its function-edge collection. Pointer invocation evidence is
+available in the separate `pointer_calls` collection.
 
 Continue to [07-error-handling.md](07-error-handling.md) for the complete
 error code reference, including every code introduced in this chapter.

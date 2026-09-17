@@ -11,12 +11,14 @@ FactStore::FactStore(std::string path, int verbosity)
 
 std::expected<void, std::error_code> FactStore::begin() {
   callableInvocations_.clear();
+  pointerCallSites_.clear();
   return storage_.begin();
 }
 
 std::expected<void, std::error_code> FactStore::end(bool reportSummary) {
   return storage_.commit().transform([this, reportSummary] {
     callableInvocations_.clear();
+    pointerCallSites_.clear();
     if (!reportSummary)
       return;
     const auto files = idsByUsr_ | std::views::values |
@@ -31,6 +33,7 @@ std::expected<void, std::error_code> FactStore::rollback() {
   return storage_.rollback().transform([this] {
     idsByUsr_.clear();
     callableInvocations_.clear();
+    pointerCallSites_.clear();
   });
 }
 

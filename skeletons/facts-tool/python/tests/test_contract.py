@@ -21,7 +21,7 @@ def test_runtime_exports_no_indexing_or_mutation_api() -> None:
 
 
 def test_relation_catalog_is_complete_and_unique() -> None:
-    assert len(RELATION_NAMES) == len(set(RELATION_NAMES)) == 23
+    assert len(RELATION_NAMES) == len(set(RELATION_NAMES)) == 24
 
 
 def test_all_hand_authored_files_have_at_most_100_lines() -> None:

@@ -4,6 +4,7 @@
 
 namespace storage_schema_test {
 
+auto verifyPointerCallStorage(const std::filesystem::path &database) -> bool;
 auto verifyReturnTypeStorage(const std::filesystem::path &database) -> bool;
 auto verifyFreshSchema(const std::filesystem::path &database) -> bool;
 auto verifyMigration(const std::filesystem::path &database) -> bool;

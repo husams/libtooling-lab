@@ -18,6 +18,12 @@ object/type relations remain unchanged. Cleanup edges are marked implicit for
 automatic, temporary, and delete-triggered destruction. Lambda invocations
 target the lambda's owned call-operator symbol.
 
+Function-pointer invocations retain separate `pointer-call` facts with the
+actual value declaration when known, canonical callable type, expression and
+source location. A proven function target also retains its exact `Calls` edge.
+Pointer values are never treated as traversable function nodes or external
+functions. `--all` includes functions whose only invocation is a pointer call.
+
 ## Querying
 
 Use [function entries](call-graph-entries.md) to distinguish committed body
@@ -126,6 +132,7 @@ deleted by a later invocation.
 | `callgraph_run_root` | `run_id, symbol_id, usr` — selected roots (all definition roots for `--all`) |
 | `callgraph_run_target` | `run_id, symbol_id, usr` — the `--to` target, when given |
 | `callgraph_run_edge` | `run_id, source_id, destination_id, kind (1=Calls, 18=DispatchCalls), position, file_id, offset, depth, cycle` — only the `relation_site` rows actually reached |
+| `callgraph_run_pointer_call_site` | `run_id, source_id, target_id (nullable), file_id, offset, line, col, signature, expression, target_name, target_usr` — pointer-call snapshots for reached callers (schema 14) |
 | `callgraph_run_frontier` | `run_id, symbol_id, reason` |
 | `callgraph_run_recovery` | `run_id, tu_file_id, outcome (attempted\|failed\|reused\|suppressed), diagnostic` |
 

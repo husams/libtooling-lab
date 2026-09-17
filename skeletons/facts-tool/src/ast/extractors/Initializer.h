@@ -4,6 +4,7 @@
 #include "model/Initializer.h"
 
 #include <optional>
+#include <string>
 
 namespace clang {
 class ASTContext;
@@ -13,6 +14,10 @@ class SourceManager;
 } // namespace clang
 
 namespace facts {
+
+std::string extractExpressionText(const clang::Expr &expression,
+                                  const clang::ASTContext &context,
+                                  const clang::SourceManager &sourceManager);
 
 std::optional<Initializer>
 extractInitializer(const clang::Expr *expression,
