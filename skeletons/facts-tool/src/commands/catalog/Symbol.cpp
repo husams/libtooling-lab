@@ -1,4 +1,6 @@
 #include "commands/ConfigurationSupport.h"
+#include "commands/FactConfiguration.h"
+#include "commands/FactPairValidation.h"
 #include "commands/catalog/Commands.h"
 #include "commands/catalog/MatchedSymbolFormat.h"
 #include "commands/catalog/MatchedSymbolQuery.h"
@@ -58,33 +60,19 @@ catalog::Result<int> runSymbol(const cli::SymbolOptions &options) {
       options.action == cli::SymbolOptions::Action::clearIndex)
     return runMatchedIndex(options);
   auto configured = options;
-  // An explicit --facts with no configuration flags stays independent of
-  // configuration (S-019): no discovery happens at all. Otherwise resolve,
-  // both to locate the project conf DB and to fill a missing --facts from
-  // facts_template.
-  const bool needsConfiguration = !options.factsProvided ||
-                                  !options.configuration.empty() ||
-                                  !options.configurationFile.empty() ||
-                                  config::detail::present("FACTS_TOOL_CONF");
-  if (needsConfiguration) {
-    auto resolved =
-        loadConfiguration(options.configuration, options.configurationFile,
-                          false, !options.factsProvided);
-    if (!resolved)
-      return std::unexpected(resolved.error());
-    if (!options.configuration.empty() || !options.configurationFile.empty() ||
-        config::detail::present("FACTS_TOOL_CONF")) {
-      configured.configuration = resolved->database.string();
-      if (!std::filesystem::exists(resolved->database))
-        return std::unexpected("project configuration database not found: " +
-                               configured.configuration);
-    }
-    if (!options.factsProvided) {
-      auto facts = resolveFactsOutput(*resolved, {});
-      if (!facts)
-        return std::unexpected(facts.error());
-      configured.facts = facts->string();
-    }
+  if (configured.factsProvided && configured.facts.empty())
+    return std::unexpected("facts-tool: usage error: --facts must not be empty");
+  auto resolved = loadFactConfiguration(
+      options.configuration, options.configurationFile, options.facts);
+  if (!resolved)
+    return std::unexpected(resolved.error());
+  configured.facts = resolved->facts.string();
+  if (resolved->projectSelected) {
+    configured.configuration = resolved->project.database.string();
+    auto paired = validateFactPairForRead(configured.facts,
+                                          configured.configuration);
+    if (!paired)
+      return std::unexpected(paired.error());
   }
   const auto name = configured.action == cli::SymbolOptions::Action::show
                         ? std::optional{configured.qualifiedName}

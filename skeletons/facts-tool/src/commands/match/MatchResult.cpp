@@ -11,15 +11,17 @@ namespace facts::commands::match {
 
 llvm::json::Object describeMatch(
     const clang::ast_matchers::MatchFinder::MatchResult &result,
-    const std::optional<std::string> &relationKind) {
+    const std::optional<std::string> &relationKind,
+    const clang::ast_matchers::BoundNodes::IDToNodeMap &nodes) {
   llvm::json::Object bindings;
-  for (const auto &[name, node] : result.Nodes.getMap())
+  for (const auto &[name, node] : nodes)
     bindings[name] = describeBinding(node, *result.Context);
   const auto &source = result.Context->getSourceManager();
   llvm::json::Value kind = nullptr;
   if (relationKind)
     kind = *relationKind;
-  else if (result.Nodes.getNodeAs<clang::CallExpr>("call"))
+  else if (result.Nodes.getNodeAs<clang::CallExpr>("call") &&
+           result.Nodes.getNodeAs<clang::FunctionDecl>("callee"))
     kind = "Calls";
   return llvm::json::Object{{"translation_unit", sourcePath(
                source, source.getLocForStartOfFile(source.getMainFileID()))},
@@ -48,6 +50,11 @@ std::string describeLocation(const clang::NamedDecl &node,
 std::string describeLocation(const clang::Stmt &node,
                              const clang::ASTContext &context) {
   return nodeLocation(clang::DynTypedNode::create(node), context);
+}
+
+std::string describeLocation(const clang::DynTypedNode &node,
+                             const clang::ASTContext &context) {
+  return nodeLocation(node, context);
 }
 
 void writeResults(const cli::MatchOptions &options,

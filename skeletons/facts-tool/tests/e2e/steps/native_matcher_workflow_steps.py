@@ -483,8 +483,8 @@ def paired_call_graph(context: FactsToolContext) -> None:
             str(first_edges))
 
 
-@when("an invalid symbol binding runs with the explicit database pair")
-def invalid_pair_match(context: FactsToolContext) -> None:
+@when("an arbitrary symbol binding runs with the explicit database pair")
+def arbitrary_pair_match(context: FactsToolContext) -> None:
     completed = run([
         str(context.facts_tool), "match", "-v", "0", "--conf",
         str(context.files_database), "--facts", str(context.facts_database),
@@ -496,25 +496,14 @@ def invalid_pair_match(context: FactsToolContext) -> None:
     context.last_output = completed.stdout + completed.stderr
 
 
-@then("the paired native match fails with an actionable binding contract")
-def invalid_binding_message(context: FactsToolContext) -> None:
-    require(context.last_returncode != 0, context.last_output)
-    require(
-        'bind("symbol")' in context.last_output and
-        'bind("call")+bind("callee")' in context.last_output and
-        'bind("source")+bind("target")' in context.last_output,
-        context.last_output,
-    )
-
-
-@then("the matcher help lists the supported binding contracts")
+@then("the matcher help describes flexible bindings")
 def matcher_help_contracts(context: FactsToolContext) -> None:
     completed = run([str(context.facts_tool), "match", "--help"])
     output = completed.stdout + completed.stderr
     require(completed.returncode == 0, output)
-    require("bind symbol" in output, output)
-    require("call+callee" in output, output)
-    require("source+target[+site]" in output, output)
+    require("arbitrary names" in output, output)
+    require("--source-binding" in output, output)
+    require("--callee-binding" in output, output)
 
 
 @given("a separate-build native matcher fixture")

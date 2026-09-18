@@ -16,11 +16,14 @@ namespace facts::commands::match {
 
 llvm::json::Object describeMatch(
     const clang::ast_matchers::MatchFinder::MatchResult &result,
-    const std::optional<std::string> &relationKind);
+    const std::optional<std::string> &relationKind,
+    const clang::ast_matchers::BoundNodes::IDToNodeMap &bindings);
 
 std::string describeLocation(const clang::NamedDecl &node,
                              const clang::ASTContext &context);
 std::string describeLocation(const clang::Stmt &node,
+                             const clang::ASTContext &context);
+std::string describeLocation(const clang::DynTypedNode &node,
                              const clang::ASTContext &context);
 
 void writeResults(const cli::MatchOptions &options,

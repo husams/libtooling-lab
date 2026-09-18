@@ -108,6 +108,11 @@ struct MatchOptions {
   std::optional<std::string> traversal;
   std::string format = "text";
   std::optional<std::string> relationKind;
+  std::string sourceBinding = "source";
+  std::string targetBinding = "target";
+  std::string siteBinding = "site";
+  std::string callBinding = "call";
+  std::string calleeBinding = "callee";
   bool captureSource = false;
   std::vector<std::string> sources;
   astcache::Options astCache;

@@ -4,6 +4,7 @@
 #include "commands/ConfigurationSupport.h"
 #include "commands/DatabasePaths.h"
 #include "commands/ExtractionSetup.h"
+#include "commands/FactConfiguration.h"
 #include "commands/FactPairValidation.h"
 #include "commands/match/MatchExecution.h"
 #include "commands/match/RelationKinds.h"
@@ -32,41 +33,29 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
   }
   auto configured = options;
   configured.sources = normalizeSourceSelectors(options.sources);
-  const bool explicitConfiguration = !options.configuration.empty() ||
-                                     !options.configurationFile.empty() ||
-                                     config::detail::present("FACTS_TOOL_CONF");
-  if (configured.factsProvided && !explicitConfiguration) {
-    // A supplied --facts path historically names the combined imported
-    // project/facts database; preserve that contract when --conf is omitted.
-    configured.configuration = configured.facts;
-  }
-  auto resolved = loadConfiguration(configured.configuration,
-                                    configured.configurationFile, false, true);
-  if (!resolved)
-    return std::unexpected(resolved.error());
-  configured.configuration = resolved->database.string();
-  if (configured.factsProvided && !explicitConfiguration)
-    configured.facts = configured.configuration;
-  configured.astCache = resolved->astCache;
+  if (configured.factsProvided && configured.facts.empty())
+    return std::unexpected("facts-tool: usage error: --facts must not be empty");
+  auto session = loadFactConfiguration(configured.configuration,
+                                       configured.configurationFile,
+                                       configured.facts, configured.sources,
+                                       true);
+  if (!session)
+    return std::unexpected(session.error());
+  const bool combined = configured.factsProvided && !session->projectSelected;
+  configured.facts = session->facts.string();
+  configured.configuration = combined ? configured.facts
+                                       : session->project.database.string();
+  configured.astCache = session->project.astCache;
+  configured.astCache.database = configured.configuration;
   configured.astCache.verbosity = options.verbosity;
-  if (!configured.factsProvided) {
-    auto facts = resolveFactsOutput(*resolved, configured.sources);
-    if (!facts)
-      return std::unexpected(facts.error());
-    configured.facts = facts->string();
-  }
-  if (configured.facts.empty())
-    return std::unexpected(
-        "facts-tool: usage error: --facts must not be empty");
-  if (!(configured.factsProvided && !explicitConfiguration)) {
+  if (!combined) {
     auto paths =
         validateDatabasePaths(configured.facts, configured.configuration);
     if (!paths)
       return std::unexpected("facts-tool: configuration error: " +
                              paths.error());
   }
-  if (!(configured.factsProvided && !explicitConfiguration) &&
-      std::filesystem::exists(configured.facts)) {
+  if (!combined && std::filesystem::exists(configured.facts)) {
     auto pairing =
         validateFactPairForRead(configured.facts, configured.configuration);
     if (!pairing)
@@ -77,12 +66,12 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
   if (!loaded)
     return std::unexpected(
         "cannot load project configuration: " + loaded.error() +
-        (configured.factsProvided && !explicitConfiguration
+        (combined
              ? "; pass --conf <project db> for a separate project database, "
                "or omit --facts to use facts_template"
              : ""));
   auto commands = requireStoredCommands(
-      appendExtraArguments(std::move(*loaded), resolved->extraArguments));
+      appendExtraArguments(std::move(*loaded), session->project.extraArguments));
   if (!commands)
     return std::unexpected(commands.error());
   auto opened =

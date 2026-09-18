@@ -58,15 +58,15 @@ Feature: Targeted dynamic AST matching
 
   Scenario: Reject an indirect call without guessing a target
     Given the targeted matcher corpus is imported
-    When match runs with matcher "callExpr(callee(expr(ignoringParenImpCasts(declRefExpr(to(varDecl(hasName(\"function\")))))).bind(\"callee\"))).bind(\"call\")"
+    When match runs with relation "Calls" and matcher "callExpr(callee(expr(ignoringParenImpCasts(declRefExpr(to(varDecl(hasName(\"function\")))))).bind(\"callee\"))).bind(\"call\")"
     Then match fails with "callee must bind FunctionDecl"
     And no targeted facts are stored
 
-  Scenario: Reject invalid bindings without partial writes
+  Scenario: Arbitrary binding names persist supported declarations
     Given the targeted matcher corpus is imported
     When match runs with matcher "functionDecl(hasName(\"targeted_match::caller\")).bind(\"wrong\")"
-    Then match fails with "bindings must exactly match a supported contract"
-    And no targeted facts are stored
+    Then match succeeds and reports symbol kind "function"
+    And the selected symbol "targeted_match::caller" is stored once as kind 13 with properties 0
 
   Scenario Outline: Reject invalid contracts without partial writes
     Given the targeted matcher corpus is imported
@@ -86,10 +86,10 @@ Feature: Targeted dynamic AST matching
       | MethodOf | MethodOf has incompatible source/target declarations | functionDecl(hasName("targeted_match::caller"),hasAncestor(namespaceDecl(hasDescendant(cxxRecordDecl(hasName("targeted_match::Record")).bind("target"))))).bind("source") |
       | Unknown | unsupported relation kind | fieldDecl(hasName("targeted_match::Record::field"),hasParent(cxxRecordDecl().bind("target"))).bind("source") |
 
-  Scenario: Reject an unsupported template declaration
+  Scenario: Query a declaration outside the persisted symbol schema
     Given the targeted matcher corpus is imported
     When match runs with matcher "typeAliasTemplateDecl(hasName(\"targeted_match::Alias\")).bind(\"symbol\")"
-    Then match fails with "unsupported TemplateDecl binding"
+    Then match succeeds and reports node kind "TypeAliasTemplateDecl"
     And no targeted facts are stored
 
   Scenario: Match all imported translation units in stored order

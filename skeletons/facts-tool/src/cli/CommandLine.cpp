@@ -217,7 +217,16 @@ private:
   void configureCallGraph(CLI::App &command) {
     callGraphCommand_ = &command;
     configureVerbosity(command, callGraph_.verbosity);
-    command.add_option("-f,--facts", callGraph_.facts, "SQLite facts database")
+    command
+        .add_option_function<std::string>(
+            "-f,--facts",
+            [this](const std::string &value) {
+              if (value.empty())
+                throw CLI::ValidationError("--facts must not be empty");
+              callGraph_.facts = value;
+            },
+            "SQLite facts database; defaults to facts_template when omitted")
+        ->trigger_on_parse()
         ->type_name("FILE");
     configurationOptions(command, callGraph_.configuration,
                          callGraph_.configurationFile);
@@ -252,9 +261,15 @@ private:
     callGraphEntryCommand_ = &command;
     configureVerbosity(command, callGraphEntry_.verbosity);
     command
-        .add_option("-f,--facts", callGraphEntry_.facts,
-                    "SQLite facts database")
-        ->required()
+        .add_option_function<std::string>(
+            "-f,--facts",
+            [this](const std::string &value) {
+              if (value.empty())
+                throw CLI::ValidationError("--facts must not be empty");
+              callGraphEntry_.facts = value;
+            },
+            "SQLite facts database; defaults to facts_template when omitted")
+        ->trigger_on_parse()
         ->type_name("FILE");
     configurationOptions(command, callGraphEntry_.configuration,
                          callGraphEntry_.configurationFile);

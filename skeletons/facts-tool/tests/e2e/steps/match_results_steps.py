@@ -8,6 +8,130 @@ from support.match_results import MATCHERS, import_sources, invoke
 
 IMPLICIT_EXPRESSION_MATCHER = "implicitCastExpr().bind(\"expression\")"
 
+# matcher, returned binding names, relation kind, optional role mappings
+FLEXIBLE_MATCHERS = {
+    "arbitrary-name": ('functionDecl(hasName("shared_match")).bind("my.function")',
+                       {"my.function"}, None, ()),
+    "multiple-symbols": ('functionDecl(hasName("shared_match"),hasParameter(0,'
+                         'parmVarDecl().bind("argument"))).bind("chosen")',
+                         {"argument", "chosen"}, None, ()),
+    "helper-equality": ('functionDecl(hasName("shared_match"),hasParameter(0,'
+                        'parmVarDecl().bind("argument")),hasDescendant('
+                        'declRefExpr(to(varDecl(equalsBoundNode("argument"))))'
+                        '.bind("use"))).bind("function")',
+                        {"argument", "use", "function"}, None, ()),
+    "statement": ('returnStmt(hasAncestor(functionDecl(hasName("shared_match"))))'
+                  '.bind("return-statement")', {"return-statement"}, None, ()),
+    "type": ('functionDecl(hasName("shared_match"),'
+             'returns(qualType().bind("result-type"))).bind("function")',
+             {"result-type", "function"}, None, ()),
+    "no-bind": ('functionDecl(hasName("shared_match"))', {"root"}, None, ()),
+    "explicit-root": ('functionDecl(hasName("shared_match"),hasParameter(0,'
+                      'parmVarDecl().bind("root")))', {"root"}, None, ()),
+    "private-name": ('functionDecl(hasName("shared_match"))'
+                     '.bind("__facts_tool_root")', {"__facts_tool_root"}, None, ()),
+    "source-only": ('functionDecl(hasName("shared_match")).bind("source")',
+                    {"source"}, None, ()),
+    "named-relation": ('cxxRecordDecl(hasName("MatchRecord"),isDefinition(),'
+                       'isDerivedFrom(cxxRecordDecl(hasName("MatchBase"))'
+                       '.bind("base"))).bind("derived")',
+                       {"base", "derived"}, "Inherits",
+                       ("--source-binding", "derived", "--target-binding", "base")),
+    "named-call": ('callExpr(callee(functionDecl(hasName("shared_match"))'
+                   '.bind("function"))).bind("invocation")',
+                   {"function", "invocation"}, "Calls",
+                   ("--call-binding", "invocation", "--callee-binding", "function")),
+    "named-site": ('declRefExpr(to(parmVarDecl(hasName("value")).bind("parameter")),'
+                   'hasAncestor(functionDecl(hasName("shared_match")).bind("owner")))'
+                   '.bind("reference")', {"parameter", "owner", "reference"}, "Uses",
+                   ("--source-binding", "owner", "--target-binding", "parameter",
+                    "--site-binding", "reference")),
+    "relation-helper": ('cxxRecordDecl(hasName("MatchRecord"),isDefinition(),'
+                        'has(fieldDecl().bind("member")),'
+                        'isDerivedFrom(cxxRecordDecl(hasName("MatchBase"))'
+                        '.bind("target"))).bind("source")',
+                        {"source", "target", "member"}, "Inherits", ()),
+    "call-helper": ('callExpr(callee(functionDecl(hasName("shared_match"))'
+                    '.bind("callee")),hasAncestor(functionDecl().bind("owner")))'
+                    '.bind("call")', {"call", "callee", "owner"}, "Calls", ()),
+    "call-shorthand": ('callExpr(callee(functionDecl(hasName("shared_match"))'
+                       '.bind("callee")),hasAncestor(functionDecl().bind("owner")))'
+                       '.bind("call")', {"call", "callee", "owner"}, None, ()),
+    "template-target": ('declRefExpr(to(nonTypeTemplateParmDecl()))'
+                        '.bind("parameter_reference")',
+                        {"parameter_reference"}, None, ()),
+}
+
+
+@when(parsers.parse('a flexible matcher runs for "{case}"'))
+def flexible(context, case):
+    matcher, _, relation, arguments = FLEXIBLE_MATCHERS[case]
+    result = invoke(context, matcher, relation=relation, extra_arguments=arguments)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@then(parsers.parse('its complete bindings for "{case}" are returned through the SDK'))
+def flexible_results(context, case):
+    from facts_tool import MatchResults
+
+    results = MatchResults.from_json(context.match_completed.stdout)
+    _, names, relation, _ = FLEXIBLE_MATCHERS[case]
+    assert len(results) == 2
+    for row in results:
+        assert set(row.bindings) == names
+        assert row.relation_kind == ("Calls" if case == "call-shorthand" else relation)
+    if case == "explicit-root":
+        assert all(row.bindings["root"].node_kind == "ParmVarDecl" for row in results)
+    elif case == "no-bind":
+        assert all(row.bindings["root"].name == "shared_match" for row in results)
+    elif case == "statement":
+        assert all(row.bindings["return-statement"].node_kind == "ReturnStmt"
+                   for row in results)
+    elif case == "type":
+        assert all(row.bindings["result-type"].node_kind == "QualType"
+                   for row in results)
+    elif case == "template-target":
+        import sqlite3
+
+        assert all(row.bindings["parameter_reference"].node_kind == "DeclRefExpr"
+                   for row in results)
+        with sqlite3.connect(context.facts_database) as database:
+            evidence = database.execute(
+                "SELECT target_id,unavailable_reason FROM expression_occurrence "
+                "WHERE expression_kind='DeclRefExpr'").fetchall()
+        assert len(evidence) == 1  # Shared-header evidence is idempotent across TUs.
+        assert all(target is None and reason == "dependent expression effect is unresolved"
+                   for target, reason in evidence)
+
+
+@when("a flexible statement matcher runs in text mode")
+def statement_text(context):
+    result = invoke(context, FLEXIBLE_MATCHERS["statement"][0], text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@then("the statement bindings and source coordinates are printed")
+def statement_text_results(context):
+    text = context.match_completed.stdout
+    assert text.count("binding name=return-statement kind=ReturnStmt") == 2
+    assert f"source={context.match_header.resolve()}:4:" in text
+
+
+@when("a matcher uses alternative binding names")
+def alternative_bindings(context):
+    result = invoke(context, 'functionDecl(anyOf(functionDecl(hasName("result_alpha"))'
+                    '.bind("alpha"),functionDecl(hasName("result_beta")).bind("beta")))')
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@then("both alternatives return their original binding names")
+def alternative_results(context):
+    from facts_tool import MatchResults
+
+    results = MatchResults.from_json(context.match_completed.stdout)
+    assert len(results) == 2
+    assert [set(row.bindings) for row in results] == [{"alpha"}, {"beta"}]
+
 
 @given("an isolated two-source match results fixture")
 def fixture(context):
@@ -17,7 +141,8 @@ def fixture(context):
     context.match_header.write_text(
         "#pragma once\nstruct MatchBase {};\n"
         "struct MatchRecord : MatchBase { int field; };\n"
-        "inline int shared_match(int value) { return value + 1; }\n")
+        "inline int shared_match(int value) { return value + 1; }\n"
+        "template<int N> int generic_ref() { return N; }\n")
     context.match_sources = [root / "alpha.cpp", root / "beta.cpp"]
     for path, name in zip(context.match_sources, ["result_alpha", "result_beta"]):
         path.write_text('#include "common.hpp"\n'

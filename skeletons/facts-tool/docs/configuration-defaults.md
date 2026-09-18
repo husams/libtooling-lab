@@ -53,7 +53,8 @@ their separate `*_source` provenance without creating a cache directory.
 
 `conf_root`/`conf_template` generate the project configuration database name;
 `facts_template` supplies the default `-o`/`--facts` path for `extract`,
-`analyse dependency`, and `symbol` when the command omits it. Both templates
+`analyse dependency`, `match`, `analyse call-graph`,
+`analyse call-graph-entry`, and `symbol` when the command omits it. Both templates
 share one placeholder set: `{project_root}` (canonical project base),
 `{project_name}` (the project's git repository name when `{project_root}` is
 a git repository, else its basename - see below), `{relative_path}`/`{filename}`, `{user}`
@@ -96,8 +97,10 @@ store local filesystem locations. Configuration only selects the database path.
 Use `--conf PATH` or `FACTS_TOOL_CONF`
 to select a database directly and bypass generated naming;
 `--conf` beats `FACTS_TOOL_CONF`, and conf-only catalog commands skip YAML
-entirely under either. A symbol command with an omitted `--facts` still
-loads YAML to resolve its independent `facts_template`. Compiler consumers (import, extract,
+entirely under either. A facts override by itself still loads YAML to discover
+the project database independently of the facts database. Read-only facts
+consumers with both a direct project override and an explicit facts path may
+skip unused defaults. Compiler consumers (import, extract,
 dependency analysis) still load YAML defaults despite a direct
 override, ignoring the now-unused `conf_root`/`conf_template` values
 (including their validation); `facts_template` is never bypassed by a direct
@@ -204,9 +207,16 @@ invalid lower tier is still a configuration error even when a higher tier's
 value wins the merge. Unavailable HOME paths remain symbolic. Read-only
 consumers never create storage; missing project DBs are runtime errors.
 Import and catalog writes may initialize storage before normal entity
-validation. Help, and symbol/catalog commands given an explicit
-`--facts`/`--conf` with no other configuration flags, do not discover
-defaults.
+validation. Help and read-only catalog commands given an explicit `--conf`
+do not discover defaults; read-only facts consumers likewise skip unused
+defaults when both project and facts paths are explicit. An explicit `--facts`
+on its own overrides only the facts
+database; it never prevents project configuration discovery. A project selected
+directly, through `--config`/`FACTS_TOOL_CONFIG`, or through YAML
+`conf_root`/`conf_template` must exist; consumers never silently substitute
+another database. When no project is selected, configured, or present at the
+generated default path, facts-only inspection remains available, and `match`
+retains support for an explicit combined project/facts database.
 
 Configuration errors exit 3; usage errors exit 2 and runtime failures exit 1.
 

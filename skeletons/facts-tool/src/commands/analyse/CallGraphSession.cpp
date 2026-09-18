@@ -1,28 +1,20 @@
 #include "commands/analyse/CallGraphSession.h"
-#include "commands/ConfigurationSupport.h"
+#include "commands/FactConfiguration.h"
 #include <filesystem>
 
 namespace facts::commands {
 std::expected<cli::CallGraphOptions, std::string>
 resolveGraphSession(cli::CallGraphOptions options) {
-  const bool configured = !options.configuration.empty() ||
-                          !options.configurationFile.empty() ||
-                          config::detail::present("FACTS_TOOL_CONF");
-  if (configured || options.facts.empty()) {
-    auto resolved =
-        loadConfiguration(options.configuration, options.configurationFile,
-                          false, options.recoverMissing || options.facts.empty());
-    if (!resolved)
-      return std::unexpected(resolved.error());
-    options.configuration = resolved->database.string();
-    options.astCache = resolved->astCache;
-    if (options.facts.empty()) {
-      auto facts = resolveFactsOutput(*resolved, {});
-      if (!facts)
-        return std::unexpected(facts.error());
-      options.facts = facts->string();
-    }
-  }
+  auto resolved = loadFactConfiguration(
+      options.configuration, options.configurationFile, options.facts, {},
+      options.recoverMissing);
+  if (!resolved)
+    return std::unexpected(resolved.error());
+  options.configuration = resolved->projectSelected
+                              ? resolved->project.database.string()
+                              : "";
+  options.astCache = resolved->project.astCache;
+  options.facts = resolved->facts.string();
   options.astCache.verbosity = options.verbosity;
   std::error_code error;
   auto facts = std::filesystem::weakly_canonical(options.facts, error);

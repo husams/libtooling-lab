@@ -16,9 +16,10 @@ expressions, traversal depth, or compilation-database directories.
 | `conf_root`, `conf_template` | `-c`, `--conf` | `import`, `extract`, `analyse dependency` | Resolve the YAML-generated project DB; absent keys use the data directory and `{relative_path}/{filename}.db`. |
 | `conf_root`, `conf_template` | `-c`, `--conf` | `repo`, `component`, `dir`, `file` groups and leaves | The same project DB resolver serves catalog reads and writes. |
 | `conf_root`, `conf_template` | `-c`, `--conf` | `config show` | Display resolved values and provenance without creating storage. |
-| `conf_root`, `conf_template` | `-c`, `--conf` | `symbol` group and leaves when configuration is consumed | Select the project configuration DB independently of the facts DB. |
+| `conf_root`, `conf_template` | `-c`, `--conf` | `match`, every `analyse` leaf, and `symbol` group and leaves | Select the project configuration DB independently of an explicit or configured facts DB. |
 | `facts_template` | `-o`, `--output` | `extract`, `analyse dependency` | Render the YAML facts path; no built-in facts template. |
 | `facts_template` | `-f`, `--facts` | `symbol list` / `ls`, `show`, `browser`; group or leaf | Render a project-scoped YAML template; source-dependent templates require an explicit facts path. |
+| `facts_template` | `-f`, `--facts` | `match`, `analyse call-graph`, `analyse call-graph-entry` | Render the YAML facts path when omitted; analysis without a source selector needs a project-scoped template. |
 | `extra_args` | repeated `--extra-arg` | `import`, `extract`, `analyse dependency` | Use merged YAML tokens; the built-in list is empty. |
 | `ast_cache` | YAML only | Every command that parses translation units | Disabled by default; selected file > project > user > built-in, including explicit `false`. |
 | `ast_cache_dir` | YAML only | Every command that parses translation units; `config show` | Defaults to `<project_root>/.facts-tool/ast-cache`; relative directories anchor to project root and `~/` expands `HOME`. |
@@ -28,11 +29,18 @@ selector on commands accepting configuration options. That selected file
 still participates above project and user YAML. `FACTS_TOOL_CONF` remains
 below explicit `--conf` and above generated project DB naming.
 
-`match` accepts `--conf`/`--config` for the project database and uses an
-explicit `--facts` path or the configured `facts_template`; when neither
-`--conf` nor `FACTS_TOOL_CONF` is set, a supplied `--facts` retains the legacy
-combined-store behavior.
-`analyse call-graph` still reads its explicit facts database. `config show`
+`--conf`/`-c` and `--config` are optional throughout the command tree.
+`match`, call-graph analysis, entry inspection, and symbol inspection discover
+the project database even when `--facts` is supplied. An explicit facts path
+overrides only the facts path, leaving project configuration discovery intact.
+This also makes configured project metadata and call-graph recovery available
+without repeating `--conf`.
+
+When no project database is selected, configured, or present at the generated
+default path, an explicit facts path can still be used for standalone reads
+or the legacy combined project/facts `match` workflow. Invalid configuration
+and missing explicitly configured databases do not trigger that fallback.
+`config show`
 reports YAML extras but has no `--extra-arg` option. The override rule does not
 introduce new flags or keys.
 
