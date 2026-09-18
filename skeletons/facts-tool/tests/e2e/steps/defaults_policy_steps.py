@@ -37,15 +37,16 @@ def write_missing(defaults, operation):
     defaults.database = defaults.root / "store/catalog.db"
     defaults.run(*shlex.split(operation))
 
-@then("storage has one owner and normal catalog validation ran")
+@then("storage has a project catalog without ownership metadata and normal validation ran")
 def initialized(defaults):
     assert defaults.last.returncode == 1, defaults.last
     assert "configuration error" not in defaults.last.stderr
     assert "database not found" not in defaults.last.stderr
     assert defaults.database.is_file()
     with sqlite3.connect(defaults.database) as database:
-        assert database.execute("SELECT project_root FROM generated_conf_owner").fetchall() == [
-            (str(defaults.cwd),)]
+        assert database.execute(
+            "SELECT name FROM sqlite_master WHERE name='generated_conf_owner'"
+        ).fetchall() == []
         assert database.execute("SELECT count(*) FROM file").fetchone()[0] == 0
 
 @when(parsers.parse('"{family}" runs with invalid unused path settings'))

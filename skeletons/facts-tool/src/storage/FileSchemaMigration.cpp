@@ -240,7 +240,32 @@ std::expected<void, std::string> requireCompleteFileSchema(sqlite3 *database) {
   return {};
 }
 
+std::expected<void, std::string> requireProjectCatalogColumns(sqlite3 *database) {
+  // Preparing this read validates the catalog shape without reading rows or
+  // changing an existing database. Leave columns added by supported migrations
+  // (including project_registry.schema_version) to their normal import path.
+  constexpr std::string_view sql =
+      "SELECT r.id,r.name,r.active_clone_id,c.id,c.repository_id,c.path,"
+      "p.id,p.name,p.path,p.kind,p.repository_id,d.id,d.component_id,d.path,"
+      "f.id,f.directory_id,f.name,f.driver,f.compile_options,"
+      "u.id,u.key,u.name,u.policy,g.id,g.complete,g.fingerprint,g.file_count "
+      "FROM repository r,clone c,component p,directory d,file f,"
+      "semantic_universe u,project_registry g LIMIT 0";
+  return storage::prepare(database, sql)
+      .transform_error([](std::error_code error) {
+        return "not a project configuration database: invalid catalog schema: " +
+               error.message();
+      })
+      .transform([](storage::Statement) {});
+}
+
 } // namespace
+
+std::expected<void, std::string> requireSupportedFileSchema(sqlite3 *database) {
+  return requireCompleteFileSchema(database)
+      .and_then([&] { return requireProjectCatalogColumns(database); })
+      .and_then([&] { return requireSupportedProjectSchema(database); });
+}
 
 std::expected<void, std::error_code> migrateFileSchema(sqlite3 *database) {
   return storage::Transaction::immediate(database).and_then(

@@ -15,7 +15,7 @@ callGraphProjectHasFiles(const std::string &configuration) {
             [](const storage::Row &) { return true; });
         if (!tables)
           return std::unexpected(tables.error());
-        // Generated ownership can exist before catalog initialization.
+        // A newly created database may not have a file registry yet.
         if (tables->empty())
           return false;
         return catalog::query(database, "SELECT 1 FROM file LIMIT 1",

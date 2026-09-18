@@ -61,7 +61,7 @@ text is reproduced once here and elided below as **[[config-help]]**:
 
 | Flag | Type | Default | Meaning |
 |---|---|---|---|
-| `-c`, `--conf` | `FILE` | generated from `conf_template` | Direct project DB path: overrides `FACTS_TOOL_CONF` and generated naming/ownership. Compiler extras use YAML when CLI `--extra-arg` is omitted. |
+| `-c`, `--conf` | `FILE` | generated from `conf_template` | Direct project DB path: overrides `FACTS_TOOL_CONF` and generated naming. Compiler extras use YAML when CLI `--extra-arg` is omitted. |
 | `--config` | `FILE` | none | YAML defaults file (yaml-cpp 0.9.0). Every explicitly supplied CLI value overrides its YAML value; omitted CLI values fall back to YAML, then built-ins. Files merge **per key**, highest precedence first: `--config`/`FACTS_TOOL_CONFIG` file, nearest project `.facts-tool.yaml`, then the user file (`$XDG_CONFIG_HOME/facts-tool/config.yaml` or `$HOME/.config/facts-tool/config.yaml`). |
 | `-h`, `--help` | flag | - | Print help and exit |
 

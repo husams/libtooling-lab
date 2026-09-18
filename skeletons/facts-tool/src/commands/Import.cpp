@@ -307,11 +307,11 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
                                    })
                   .and_then([&](CompilationDatabasePtr database) {
                     if (resolved->generated) {
-                      auto owned = config::ensureOwnedDatabase(*resolved);
-                      if (!owned)
+                      auto prepared = config::prepareDatabase(*resolved);
+                      if (!prepared)
                         return std::expected<int, std::string>(std::unexpected(
                             "facts-tool: configuration error: " +
-                            owned.error()));
+                            prepared.error()));
                     }
                     auto views = compilationViews(
                         std::move(database), configured.defaultExtraArguments,

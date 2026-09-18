@@ -13,7 +13,7 @@ unexpected, before you assume something is broken.
 $ facts-tool config --help
 Inspect merged YAML defaults with yaml-cpp 0.9.0: an optional
 --config/FACTS_TOOL_CONFIG file, the project file, and the user file (XDG/HOME)
-merge per key; --conf overrides generated naming and ownership
+merge per key; --conf overrides generated naming
 
 facts-tool config [OPTIONS] SUBCOMMAND
 
@@ -79,7 +79,7 @@ Each field:
   `[invalid]` entry at any tier makes the whole invocation a configuration
   error (exit 3), even when a higher tier supplied every key.
 
-## Explicit `--conf` overrides naming and ownership, but not `facts_template`
+## Explicit `--conf` overrides database naming
 
 ```console
 $ facts-tool config show --conf demo.db

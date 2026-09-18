@@ -15,9 +15,9 @@ loadConfiguration(std::string_view direct, std::string_view selector,
                                  create, compilerDefaults || !directOverride});
   if (!result) return std::unexpected("facts-tool: configuration error: " + result.error());
   if (create && result->generated) {
-    if (auto owned = config::ensureOwnedDatabase(*result); !owned)
+    if (auto prepared = config::prepareDatabase(*result); !prepared)
       return std::unexpected("facts-tool: configuration error: " +
-                             owned.error());
+                             prepared.error());
   }
   return result;
 }

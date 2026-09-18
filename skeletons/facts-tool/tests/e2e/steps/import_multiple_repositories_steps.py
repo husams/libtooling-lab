@@ -15,18 +15,38 @@ def rows(defaults, sql):
 
 
 def identities(defaults):
+    identity_columns = {
+        "repository": "id,name,kind,active_clone_id,semantic_universe_id",
+        "clone": "id,repository_id,path",
+        "component": "id,path,kind,version,repository_id,semantic_universe_id",
+        "directory": "id,component_id,path",
+    }
     return {
-        table: rows(defaults, f'SELECT * FROM "{table}" ORDER BY id')
-        for table in ("repository", "clone", "component", "directory")
+        table: rows(defaults, f'SELECT {columns} FROM "{table}" ORDER BY id')
+        for table, columns in identity_columns.items()
     } | {"file": file_snapshot(defaults.shared_database)}
 
 
-def import_repository(defaults, repository):
+def import_repository(defaults, repository, name=None):
     result = defaults.run(
         "import", "-p", repository,
-        "--component", f"{repository.name}={repository}", *defaults.args, cwd=repository,
+        "--component", f"{name or repository.name}={repository}", *defaults.args, cwd=repository,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def extract_repository(defaults, repository):
+    result = defaults.run(
+        "extract", "--output", defaults.root / "shared-facts.db",
+        repository / "main.cpp", *defaults.args, cwd=repository,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def indexed_states(defaults):
+    return rows(defaults,
+        "SELECT id,indexed,indexed_at,facts_db,md5,git_commit FROM file "
+        "WHERE name='main.cpp' ORDER BY id")
 
 
 @given("two Git repositories share one generated project database")
@@ -74,6 +94,31 @@ def register_repositories(defaults, registration):
         assert registration == "discovered"
 
 
+@given(parsers.parse('the shared catalog already exists from "{creation}"'))
+def existing_catalog(defaults, creation):
+    defaults.shared_database.parent.mkdir()
+    if creation == "environment import":
+        defaults.env["FACTS_TOOL_CONF"] = str(defaults.shared_database)
+    else:
+        assert creation in ("explicit import", "explicit repository registration")
+        defaults.args = ["--conf", str(defaults.shared_database)]
+    repository = defaults.repositories[0]
+    if creation == "explicit repository registration":
+        result = defaults.run("repo", "add", repository.name, repository,
+                              *defaults.args, cwd=repository)
+        assert result.returncode == 0, result.stdout + result.stderr
+    else:
+        import_repository(defaults, repository)
+        extract_repository(defaults, repository)
+        assert indexed_states(defaults)[0][1] == 1
+    defaults.existing_identities = identities(defaults)
+    defaults.existing_indexed_states = indexed_states(defaults)
+    assert rows(defaults,
+        "SELECT name FROM sqlite_master WHERE name='generated_conf_owner'") == []
+    defaults.args = []
+    defaults.env.pop("FACTS_TOOL_CONF", None)
+
+
 @when("I import each repository from its own checkout")
 def import_both(defaults):
     for repository in defaults.repositories:
@@ -81,17 +126,29 @@ def import_both(defaults):
     defaults.imported_identities = identities(defaults)
 
 
+@when(parsers.parse(
+    'I import both repositories using generated selection starting with "{checkout}"'))
+def import_existing_catalog(defaults, checkout):
+    assert checkout in ("same", "other")
+    repositories = defaults.repositories if checkout == "same" else reversed(defaults.repositories)
+    for repository in repositories:
+        import_repository(defaults, repository)
+    defaults.imported_identities = identities(defaults)
+
+
+@then("the existing catalog keeps its identities and indexed state")
+def existing_catalog_preserved(defaults):
+    current = identities(defaults)
+    for table, existing in defaults.existing_identities.items():
+        assert set(existing).issubset(current[table]), (table, existing, current[table])
+    assert set(defaults.existing_indexed_states).issubset(indexed_states(defaults))
+
+
 @when("I extract both repository sources using their stored commands")
 def extract_both(defaults):
     for repository in defaults.repositories:
-        result = defaults.run(
-            "extract", "--output", defaults.root / "shared-facts.db",
-            repository / "main.cpp", *defaults.args, cwd=repository,
-        )
-        assert result.returncode == 0, result.stdout + result.stderr
-    defaults.indexed_states = rows(defaults,
-        "SELECT id,indexed,indexed_at,facts_db,md5,git_commit FROM file "
-        "WHERE name='main.cpp' ORDER BY id")
+        extract_repository(defaults, repository)
+    defaults.indexed_states = indexed_states(defaults)
 
 
 @then("both repository sources are indexed")
@@ -119,10 +176,8 @@ def retained_catalogs(defaults):
     assert {path for _, path in actual_files} == expected_paths, actual_files
     assert rows(defaults, "SELECT count(*) FROM repository") == [(2,)]
     assert rows(defaults, "SELECT count(*) FROM clone") == [(2,)]
-    if not defaults.args:
-        assert set(rows(defaults, "SELECT project_root FROM generated_conf_owner")) == {
-            (str(repository),) for repository in defaults.repositories
-        }
+    assert rows(defaults,
+        "SELECT name FROM sqlite_master WHERE name='generated_conf_owner'") == []
     commands = rows(defaults,
         "SELECT r.name,f.driver,f.compile_options,f.working_directory FROM file f "
         "JOIN directory d ON d.id=f.directory_id "
@@ -146,9 +201,7 @@ def retained_identities(defaults):
 
 @then("neither repository loses its unchanged indexed state")
 def retained_index_state(defaults):
-    assert rows(defaults,
-        "SELECT id,indexed,indexed_at,facts_db,md5,git_commit FROM file "
-        "WHERE name='main.cpp' ORDER BY id") == defaults.indexed_states
+    assert indexed_states(defaults) == defaults.indexed_states
 
 
 @when("I export the stored compilation commands from each repository")

@@ -8,7 +8,7 @@
 #include <utility>
 
 namespace facts::config::detail {
-// Lock the existing parent directory, without leaving an ownership sidecar.
+// Serialize generated database initialization through its parent directory.
 class ParentLock {
 public:
   explicit ParentLock(int fd) : fd_(fd) {}

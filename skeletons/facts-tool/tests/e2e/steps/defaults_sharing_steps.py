@@ -11,7 +11,7 @@ def projects(defaults):
                    conf_template="same.db",
                    facts_template=str(defaults.root / "shared-facts.db"))
     (defaults.other / ".facts-tool.yaml").write_bytes(defaults.files["project"].read_bytes())
-    defaults.owned_db = defaults.root / "shared/same.db"
+    defaults.shared_db = defaults.root / "shared/same.db"
 
 def register(defaults, cwd, name):
     path = cwd / name
@@ -19,14 +19,14 @@ def register(defaults, cwd, name):
     return defaults.run("component", "add", "--name", name, "--path", path,
                         "--kind", "external", cwd=cwd)
 
-@when(parsers.parse('I initialize generated ownership with "{mode}"'))
+@when(parsers.parse('I initialize the shared database with "{mode}"'))
 def initialize(defaults, mode):
     if mode == "existing":
-        defaults.owned_db.parent.mkdir()
-        with sqlite3.connect(defaults.owned_db) as db:
+        defaults.shared_db.parent.mkdir()
+        with sqlite3.connect(defaults.shared_db) as db:
             db.execute("CREATE TABLE unrelated(value TEXT)")
             db.execute("INSERT INTO unrelated VALUES('preserve')")
-        defaults.original = defaults.owned_db.read_bytes()
+        defaults.original = defaults.shared_db.read_bytes()
         defaults.results = [register(defaults, defaults.cwd, "first")]
     elif mode == "repeat":
         defaults.results = [register(defaults, defaults.cwd, "first"),
@@ -43,7 +43,7 @@ def initialize(defaults, mode):
     defaults.mode = mode
 
 @then("database sharing is serialized and unrelated databases are never adopted")
-def ownership(defaults):
+def shared_database(defaults):
     results = defaults.results
     codes = sorted(r.returncode for r in results)
     expected = {"existing": [3], "repeat": [0, 0], "shared-root": [0, 0],
@@ -51,16 +51,16 @@ def ownership(defaults):
     assert codes == expected[defaults.mode], [(r.returncode, r.stderr) for r in results]
     for r in results:
         if r.returncode:
-            assert "generated conf path collision:" in r.stderr, r.stderr
+            assert "not a project configuration database:" in r.stderr, r.stderr
     if defaults.mode == "existing":
-        assert defaults.owned_db.read_bytes() == defaults.original
+        assert defaults.shared_db.read_bytes() == defaults.original
     else:
-        with sqlite3.connect(defaults.owned_db) as db:
-            owners = db.execute("SELECT project_root FROM generated_conf_owner").fetchall()
+        with sqlite3.connect(defaults.shared_db) as db:
+            assert db.execute(
+                "SELECT name FROM sqlite_master WHERE name='generated_conf_owner'"
+            ).fetchall() == []
             components = db.execute(
                 "SELECT name FROM component WHERE kind='external' AND path != '/'"
             ).fetchall()
-        roots = [defaults.cwd, defaults.other] if "shared-root" in defaults.mode else [defaults.cwd]
-        assert set(owners) == {(str(root),) for root in roots}
         assert set(components) == {("first",), ("second",)}
-    assert {p.name for p in defaults.owned_db.parent.iterdir()} == {"same.db"}
+    assert {p.name for p in defaults.shared_db.parent.iterdir()} == {"same.db"}

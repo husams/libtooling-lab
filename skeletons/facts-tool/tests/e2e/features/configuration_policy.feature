@@ -27,7 +27,7 @@ Feature: Configuration command policy and empty overrides
   Scenario Outline: Write consumer <operation> initializes generated storage
     Given an isolated defaults project
     When missing storage receives "<operation>"
-    Then storage has one owner and normal catalog validation ran
+    Then storage has a project catalog without ownership metadata and normal validation ran
     Examples:
       | operation |
       | repo rm absent |
