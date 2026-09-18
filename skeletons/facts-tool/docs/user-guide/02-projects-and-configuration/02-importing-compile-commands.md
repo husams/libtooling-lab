@@ -110,6 +110,10 @@ resolves to the same database path, import reuses that database automatically,
 including a database originally created with `--conf` or `FACTS_TOOL_CONF`.
 Importing a repository preserves the other repositories' stored compiler
 commands and file identities; no explicit `--conf` is required for reuse.
+The database has no owning repository or checkout. Repository records identify
+the projects, and each repository's clone records store its local paths and
+active clone. Older `generated_conf_owner` metadata is removed during writable
+project migration.
 
 Re-importing the same checkout updates its existing records. The clone path
 identifies its repository even if the detected name changes, for example

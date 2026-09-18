@@ -46,7 +46,7 @@ void astCache();
 void paths();
 void discovery();
 void arguments();
-void ownership();
+void database();
 void existingDatabase();
 void policies();
 void placeholders();

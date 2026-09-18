@@ -287,7 +287,7 @@ add_library(facts-config STATIC
   src/config/ConfigurationSearch.cpp
   src/config/ConfigurationMerge.cpp
   src/config/ConfigurationYaml.cpp
-  src/config/ConfigurationOwnership.cpp
+  src/config/ConfigurationDatabase.cpp
   src/config/RepositoryUrl.cpp
   src/config/RepositoryName.cpp
   src/config/GitFileCommit.cpp
@@ -740,7 +740,7 @@ if(BUILD_TESTING)
     tests/configuration/AstCache.cpp
     tests/configuration/ArgumentOverrides.cpp
     tests/configuration/ExistingDatabase.cpp
-    tests/configuration/Ownership.cpp tests/configuration/Safety.cpp
+    tests/configuration/Database.cpp tests/configuration/Safety.cpp
     tests/configuration/Policies.cpp
     tests/configuration/Placeholders.cpp
     tests/configuration/RepositoryUrl.cpp

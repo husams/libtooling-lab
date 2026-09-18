@@ -13,7 +13,7 @@ inline void configurationOptions(CLI::App &command, std::string &direct,
         }, help)->trigger_on_parse()->type_name("FILE");
   };
   add("-c,--conf", direct,
-      "Direct project DB: overrides FACTS_TOOL_CONF and generated naming/ownership; "
+      "Direct project DB: overrides FACTS_TOOL_CONF and generated naming; "
       "compiler extras use YAML when CLI --extra-arg is omitted");
   add("--config", selector,
       "YAML defaults (yaml-cpp 0.9.0); every explicitly supplied CLI value "

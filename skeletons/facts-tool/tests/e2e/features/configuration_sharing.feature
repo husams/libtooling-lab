@@ -1,7 +1,7 @@
 Feature: Transactional generated database sharing
-  Scenario Outline: Generated ownership under <mode>
+  Scenario Outline: Database sharing under <mode>
     Given two marked projects map to one generated database
-    When I initialize generated ownership with "<mode>"
+    When I initialize the shared database with "<mode>"
     Then database sharing is serialized and unrelated databases are never adopted
     Examples:
       | mode |

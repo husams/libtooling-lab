@@ -50,8 +50,7 @@ public:
         "config",
         "Inspect merged YAML defaults with yaml-cpp 0.9.0: an optional "
         "--config/FACTS_TOOL_CONFIG file, the project file, and the user "
-        "file (XDG/HOME) merge per key; --conf overrides generated naming "
-        "and ownership");
+        "file (XDG/HOME) merge per key; --conf overrides generated naming");
     configCommand_->require_subcommand(1, 1);
     auto &show = *configCommand_->add_subcommand(
         "show",

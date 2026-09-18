@@ -45,3 +45,28 @@ Feature: Import multiple repositories into one project database
       | explicit import                  | other    |
       | environment import               | other    |
       | explicit repository registration | other    |
+
+  Scenario Outline: Imports remove obsolete owner metadata without replacing the catalog
+    Given two Git repositories share one generated project database
+    And the shared catalog already exists from "explicit import"
+    And the shared catalog has an obsolete owner marker for an unrelated checkout
+    When I import both repositories using "<selection>" database selection
+    Then both repositories retain their sources headers and compilation commands
+    And the existing catalog keeps its identities and indexed state
+
+    Examples:
+      | selection   |
+      | generated   |
+      | explicit    |
+      | environment |
+
+  Scenario: Shared configuration follows each repository's active clone without an owner
+    Given two Git repositories share one generated project database
+    When I import each repository from its own checkout
+    And I register a second clone of each shared repository
+    Then each repository has two clones and one active local checkout
+    When I switch to both second clones and import from those checkouts
+    Then the shared catalog resolves unchanged file identities through the active clones
+    When I switch back and reimport both original checkouts
+    Then each repository has two clones and one active local checkout
+    And all repository clone and file identities survive both switches

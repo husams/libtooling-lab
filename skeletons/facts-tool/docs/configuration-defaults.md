@@ -86,13 +86,15 @@ project root when relative, never to the directory holding the YAML file
 that declared it) and anchors there. For example
 `conf_template: "{project_root}/.index/project.db"` yields
 `<root>/.index/project.db` directly, and a literal
-`conf_template: "/srv/index/{filename}.db"` yields `/srv/index/<name>.db`. A generated database records the
-project roots that use it. Multiple repositories may share the same generated
+`conf_template: "/srv/index/{filename}.db"` yields `/srv/index/<name>.db`.
+The project database has no owner. Multiple repositories may share the same generated
 database by resolving to the same path, for example with a shared absolute
 `conf_template: "/srv/index/workspace/project.db"`. Import updates the selected
 repository's compile commands and preserves the other repositories' commands.
+Each repository can have multiple clones, with one active clone; clone records
+store local filesystem locations. Configuration only selects the database path.
 Use `--conf PATH` or `FACTS_TOOL_CONF`
-to select a database directly and bypass generated naming and ownership;
+to select a database directly and bypass generated naming;
 `--conf` beats `FACTS_TOOL_CONF`, and conf-only catalog commands skip YAML
 entirely under either. A symbol command with an omitted `--facts` still
 loads YAML to resolve its independent `facts_template`. Compiler consumers (import, extract,
@@ -135,12 +137,13 @@ braces, backslashes, NUL/newline (including inside a substituted
 canonical symlink escapes are rejected before creation. Parents are
 rechecked immediately before opening. Concurrent creators serialize, including
 creators from different project roots sharing a generated database. Existing
-project databases are reused even when they were originally created with
-`--conf PATH` or `FACTS_TOOL_CONF` and have no generated ownership record.
-Each participating project root is recorded automatically. Before an unmarked
-database is adopted, its catalog structure and supported schema version are
-checked without committing changes on failure. Older project schema versions
-of the normalized catalog can still be migrated by `import`.
+project databases are reused whether selected by generated naming, `--conf PATH`,
+or `FACTS_TOOL_CONF`. Existing files are checked for a supported project catalog.
+New databases initialize the catalog without ownership metadata. Writable
+project migration removes the obsolete `generated_conf_owner` table from older
+databases, preserving repository and clone records; read-only commands do not
+change the database. Older project schema versions of the normalized catalog
+can still be migrated by `import`.
 
 `extra_args` entries are complete compiler tokens. Repeatable CLI
 `--extra-arg` values are shell-tokenized once, preserving duplicates and

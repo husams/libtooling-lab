@@ -57,6 +57,14 @@ project_schema::Result migrateProjectSchema(sqlite3 *database) {
                   : project_schema::Result{};
             })
             .and_then([&] {
+              // Repository locations are recorded by their clones. Remove
+              // the obsolete generated-path marker during schema migration,
+              // including catalogs imported directly with --conf.
+              return storage::execute(database,
+                                      "DROP TABLE IF EXISTS generated_conf_owner")
+                  .transform_error([](auto error) { return error.message(); });
+            })
+            .and_then([&] {
               return transaction.commit().transform_error(
                   [](auto error) { return error.message(); });
             });

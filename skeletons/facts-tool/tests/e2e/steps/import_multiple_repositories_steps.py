@@ -27,10 +27,10 @@ def identities(defaults):
     } | {"file": file_snapshot(defaults.shared_database)}
 
 
-def import_repository(defaults, repository):
+def import_repository(defaults, repository, name=None):
     result = defaults.run(
         "import", "-p", repository,
-        "--component", f"{repository.name}={repository}", *defaults.args, cwd=repository,
+        "--component", f"{name or repository.name}={repository}", *defaults.args, cwd=repository,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -176,10 +176,8 @@ def retained_catalogs(defaults):
     assert {path for _, path in actual_files} == expected_paths, actual_files
     assert rows(defaults, "SELECT count(*) FROM repository") == [(2,)]
     assert rows(defaults, "SELECT count(*) FROM clone") == [(2,)]
-    if not defaults.args:
-        assert set(rows(defaults, "SELECT project_root FROM generated_conf_owner")) == {
-            (str(repository),) for repository in defaults.repositories
-        }
+    assert rows(defaults,
+        "SELECT name FROM sqlite_master WHERE name='generated_conf_owner'") == []
     commands = rows(defaults,
         "SELECT r.name,f.driver,f.compile_options,f.working_directory FROM file f "
         "JOIN directory d ON d.id=f.directory_id "

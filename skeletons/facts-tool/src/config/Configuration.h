@@ -63,6 +63,6 @@ renderDatabasePath(const Resolved &value);
 std::expected<std::filesystem::path, std::string>
 renderFactsPath(const Resolved &value, const std::vector<std::string> &sources);
 std::expected<void, std::string>
-ensureOwnedDatabase(const Resolved &resolved);
+prepareDatabase(const Resolved &resolved);
 
 } // namespace facts::config
