@@ -47,6 +47,7 @@ void paths();
 void discovery();
 void arguments();
 void ownership();
+void existingDatabase();
 void policies();
 void placeholders();
 void safety();

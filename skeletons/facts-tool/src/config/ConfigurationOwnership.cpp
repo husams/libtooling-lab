@@ -1,5 +1,6 @@
 #include "config/Configuration.h"
 #include "config/ConfigurationLock.h"
+#include "storage/FileSchemaMigration.h"
 
 #include <sqlite3.h>
 #include <filesystem>
@@ -42,14 +43,18 @@ std::expected<void, std::string> ensureOwnedDatabase(const Resolved &resolved) {
   }
   const bool hasOwner = status == SQLITE_ROW;
   sqlite3_finalize(statement);
-  const auto collision = "generated conf path collision: " + resolved.database.string() +
-                         "; use --conf to select an existing database explicitly";
   if (existed && !hasOwner) {
-    sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr); return finish(collision);
+    // Direct --conf imports and older catalogs do not carry a generated-path
+    // marker. Recognize their schema before recording this additional root.
+    auto supported = requireSupportedFileSchema(db);
+    if (!supported) {
+      sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr);
+      return finish(resolved.database.string() + ": " + supported.error());
+    }
   }
   // A shared configuration can deliberately map several repositories to one
   // catalog. Record each root without treating the first one as exclusive.
-  // The marker still prevents implicitly adopting an unrelated database.
+  // Unmarked databases are validated above before any changes are committed.
   {
     if (sqlite3_prepare_v2(db, "INSERT INTO generated_conf_owner VALUES(?) "
                              "ON CONFLICT(project_root) DO NOTHING", -1,

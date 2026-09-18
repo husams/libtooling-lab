@@ -135,8 +135,12 @@ braces, backslashes, NUL/newline (including inside a substituted
 canonical symlink escapes are rejected before creation. Parents are
 rechecked immediately before opening. Concurrent creators serialize, including
 creators from different project roots sharing a generated database. Existing
-databases without a generated ownership record are rejected; select those
-explicitly with `--conf PATH` or `FACTS_TOOL_CONF`.
+project databases are reused even when they were originally created with
+`--conf PATH` or `FACTS_TOOL_CONF` and have no generated ownership record.
+Each participating project root is recorded automatically. Before an unmarked
+database is adopted, its catalog structure and supported schema version are
+checked without committing changes on failure. Older project schema versions
+of the normalized catalog can still be migrated by `import`.
 
 `extra_args` entries are complete compiler tokens. Repeatable CLI
 `--extra-arg` values are shell-tokenized once, preserving duplicates and

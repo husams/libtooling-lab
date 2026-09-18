@@ -293,7 +293,8 @@ add_library(facts-config STATIC
   src/config/GitFileCommit.cpp
 )
 target_include_directories(facts-config PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(facts-config PUBLIC yaml-cpp::yaml-cpp facts-sqlite PRIVATE facts-git)
+target_link_libraries(facts-config PUBLIC yaml-cpp::yaml-cpp facts-sqlite
+                                  PRIVATE facts-git facts-storage)
 
 # Kept separate from facts-commands so a unit test can link the freshness
 # decision (and the discovery/index-state types it depends on) without
@@ -738,6 +739,7 @@ if(BUILD_TESTING)
     tests/configuration/Discovery.cpp tests/configuration/Arguments.cpp
     tests/configuration/AstCache.cpp
     tests/configuration/ArgumentOverrides.cpp
+    tests/configuration/ExistingDatabase.cpp
     tests/configuration/Ownership.cpp tests/configuration/Safety.cpp
     tests/configuration/Policies.cpp
     tests/configuration/Placeholders.cpp

@@ -105,6 +105,12 @@ split one compilation database across multiple named components.
 
 ## Re-importing an existing project
 
+Multiple repositories can share one project database. When their configuration
+resolves to the same database path, import reuses that database automatically,
+including a database originally created with `--conf` or `FACTS_TOOL_CONF`.
+Importing a repository preserves the other repositories' stored compiler
+commands and file identities; no explicit `--conf` is required for reuse.
+
 Re-importing the same checkout updates its existing records. The clone path
 identifies its repository even if the detected name changes, for example
 after adding a git remote to a checkout previously named after its directory.

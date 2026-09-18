@@ -14,6 +14,7 @@ int main() {
   configuration_test::arguments();
   configuration_test::argumentOverrides();
   configuration_test::ownership();
+  configuration_test::existingDatabase();
   configuration_test::policies();
   configuration_test::placeholders();
   configuration_test::safety();

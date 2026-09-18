@@ -51,7 +51,7 @@ def ownership(defaults):
     assert codes == expected[defaults.mode], [(r.returncode, r.stderr) for r in results]
     for r in results:
         if r.returncode:
-            assert "generated conf path collision:" in r.stderr, r.stderr
+            assert "not a project configuration database:" in r.stderr, r.stderr
     if defaults.mode == "existing":
         assert defaults.owned_db.read_bytes() == defaults.original
     else:
