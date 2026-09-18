@@ -95,6 +95,7 @@ int buildOne(const clang::tooling::CompilationDatabase &database,
     IncludeGraphFacts cached;
     if (auto loaded = detail::loadAST(*entry, includes ? &cached : nullptr)) {
       report(options, "hit", source);
+      report(options, "AST parsing skipped (cache hit)", source);
       units.push_back(std::move(loaded));
       if (includes)
         appendIncludes(*includes, std::move(cached));
@@ -166,6 +167,7 @@ int prepareAST(const clang::tooling::CompilationDatabase &database,
     if (auto prepared = detail::preparedIncludes(*entry)) {
       includes = std::move(*prepared);
       report(options, "hit", source);
+      report(options, "AST parsing skipped (cache hit)", source);
       if (options.verbosity >= 1)
         llvm::errs() << "dependency-cache: hit " << source << '\n';
       return 0;

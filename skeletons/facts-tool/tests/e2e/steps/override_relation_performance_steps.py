@@ -58,7 +58,7 @@ def then_override_resolution_is_bounded(
     require(context.last_returncode == 0, context.last_output)
     require("rollback output transaction" not in context.last_output,
             context.last_output)
-    start = "facts-tool: extract: Clang parse and AST extraction"
+    start = "facts-tool: extract: extract facts from AST"
     end = "facts-tool: extract: commit output transaction"
     require(start in context.last_output and end in context.last_output,
             context.last_output)

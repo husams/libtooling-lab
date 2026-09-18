@@ -134,7 +134,7 @@ for the full `symbol`/`file` command surface.
 $ touch src/main.cpp
 $ time facts-tool extract --conf project.sqlite -o facts.sqlite -v 1 src/main.cpp
 facts-tool: extract: starting
-... facts-tool: extract: Clang parse and AST extraction
+... facts-tool: extract: extract facts from AST
 facts-tool: 4 symbol(s) recorded from 2 file(s)
 facts-tool: extract: complete
 0.10s user 0.16s system 97% cpu 0.262 total

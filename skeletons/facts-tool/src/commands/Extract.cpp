@@ -258,7 +258,7 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
               "cannot begin output transaction: " + started.error().message())};
         }
         const auto toolResult =
-            runExtractStage(options, "Clang parse and AST extraction", [&] {
+            runExtractStage(options, "extract facts from AST", [&] {
               return extractTranslationUnits(**configured, stale, files, store,
                                              indexing, options.astCache);
             });

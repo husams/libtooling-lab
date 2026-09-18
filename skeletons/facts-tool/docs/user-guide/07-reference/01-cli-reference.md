@@ -139,7 +139,7 @@ facts-tool: extract: up_to_date=0 stale=2
 facts-tool: extract: configure Clang tool
 facts-tool: extract: open output database
 facts-tool: extract: begin output transaction
-facts-tool: extract: Clang parse and AST extraction
+facts-tool: extract: extract facts from AST
 [1/2] Processing file .../proj/src/shapes.cpp.
 [2/2] Processing file .../proj/src/main.cpp.
 facts-tool: extract: commit output transaction
