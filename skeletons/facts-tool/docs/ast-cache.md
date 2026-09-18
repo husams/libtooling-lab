@@ -49,6 +49,11 @@ reads only SQLite metadata on a hit. Warm import also reads the AST bytes to
 verify integrity, without deserializing them. Disabled caching performs no
 cache reads or writes and does not populate the metadata tables.
 
+When a saved AST is loaded or an unchanged import validates its prepared cache,
+the hit is followed by `ast-cache: AST parsing skipped (cache hit) <source>`.
+Extraction reports `facts-tool: extract: extract facts from AST` for its
+extraction stage; this stage runs for both cached and freshly parsed ASTs.
+
 Verbose output also reports actual frontend work as `frontend: ast-parse`,
 `frontend: dependency-scan`, `frontend: include-reconstruction`, or
 `frontend: driver-probe`. A prepared, valid cache should produce none of

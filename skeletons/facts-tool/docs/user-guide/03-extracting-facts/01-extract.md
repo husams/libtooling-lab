@@ -105,7 +105,7 @@ facts-tool: extract: up_to_date=0 stale=2
 facts-tool: extract: configure Clang tool
 facts-tool: extract: open output database
 facts-tool: extract: begin output transaction
-facts-tool: extract: Clang parse and AST extraction
+facts-tool: extract: extract facts from AST
 [1/2] Processing file .../proj/src/shapes.cpp.
 facts-tool: coverage.unsupported_semantics kind=implicit-cleanup site=.../c++/v1/__chrono/duration.h:340:8
 ... (12 more coverage.unsupported_semantics lines for shapes.cpp, all in libc++/Clang resource headers)
