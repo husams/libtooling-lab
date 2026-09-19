@@ -101,13 +101,14 @@ def match_twice(context: FactsToolContext, matcher: str) -> None:
 
 @when(parsers.parse('match runs with relation "{relation}" and matcher "{matcher}"'))
 def relation_match(context: FactsToolContext, relation: str, matcher: str) -> None:
-    invoke(context, matcher, relation)
+    invoke(context, matcher.replace(r'\"', '"'), relation)
 
 
 @when(parsers.parse(
     'match runs twice with relation "{relation}" and matcher "{matcher}"'))
 def relation_match_twice(context: FactsToolContext, relation: str,
                          matcher: str) -> None:
+    matcher = matcher.replace(r'\"', '"')
     invoke(context, matcher, relation)
     require(context.last_returncode == 0, context.last_output)
     invoke(context, matcher, relation)
@@ -269,3 +270,9 @@ def atomic_failure(context: FactsToolContext) -> None:
 @then("the database schema is unchanged")
 def unchanged_schema(context: FactsToolContext) -> None:
     require(schema(context) == context.schema_before, str(schema(context)))
+
+
+@then(parsers.parse('match succeeds and reports node kind "{kind}"'))
+def node_success(context: FactsToolContext, kind: str) -> None:
+    require(context.last_returncode == 0, context.last_output)
+    require(f"kind={kind}" in context.last_output, context.last_output)

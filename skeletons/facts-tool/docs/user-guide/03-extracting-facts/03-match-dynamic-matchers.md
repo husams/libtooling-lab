@@ -2,7 +2,7 @@
 
 `facts-tool match` runs a Clang **dynamic AST matcher expression** - the
 same matcher language used by `clang-query` - against one or more
-translation units, and persists whatever the matcher binds. Unlike
+translation units, returns all bound nodes, and persists supported facts. Unlike
 `extract`, which walks the whole AST and records everything it understands,
 `match` records only what your matcher expression explicitly asks for.
 
@@ -14,10 +14,15 @@ POSITIONALS:
 
 OPTIONS:
   -f, --facts FILE          SQLite facts database; defaults to facts_template when omitted
-      --matcher EXPR REQUIRED   Clang dynamic matcher expression; bind symbol, expression, call+callee, or source+target[+site]
+      --matcher EXPR REQUIRED   Clang dynamic matcher expression; optional bindings with arbitrary names
       --traversal MODE          AsIs (default) or IgnoreUnlessSpelledInSource
       --format text|json       Located text (default) or structured invocation results
-      --relation-kind KIND      Relation kind for source/target bindings; required for relation contracts
+      --relation-kind KIND      Persist a relation using the selected role bindings
+      --source-binding NAME     Relation source (default: source)
+      --target-binding NAME     Relation target (default: target)
+      --site-binding NAME       Relation occurrence (default: site)
+      --call-binding NAME       Calls expression (default: call)
+      --callee-binding NAME     Calls destination (default: callee)
 ```
 
 ## Choose the traversal mode
@@ -77,7 +82,7 @@ facts transaction, so a later failure rolls back earlier matched facts. Each
 new invocation still parses source; `symbol find` remains the fast lookup for
 previously matched identities.
 
-## The binding contract
+## Flexible bindings
 
 For source-symbol discovery, start with a registered translation unit and
 pass a Clang matcher expression directly to `--matcher` (without the
@@ -108,20 +113,49 @@ evidence, always use the public Python SDK. Never query either database
 directly, including for diagnostics. A matched definition still does not
 establish extracted body or outgoing-call coverage.
 
-A matcher expression must bind exactly one of four shapes:
+Binding names are ordinary Clang matcher identifiers. Use any names, multiple
+bindings, helper bindings, `equalsBoundNode`, `anyOf`, and `forEachDescendant`.
+Without explicit bindings, the matched top-level node is returned as `root`.
+When your matcher binds any nodes, only those user bindings appear in results;
+a user binding named `root` is preserved.
 
-- **`symbol`** - bind one declaration node to the name `"symbol"`. This is
-  the shape used to find or confirm that a declaration exists.
-- **`expression`** - bind an expression node to persist opt-in expression evidence.
-- **`call`** + **`callee`** - bind a direct call expression and its callee,
-  to record a `Calls` relation site.
-- **`source`** + **`target`** (and optionally **`site`**) - bind an
-  arbitrary relation between two nodes; `--relation-kind` is required for
-  this shape, since the relation kind cannot be inferred from the matcher
-  alone.
+```sh
+facts-tool match --format json \
+  --matcher 'functionDecl(hasName("main")).bind("myFunction")' src/main.cpp
+facts-tool match --format json \
+  --matcher 'returnStmt()' src/main.cpp
+facts-tool match --format json \
+  --matcher 'functionDecl(hasParameter(0, parmVarDecl().bind("parameter"))).bind("function")' src/main.cpp
+```
 
-Binding `source` without a matching `target` fails contract validation -
-every accepted binding shape needs its full node set, not a partial one.
+Without `--relation-kind`, supported declaration nodes are persisted as symbols
+and expression nodes as expression evidence, regardless of their binding names.
+Other nodes, including statements, types, namespaces and unsupported declaration
+kinds, remain visible in text or JSON results without creating unsupported facts.
+Repeated bindings of the same node are retained in JSON and persisted once per
+match. Storage errors still fail the invocation and roll back its writes.
+
+For relationship persistence, `--relation-kind` selects the intended meaning:
+
+| Relation | Default bindings | Custom role options |
+| --- | --- | --- |
+| `Calls` | `call` (CallExpr), `callee` (FunctionDecl) | `--call-binding`, `--callee-binding` |
+| Other supported kinds | `source`, `target` (declarations), and where required `site` | `--source-binding`, `--target-binding`, `--site-binding` |
+
+Role options require `--relation-kind`. Additional helper bindings are allowed
+and returned with the relation; only relation endpoints and evidence are
+persisted by this mode. A correctly typed `call` + `callee` pair also keeps the
+existing implicit `Calls` shorthand when the kind is omitted. Names alone do
+not reserve node types: a function bound to `source` without `--relation-kind`
+is an ordinary symbol match.
+
+For example, keep your chosen binding names for an inheritance relation:
+
+```sh
+facts-tool match --relation-kind Inherits \
+  --source-binding derived --target-binding base \
+  --matcher 'cxxRecordDecl(isDefinition(), isDerivedFrom(cxxRecordDecl().bind("base"))).bind("derived")' src/main.cpp
+```
 
 ## Worked example: binding a symbol by name
 
@@ -279,10 +313,9 @@ too broad, and each one succeeds once scoped to one function's body.
 ## Binding a direct call: `call` + `callee`
 
 `call`+`callee` records a `Calls` relation site between a call expression
-and its resolved callee. `--relation-kind` is optional here (the shape
-always means `Calls`), but if you do supply it, it must be exactly
-`Calls` - any other value fails with `call and callee bindings only
-support Calls`, exit 1. An unscoped matcher over the whole translation
+and its resolved callee. `--relation-kind Calls` is optional for the default
+`call` and `callee` names; custom names use the role options above. Explicit
+relation kinds validate their own required endpoint and site roles. An unscoped matcher over the whole translation
 unit fails immediately, before printing anything, because it reaches call
 expressions (implicit conversions, cleanup calls) that have no call site
 the extractor can persist:
@@ -360,22 +393,16 @@ $ echo $?
 `source` and `target` must each resolve to a declaration node
 (`hasAncestor(functionDecl(...).bind("source"))` above binds the
 *enclosing function declaration*, not the reference expression itself);
-`site` is the only name allowed to bind the expression or occurrence node
-directly.
+the site role identifies the expression or occurrence node. Its default name
+is `site`; use `--site-binding` for another name. Extra helper bindings can use
+any node type.
 
-## Summary of the binding contract
+## Persistence and result guarantees
 
-The `call`+`callee` and `source`+`target`[+`site`] binding forms, and the
-`--relation-kind` option the latter requires, follow the same contract
-described at the top of this chapter - bind exactly one complete shape per
-matcher expression, and supply `--relation-kind` whenever you use the
-`source`/`target` shape. If a matcher expression from this section doesn't
-produce the expected persisted rows, confirm the binding names in your
-expression exactly match `symbol`, `call`+`callee`, or `source`+`target`
-(optionally `site`) - a near-miss binding name fails validation rather than
-silently matching nothing. And if the matcher fails outright rather than
-matching nothing, check whether it needs to be scoped down to one
-function's body first, per the previous three sections.
+Bindings do not have to follow a fixed shape. Relation persistence still requires
+valid endpoints and occurrence evidence for the selected relation kind. If a
+relation fails, inspect its role mappings and scope the matcher to the intended
+source constructs; no partial results or facts are published.
 
 `facts_committed` and `index_committed` describe successful publication (including
 an empty no-op); they do not mean every binding became a discovery-index row.

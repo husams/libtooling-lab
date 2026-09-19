@@ -1,7 +1,9 @@
 # Expression and source evidence
 
 Expression evidence is opt-in through the native `match` command. The matcher
-must bind exactly `"expression"` to an `Expr`; relation kinds are rejected.
+may bind an `Expr` under any name, with any additional helper bindings. An
+unbound expression matcher returns its matched node as `root` and captures the
+same evidence. An explicit relation kind selects relation persistence instead.
 Ordinary extraction does not collect these rows.
 
 | Observed construct | Stored access | Scope |

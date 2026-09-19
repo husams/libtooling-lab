@@ -36,6 +36,16 @@ Result execute(const cli::MatchOptions &options,
       expression, &diagnostics);
   if (!matcher)
     return std::unexpected("invalid matcher: " + diagnostics.toString());
+  // Clang-query-style root results for matchers with no explicit bindings.
+  // A private name avoids overwriting any user binding, including "root".
+  std::string implicitRootBinding = "__facts_tool_root";
+  while (options.matcher.find(implicitRootBinding) != std::string::npos)
+    implicitRootBinding += '_';
+  matcher->setAllowBind(true);
+  if (auto rooted = matcher->tryBind(implicitRootBinding))
+    matcher = std::move(rooted);
+  else
+    implicitRootBinding.clear();
   std::vector<FileId> selected;
   selected.reserve(sources.size());
   for (const auto &source : sources) {
@@ -69,7 +79,8 @@ Result execute(const cli::MatchOptions &options,
     if (auto begun = store.begin(); !begun)
       return std::unexpected("cannot begin facts transaction: " +
                              begun.error().message());
-    MatchCallback callback(options, files, store, rejectLegacyWrites);
+    MatchCallback callback(options, files, store, rejectLegacyWrites,
+                           implicitRootBinding);
     clang::ast_matchers::MatchFinder finder;
     if (!finder.addDynamicMatcher(*matcher, &callback))
       return finishMatch(store, options, 1,

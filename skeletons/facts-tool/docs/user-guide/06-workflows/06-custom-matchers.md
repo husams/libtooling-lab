@@ -13,10 +13,11 @@ and understand why matcher breadth matters on a real, non-trivial file.
 - `facts-tool match` requires a project database that already has the
   target source imported (see
   [02-importing-compile-commands](../02-projects-and-configuration/02-importing-compile-commands.md)).
-- Familiarity with the binding contract in
+- Familiarity with the binding and persistence behavior in
   [03-extracting-facts/03-match-dynamic-matchers](../03-extracting-facts/03-match-dynamic-matchers.md):
-  a matcher expression must bind exactly one of `symbol`, `call`+`callee`,
-  or `source`+`target`[+`site`].
+  binding names are arbitrary, helper bindings are allowed, and unbound
+  matchers expose the matched `root`. Explicit relation persistence uses
+  role bindings, whose names can be selected with the binding options.
 
 ## Steps
 

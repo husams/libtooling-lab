@@ -79,6 +79,47 @@ void testContracts(ASTContext &context) {
   require(!expression.empty() && classify(expression.front(), std::nullopt));
   require(!classify(expression.front(), "Uses"));
 }
+
+void testFlexibleBindings(ASTContext &context) {
+  auto symbols = match(functionDecl(hasName("N::use"),
+                                   hasParameter(0, parmVarDecl().bind("argument")),
+                                   hasAncestor(namespaceDecl().bind("scope")))
+                           .bind("function"), context);
+  require(symbols.size() == 1);
+  const auto generic = classify(symbols.front(), std::nullopt);
+  require(generic && generic->size() == 3);
+  require(std::holds_alternative<SymbolMatch>(generic->at(0)));
+  require(std::holds_alternative<SymbolMatch>(generic->at(1)));
+  require(std::holds_alternative<NodeMatch>(generic->at(2)));
+
+  auto statements = match(compoundStmt(hasParent(functionDecl(hasName("N::use"))))
+                              .bind("body"), context);
+  require(statements.size() == 1);
+  auto statement = classify(statements.front(), std::nullopt);
+  require(statement && std::holds_alternative<NodeMatch>(statement->front()));
+
+  auto expression = match(memberExpr(hasDeclaration(fieldDecl().bind("field")))
+                              .bind("access"), context);
+  require(expression.size() == 1);
+  auto mixed = classify(expression.front(), std::nullopt);
+  require(mixed && mixed->size() == 2);
+  require(std::holds_alternative<ExpressionMatch>(mixed->at(0)));
+  require(std::holds_alternative<SymbolMatch>(mixed->at(1)));
+
+  auto relation = match(cxxMethodDecl(hasName("N::Record::run"),
+                                    forEachOverridden(cxxMethodDecl().bind("base")),
+                                    hasParent(cxxRecordDecl().bind("owner")))
+                           .bind("derived"), context);
+  require(relation.size() == 1);
+  require(classify(relation.front(), "Overrides",
+                   {.source = "derived", .target = "base"}));
+  require(!classify(relation.front(), "Overrides"));
+
+  auto unbound = match(functionDecl(hasName("N::function")), context);
+  require(unbound.size() == 1);
+  auto empty = classify(unbound.front(), std::nullopt);
+  require(empty && empty->empty());
+}
 } // namespace
 
 int main() {
@@ -91,4 +132,5 @@ int main() {
   require(ast);
   testEndpoints(ast->getASTContext());
   testContracts(ast->getASTContext());
+  testFlexibleBindings(ast->getASTContext());
 }

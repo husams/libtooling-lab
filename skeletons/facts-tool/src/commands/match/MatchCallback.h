@@ -23,7 +23,8 @@ class MatchCallback final
     : public clang::ast_matchers::MatchFinder::MatchCallback {
 public:
   MatchCallback(const cli::MatchOptions &options, FileManager &files,
-                FactStore &store, bool rejectLegacyWrites = false);
+                FactStore &store, bool rejectLegacyWrites = false,
+                std::string implicitRootBinding = {});
   void onStartOfTranslationUnit() override { fingerprints_.clear(); }
   std::optional<clang::TraversalKind> getCheckTraversalKind() const override;
   void
@@ -40,6 +41,7 @@ private:
   FileManager &files_;
   FactStore &store_;
   bool rejectLegacyWrites_ = false;
+  std::string implicitRootBinding_;
   std::optional<std::string> error_;
   std::vector<MatchedSymbol> matches_;
   llvm::json::Array results_;

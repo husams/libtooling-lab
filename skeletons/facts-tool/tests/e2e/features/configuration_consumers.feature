@@ -42,11 +42,15 @@ Feature: Shared configuration read and write policies
     When I change YAML defaults between extractions
     Then changed defaults apply once without changing stored arguments
 
-  Scenario Outline: Facts-only and help are independent of defaults
+  Scenario Outline: Help is independent of defaults
     Given a selected YAML file with "malformed"
     When I run configuration-independent "<command>"
     Then no configuration discovery occurs
     Examples:
       | command |
       | help |
-      | symbol |
+
+  Scenario: A facts override still validates discovered configuration
+    Given a selected YAML file with "malformed"
+    When I invoke the "symbol" configuration consumer
+    Then configuration fails with "configuration error:"

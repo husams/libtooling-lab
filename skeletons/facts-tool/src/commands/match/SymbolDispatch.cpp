@@ -68,6 +68,10 @@ indexRecord(const clang::NamedDecl &node, std::string usr,
 }
 } // namespace
 
+bool supportsSymbol(const clang::NamedDecl &node) {
+  return supportedDeclaration(node).has_value();
+}
+
 void appendMatchedIndex(std::vector<MatchedSymbol> &matched,
                         PersistedSymbol symbol) {
   if (symbol.index)

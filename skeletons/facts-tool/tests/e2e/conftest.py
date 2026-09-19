@@ -52,6 +52,8 @@ pytest_plugins = (
     "steps.cli_yaml_paths_steps",
     "steps.cli_yaml_paths_symbol_steps",
     "steps.cli_yaml_catalog_steps",
+    "steps.optional_project_configuration_steps",
+    "steps.facts_consumer_configuration_steps",
     "steps.extra_args_retention_steps",
     "steps.callable_steps",
     "steps.callable_persistence_steps",

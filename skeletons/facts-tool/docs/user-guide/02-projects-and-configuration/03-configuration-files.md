@@ -35,10 +35,18 @@ order, highest precedence first:
    YAML or an explicit `-o`/`-f`); `extra_args` = `[]`; `ast_cache` = `false`;
    `ast_cache_dir` = `<project_root>/.facts-tool/ast-cache`.
 
-A missing file at any YAML tier is not an error - it's simply skipped. An
+Missing project and user YAML files are skipped. A file selected explicitly
+with `--config` or `FACTS_TOOL_CONFIG` must exist. An
 **existing but invalid** file at *any* tier, however, **is** a
 configuration error (exit code 3), even if a higher tier would have won
 anyway; every tier is still checked and reported for diagnostics.
+
+`--conf`/`-c` and `--config` are optional on every command. Once defaults are
+configured, `match`, all `analyse` commands, catalog commands, and symbol
+commands use them without repeating database paths. Supplying `--facts`
+overrides the facts database only; it does not disable project configuration
+discovery. `analyse call-graph-entry` also uses `facts_template` when
+`--facts` is omitted.
 
 ## YAML keys
 

@@ -56,11 +56,11 @@ Feature: Native matcher workflow
     When ordinary extraction runs for the expression fixture
     Then ordinary extraction has no expression or source evidence rows
 
-  Scenario: Invalid binding fails before writing through the paired workflow
+  Scenario: Arbitrary symbol binding works through the paired workflow
     Given a separately stored native matcher fixture
-    When an invalid symbol binding runs with the explicit database pair
-    Then the paired native match fails with an actionable binding contract
-    And the matcher help lists the supported binding contracts
+    When an arbitrary symbol binding runs with the explicit database pair
+    Then the paired native match succeeds
+    And the matcher help describes flexible bindings
 
   Scenario: Relative import selectors use the invocation directory
     Given a separate-build native matcher fixture

@@ -20,6 +20,40 @@ Feature: Located matcher results for Python processing
     When a located symbol matcher runs in text mode
     Then symbol output contains its header path and coordinates
 
+  Scenario Outline: Clang binding names and node kinds remain unrestricted
+    Given an isolated two-source match results fixture
+    When a flexible matcher runs for "<case>"
+    Then its complete bindings for "<case>" are returned through the SDK
+
+    Examples:
+      | case             |
+      | arbitrary-name   |
+      | multiple-symbols |
+      | helper-equality  |
+      | statement        |
+      | type             |
+      | no-bind          |
+      | explicit-root    |
+      | private-name     |
+      | source-only      |
+      | named-relation   |
+      | named-call       |
+      | named-site       |
+      | relation-helper  |
+      | call-helper      |
+      | call-shorthand   |
+      | template-target  |
+
+  Scenario: Generic statement matching is visible in text output
+    Given an isolated two-source match results fixture
+    When a flexible statement matcher runs in text mode
+    Then the statement bindings and source coordinates are printed
+
+  Scenario: Matcher alternatives preserve their own bindings
+    Given an isolated two-source match results fixture
+    When a matcher uses alternative binding names
+    Then both alternatives return their original binding names
+
   Scenario: An empty match produces an empty complete result collection
     Given an isolated two-source match results fixture
     When a structured matcher runs for "empty"

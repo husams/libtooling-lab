@@ -2,7 +2,11 @@
 
 #include "model/Relation.h"
 
+#include <clang/AST/ASTTypeTraits.h>
+
+#include <string>
 #include <variant>
+#include <vector>
 
 namespace clang {
 class CallExpr;
@@ -35,7 +39,22 @@ struct DirectCallMatch {
   const clang::FunctionDecl &callee;
 };
 
+struct NodeMatch {
+  std::string binding;
+  clang::DynTypedNode node;
+};
+
+struct BindingNames {
+  std::string source = "source";
+  std::string target = "target";
+  std::string site = "site";
+  std::string call = "call";
+  std::string callee = "callee";
+};
+
 using Contract =
-    std::variant<SymbolMatch, ExpressionMatch, RelationMatch, DirectCallMatch>;
+    std::variant<SymbolMatch, ExpressionMatch, RelationMatch, DirectCallMatch,
+                 NodeMatch>;
+using Contracts = std::vector<Contract>;
 
 } // namespace facts::commands::match
