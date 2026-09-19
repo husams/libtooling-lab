@@ -32,7 +32,8 @@ collectRecoveryNativeFacts(const RecoveryContext &context,
   const auto path =
       (std::filesystem::path(scratch.directory.str().str()) / "facts.db")
           .string();
-  auto files = FileManager::openReadOnly(context.project);
+  auto files = FileManager::openImported(context.project, context.astCache.enabled,
+                                        context.verbosity);
   if (!files)
     return std::unexpected(files.error());
   try {

@@ -18,7 +18,8 @@ std::expected<RecoveryAttemptResult, std::string> extractRecoveryCandidate(
   if (scan == context.scans.end() || scan->second->status != 0 ||
       scan->second->units.empty())
     return std::unexpected("missing parsed recovery translation unit");
-  auto files = FileManager::openReadOnly(context.project, options.verbosity);
+  auto files = FileManager::openImported(context.project, context.astCache.enabled,
+                                        options.verbosity);
   if (!files)
     return std::unexpected(files.error());
   auto pairing = prepareFactPairForWrite(options.facts, context.project);

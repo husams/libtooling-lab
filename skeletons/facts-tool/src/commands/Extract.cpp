@@ -176,7 +176,8 @@ recordIndexState(const cli::ExtractOptions &options,
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
                                         CompilationDatabasePtr database) {
   auto opened = runExtractStage(options, "open project database", [&] {
-    return FileManager::openReadOnly(options.configuration, options.verbosity);
+    return FileManager::openImported(options.configuration,
+                                     options.astCache.enabled, options.verbosity);
   });
   if (!opened) {
     return std::expected<int, std::string>{std::unexpected(opened.error())};

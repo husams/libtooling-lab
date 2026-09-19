@@ -23,10 +23,12 @@ public:
   // Read-write: creates and migrates the registry; throws when it cannot.
   explicit FileManager(std::string databasePath, int verbosity = 0);
 
-  // Read-only: never throws. An unreadable, incomplete or outdated registry
-  // comes back as a message the calling command can report.
+  // Opens an existing imported registry without creating or migrating it.
+  // Parsing commands request writable access when AST caching is enabled.
+  // An unreadable, incomplete or outdated registry returns a diagnostic.
   static std::expected<std::unique_ptr<FileManager>, std::string>
-  openReadOnly(std::string databasePath, int verbosity = 0);
+  openImported(std::string databasePath, bool writable = false,
+               int verbosity = 0);
 
   ~FileManager();
 

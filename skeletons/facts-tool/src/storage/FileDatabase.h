@@ -28,9 +28,10 @@ public:
   static std::expected<std::unique_ptr<FileDatabase>, std::string>
   openReadOnly(const std::string &path);
 
-  // Extraction additionally requires at least one stored compile command.
+  // Open an existing, current registry with at least one stored compile
+  // command. Writable access never creates or migrates a database.
   static std::expected<std::unique_ptr<FileDatabase>, std::string>
-  openImportedReadOnly(const std::string &path);
+  openImported(const std::string &path, bool writable = false);
 
   ~FileDatabase();
 
