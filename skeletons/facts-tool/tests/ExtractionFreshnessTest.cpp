@@ -9,6 +9,7 @@ namespace {
 using facts::FileIndexState;
 using facts::commands::FreshnessObservation;
 using facts::commands::isUpToDate;
+using facts::commands::staleReason;
 
 FileIndexState baseState() {
   FileIndexState state;
@@ -33,24 +34,28 @@ FreshnessObservation baseObservation() {
 int main() {
   // Every rule holding: up to date.
   assert(isUpToDate(baseState(), baseObservation()));
+  assert(!staleReason(baseState(), baseObservation()));
 
   // Rule 1: not indexed at all.
   {
     auto state = baseState();
     state.indexed = false;
     assert(!isUpToDate(state, baseObservation()));
+    assert(staleReason(state, baseObservation()) == "not-indexed");
   }
   // Rule 1: no recorded facts database.
   {
     auto state = baseState();
     state.factsDb.clear();
     assert(!isUpToDate(state, baseObservation()));
+    assert(staleReason(state, baseObservation()) == "not-indexed");
   }
   // Rule 1: recorded facts database differs from this run's output.
   {
     auto state = baseState();
     state.factsDb = "/tmp/other.sqlite";
     assert(!isUpToDate(state, baseObservation()));
+    assert(staleReason(state, baseObservation()) == "facts-database-changed");
   }
 
   // Rule 2: both NULL counts as equal.
@@ -60,24 +65,28 @@ int main() {
     auto observation = baseObservation();
     observation.gitCommit = std::nullopt;
     assert(isUpToDate(state, observation));
+    assert(!staleReason(state, observation));
   }
   // Rule 2: recorded NULL, current has a commit.
   {
     auto state = baseState();
     state.gitCommit = std::nullopt;
     assert(!isUpToDate(state, baseObservation()));
+    assert(staleReason(state, baseObservation()) == "git-commit-changed");
   }
   // Rule 2: recorded has a commit, current is NULL (the file left its repo).
   {
     auto observation = baseObservation();
     observation.gitCommit = std::nullopt;
     assert(!isUpToDate(baseState(), observation));
+    assert(staleReason(baseState(), observation) == "git-commit-changed");
   }
   // Rule 2: different commits.
   {
     auto observation = baseObservation();
     observation.gitCommit = std::string(40, 'b');
     assert(!isUpToDate(baseState(), observation));
+    assert(staleReason(baseState(), observation) == "git-commit-changed");
   }
 
   // Rule 3: the file could not be stat'd this run.
@@ -85,18 +94,21 @@ int main() {
     auto observation = baseObservation();
     observation.mtime = std::nullopt;
     assert(!isUpToDate(baseState(), observation));
+    assert(staleReason(baseState(), observation) == "mtime-unavailable");
   }
   // Rule 3: no recorded mtime to compare against.
   {
     auto state = baseState();
     state.mtime = std::nullopt;
     assert(!isUpToDate(state, baseObservation()));
+    assert(staleReason(state, baseObservation()) == "mtime-unavailable");
   }
   // Rule 3: current mtime is later than recorded -- a real edit.
   {
     auto observation = baseObservation();
     observation.mtime = 200.0;
     assert(!isUpToDate(baseState(), observation));
+    assert(staleReason(baseState(), observation) == "mtime-changed");
   }
   // Rule 3: current mtime is earlier than recorded. There is no "not newer
   // than" allowance -- any difference, in either direction, is stale, so a
@@ -108,6 +120,7 @@ int main() {
     auto observation = baseObservation();
     observation.mtime = 50.0;
     assert(!isUpToDate(baseState(), observation));
+    assert(staleReason(baseState(), observation) == "mtime-changed");
   }
   // Rule 3: an exact match despite carrying a fractional second is fresh --
   // indexed_at (whole seconds only) plays no part in this decision at all,
@@ -118,6 +131,7 @@ int main() {
     auto observation = baseObservation();
     observation.mtime = 100.25;
     assert(isUpToDate(state, observation));
+    assert(!staleReason(state, observation));
   }
   // Rule 3: a same-second edit -- two fractional-second mtimes close enough
   // to share a floored indexed_at, but not exactly equal -- is still caught,
@@ -128,6 +142,7 @@ int main() {
     auto observation = baseObservation();
     observation.mtime = 100.75;
     assert(!isUpToDate(state, observation));
+    assert(staleReason(state, observation) == "mtime-changed");
   }
   // An unparseable or otherwise unusual indexed_at has no bearing on the
   // decision: only factsDb, git commit, and mtime matter.
@@ -135,6 +150,15 @@ int main() {
     auto state = baseState();
     state.indexedAt = "not-a-timestamp";
     assert(isUpToDate(state, baseObservation()));
+    assert(!staleReason(state, baseObservation()));
+  }
+  // Report the first failed rule when multiple observations have changed.
+  {
+    auto observation = baseObservation();
+    observation.factsDb = "/tmp/other.sqlite";
+    observation.gitCommit = std::string(40, 'b');
+    observation.mtime = std::nullopt;
+    assert(staleReason(baseState(), observation) == "facts-database-changed");
   }
   return 0;
 }

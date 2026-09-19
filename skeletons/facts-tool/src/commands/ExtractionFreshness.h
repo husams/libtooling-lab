@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -38,9 +39,22 @@ std::optional<double> currentMtime(const std::filesystem::path &file);
 bool isUpToDate(const FileIndexState &state,
                 const FreshnessObservation &observation);
 
+// The first failed freshness rule, or nullopt when every rule holds.
+// Reason strings have static storage duration and can be retained by callers.
+std::optional<std::string_view>
+staleReason(const FileIndexState &state,
+            const FreshnessObservation &observation);
+
+struct SourceStaleness {
+  std::string file;
+  std::string_view reason;
+};
+
 struct PartitionedSources {
   std::vector<std::string> stale;
   std::vector<std::string> upToDate;
+  // The first stale file in each source's include closure and its reason.
+  std::unordered_map<std::string, SourceStaleness> staleReasons;
   // Every file (TU or header) this check actually stat'd, mapped to the
   // mtime observed at that moment. The "record index state" stage reuses
   // this instead of stat'ing again, so a file edited while a long Clang

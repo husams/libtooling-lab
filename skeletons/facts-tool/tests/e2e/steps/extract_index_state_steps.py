@@ -43,6 +43,96 @@ def when_force_extracts_every_source_again(context: FactsToolContext) -> None:
     context.extract_index_state_sources(force=True)
 
 
+@when(parsers.parse(
+    'the real facts-tool explicitly extracts "{source}" at verbosity {level:d}'
+))
+def when_extracts_selected_source(
+    context: FactsToolContext, source: str, level: int
+) -> None:
+    result = context.run(context._tool_command(
+        (context.run_root_path / source,), verbosity=level
+    ))
+    require(result.returncode == 0, context.last_output)
+    require("facts-tool: extract: extraction " not in result.stdout,
+            f"extraction diagnostics leaked to stdout:\n{result.stdout}")
+    if not context.initial_symbols:
+        context.initial_symbols = symbol_snapshot(context.facts_database_path)
+
+
+@when("extraction selects another facts database")
+def when_selects_another_facts_database(context: FactsToolContext) -> None:
+    context.facts_database = context.run_root_path / "other-facts.sqlite"
+
+
+@then(parsers.parse('extraction starts for "{source}"'))
+def then_extraction_starts(context: FactsToolContext, source: str) -> None:
+    path = context.run_root_path / source
+    expected = f"facts-tool: extract: extraction started source={path}"
+    require(context.last_output.splitlines().count(expected) == 1,
+            f"expected one traversal start for {source}:\n{context.last_output}")
+    require(f"extraction skipped source={path}" not in context.last_output,
+            f"extracted source also reported skipped:\n{context.last_output}")
+
+
+@then(parsers.parse('extraction is skipped for "{source}"'))
+def then_extraction_is_skipped(context: FactsToolContext, source: str) -> None:
+    path = context.run_root_path / source
+    expected = (f"facts-tool: extract: extraction skipped source={path} "
+                "reason=up-to-date")
+    require(context.last_output.splitlines().count(expected) == 1,
+            f"expected one skip decision for {source}:\n{context.last_output}")
+    for decision in ("started", "required"):
+        require(f"extraction {decision} source={path}" not in context.last_output,
+                f"fresh source reported {decision}:\n{context.last_output}")
+
+
+@then(parsers.parse(
+    'extraction is required for "{source}" because "{file}" is "{reason}"'
+))
+def then_extraction_is_required(
+    context: FactsToolContext, source: str, file: str, reason: str
+) -> None:
+    expected = ("facts-tool: extract: extraction required "
+                f"source={context.run_root_path / source} reason={reason} "
+                f"file={context.run_root_path / file}")
+    require(expected in context.last_output.splitlines(),
+            f"missing stale dependency diagnostic:\n{context.last_output}")
+
+
+@then(parsers.parse('extraction is forced for "{source}"'))
+def then_extraction_is_forced(context: FactsToolContext, source: str) -> None:
+    expected = ("facts-tool: extract: extraction required "
+                f"source={context.run_root_path / source} reason=forced")
+    require(expected in context.last_output,
+            f"missing forced extraction diagnostic:\n{context.last_output}")
+
+
+@then(parsers.parse('no extraction decision is logged for "{source}"'))
+def then_no_extraction_decision_for_source(
+    context: FactsToolContext, source: str
+) -> None:
+    for decision in ("started", "skipped", "required"):
+        expected = f"extraction {decision} source={context.run_root_path / source}"
+        require(expected not in context.last_output,
+                f"unselected source reported {decision}:\n{context.last_output}")
+
+
+@then("no per-source extraction decisions are logged")
+def then_no_extraction_decisions(context: FactsToolContext) -> None:
+    for decision in ("started", "skipped", "required"):
+        require(f"extraction {decision} source=" not in context.last_output,
+                f"per-source detail below verbosity 2:\n{context.last_output}")
+
+
+@then("the extract reports preparation without claiming extraction started")
+def then_only_extraction_preparation(context: FactsToolContext) -> None:
+    require("facts-tool: extract: prepare extraction" in context.last_output,
+            f"missing preparation progress:\n{context.last_output}")
+    for activity in ("extraction started", "extract facts", "extract facts from AST"):
+        require(f"facts-tool: extract: {activity}" not in context.last_output,
+                f"skip misleadingly reports extraction work:\n{context.last_output}")
+
+
 @when("the first source's mtime moves into the future")
 def when_first_source_mtime_moves_into_the_future(
     context: FactsToolContext,
