@@ -50,10 +50,49 @@ def run(ast_cache, family):
     ast_cache.run(family)
 
 
+@when(parsers.parse('forced AST cache extraction runs at verbosity {level:d}'))
+def forced_extraction_at_verbosity(ast_cache, level):
+    command = ast_cache.command("extract")
+    command[command.index("-v") + 1] = str(level)
+    ast_cache.run("extract", command=command)
+
+
+@when(parsers.parse('current AST cache extraction runs at verbosity {level:d}'))
+def current_extraction_at_verbosity(ast_cache, level):
+    command = ast_cache.command("extract")
+    command.remove("--force")
+    command[command.index("-v") + 1] = str(level)
+    ast_cache.run("extract", command=command)
+
+
+@then("cached extraction reports that fact traversal started")
+def cached_extraction_started(ast_cache):
+    ast_cache.succeed()
+    started = f"facts-tool: extract: extraction started source={ast_cache.source}"
+    assert ast_cache.last.stderr.splitlines().count(started) == 1, ast_cache.last.stderr
+    assert "extraction skipped source=" not in ast_cache.last.stderr, ast_cache.last.stderr
+    assert "extraction required source=" in ast_cache.last.stderr, ast_cache.last.stderr
+    assert "reason=forced" in ast_cache.last.stderr, ast_cache.last.stderr
+    assert started not in ast_cache.last.stdout, ast_cache.last.stdout
+    if "ast-cache: hit" in ast_cache.last.stderr:
+        assert "AST parsing skipped (cache hit)" in ast_cache.last.stderr, ast_cache.last.stderr
+        assert (ast_cache.last.stderr.index("AST parsing skipped (cache hit)")
+                < ast_cache.last.stderr.index(started)), ast_cache.last.stderr
+
+
+@then("cached extraction emits no per-source extraction decisions")
+def cached_extraction_without_decisions(ast_cache):
+    ast_cache.succeed()
+    for decision in ("started", "skipped", "required"):
+        assert f"extraction {decision} source=" not in ast_cache.last.stderr, ast_cache.last.stderr
+        assert f"extraction {decision} source=" not in ast_cache.last.stdout, ast_cache.last.stdout
+
+
 @when("current extraction runs twice without forcing")
 def current_extraction(ast_cache):
     command = ast_cache.command("extract")
     command.remove("--force")
+    command[command.index("-v") + 1] = "2"
     ast_cache.current_extractions = [
         ast_cache.run("extract", command=command) for _ in range(2)
     ]
@@ -67,6 +106,14 @@ def current_extraction_skips_frontend(ast_cache):
         assert "dependency-cache: hit" in result.stderr, result.stderr
         assert "ast-cache:" not in result.stderr, result.stderr
         assert "frontend:" not in result.stderr, result.stderr
+        skipped = (f"facts-tool: extract: extraction skipped source={ast_cache.source} "
+                   "reason=up-to-date")
+        assert result.stderr.splitlines().count(skipped) == 1, result.stderr
+        assert "extraction started source=" not in result.stderr, result.stderr
+        assert "extraction required source=" not in result.stderr, result.stderr
+        assert "facts-tool: extract: extract facts" not in result.stderr, result.stderr
+        assert "facts-tool: extract: prepare extraction" in result.stderr, result.stderr
+        assert skipped not in result.stdout, result.stdout
     assert ast_cache.snapshot_cache() == ast_cache.cache_before
 
 

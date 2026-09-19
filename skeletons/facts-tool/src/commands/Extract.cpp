@@ -211,8 +211,16 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
             });
         for (const auto &source : partitioned.upToDate) {
           cli::logVerbose(options.verbosity, 2,
-                          "facts-tool: extract: skip up-to-date source={}",
+                          "facts-tool: extract: extraction skipped source={} "
+                          "reason=up-to-date",
                           source);
+        }
+        for (const auto &source : partitioned.stale) {
+          const auto &stale = partitioned.staleReasons.at(source);
+          cli::logVerbose(options.verbosity, 2,
+                          "facts-tool: extract: extraction required source={} "
+                          "reason={} file={}",
+                          source, stale.reason, stale.file);
         }
         cli::logVerbose(options.verbosity, 1,
                         "facts-tool: extract: up_to_date={} stale={}",
@@ -346,7 +354,7 @@ runExtractResolved(const cli::ExtractOptions &options) {
         });
       })
       .and_then([&](CompilationDatabasePtr database) {
-        return cli::runStage(options.verbosity, "extract", "extract facts",
+        return cli::runStage(options.verbosity, "extract", "prepare extraction",
                              [&] {
                                return timePhase("extract total", [&] {
                                  return extract(options, std::move(database));

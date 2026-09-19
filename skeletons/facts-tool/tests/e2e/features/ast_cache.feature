@@ -7,10 +7,12 @@ Feature: Reuse persisted Clang ASTs across native commands
 
   Scenario: Forced extraction reuses a serialized AST with identical semantic facts
     Given AST caching is enabled
-    When the AST cache project runs "extract"
+    When forced AST cache extraction runs at verbosity 2
     Then the cold AST is persisted
-    When the AST cache project runs "extract"
+    And cached extraction reports that fact traversal started
+    When forced AST cache extraction runs at verbosity 2
     Then the persisted AST is reused
+    And cached extraction reports that fact traversal started
     And cold and warm extraction facts are identical
 
   Scenario: Repeated current extraction skips AST loading and all frontend work
@@ -19,6 +21,20 @@ Feature: Reuse persisted Clang ASTs across native commands
     When current extraction runs twice without forcing
     Then current extraction reuses dependencies without loading or rebuilding an AST
     And cold and warm extraction facts are identical
+
+  Scenario Outline: Cached extraction omits source decisions below verbosity two
+    Given AST caching is enabled
+    And a persisted AST from extraction
+    When forced AST cache extraction runs at verbosity <level>
+    Then cached extraction emits no per-source extraction decisions
+    When current AST cache extraction runs at verbosity <level>
+    Then cached extraction emits no per-source extraction decisions
+    And cold and warm extraction facts are identical
+
+    Examples:
+      | level |
+      | 0     |
+      | 1     |
 
   Scenario Outline: Native commands reuse persisted ASTs or project dependency metadata
     Given AST caching is enabled
