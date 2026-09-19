@@ -86,13 +86,8 @@ struct PriorCompileOptions {
   std::string compileOptions;
 };
 
-// Snapshots this repository's registered compile-relevant columns before a
-// reimport's reset (see storeProjectConfiguration) clears
-// them, so the file upsert further down can compare what this reimport is
-// about to write against what was actually there beforehand -- the wipe
-// would otherwise make every reimported file look "changed" from NULL,
-// even one whose driver/working directory/compile options are identical to
-// last time.
+// Snapshot the stored compilation context so each incoming source can retain
+// its index state when its command is unchanged. Omitted sources are preserved.
 std::expected<std::map<ProjectFileKey, PriorCompileOptions>, std::error_code>
 loadPriorCompileOptions(storage::Database &database,
                         std::int64_t repositoryId) {
@@ -259,26 +254,9 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
               return currentSetActiveClone(database_, repositoryId, cloneId);
             })
             .and_then([&] {
-              // Captured before the wipe below clears this repository's
-              // non-overridden driver/working directory/compile options, so the
-              // file upsert further down can still tell an unchanged
-              // reimport from a real edit.
               return loadPriorCompileOptions(database_, repositoryId)
                   .transform(
                       [&](auto loaded) { priorOptions = std::move(loaded); });
-            })
-            .and_then([&] {
-              return database_.executeBulk(
-                  "UPDATE file SET compile_options=NULL,driver=NULL,"
-                  "working_directory=NULL WHERE args_overridden=0 "
-                  "AND directory_id IN (SELECT d.id FROM directory d "
-                  "JOIN component c ON c.id=d.component_id "
-                  "WHERE c.repository_id=?1)", std::array{repositoryId},
-                  [](sqlite3_stmt *statement, std::int64_t id) {
-                    return storage::bindParameters(statement, id);
-                  },
-                  {.atomic = false})
-                  .transform([](const storage::BulkResult &) {});
             })
             .and_then([&] {
               return database_.execute(
@@ -344,13 +322,9 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
               // real edit to the file itself would, so the next plain
               // extract re-extracts exactly the files this reimport
               // actually changed, not every registered file. Whether a
-              // file is unchanged is decided in C++ against `priorOptions`
-              // (captured above, before the wipe) rather than compared in
-              // SQL against this row's own current driver/working
-              // directory/compile options: the wipe already cleared those
-              // to NULL for this repository's non-overridden rows, so a
-              // same-statement SQL comparison would find every reimported
-              // file "changed" from NULL, forced or not.
+              // file is unchanged is decided against `priorOptions`.
+              // Only incoming commands are upserted: a source omitted from
+              // this import keeps its command, overrides, and index state.
               struct FileUpsertInput {
                 const ProjectFile *file;
                 bool unchanged;

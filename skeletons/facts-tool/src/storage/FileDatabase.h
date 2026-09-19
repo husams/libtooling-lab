@@ -46,6 +46,7 @@ public:
   addBulk(std::span<const std::string> identities);
   // Refuses with the name of the offending repository, clone, component or
   // file field; storage failures come back as their own message.
+  // Replaces commands for supplied sources; preserves all omitted sources.
   std::expected<void, std::string>
   replaceProjectConfiguration(const ProjectConfiguration &configuration);
   std::expected<void, std::error_code>
