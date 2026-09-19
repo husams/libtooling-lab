@@ -162,6 +162,37 @@ int main(int argc, char **argv) {
   assertSingleProject(database, "2");
   assert(query(database, "SELECT * FROM file ORDER BY id") == twoFiles);
 
+  // Importing a single source must preserve the other source's complete row,
+  // including its stored command and existing extraction freshness state.
+  {
+    facts::FileDatabase files(databasePath.string());
+    const facts::FileIndexRecord indexed{
+        .id = fileId,
+        .indexedAt = "2026-09-19T10:00:00Z",
+        .mtime = 23456.5,
+        .factsDb = "/tmp/incremental-facts.sqlite",
+        .gitCommit = std::string(40, 'b')};
+    assert(files.markIndexed(std::span(&indexed, 1)));
+  }
+  constexpr auto untouchedSource =
+      "SELECT file.* FROM file JOIN directory ON directory.id=file.directory_id "
+      "WHERE directory.path='src'";
+  const auto beforePartialImport = query(database, untouchedSource);
+  configuration.files = {second};
+  configuration.files.front().compileOptions = "[\"-DVALUE=3\"]";
+  reimport();
+  assertSingleProject(database, "2");
+  assert(identities(database) == originalIds);
+  assert(query(database, untouchedSource) == beforePartialImport);
+  assert((query(database,
+                "SELECT file.compile_options FROM file JOIN directory "
+                "ON directory.id=file.directory_id WHERE directory.path='other'") ==
+          Rows{{configuration.files.front().compileOptions}}));
+  const auto afterPartialImport = query(database, "SELECT * FROM file ORDER BY id");
+  reimport();
+  assertSingleProject(database, "2");
+  assert(query(database, "SELECT * FROM file ORDER BY id") == afterPartialImport);
+
   // A name owned by another checkout must not silently merge repositories.
   assert(sqlite3_exec(
              database,
