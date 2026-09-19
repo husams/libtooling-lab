@@ -86,7 +86,8 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
   if (!commands)
     return std::unexpected(commands.error());
   auto opened =
-      FileManager::openReadOnly(configured.configuration, configured.verbosity);
+      FileManager::openImported(configured.configuration,
+                                configured.astCache.enabled, configured.verbosity);
   if (!opened)
     return std::unexpected(opened.error());
   auto registry = requireCompletedRegistry(**opened);

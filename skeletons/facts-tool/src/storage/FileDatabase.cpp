@@ -123,19 +123,20 @@ loadPriorCompileOptions(storage::Database &database,
 }
 
 std::expected<storage::Database, std::string>
-openReadOnlyFileDatabase(const std::string &path) {
-  constexpr int flags = storage::Database::readOnly | SQLITE_OPEN_FULLMUTEX;
+openExistingFileDatabase(const std::string &path, bool writable) {
+  const int flags = (writable ? SQLITE_OPEN_READWRITE : SQLITE_OPEN_READONLY) |
+                    SQLITE_OPEN_FULLMUTEX;
+  const std::string failure = std::string{"cannot open project configuration "} +
+                              (writable ? "read-write: " : "read-only: ");
   return storage::Database::open(path, flags)
-      .transform_error([](std::error_code error) {
-        return "cannot open project configuration read-only: " +
-               error.message();
+      .transform_error([&](std::error_code error) {
+        return failure + error.message();
       })
-      .and_then([](storage::Database database)
+      .and_then([&](storage::Database database)
                     -> std::expected<storage::Database, std::string> {
         return database.executeScript("PRAGMA foreign_keys=ON")
-            .transform_error([](std::error_code error) {
-              return "cannot open project configuration read-only: " +
-                     error.message();
+            .transform_error([&](std::error_code error) {
+              return failure + error.message();
             })
             .and_then([&] {
               return requireCurrentFileSchema(database.nativeHandle());
@@ -183,14 +184,15 @@ FileDatabase::FileDatabase(storage::Database database)
 
 std::expected<std::unique_ptr<FileDatabase>, std::string>
 FileDatabase::openReadOnly(const std::string &path) {
-  return openReadOnlyFileDatabase(path).transform([](storage::Database opened) {
-    return std::unique_ptr<FileDatabase>(new FileDatabase(std::move(opened)));
-  });
+  return openExistingFileDatabase(path, false)
+      .transform([](storage::Database opened) {
+        return std::unique_ptr<FileDatabase>(new FileDatabase(std::move(opened)));
+      });
 }
 
 std::expected<std::unique_ptr<FileDatabase>, std::string>
-FileDatabase::openImportedReadOnly(const std::string &path) {
-  return openReadOnlyFileDatabase(path)
+FileDatabase::openImported(const std::string &path, bool writable) {
+  return openExistingFileDatabase(path, writable)
       .and_then([](storage::Database opened)
                     -> std::expected<storage::Database, std::string> {
         return requireImportedProjectConfiguration(opened.nativeHandle())
