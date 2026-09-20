@@ -1,0 +1,41 @@
+type: object
+required:
+- id
+- name
+- kind
+- remote_url
+- active_clone_id
+- clones
+- component_count
+- source_count
+- indexed_source_count
+additionalProperties: false
+properties:
+  id: &id001
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  name:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  kind:
+    type: string
+  remote_url:
+    anyOf:
+    - type: string
+    - type: 'null'
+  active_clone_id:
+    anyOf:
+    - *id001
+    - type: 'null'
+  clones:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2Clone'
+  component_count: &id002
+    type: integer
+    minimum: 0
+  source_count: *id002
+  indexed_source_count: *id002

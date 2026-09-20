@@ -1,0 +1,7 @@
+anyOf:
+- $ref: '../../openapi.yaml#/components/schemas/V2FlowEdgePage'
+- $ref: '../../openapi.yaml#/components/schemas/V2FlowNodePage'
+- $ref: '../../openapi.yaml#/components/schemas/V2FlowBoundaryPage'
+- $ref: '../../openapi.yaml#/components/schemas/V2DiagnosticPage'
+description: The collection query parameter determines the record schema. Empty pages
+  satisfy more than one alternative; each alternative is fully typed.

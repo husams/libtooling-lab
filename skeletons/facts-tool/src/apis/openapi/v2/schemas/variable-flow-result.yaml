@@ -1,0 +1,44 @@
+type: object
+required:
+- root_function
+- root_variable
+- status
+- coverage
+- node_count
+- edge_count
+additionalProperties: false
+properties:
+  root_function:
+    type: string
+  root_variable:
+    type: string
+  status:
+    type: string
+  coverage:
+    type: string
+    enum:
+    - complete
+    - partial
+  nodes:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2FlowNode'
+  edges:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2FlowEdge'
+  boundaries:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2FlowBoundary'
+  node_count: &id001
+    type: integer
+    minimum: 0
+  edge_count: *id001
+  diagnostics:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2Diagnostic'
+description: Job reads return scalar summary fields. Record arrays are optional and
+  are fetched lazily through the typed results endpoint with the appropriate collection
+  query parameter.

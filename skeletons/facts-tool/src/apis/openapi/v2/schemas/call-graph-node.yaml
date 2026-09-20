@@ -1,0 +1,34 @@
+type: object
+required:
+- symbol_id
+- qualified_name
+- usr
+- definition
+- external
+- file_id
+- line
+- column
+- unresolved_calls
+- pointer_calls
+additionalProperties: false
+properties:
+  symbol_id: &id001
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  qualified_name:
+    type: string
+  usr:
+    type: string
+  definition:
+    type: boolean
+  external:
+    type: boolean
+  file_id: *id001
+  line: &id002
+    type: integer
+    minimum: 0
+  column: *id002
+  unresolved_calls: *id002
+  pointer_calls: *id002

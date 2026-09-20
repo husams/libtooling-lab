@@ -1,0 +1,26 @@
+type: object
+required:
+- compilation_databases
+- files_registered
+- index_revision
+additionalProperties: false
+properties:
+  compilation_databases: &id001
+    type: integer
+    minimum: 0
+  files_registered: *id001
+  databases:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2ImportedDatabase'
+  diagnostics:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2Diagnostic'
+  index_revision:
+    anyOf:
+    - type: string
+    - type: 'null'
+description: Job reads return scalar summary fields. Record arrays are optional and
+  are fetched lazily through the typed results endpoint with the appropriate collection
+  query parameter.

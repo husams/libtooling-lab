@@ -1,0 +1,7 @@
+type: object
+required:
+- error
+additionalProperties: false
+properties:
+  error:
+    $ref: '../../openapi.yaml#/components/schemas/V2Error'

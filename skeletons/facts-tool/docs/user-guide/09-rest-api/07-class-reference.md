@@ -93,13 +93,27 @@ automatic reimport. The Git repository/index handle aliases are not extra types.
 
 ## Python REST SDK
 
-The following classes are exported from `facts_tool.rest`. Source paths are relative
+New clients use the following `/api/v2` resource types. Source paths are relative
 to `python/src/facts_tool/rest`.
+
+| Class or group | Responsibility | Source |
+|---|---|---|
+| `Client`, `AsyncClient` | Typed resource collections, discovery, settings and v1 compatibility access | [v2/client.py](../../../python/src/facts_tool/rest/v2/client.py), [v2/async_client.py](../../../python/src/facts_tool/rest/v2/async_client.py) |
+| `Repository`, `File`, `Component`, `CompilationCommand`, `NewClone` | Catalog values and nested configuration | [v2/catalog_models.py](../../../python/src/facts_tool/rest/v2/catalog_models.py) |
+| `FileSelection`, `FileReference`, `FileIdentity` | Typed source selection | [v2/selections.py](../../../python/src/facts_tool/rest/v2/selections.py) |
+| `GlobalSymbol`, symbol occurrence and relation models | Stable symbol identities and source evidence | [v2/symbol_models.py](../../../python/src/facts_tool/rest/v2/symbol_models.py) |
+| `AnalysisJob`, `AsyncAnalysisJob` | Operation-specific results, waiting and cooperative cancellation | [v2/jobs.py](../../../python/src/facts_tool/rest/v2/jobs.py), [v2/async_jobs.py](../../../python/src/facts_tool/rest/v2/async_jobs.py) |
+| `ExtractionResult` and dependency/import/scan results | Typed analysis summaries and records | [v2/analysis_models.py](../../../python/src/facts_tool/rest/v2/analysis_models.py) |
+| Graph and variable-flow models | Typed nodes, edges, boundaries and coverage | [v2/graph_models.py](../../../python/src/facts_tool/rest/v2/graph_models.py), [v2/flow_models.py](../../../python/src/facts_tool/rest/v2/flow_models.py) |
+
+V2 models and HTTP adapters are maintained alongside the generated contract and
+validated with native response and SDK tests. Existing v1 exports remain:
+
 
 | Class | Responsibility | Source |
 |---|---|---|
-| `Client` | Provide synchronous typed resources and job polling. | [client.py](../../../python/src/facts_tool/rest/client.py) |
-| `AsyncClient` | Provide asynchronous typed resources and job polling. | [async_client.py](../../../python/src/facts_tool/rest/async_client.py) |
+| `LegacyClient` | Provide synchronous v1 resources and job polling. | [client.py](../../../python/src/facts_tool/rest/client.py) |
+| `LegacyAsyncClient` | Provide asynchronous v1 resources and job polling. | [async_client.py](../../../python/src/facts_tool/rest/async_client.py) |
 | `FileSelector` | Identify a registered source using path and optional repo, clone and component. | [domain_models.py](../../../python/src/facts_tool/rest/domain_models.py) |
 | `Symbol` | Represent one global-index result with defining file identity. | [domain_models.py](../../../python/src/facts_tool/rest/domain_models.py) |
 | `SymbolPage` | Hold a tuple of symbols and optional next cursor. | [domain_models.py](../../../python/src/facts_tool/rest/domain_models.py) |
@@ -113,15 +127,16 @@ to `python/src/facts_tool/rest`.
 | `JobFailedError` | Retain a completed failed or cancelled job and its output. | [errors.py](../../../python/src/facts_tool/rest/errors.py) |
 | `JobTimeoutError` | Report an expired wait while the remote job continues. | [errors.py](../../../python/src/facts_tool/rest/errors.py) |
 
-Native resource jobs decode as `DomainJob`; compatibility jobs decode as `Job`. `JobState` is a Python type alias, not an additional class.
-`Client` and `AsyncClient` are generated from the OpenAPI contract and small
+V1 native resource jobs decode as `DomainJob`; compatibility jobs decode as
+`Job`. V2 jobs use their operation-specific result model. The v1 client classes
+are generated from the OpenAPI contract and small
 lifecycle/polling templates. Their resource bindings are split into two internal
 base classes to keep generated modules small:
 
 | Internal class | Responsibility | Source |
 |---|---|---|
-| `ResourceOperations` | Generated synchronous resource methods inherited by `Client`. | [generated/resources.py](../../../python/src/facts_tool/rest/generated/resources.py) |
-| `AsyncResourceOperations` | Generated async resource methods inherited by `AsyncClient`. | [generated/async_resources.py](../../../python/src/facts_tool/rest/generated/async_resources.py) |
+| `ResourceOperations` | Generated synchronous v1 methods. | [generated/resources.py](../../../python/src/facts_tool/rest/generated/resources.py) |
+| `AsyncResourceOperations` | Generated async v1 methods. | [generated/async_resources.py](../../../python/src/facts_tool/rest/generated/async_resources.py) |
 
 ## Components implemented as functions
 

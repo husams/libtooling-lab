@@ -7,6 +7,7 @@ def operations(spec: dict) -> dict[str, tuple[str, str]]:
     return {
         operation["operationId"]: (method.upper(), path.lstrip("/"))
         for path, path_item in spec["paths"].items()
+        if not path.startswith("/api/v2/")
         for method, operation in path_item.items()
         if method in {"get", "post", "put", "patch", "delete", "head", "options"}
     }

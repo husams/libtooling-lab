@@ -46,6 +46,7 @@ void State::stop() {
   stopped = true;
   retry.cancel();
   work.clear();
+  for (auto &[id, token] : cancellations) token->store(true);
   for (auto &[id, job] : jobs) if (job["state"] == "queued") {
     job["state"] = "cancelled";
     job["finished_at"] = timestamp();

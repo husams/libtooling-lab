@@ -37,6 +37,7 @@ void State::indexed(domain::Result<index::RefreshResult> result) {
   indexStatus["error"] = result ? Json(nullptr) : Json(result.error().message);
   if (result) {
     indexReady = true;
+    indexStatus["index_revision"] = std::to_string(result->generation);
     indexStatus["files"] = result->sources;
     indexStatus["symbols"] = result->symbols;
     indexStatus["updated_at"] = timestamp();

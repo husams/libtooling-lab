@@ -4,8 +4,8 @@
 SQLite database together with its project/configuration SQLite database. It
 provides an immutable declarative query language, typed graph navigation, full
 result provenance, and explicit capability errors. Direct SQLite queries do not
-modify either database. Optional REST clients can also run all CLI commands on a
-server, including commands that import, index, and modify its databases.
+modify either database. Optional typed REST clients query server-owned resources
+and run import, extraction, matching, call-graph, and variable-flow analysis jobs.
 
 ## Install and query
 
@@ -60,8 +60,8 @@ from facts_tool.rest import AsyncClient
 
 async def inspect_server():
     async with AsyncClient("http://127.0.0.1:8080") as api:
-        job = await api.run("--help", timeout=30)
-        print(job.stdout)
+        async for symbol in api.symbols.find(qualified_name="app::"):
+            print(symbol.qualified_name)
 ```
 
 `Client` provides the same methods synchronously. Pass `token=` explicitly for
@@ -93,3 +93,6 @@ Python 3.12 and 3.13 are supported on macOS and Linux, including
 RHEL-compatible distributions. The direct SQLite SDK uses only Python's standard
 library and never invokes Clang, libclang, cpp-indexer, or facts-tool. REST clients
 require the optional HTTPX dependency and submit CLI jobs to an existing server.
+
+See [Typed REST API v2](docs/rest-v2.md) for resource clients, automatic import,
+lazy results, and async usage.

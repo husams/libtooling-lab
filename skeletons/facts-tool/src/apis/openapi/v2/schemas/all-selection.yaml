@@ -1,0 +1,8 @@
+type: object
+required:
+- type
+additionalProperties: false
+properties:
+  type:
+    type: string
+    const: all

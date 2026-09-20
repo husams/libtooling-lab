@@ -41,6 +41,11 @@ cli::MatchOptions matchOptions(const domain::Context &context,
   options.traversal = request.traversal;
   options.relationKind = request.relationKind;
   options.captureSource = request.captureSource;
+  options.sourceBinding = request.sourceBinding;
+  options.targetBinding = request.targetBinding;
+  options.siteBinding = request.siteBinding;
+  options.callBinding = request.callBinding;
+  options.calleeBinding = request.calleeBinding;
   options.format = "json";
   return options;
 }

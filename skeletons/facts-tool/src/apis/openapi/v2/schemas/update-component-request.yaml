@@ -1,0 +1,12 @@
+type: object
+required: []
+additionalProperties: false
+properties:
+  name:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  version:
+    anyOf:
+    - type: string
+    - type: 'null'

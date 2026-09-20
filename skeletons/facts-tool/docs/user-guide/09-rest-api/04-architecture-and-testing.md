@@ -15,6 +15,10 @@ The REST layer lives in `src/apis`, divided by responsibility:
 | `jobs` | Bounded queue, native work scheduling and legacy subprocess lifetime |
 | `domain` | Registered-file selection, server configuration and facts-location resolution |
 | `operations` | Typed extraction, match and dependency services shared with native command handlers |
+| `v2/catalog` | Repository, component, file and directory resources; atomic nested updates |
+| `v2/http` | Standard HTTP resource dispatch, typed requests, jobs, settings and pagination |
+| `v2/symbols` | Stable symbol identities, occurrences, relations and literal prefix lookup |
+| `v2/Job*` | Operation-specific extraction, import, scan, call-graph and local-flow jobs |
 | `index` | Persistent global symbol index, background refresh and paged lookup |
 | `runtime` | Async resource scheduling, worker execution and index lifecycle |
 | `watch` | Inotify events, asynchronous scans, debounce and refresh scheduling |
@@ -48,7 +52,8 @@ processes, CLI discovery and captured output. It supports existing clients while
 new clients use symbol and file resources.
 
 The [OpenAPI contract](08-openapi-contract.md) generates the native route table
-and Python clients. Native handlers implement each operation; async Python
+and v1 compatibility adapters. Typed v2 Python models and resource clients are
+maintained alongside those adapters. Native handlers implement each operation; async Python
 methods await HTTPX requests. Both live contract formats are cached at startup.
 The generator's `--check` mode verifies that committed bindings match the YAML.
 
@@ -57,20 +62,19 @@ logging worker, keeping file writes off the HTTP event loop. Shutdown drains
 queued records. See [Logging and verbosity](09-logging.md) for configuration,
 event levels and the distinction between server logs and captured command output.
 
-Coordinated queues serialize mutating native, compatibility and watcher work. Native
-analysis cannot be interrupted safely after it starts; queued work is cancellable,
-while cancellation of running native work returns HTTP `409`. Shutdown waits for
-native work to finish. Compatibility process jobs retain process-group cancellation
+Coordinated queues serialize mutating native, compatibility and watcher work. Queued v2 work can be cancelled immediately. Running v2 work uses cooperative
+cancellation at safe checkpoints and may finish an in-progress native transaction
+before observing cancellation. V1 native cancellation retains its compatibility
+behavior. Shutdown waits for native work to finish. Compatibility process jobs retain process-group cancellation
 and deadlines. External CLI processes still follow SQLite concurrency rules.
 
 A background task creates and refreshes `global_symbol_index` in `project.db`
 from known facts databases on startup. It stores fully qualified name, kind, USR
 and defining file ID, with a composite lookup index. Refresh builds replacement
 rows and publishes them transactionally. Queries see a completed generation, and
-a failed scan preserves the prior index. Successful extraction/matching and
-watcher completion request another refresh after the operation response. Clients
-inspect `/v1/index` to distinguish HTTP readiness, job completion and index
-publication. Database files remain owned and resolved by the server.
+a failed scan preserves the prior index. V2 extraction/matching publish index updates before successful job completion.
+Watcher completion also refreshes the index. Clients inspect `/api/v2/index` and
+`/api/v2/readiness` to distinguish HTTP liveness from searchable index availability. Database files remain owned and resolved by the server.
 
 A background watcher scan reads repository and active-clone changes every second.
 Path filters apply when registering watches and selecting refresh sources.

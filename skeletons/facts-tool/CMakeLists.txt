@@ -614,7 +614,8 @@ if(BUILD_TESTING)
   add_executable(api-global-index-test tests/apis/native/IndexTest.cpp
     tests/apis/native/index/Fixture.cpp tests/apis/native/index/Snapshot.cpp
     tests/apis/native/index/Failures.cpp tests/apis/native/index/Cursor.cpp
-    tests/apis/native/index/Migration.cpp tests/apis/native/index/Obsolete.cpp)
+    tests/apis/native/index/Migration.cpp tests/apis/native/index/Obsolete.cpp
+    tests/apis/native/index/Graph.cpp)
   target_link_libraries(api-global-index-test PRIVATE facts-apis facts-storage)
   add_test(NAME api-global-index COMMAND api-global-index-test)
   set_tests_properties(api-global-index PROPERTIES TIMEOUT 30)

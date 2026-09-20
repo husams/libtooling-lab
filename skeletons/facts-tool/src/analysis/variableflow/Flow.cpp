@@ -55,6 +55,7 @@ void Traversal::activate(std::int64_t id) {
 
 void Traversal::drain() {
   while (!pending.empty()) {
+    if (request.cancelled && request.cancelled()) return;
     const auto id = pending.front();
     pending.pop_front();
     const auto found = owners.find(id);
@@ -134,6 +135,11 @@ Graph runFlow(const Parsed &parsed, const Function &root,
   bool changed = false;
   do {
     traversal.drain();
+    if (request.cancelled && request.cancelled()) {
+      Graph cancelled;
+      cancelled.status = "cancelled";
+      return cancelled;
+    }
     const auto priorEdges = traversal.builder.graph.edges.size();
     traversal.linkEffects();
     changed = priorEdges != traversal.builder.graph.edges.size();

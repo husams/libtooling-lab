@@ -1,0 +1,27 @@
+type: object
+required:
+- selection
+- expression
+additionalProperties: false
+properties:
+  selection:
+    $ref: '../../openapi.yaml#/components/schemas/V2Selection'
+  expression:
+    type: string
+    minLength: 1
+    maxLength: 65536
+  traversal:
+    type: string
+    enum:
+    - AsIs
+    - IgnoreUnlessSpelledInSource
+    default: AsIs
+  capture_source:
+    type: boolean
+    default: false
+  relation_kind:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  bindings:
+    $ref: '../../openapi.yaml#/components/schemas/V2MatchBindings'

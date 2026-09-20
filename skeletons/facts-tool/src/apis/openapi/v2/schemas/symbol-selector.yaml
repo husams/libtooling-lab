@@ -1,0 +1,31 @@
+type: object
+required: []
+additionalProperties: false
+properties:
+  qualified_name:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  usr:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  symbol_id:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  repository:
+    type: string
+    minLength: 1
+    maxLength: 4096
+oneOf:
+- required:
+  - qualified_name
+- required:
+  - usr
+- required:
+  - symbol_id
+description: Exactly one identity field is required. Analysis roots resolve one exact
+  symbol; ambiguous overloads are rejected. Prefix matching applies to the symbols
+  collection search only.

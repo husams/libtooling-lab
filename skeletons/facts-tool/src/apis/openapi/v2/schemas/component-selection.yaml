@@ -1,0 +1,17 @@
+type: object
+required:
+- type
+- component
+additionalProperties: false
+properties:
+  type:
+    type: string
+    const: component
+  component:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  repository:
+    type: string
+    minLength: 1
+    maxLength: 4096

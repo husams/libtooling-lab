@@ -1,0 +1,39 @@
+type: object
+required:
+- root
+additionalProperties: false
+properties:
+  root:
+    $ref: '../../openapi.yaml#/components/schemas/V2SymbolSelector'
+  direction:
+    type: string
+    enum:
+    - callees
+    - callers
+    default: callees
+  target:
+    $ref: '../../openapi.yaml#/components/schemas/V2SymbolSelector'
+  max_depth:
+    type: integer
+    minimum: 0
+    maximum: 2147483647
+  max_nodes:
+    type: integer
+    minimum: 1
+    maximum: 2147483647
+  max_edges:
+    type: integer
+    minimum: 1
+    maximum: 2147483647
+  time_limit_ms:
+    type: integer
+    minimum: 1
+    maximum: 2147483647
+  path_mode:
+    type: string
+    enum:
+    - shortest
+    - all_simple
+dependentRequired:
+  path_mode:
+  - target

@@ -1,0 +1,33 @@
+type: object
+required:
+- code
+- severity
+- path
+- target
+- action
+- message
+additionalProperties: false
+properties:
+  code:
+    type: string
+    enum:
+    - broken_symlink
+    - symlink_cycle
+    - symlink_outside_roots
+    - unavailable_entry
+    - unreadable_directory
+    - scan_notice
+  severity:
+    type: string
+    const: warning
+  path:
+    type: string
+  target:
+    anyOf:
+    - type: string
+    - type: 'null'
+  action:
+    type: string
+    const: skipped
+  message:
+    type: string

@@ -1,227 +1,276 @@
-# REST requests and asynchronous jobs
+# REST resources and asynchronous jobs
 
-← [User guide index](../README.md) · [Table of contents](../toc.md)
+← [User guide index](../README.md)
 
-The server owns its project database, facts databases and global symbol index.
-Clients identify symbols or source files; they do not supply database paths or
-CLI argument arrays to the resource endpoints. Examples use the address saved
-by `serve`:
+Use `/api/v2` for new clients. The server owns project databases, facts stores,
+AST caches and the global symbol index. Requests identify repositories, files,
+symbols and analyses; clients never pass database paths or CLI command arrays.
+The existing `/v1` API remains available for compatibility.
 
 ```sh
 API=http://127.0.0.1:42817
 ```
 
-Add `-H "Authorization: Bearer $FACTS_TOOL_API_TOKEN"` when configured.
+Use the listener address written by `serve`. Add
+`-H "Authorization: Bearer $FACTS_TOOL_API_TOKEN"` when authentication is enabled.
+Paths in request bodies refer to the **server's** filesystem.
 
-## Find a symbol across repositories
+## HTTP methods
 
-Only the exact fully qualified name is required. Kind, USR, repository and
-component are optional filters:
+| Method | Meaning | Parameters |
+|---|---|---|
+| `GET` | Read a resource or collection | Resource IDs in paths; filters and pagination in the query |
+| `POST` | Register a resource or start a job | A typed JSON body |
+| `PATCH` | Change selected fields | A typed JSON body; omitted fields remain unchanged |
+| `PUT` | Replace a complete configuration | All required configuration fields in JSON |
+| `DELETE` | Unregister a resource or cancel a job | Resource ID in the path |
+
+`GET` and `DELETE` do not use JSON bodies. Version and addressed resource IDs are
+in the URL. Request bodies do not repeat an API version or an operation name.
+IDs returned in JSON let clients address resources. Treat them as opaque strings.
+Unknown request fields are rejected instead of silently ignored.
+
+## Repositories and automatic import
+
+Register a repository and its first clone:
 
 ```sh
-curl -sS -G "$API/v1/symbols" \
+curl -sS -X POST "$API/api/v2/repositories" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"example","clones":[{"label":"main","path":"/workspace/example"}]}'
+```
+
+The first clone becomes active. Registration returns `201 Created`, the
+repository object and its `Location`. When watching is enabled, the server scans
+the active clone, discovers eligible `compile_commands.json` files, imports
+commands and extracts registered sources. The same initial reconciliation runs
+when the server starts. Registration does not wait for indexing; inspect
+`GET /api/v2/watcher` and `GET /api/v2/index` for progress and failures. The
+repository also exposes `source_count` and `indexed_source_count` for registered
+translation units with compilation commands. A file with no stored compiler
+command, such as a header using an includer context, returns
+`compilation_command: null`.
+
+Compilation database generation remains the build system's responsibility.
+Without a discovered database, automatic processing uses stored compilation
+commands. Sources without compilation settings cannot be analysed. Monitoring,
+ignore rules, explicit compilation database paths and startup behavior are
+covered in [Repository monitoring](03-watching-directories.md).
+
+Clones are fields of their repository, not separate REST resources:
+
+```sh
+curl -sS -X PATCH "$API/api/v2/repositories/$REPOSITORY_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"active_clone_id":"clone-2"}'
+```
+
+Use the actual returned clone ID. Supplying `clones` replaces the registered
+clone list atomically. Include an existing clone's `id` to retain its identity;
+omit `id` for a new clone. Removing the active clone requires selecting another
+in the same update. Changing registrations never deletes source directories.
+
+Compilation settings belong to the file resource:
+
+```sh
+curl -sS -X PATCH "$API/api/v2/files/$FILE_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"compilation_command":{"driver":"clang++","working_directory":"/workspace/example/build","arguments":["-std=c++23","-I../include"]}}'
+```
+
+The complete `compilation_command` replaces the old settings and invalidates
+affected cached analysis. Automatic server reimports preserve this explicit
+file override. The `arguments` array contains compiler options; it
+is not a facts-tool command invocation.
+
+## Symbol lookup
+
+Only a name or USR is required. Names use **case-sensitive literal prefix
+matching by default**, so this finds `example::Widget` and longer names beginning
+with it:
+
+```sh
+curl -sS -G "$API/api/v2/symbols" \
   --data-urlencode 'qualified_name=example::Widget' \
   --data-urlencode 'kind=class'
 ```
 
-A successful response contains structured records, rather than command output:
+Add `--data-urlencode 'match=exact'` for name equality. `%` and `_` in the input
+are ordinary characters, not wildcard operators. A USR always selects by exact
+identity. Optional `repository`, `component` and `kind` filters narrow results.
+Overloads and symbols in different repositories remain separate records.
+
+The result is a typed page with `items`, `next_cursor` and `index_revision`.
+Symbol items have `symbol_id`, `qualified_name`, `kind`, `usr`, `repository`,
+`component`, and a nullable `definition` location. Use:
+
+- `GET /api/v2/symbols/{id}` for one symbol.
+- `GET /api/v2/symbols/{id}/occurrences` for declarations and definitions.
+- `GET /api/v2/symbols/{id}/relations` for relationships, with optional `kind` and
+  `direction=outgoing|incoming|both`.
+
+`limit` defaults to 50 and is at most 500 for symbols. Follow `next_cursor` using
+the original filters. Symbol cursors identify an index revision; after revision
+expiry, restart from the first page. A missing name returns an empty page; a
+missing resource ID returns `404`. Before the initial index is available, queries
+return `503 index_not_ready`, not a misleading empty result.
+
+## Select source files
+
+Extraction, matching and dependencies take a discriminated `selection`:
 
 ```json
 {
-  "items": [
-    {
-      "qualified_name": "example::Widget",
-      "kind": "class",
-      "usr": "c:@N@example@S@Widget",
-      "file_id": 42,
-      "is_definition": true,
-      "path": "/workspace/core/include/widget.hpp",
-      "repo": "core",
-      "clone": "main",
-      "component": "core"
-    }
-  ],
-  "next_cursor": null
+  "selection": {
+    "type": "files",
+    "files": [
+      {"path": "src/Widget.cpp", "repository": "example"}
+    ]
+  }
 }
 ```
 
-`is_definition` distinguishes a known definition from a declaration-only
-fallback when no definition is available. Missing repository or clone identities are
-reported as empty strings; an unlabeled known clone uses its numeric ID. Overloads and definitions in different files remain
-separate records. Use `usr`
-when a name has several overloads. `limit` defaults to 50 and accepts 1–500.
-Follow `next_cursor` with the same filters and limit until it is `null`. A missing
-symbol returns an empty `items` array. Do not infer that a symbol is missing
-before the first index scan has completed.
+A file reference can instead be `{"file_id":"the-returned-file-id"}`. Path
+references accept optional `repository`, `clone` and `component` selectors. A
+relative path is resolved in the selected clone or component. An omitted clone
+uses the repository's active clone. Ambiguous selections return a structured
+error; the server does not choose an arbitrary source.
 
-## Identify a source file
+Other selection variants are:
 
-Extraction, matching and dependency analysis use a `file` object:
-
-```json
-{"file":{"path":"/workspace/core/src/widget.cpp"}}
-```
-
-A relative path can specify its registered repository and clone:
-
-```json
-{"file":{"path":"src/widget.cpp","repo":"core","clone":"main"}}
-```
-
-`repo`, `clone` and `component` are optional when the selection is unambiguous.
-Relative paths start at the clone root; when `component` is supplied, they start
-at that component's root. An omitted clone uses the repository's active clone.
-A clone selector accepts its registered label, directory, or decimal ID string. An absolute path
-can identify a registered file without any other selectors. Explicit selectors
-must agree with that path. Parent traversal (`..`), unregistered paths and
-ambiguous file identities are rejected. The server uses the registered compile
-options and resolves the corresponding databases internally.
-
-The same selector works for a registered header:
-
-```json
-{"file":{"path":"include/widget.hpp","repo":"core"}}
-```
-
-If the header has no stored compile command, the server automatically finds a
-registered translation unit that includes it and uses that compilation context.
-Several including units are accepted when their compilation settings are
-equivalent. Conflicting settings produce `ambiguous_compilation_context` (409);
-a header with no registered includer produces `compilation_context_unavailable`
-(422). These checks run in the background for extraction, matching and dependency
-analysis: submission returns `202`, then a failed job carries the error code and
-message. Clients do not select compiler arguments or supply a translation unit.
-
-## Extract, match and analyze dependencies
-
-Each operation returns HTTP `202` with a job ID and a `Location` header pointing
-to `/v1/jobs/{id}`. Acceptance comes before the analysis starts.
-
-```sh
-curl -sS -X POST "$API/v1/extractions" \
-  -H 'Content-Type: application/json' \
-  -d '{"file":{"path":"src/widget.cpp","repo":"core"}}'
-
-curl -sS -X POST "$API/v1/matches" \
-  -H 'Content-Type: application/json' \
-  -d '{"file":{"path":"src/widget.cpp","repo":"core"},"query":"cxxRecordDecl(hasName(\"example::Widget\"))"}'
-
-curl -sS -X POST "$API/v1/dependencies" \
-  -H 'Content-Type: application/json' \
-  -d '{"file":{"path":"src/widget.cpp","repo":"core"}}'
-```
-
-Extraction additionally accepts `force: true`. Match requires a Clang AST matcher
-DSL `query`; it optionally accepts `traversal` (`AsIs` or
-`IgnoreUnlessSpelledInSource`), `relation_kind` and `capture_source`. Dependency
-analysis needs only the file selection. See the
-[OpenAPI contract](08-openapi-contract.md) for complete request schemas.
-
-Poll the accepted job:
-
-```sh
-curl -sS "$API/v1/jobs/d1"
-```
-
-A resource job reports `operation`, `state`, timestamps, a structured `result`
-on success and an `error` with `code` and `message` on failure. Compiler diagnostics are structured records with severity, message, file, line
-and column, in `result.diagnostics` or `error.details.diagnostics`. Clients do
-not parse terminal output. States are `queued`, `running`, `succeeded`, `failed` and
-`cancelled`. Use the ID returned by submission; native IDs such as `d1` and compatibility
-IDs share the polling endpoints.
-
-| Operation result | Additional structured fields |
+| Selection | Fields |
 |---|---|
-| Extraction | `symbol_count` in the resulting facts store |
-| Match | `matches` records and `match_count` |
-| Dependencies | `edges` with source/destination file IDs and paths, plus `edge_count` |
+| `directory` | `path`, optional `repository` |
+| `component` | `component`, optional `repository` |
+| `repository` | `repository` |
+| `all` | No other fields; selecting all registered sources is explicit |
 
-Each result also identifies the selected `file`, `operation`, and completion
-status. Completion means the requested operation finished. Database filenames
-are absent from these results.
+Registered headers use an including translation unit's compilation context.
+Conflicting includer settings or missing context produce a structured analysis
+error; clients do not supply an ad hoc database or guessed compiler flags.
 
-Matching stores matched evidence while preserving other stored facts. Extraction
-transactionally refreshes declarations owned by the selected translation unit and
-removes disappeared declarations such as functions, types and global variables.
-Use extraction after symbol renames or
-deletions: a match does not replace all facts for a file. Shared header facts
-are retained when the current ownership model cannot establish that they belong
-exclusively to that translation unit. Historical local and parameter value
-identities are also retained for pointer-analysis evidence, because their
-offset-based USRs can change when a function body changes; their recorded source
-positions can refer to an earlier version. The global index reflects these stored facts.
+## Create, read and cancel jobs
 
-## Global index readiness and refresh
+Each analysis has its own job collection and operation-specific OpenAPI request
+and result schemas:
+
+| Analysis | Collection |
+|---|---|
+| Extraction | `/api/v2/extract/job` |
+| AST matching | `/api/v2/match/job` |
+| Manual compilation import | `/api/v2/import/job` |
+| Dependencies | `/api/v2/dependencies/job` |
+| Call graph | `/api/v2/callgraphs/job` |
+| Local-variable flow | `/api/v2/variable-flow/job` |
+| Directory scan | `/api/v2/scan/job` |
+| Global index rebuild | `/api/v2/index/job` |
+
+For each collection, `POST` starts work and `GET` lists jobs. For
+`{collection}/{id}`, `GET` reads the job and `DELETE` requests cancellation.
+`GET {collection}/{id}/results` reads record pages; filtering and pagination use
+query parameters. Job reads contain counts and scalar summaries, so polling a
+large graph never downloads its nodes and edges. Retrieve those lazily with
+`?collection=nodes`, `?collection=edges`, or another documented collection. A job ID belongs to its analysis family: asking another
+family for it returns `404`.
+
+Start extraction:
 
 ```sh
-curl -sS "$API/health"
-curl -sS "$API/v1/index"
+curl -i -X POST "$API/api/v2/extract/job" \
+  -H 'Content-Type: application/json' \
+  -d '{"selection":{"type":"files","files":[{"path":"src/Widget.cpp","repository":"example"}]},"force":false}'
 ```
 
-Health confirms that HTTP is available. Index status separately reports
-`state` (`queued`, `running`, `ready` or `failed`), `pending`, facts-file and
-symbol counts, `error`, and the last successful `updated_at` time in Unix epoch
-milliseconds.
+The response is `202 Accepted` with a `Location` header pointing to the job.
+Poll that URL until the state is terminal. Queued and running jobs have no final
+result yet. Errors contain a stable code and message. Compiler diagnostics are retrieved
+through the typed `diagnostics` result collection where available. Extracted facts are published to the global index before a
+successful extraction job reports completion.
 
-At startup the server schedules a background scan of known existing facts
-files. It stores fully qualified name, kind, USR and defining file ID in
-`project.db`'s `global_symbol_index`. Known files include registered facts
-locations and destinations derived from the configured facts template. New
-files without a template use `facts/<file-id>.db` beside the project database.
-Clients never need these storage paths.
+Cancellation uses `DELETE`, not a `/cancel` command. Jobs remain readable for
+retained history. Cancellation must not corrupt an in-progress native database
+transaction; inspect the returned state or conflict error rather than assuming
+that HTTP cancellation killed the underlying Clang operation. Job retention is
+bounded and job records are not durable across restart; facts and indexes are.
 
-Successful extraction and matching schedule another background index refresh.
-Job completion and index publication are separate events: wait until index
-status is `ready` with `pending: false` before querying newly published symbols.
-Queries use the last completed index during a refresh. Before the first
-successful scan, queries return `503` with `index_not_ready`. A failed scan
-preserves the prior index and exposes its error through index status.
+## Match the AST
 
-## Endpoints and execution rules
+```sh
+curl -sS -X POST "$API/api/v2/match/job" \
+  -H 'Content-Type: application/json' \
+  -d '{"selection":{"type":"repository","repository":"example"},"expression":"cxxMethodDecl(hasName(\"run\")).bind(\"method\")","traversal":"IgnoreUnlessSpelledInSource","capture_source":true}'
+```
 
-| Method and path | Purpose |
-|---|---|
-| `GET /v1/symbols` | Search the global index by fully qualified name and optional filters |
-| `POST /v1/extractions` | Queue extraction for a registered file |
-| `POST /v1/matches` | Queue a Clang DSL query for a registered file |
-| `POST /v1/dependencies` | Queue dependency analysis for a registered file |
-| `GET /v1/index` | Inspect global index readiness and background refresh |
-| `GET /health` | Ping the HTTP server |
-| `GET /v1/jobs`, `GET /v1/jobs/{id}` | List retained jobs or fetch one result |
-| `DELETE /v1/jobs/{id}` | Cancel queued work; running native analysis returns `409` |
-| `GET /v1/watch` | Inspect watcher state and recent job IDs |
-| `GET /openapi.yaml`, `GET /openapi.json` | Read the generated OpenAPI contract |
-| `POST /v1/shutdown` | Request orderly server shutdown |
+The full Clang matcher DSL and arbitrary binding names remain available.
+Optional `bindings` maps semantic roles to those names; it does not impose a
+fixed name on every matcher. Results contain typed matched-node records with
+source locations and ranges. Prefix search defaults for the symbols collection
+do not alter Clang matcher semantics.
 
-Database resolution, Clang analysis and symbol queries run on background workers.
-HTTP requests remain asynchronous. Database-mutating work is serialized; this
-does not imply parallel Clang extraction. Native work already running completes
-before orderly shutdown. It cannot be forcibly cancelled safely; cancellation
-of a running resource job returns `409`. Queued resource jobs can be cancelled.
+## Call graphs and local-variable tracking
 
-`GET /v1/jobs` returns metadata with `result: null`; fetch the individual job
-for its complete result. Large result serialization runs on workers while HTTP
-remains responsive. Job records are in memory and may be evicted or lost at restart. Facts and the
-global index persist. Invalid JSON and malformed requests return `400` or `422`;
-unknown files and jobs return `404`; ambiguous selectors return `409`; unavailable
-index/project state returns `503`; queue saturation returns `429`. Authentication
-failures return `401`, and browser-origin requests return `403`. HTTP bodies are
-limited to 1 MiB, headers to 16 KiB, with a 30-second request I/O deadline.
-Selector resolution failures occur in the accepted job's structured `error`.
+Start a call graph from one exact function identity:
 
-## Deprecated command compatibility
+```json
+{
+  "root": {"qualified_name": "example::Service::run"},
+  "direction": "callees",
+  "max_depth": 10
+}
+```
 
-`GET /v1/commands`, `POST /v1/commands/{path}` and `POST /v1/jobs` remain for
-existing command clients. They are deprecated compatibility operations, separate
-from the resource API above. They accept CLI token arrays and return captured
-`stdout`/`stderr` and an exit code. A command's JSON output remains a string in
-`stdout`. Nested command names use slashes, such as `repo/add-clone`.
+Send this to `POST /api/v2/callgraphs/job`. Root and optional target selectors
+accept a qualified name, USR, or returned `symbol_id`; ambiguous function names
+require a more precise identity. `direction` can be `callers` or `callees`.
+Explicit node, edge, time and depth limits control traversal. Typed results
+report coverage and truncation rather than suggesting that bounded output is
+complete.
 
-Compatibility jobs run as child processes. Their cancellation and configured
-`--timeout` terminate the process group. Each output stream is capped at 4 MiB;
-`truncated` signals discarded output. Legacy options and database overrides
-belong only to these compatibility endpoints. New clients should use the typed
-symbol and analysis endpoints.
+Track a local variable across calls:
 
-For synchronous and asynchronous Python examples, see
-[Python REST client](../05-python-sdk/11-rest-client.md).
+```json
+{
+  "function": {"qualified_name": "example::Service::run"},
+  "variable": {
+    "name": "request",
+    "declaration": {"path": "src/Service.cpp", "line": 42, "column": 9}
+  },
+  "direction": "forward",
+  "interprocedural": true,
+  "max_call_depth": 10
+}
+```
+
+Send this to `POST /api/v2/variable-flow/job`. Declaration location distinguishes
+same-name variables in different scopes. The current implementation supports
+forward tracking only; backward requests are rejected. Set `interprocedural`
+to `false` to stay within the selected function and report call-depth boundaries.
+Diagnostics identify unresolved calls, uncertain aliasing and coverage limits;
+the analysis is not a claim of complete proof.
+
+## Resource endpoint reference
+
+| Resource | Collection methods | Individual methods |
+|---|---|---|
+| `/repositories` | `GET`, `POST` | `GET`, `PATCH`, `DELETE` |
+| `/components` | `GET`, `POST` | `GET`, `PATCH`, `DELETE` |
+| `/files` | `GET`, `POST` | `GET`, `PATCH`, `DELETE` |
+| `/directories` | `GET` | `GET`, `DELETE` |
+| `/symbols` | `GET` | `GET` |
+
+Prefix paths with `/api/v2`; individual paths append `/{id}`. Catalog collection
+pages use `items` and `next_cursor`, `limit=50` by default, maximum 500. Deletion
+with dependent registrations requires `cascade=true`; source files are never
+deleted. Watcher settings support `GET`, full replacement with `PUT`, or partial
+update with `PATCH` at `/api/v2/watcher/settings`.
+
+Other endpoints are `GET /api/v2/health`, `/readiness`, `/index`, `/watcher`,
+`/settings`, `POST /api/v2/shutdown`, and `GET /openapi.yaml` or `/openapi.json`.
+Readiness is separate from HTTP liveness. Invalid bodies return `400` or `422`,
+missing resources `404`, conflicts `409`, queue saturation `429`, and unavailable
+initial state `503`. Authenticated servers return `401` for missing/invalid
+credentials. HTTP bodies are limited to 1 MiB.
+
+The deprecated `/v1/commands` and generic `/v1/jobs` compatibility operations
+still accept CLI token arrays and captured process output. No `/api/v2` endpoint
+uses that command-wrapper contract. See [Python REST client](../05-python-sdk/11-rest-client.md).

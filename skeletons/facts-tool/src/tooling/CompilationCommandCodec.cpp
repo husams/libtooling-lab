@@ -400,13 +400,16 @@ decodeCompileOptions(std::string_view text) {
   return decodeOptions(text);
 }
 
+namespace {
 std::expected<clang::tooling::CompileCommand, std::string>
-decodeStoredCommand(const StoredCompileFile &file,
-                    const StoredCommandAliases &aliases) {
+resolveStoredCommand(const StoredCompileFile &file,
+                     const StoredCommandAliases &aliases, bool sanitize) {
   auto fileAliases = aliases;
   fileAliases.try_emplace(file.componentName, file.root.string());
   return decodeCompileOptions(file.options)
-      .transform(sanitizeCommandArguments)
+      .transform([&](auto arguments) {
+        return sanitize ? sanitizeCommandArguments(std::move(arguments)) : std::move(arguments);
+      })
       .transform([&](auto arguments) {
         return resolveIncludePaths(std::move(arguments), fileAliases,
                                    file.remapping);
@@ -417,18 +420,35 @@ decodeStoredCommand(const StoredCompileFile &file,
 }
 
 std::expected<CompileCommands, std::string>
-decodeCompileCommands(const StoredCompilationSnapshot &snapshot) {
+resolveCompileCommands(const StoredCompilationSnapshot &snapshot, bool sanitize) {
   const auto aliases = mergeAliases(snapshot.labels, snapshot.components);
   CompileCommands commands;
   commands.reserve(snapshot.files.size());
   for (const auto &file : snapshot.files) {
-    auto command = decodeStoredCommand(file, aliases);
+    auto command = resolveStoredCommand(file, aliases, sanitize);
     if (!command) {
       return std::unexpected(command.error());
     }
     commands.push_back(std::move(*command));
   }
   return commands;
+}
+} // namespace
+
+std::expected<clang::tooling::CompileCommand, std::string>
+decodeStoredCommand(const StoredCompileFile &file,
+                    const StoredCommandAliases &aliases) {
+  return resolveStoredCommand(file, aliases, true);
+}
+
+std::expected<CompileCommands, std::string>
+decodeCompileCommands(const StoredCompilationSnapshot &snapshot) {
+  return resolveCompileCommands(snapshot, true);
+}
+
+std::expected<CompileCommands, std::string>
+expandCompileCommands(const StoredCompilationSnapshot &snapshot) {
+  return resolveCompileCommands(snapshot, false);
 }
 
 } // namespace facts

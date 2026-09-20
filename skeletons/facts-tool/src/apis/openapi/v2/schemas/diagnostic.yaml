@@ -1,0 +1,22 @@
+type: object
+required:
+- severity
+- message
+additionalProperties: false
+properties:
+  severity:
+    type: string
+  message:
+    type: string
+  file:
+    anyOf:
+    - type: string
+    - type: 'null'
+  line:
+    anyOf:
+    - type: integer
+    - type: 'null'
+  column:
+    anyOf:
+    - type: integer
+    - type: 'null'

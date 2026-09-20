@@ -1,0 +1,49 @@
+type: object
+required:
+- state
+- pending
+- files
+- symbols
+- error
+- updated_at
+- index_revision
+additionalProperties: false
+description: 'Background global-index state. Queries read the last completed index
+  while
+
+  indexing is queued or running. Before the first successful scan, symbol
+
+  queries return 503 index_not_ready. Failed scans preserve the prior index.
+
+  '
+properties:
+  state:
+    type: string
+    enum:
+    - queued
+    - running
+    - ready
+    - failed
+  pending:
+    type: boolean
+    description: Another refresh is requested.
+  files:
+    type: integer
+    minimum: 0
+  symbols:
+    type: integer
+    minimum: 0
+  error:
+    type:
+    - string
+    - 'null'
+  updated_at:
+    type:
+    - integer
+    - 'null'
+    format: int64
+    description: Last successful refresh in Unix epoch milliseconds.
+  index_revision:
+    anyOf:
+    - type: string
+    - type: 'null'

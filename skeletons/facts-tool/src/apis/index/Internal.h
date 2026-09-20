@@ -9,6 +9,8 @@ struct Position { std::int64_t generation = 0, record = 0; };
 Result<void> initialize(Database &database);
 Result<void> ensureStateCounts(Database &database);
 Result<void> ensurePositions(Database &database);
+Result<void> ensureIdentities(Database &database);
+Result<void> updateIdentities(Database &database);
 Result<bool> hasStateCounts(Database &database);
 Result<void> prepareStage(Database &database);
 Result<void> prepareOwners(Database &database, const std::filesystem::path &base);

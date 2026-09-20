@@ -1,0 +1,17 @@
+type: object
+required:
+- selection
+additionalProperties: false
+properties:
+  selection:
+    $ref: '../../openapi.yaml#/components/schemas/V2Selection'
+  force:
+    type: boolean
+    default: false
+examples:
+- selection:
+    type: files
+    files:
+    - path: src/Widget.cpp
+      repository: example
+  force: false

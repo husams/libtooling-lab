@@ -1,4 +1,5 @@
 #include "apis/watch/State.h"
+#include "apis/watch/Snapshot.h"
 #include <chrono>
 
 namespace facts::apis {
@@ -41,9 +42,23 @@ void Watcher::Impl::finished(bool success) {
   active = false;
   commands.clear();
   if (!success) { ++failures; needsScan = true; }
+  checkpointPending = success;
   if (logger) logger->write(success ? logging::Level::debug : logging::Level::warning,
       "watch.cycle.completed", {{"cycle", cycles}, {"succeeded", success},
                                 {"jobs", latestJobs.size()}, {"failures", failures}});
+#ifdef __linux__
+  // Re-read stable compilation metadata after successful import before making
+  // its pre-processing snapshot reusable. A changed catalog triggers another
+  // normal cycle; an unchanged catalog publishes the pending checkpoint.
+  if (success && running) { scan(); return; }
+#endif
   if (dirty && running) changed();
+}
+void Watcher::Impl::checkpoint() {
+  checkpointPending = false;
+  if (!snapshot) return;
+  auto saved = watch::remember(settings, *snapshot);
+  if (!saved && logger) logger->write(logging::Level::warning, "watch.checkpoint.failed",
+                                     {{"message", saved.error()}});
 }
 }

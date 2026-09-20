@@ -1,0 +1,49 @@
+type: object
+required:
+- id
+- operation
+- state
+- created_at
+- result
+- error
+additionalProperties: false
+properties:
+  id:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  operation:
+    type: string
+    const: dependencies
+  state:
+    type: string
+    enum:
+    - queued
+    - running
+    - cancelling
+    - succeeded
+    - failed
+    - cancelled
+  created_at: &id001
+    type: integer
+    format: int64
+    description: Unix epoch milliseconds.
+  started_at:
+    anyOf:
+    - *id001
+    - type: 'null'
+  finished_at:
+    anyOf:
+    - *id001
+    - type: 'null'
+  result:
+    anyOf:
+    - $ref: '../../openapi.yaml#/components/schemas/V2DependenciesResult'
+    - type: 'null'
+  error:
+    anyOf:
+    - $ref: '../../openapi.yaml#/components/schemas/V2Error'
+    - type: 'null'
+description: The result type is specific to this analysis. Lists contain metadata
+  with result=null. Finished jobs remain readable until bounded retention evicts them.

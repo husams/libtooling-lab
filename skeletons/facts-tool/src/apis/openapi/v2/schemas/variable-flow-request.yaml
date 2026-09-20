@@ -1,0 +1,26 @@
+type: object
+required:
+- function
+- variable
+additionalProperties: false
+properties:
+  function:
+    $ref: '../../openapi.yaml#/components/schemas/V2SymbolSelector'
+  variable:
+    $ref: '../../openapi.yaml#/components/schemas/V2VariableSelector'
+  selection:
+    $ref: '../../openapi.yaml#/components/schemas/V2Selection'
+  direction:
+    type: string
+    const: forward
+    default: forward
+  interprocedural:
+    type: boolean
+    default: true
+  max_call_depth:
+    type: integer
+    minimum: 0
+    maximum: 2147483647
+description: Trace local values through supported assignments, arguments, parameters
+  and returns. Coverage diagnostics report uncertain or unsupported flow; this is
+  not a proof of complete alias resolution.

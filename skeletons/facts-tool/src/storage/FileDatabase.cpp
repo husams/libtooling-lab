@@ -363,19 +363,19 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
                   "WHERE component.repository_id=?1 "
                   "AND component.path=?2 AND directory.path=?3 "
                   "ON CONFLICT(directory_id,name) DO UPDATE SET "
-                  "driver=excluded.driver,"
-                  "working_directory=excluded.working_directory,"
-                  "compile_options=excluded.compile_options,"
-                  "args_overridden=0,"
-                  "indexed=CASE WHEN ?8=1 THEN indexed ELSE 0 END,"
-                  "indexed_at=CASE WHEN ?8=1 THEN indexed_at ELSE NULL END,"
-                  "mtime=CASE WHEN ?8=1 THEN mtime ELSE NULL END,"
-                  "facts_db=CASE WHEN ?8=1 THEN facts_db ELSE NULL END,"
-                  "git_commit=CASE WHEN ?8=1 THEN git_commit ELSE NULL END";
+                  "driver=CASE WHEN ?9=1 AND args_overridden=1 THEN driver ELSE excluded.driver END,"
+                  "working_directory=CASE WHEN ?9=1 AND args_overridden=1 THEN working_directory ELSE excluded.working_directory END,"
+                  "compile_options=CASE WHEN ?9=1 AND args_overridden=1 THEN compile_options ELSE excluded.compile_options END,"
+                  "args_overridden=CASE WHEN ?9=1 THEN args_overridden ELSE 0 END,"
+                  "indexed=CASE WHEN ?8=1 OR (?9=1 AND args_overridden=1) THEN indexed ELSE 0 END,"
+                  "indexed_at=CASE WHEN ?8=1 OR (?9=1 AND args_overridden=1) THEN indexed_at ELSE NULL END,"
+                  "mtime=CASE WHEN ?8=1 OR (?9=1 AND args_overridden=1) THEN mtime ELSE NULL END,"
+                  "facts_db=CASE WHEN ?8=1 OR (?9=1 AND args_overridden=1) THEN facts_db ELSE NULL END,"
+                  "git_commit=CASE WHEN ?8=1 OR (?9=1 AND args_overridden=1) THEN git_commit ELSE NULL END";
               auto files = database_.executeBulk(
                   insertFilesSql,
                   upsertInputs,
-                  [repositoryId](sqlite3_stmt *statement,
+                  [repositoryId, &configuration](sqlite3_stmt *statement,
                                  const FileUpsertInput &input) {
                     const auto &file = *input.file;
                     const auto workingDirectory =
@@ -386,7 +386,8 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
                         statement, repositoryId, file.componentPath,
                         file.directory, file.name, file.driver,
                         workingDirectory, file.compileOptions,
-                        input.unchanged ? 1 : 0);
+                        input.unchanged ? 1 : 0,
+                        configuration.preserveCompilationOverrides ? 1 : 0);
                   },
                   {.atomic = false});
               return files.transform([](const storage::BulkResult &) {});

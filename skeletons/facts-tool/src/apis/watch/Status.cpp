@@ -4,6 +4,7 @@
 namespace facts::apis {
 Json Watcher::Impl::status() const {
   Json roots = Json::array(), clones = Json::array(), notices = Json::array();
+  Json warnings = Json::array();
   std::string database;
   if (snapshot) {
     database = snapshot->catalog.database.string();
@@ -14,15 +15,19 @@ Json Watcher::Impl::status() const {
         {"label", clone.label}, {"path", clone.path.string()},
         {"active", clone.active}, {"excluded", clone.excluded}});
     notices = snapshot->notices;
+    for (const auto &warning : snapshot->warnings)
+      warnings.push_back({{"code", warning.code}, {"severity", "warning"},
+        {"path", warning.path.string()}, {"target", warning.target.string()},
+        {"action", "skipped"}, {"message", warning.message}});
   }
   const auto explicitPaths = watch::explicitDatabases(settings);
   const bool stored = explicitPaths && explicitPaths->empty() &&
                       (!snapshot || snapshot->databases.empty());
   Json result{{"enabled", settings.watchEnabled}, {"running", running},
               {"active", active}, {"pending", dirty}, {"directories", roots},
-              {"scanning", scanning}, {"ready", ready},
+              {"scanning", scanning}, {"ready", ready}, {"resumed", resumed},
               {"source", "project_database"}, {"project_database", database},
-              {"clones", clones}, {"notices", notices},
+              {"clones", clones}, {"notices", notices}, {"warnings", warnings},
               {"events", events}, {"cycles", cycles}, {"failures", failures},
               {"overflows", overflows}, {"last_error", error},
               {"latest_jobs", latestJobs},

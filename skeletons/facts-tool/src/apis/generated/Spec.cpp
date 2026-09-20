@@ -4,27 +4,8 @@
 namespace facts::apis::generated {
 std::string_view specification() {
   static constexpr char document[] =
-#include "SpecPart000.inc"
-#include "SpecPart001.inc"
-#include "SpecPart002.inc"
-#include "SpecPart003.inc"
-#include "SpecPart004.inc"
-#include "SpecPart005.inc"
-#include "SpecPart006.inc"
-#include "SpecPart007.inc"
-#include "SpecPart008.inc"
-#include "SpecPart009.inc"
-#include "SpecPart010.inc"
-#include "SpecPart011.inc"
-#include "SpecPart012.inc"
-#include "SpecPart013.inc"
-#include "SpecPart014.inc"
-#include "SpecPart015.inc"
-#include "SpecPart016.inc"
-#include "SpecPart017.inc"
-#include "SpecPart018.inc"
-#include "SpecPart019.inc"
-#include "SpecPart020.inc"
+#include "SpecSection000.inc"
+#include "SpecSection001.inc"
 ;
   return document;
 }

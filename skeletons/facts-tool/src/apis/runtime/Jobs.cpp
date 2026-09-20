@@ -13,14 +13,21 @@ domain::Result<Json> State::submit(Request request) {
     return std::unexpected(domain::Error{429, "queue_full", "Job queue is full"});
   if (jobs.size() >= 128) {
     auto oldest = std::ranges::find_if(order, [&](const auto &id) {
-      return jobs.at(id)["state"] != "queued" && jobs.at(id)["state"] != "running";
+      return jobs.at(id)["state"] != "queued" && jobs.at(id)["state"] != "running" &&
+          jobs.at(id)["state"] != "cancelling";
     });
     if (oldest == order.end()) return std::unexpected(domain::Error{429, "queue_full", "Job retention capacity reached"});
     payloads.erase(*oldest);
+    documents.erase(*oldest);
+    cancellations.erase(*oldest);
     jobs.erase(*oldest);
     order.erase(oldest);
   }
   const auto id = "d" + std::to_string(nextId++);
+  request.settings = settings;
+  auto cancelled = std::make_shared<std::atomic_bool>(false);
+  cancellations.emplace(id, cancelled);
+  request.cancelled = [cancelled] { return cancelled->load(); };
   Json job{{"id", id}, {"operation", request.operation}, {"state", "queued"},
       {"created_at", timestamp()}, {"result", nullptr}, {"error", nullptr}};
   jobs.emplace(id, job);
@@ -42,10 +49,17 @@ domain::Result<void> State::cancel(const std::string &id) {
   const auto found = jobs.find(id);
   if (found == jobs.end()) return std::unexpected(domain::Error{404, "job_not_found", "Unknown job"});
   auto &job = found->second;
-  if (job["state"] == "running") return std::unexpected(domain::Error{
-      409, "cannot_cancel_running", "A running native operation must finish safely"});
+  if (job["state"] == "running" || job["state"] == "cancelling") {
+    if (!job.at("operation").get<std::string>().starts_with("v2."))
+      return std::unexpected(domain::Error{
+          409, "cannot_cancel_running", "A running native operation must finish safely"});
+    cancellations.at(id)->store(true);
+    job["state"] = "cancelling";
+    return {};
+  }
   if (job["state"] == "queued") {
     job["state"] = "cancelled";
+    cancellations.at(id)->store(true);
     job["finished_at"] = timestamp();
   }
   return {};

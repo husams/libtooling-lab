@@ -27,6 +27,7 @@
 #include <iostream>
 #include <iterator>
 #include <memory>
+#include <set>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -148,6 +149,35 @@ requireResolvableIdentities(FileManager &files,
                    *missing)};
 }
 
+std::expected<bool, std::string> invalidateImportFacts(
+    FileManager &files, const config::Resolved &resolved,
+    const cli::ImportOptions &options, const std::vector<std::string> &sources) {
+  if (options.existingClone == 0 || !resolved.factsTemplate.empty() || options.factsProvided)
+    return invalidateConfiguredCallGraphEntries(resolved,
+        options.factsProvided ? options.facts : "", sources);
+  // Managed server outputs are registered on the files themselves. A new
+  // source has no previous output to invalidate and needs no client DB path.
+  std::set<std::string> paths;
+  for (const auto &source : sources) {
+    auto state = files.indexState(source);
+    if (!state) {
+      if (state.error() == std::errc::no_such_file_or_directory ||
+          state.error() == std::errc::invalid_argument) continue;
+      return std::unexpected("cannot read imported source index state: " + state.error().message());
+    }
+    if (state->factsDb.empty()) continue;
+    auto path = std::filesystem::path(state->factsDb);
+    paths.insert((path.is_absolute() ? path : resolved.projectRoot / path).lexically_normal().string());
+  }
+  bool changed = false;
+  for (const auto &path : paths) {
+    auto invalidated = invalidateCallGraphEntriesBeforeMutation(resolved.database.string(), path);
+    if (!invalidated) return std::unexpected(invalidated.error());
+    changed = changed || *invalidated;
+  }
+  return changed;
+}
+
 // Import owns the file registry: every path a later command can resolve is
 // discovered and stored here, so extraction only ever reads it.
 std::expected<std::size_t, std::string>
@@ -179,7 +209,7 @@ std::expected<std::size_t, std::string>
 registerImportedFiles(FileManager &files, const CompilationDatabase &applied,
                       const std::vector<std::string> &sources,
                       const cli::ImportOptions &options) {
-  if (!options.astCache.enabled)
+  if (!options.astCache.enabled && options.existingClone == 0)
     return registerFiles(files, applied, sources, options.astCache,
                          options.existingClone != 0);
   // Warm the exact command later consumers read: import normalizes arguments
@@ -224,6 +254,7 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
       return std::unexpected("--existing-clone cannot override project components");
     auto identity = readImportIdentity(options.configuration, options.existingClone);
     if (!identity) return std::unexpected(identity.error());
+    identity->preserveCompilationOverrides = true;
     importOptions.identity = std::move(*identity);
   }
   // Storing the compile commands registers the sources themselves, so the
@@ -234,9 +265,7 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
   return cli::runStage(options.verbosity, "import", "read file registry",
                        [&] { return registeredFileCount(files); })
       .and_then([&](std::size_t before) {
-        return invalidateConfiguredCallGraphEntries(
-                   resolved, options.factsProvided ? options.facts : "",
-                   options.sources)
+        return invalidateImportFacts(files, resolved, options, sources)
             .and_then([&](bool) {
               return cli::runStage(
                   options.verbosity, "import", "store compile commands", [&] {
@@ -277,11 +306,32 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
 
 } // namespace
 
+std::expected<void, std::string> refreshImportRegistry(
+    const config::Resolved &configuration, const std::vector<std::string> &sources) {
+  return loadStoredCompilationDatabase(configuration.database.string(), sources)
+      .and_then([&](CompilationDatabasePtr database) {
+        auto adjusted = appendExtraArguments(std::move(database), configuration.extraArguments);
+        FileManager files(configuration.database.string());
+        return registerFiles(files, *adjusted, sources, configuration.astCache, true)
+            .transform([](std::size_t) {});
+      });
+}
+
 std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
-  auto resolved = loadConfiguration(options.configuration,
-                                    options.configurationFile, false, true);
-  if (!resolved)
-    return std::unexpected(resolved.error());
+  return loadConfiguration(options.configuration, options.configurationFile, false, true)
+      .and_then([&](config::Resolved resolved) -> std::expected<int, std::string> {
+        if (options.existingClone != 0) {
+          auto identity = readImportIdentity(resolved.database, options.existingClone);
+          if (!identity) return std::unexpected(identity.error());
+          resolved.projectRoot = identity->activeClone.path;
+        }
+        return runImportResolved(options, resolved);
+      });
+}
+
+std::expected<int, std::string> runImportResolved(const cli::ImportOptions &options,
+                                                const config::Resolved &configuration) {
+  const auto *resolved = &configuration;
   if (options.noAstCache) {
     auto cleared = storage::astcache::clearSnapshots(resolved->database);
     if (!cleared) return std::unexpected(cleared.error());

@@ -25,7 +25,7 @@ Result extract(const domain::Context &context, const domain::ResolvedFile &file,
   return needsExtraction(file).and_then([&](bool refresh) {
         auto options = extractOptions(context, file, request);
         options.force = options.force || refresh;
-        return commands::runExtractResolved(options, false)
+        return commands::runExtractResolved(options, false, request.statistics)
             .transform_error(operationError);
       })
       .and_then(completed)

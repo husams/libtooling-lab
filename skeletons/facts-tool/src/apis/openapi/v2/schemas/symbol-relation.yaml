@@ -1,0 +1,20 @@
+type: object
+required:
+- kind
+- source
+- target
+- count
+- position
+additionalProperties: false
+properties:
+  kind:
+    type: string
+  source:
+    $ref: '../../openapi.yaml#/components/schemas/V2RelatedSymbol'
+  target:
+    $ref: '../../openapi.yaml#/components/schemas/V2RelatedSymbol'
+  count:
+    type: integer
+    minimum: 0
+  position:
+    type: integer

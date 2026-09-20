@@ -1,0 +1,33 @@
+type: object
+required:
+- repository_id
+- repository
+- clone_id
+- label
+- path
+- active
+- excluded
+additionalProperties: false
+properties:
+  repository_id: &id001
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  repository:
+    type: string
+    description: Configured repository name.
+  clone_id: *id001
+  label:
+    type: string
+    description: Configured clone label.
+  path:
+    type: string
+    description: Filesystem path stored for this clone in the project database.
+  active:
+    type: boolean
+    description: True when selected as the active clone of its repository in the database.
+  excluded:
+    type: string
+    description: Repository or clone configuration exclusion reason; empty if none
+      applies.

@@ -42,7 +42,8 @@ struct Parsed {
 
 std::expected<Parsed, std::string> parse(clang::tooling::CompilationDatabase &,
                                         const std::vector<std::string> &,
-                                        const astcache::Options &);
+                                        const astcache::Options &,
+                                        const std::function<bool()> &cancelled = {});
 
 std::string usrFor(const clang::NamedDecl &, std::string_view tu);
 std::string functionName(const clang::FunctionDecl &);

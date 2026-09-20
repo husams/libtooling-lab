@@ -214,18 +214,42 @@ int main(int argc, char **argv) {
   assert(!std::ranges::binary_search(sharedRoot->files,
                                      (projectRoot / "conftest.py").string()));
 
-  // An include root that exists but cannot be resolved to a directory stays
-  // fatal. A self-referential symlink is the portable, privilege-independent
-  // way to produce that state.
+  // Cyclic include-root symlinks are skipped with a diagnostic, like broken links.
   const auto loopRoot = scratch / "loop";
   std::filesystem::create_symlink(loopRoot, loopRoot);
   assert(
       std::filesystem::is_symlink(std::filesystem::symlink_status(loopRoot)));
   const auto loopFailure =
       discoverWithIncludeRoot(source, otherSource, loopRoot);
-  assert(!loopFailure);
-  assert(loopFailure.error().starts_with("cannot inspect include directory '" +
-                                         loopRoot.string() + "'"));
+  assert(loopFailure);
+  assert(!loopFailure->diagnostics.empty());
+  assert(loopFailure->diagnostics.front().starts_with("skipping unavailable include directory '" +
+                                                      loopRoot.string() + "'"));
+
+  // Broken entries never end the walk. Follow valid directory/file aliases,
+  // deduplicate physical targets, and terminate ancestor cycles.
+  const auto linkedRoot = scratch / "linked";
+  const auto linkedHeaders = linkedRoot / "actual";
+  std::filesystem::create_directories(linkedHeaders);
+  writeFile(linkedHeaders / "live.hpp");
+  std::filesystem::create_symlink("absent.hpp", linkedRoot / "broken.hpp");
+  std::filesystem::create_directory_symlink("absent-dir", linkedRoot / "broken-dir");
+  std::filesystem::create_directory_symlink("actual", linkedRoot / "alias");
+  std::filesystem::create_symlink("actual/live.hpp", linkedRoot / "file-alias.hpp");
+  std::filesystem::create_directory_symlink("..", linkedHeaders / "cycle");
+  std::filesystem::create_directory_symlink(linkedRoot, scratch / "linked-root");
+  const auto linked = discoverWithIncludeRoot(source, otherSource, scratch / "linked-root");
+  assert(linked);
+  assert(std::ranges::count(linked->files, (linkedHeaders / "live.hpp").string()) == 1);
+  assert(std::ranges::any_of(linked->diagnostics, [](const auto &diagnostic) {
+    return diagnostic.find("broken.hpp") != std::string::npos;
+  }));
+  assert(std::ranges::any_of(linked->diagnostics, [](const auto &diagnostic) {
+    return diagnostic.find("broken-dir") != std::string::npos;
+  }));
+  assert(std::ranges::any_of(linked->diagnostics, [](const auto &diagnostic) {
+    return diagnostic.find("cyclic") != std::string::npos;
+  }));
 
   // An include root that exists and is a directory but cannot be traversed
   // stays fatal too. Skipped when the running user can traverse it anyway,

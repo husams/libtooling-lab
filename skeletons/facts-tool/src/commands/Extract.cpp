@@ -177,7 +177,8 @@ recordIndexState(const cli::ExtractOptions &options,
 }
 
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
-                                        CompilationDatabasePtr database, bool reportProgress) {
+                                        CompilationDatabasePtr database, bool reportProgress,
+                                        ExtractionStatistics *statistics) {
   auto opened = runExtractStage(options, "open project database", [&] {
     return FileManager::openImported(options.configuration,
                                      options.astCache.enabled, options.verbosity);
@@ -228,6 +229,10 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         cli::logVerbose(options.verbosity, 1,
                         "facts-tool: extract: up_to_date={} stale={}",
                         partitioned.upToDate.size(), partitioned.stale.size());
+        if (statistics) {
+          statistics->selected = sources.size();
+          statistics->skipped = partitioned.upToDate.size();
+        }
         if (partitioned.stale.empty()) {
           if (reportProgress)
             std::cerr << "facts-tool: " << sources.size()
@@ -330,6 +335,10 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         if (result != 0) {
           return std::expected<int, std::string>{result};
         }
+        if (statistics) {
+          statistics->processed = stale.size();
+          statistics->symbols = store.count();
+        }
         const auto toMark = filesToMark(stale, discovered.perSource);
         auto recorded = runExtractStage(options, "record index state", [&] {
           return recordIndexState(options, toMark, partitioned.observedMtime,
@@ -354,7 +363,9 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
 } // namespace
 
 std::expected<int, std::string>
-runExtractResolved(const cli::ExtractOptions &options, bool reportProgress) {
+runExtractResolved(const cli::ExtractOptions &options, bool reportProgress,
+                   ExtractionStatistics *statistics) {
+  if (statistics) *statistics = {};
   return runExtractStage(options, "validate database paths",
                          [&] {
                            return validateDatabasePaths(options.output,
@@ -383,7 +394,7 @@ runExtractResolved(const cli::ExtractOptions &options, bool reportProgress) {
         return cli::runStage(options.verbosity, "extract", "prepare extraction",
                              [&] {
                                return timePhase("extract total", [&] {
-                                 return extract(options, std::move(database), reportProgress);
+                                 return extract(options, std::move(database), reportProgress, statistics);
                                });
                              });
       });

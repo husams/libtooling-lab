@@ -42,6 +42,7 @@ void State::start() {
       self->context = std::move(*context);
       if (snapshot) {
         self->indexReady = true;
+        self->indexStatus["index_revision"] = std::to_string(snapshot->generation);
         self->indexStatus["files"] = snapshot->sources;
         self->indexStatus["symbols"] = snapshot->symbols;
       }

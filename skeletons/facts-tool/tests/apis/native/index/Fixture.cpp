@@ -1,12 +1,17 @@
 #include "Fixture.h"
 #include <cstdlib>
+#include <iostream>
 
 namespace index_test {
 void execute(const fs::path &path, const std::string &sql) {
   auto database = facts::storage::Database::open(path.string(),
       facts::storage::Database::readWrite);
   assert(database);
-  assert(facts::storage::execute(database->nativeHandle(), sql));
+  const auto result = facts::storage::execute(database->nativeHandle(), sql);
+  if (!result)
+    std::cerr << "Fixture SQL failed in " << path << ": "
+              << sqlite3_errmsg(database->nativeHandle()) << "\n" << sql << "\n";
+  assert(result);
 }
 Fixture::Fixture() {
   auto pattern = (fs::temp_directory_path() / "facts-index-XXXXXX").string();

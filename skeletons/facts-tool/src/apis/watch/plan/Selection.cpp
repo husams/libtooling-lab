@@ -16,15 +16,22 @@ std::expected<std::vector<std::string>, std::string> selectSources(
     if (*excluded) continue;
     std::error_code error;
     if (!std::filesystem::is_regular_file(path, error)) {
-      if (error && error != std::errc::no_such_file_or_directory)
+      if (error && error != std::errc::no_such_file_or_directory &&
+          error != std::errc::not_a_directory &&
+          error != std::errc::too_many_symbolic_link_levels)
         return std::unexpected("cannot read watched source: " + error.message());
       continue;
     }
     const auto canonical = std::filesystem::weakly_canonical(path, error);
     if (error) return std::unexpected("cannot resolve watched source: " + error.message());
-    const auto *target = owner(canonical, catalog);
+    const auto root = std::filesystem::canonical(clone.path, error);
+    if (error) continue;
+    const auto relative = canonical.lexically_relative(root);
+    if (relative.empty() || relative.is_absolute() || *relative.begin() == "..") continue;
+    const auto targetPath = (clone.path / relative).lexically_normal();
+    const auto *target = owner(targetPath, catalog);
     if (!target || target->cloneId != clone.cloneId) continue;
-    auto targetExcluded = ignore.excludes(canonical, false);
+    auto targetExcluded = ignore.excludes(targetPath, false);
     if (!targetExcluded) return std::unexpected(targetExcluded.error());
     if (!*targetExcluded) result.push_back(path.string());
   }

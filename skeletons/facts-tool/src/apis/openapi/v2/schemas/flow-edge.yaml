@@ -1,0 +1,16 @@
+type: object
+required:
+- source
+- target
+- kind
+- callsite
+additionalProperties: false
+properties:
+  source:
+    type: integer
+  target:
+    type: integer
+  kind:
+    type: string
+  callsite:
+    type: integer

@@ -1,103 +1,108 @@
 # OpenAPI contract and generated code
 
-← [User guide index](../README.md) · [Table of contents](../toc.md)
+← [User guide index](../README.md)
 
-The REST interface is defined in OpenAPI 3.1 YAML. Its source is
-[`src/apis/openapi/openapi.yaml`](../../../src/apis/openapi/openapi.yaml),
-with small referenced files for operations, request bodies and response schemas.
-Edit this contract when changing the HTTP interface, then regenerate its bindings.
+The authoritative contract is OpenAPI 3.1:
+[`src/apis/openapi/openapi.yaml`](../../../src/apis/openapi/openapi.yaml).
+Referenced YAML files under `v2/paths` and `v2/schemas` define `/api/v2` resources,
+requests, operation-specific job results, pagination and errors. Existing `/v1`
+paths and schemas remain for compatibility.
 
 ## Read the running server's contract
 
-Both formats describe the same typed symbol, file-analysis and job interface,
-including authentication requirements and deprecated command compatibility:
-
-```bash
+```sh
 API=http://127.0.0.1:42817
 curl --fail --silent --show-error "$API/openapi.yaml" -o facts-tool-openapi.yaml
 curl --fail --silent --show-error "$API/openapi.json" -o facts-tool-openapi.json
 ```
 
-Use the server's actual allocated port. Add
-`-H "Authorization: Bearer $FACTS_TOOL_API_TOKEN"` when authentication is enabled.
-Import the downloaded YAML into Swagger Editor or other OpenAPI tooling to
-inspect requests, responses and examples. The server rejects browser-origin
-requests; use command-line or Python clients to call it.
+Use the actual listening address. Add an Authorization header when a token is
+configured. Both downloads are self-contained and describe the same API. The
+served document reflects whether Bearer authentication is enabled. Import it
+into OpenAPI tooling to inspect typed requests and responses. The server rejects
+browser-origin HTTP calls; native and Python clients can call it directly.
 
-The resource contract includes symbol lookup (`GET /v1/symbols`), extraction,
-matching, dependency analysis and global index status. Analysis request schemas
-use a typed `file` selector; match also requires a Clang DSL `query`. Additional
-properties are rejected. Database paths and CLI arguments are absent from these
-schemas. Jobs return structured results and errors.
+## Resource contract
 
-The contract also defines polling, cancellation, health, watcher status and
-shutdown. `/v1/commands/{commandPath}` and `POST /v1/jobs` are marked deprecated
-for existing command clients. Their live CLI catalog remains discoverable for
-compatibility; it does not define the resource API.
+API versions and addressed resource IDs are in URL paths. `GET` reads resources
+and uses query parameters for search, filtering and pagination. `POST` registers
+resources or creates jobs. `PATCH` changes selected fields, `PUT` replaces
+complete watcher settings, and `DELETE` unregisters resources or cancels jobs.
+There are no v2 CLI-token arrays, stdout result strings, or generic command
+submission endpoints. Compiler argument arrays are typed file configuration.
+
+Repository clone registrations and `active_clone_id` are fields of the
+repository resource. File compilation settings are fields of the file resource.
+Database filenames are server-owned and absent from creation/analysis requests.
+Unknown request fields are rejected. Selections are discriminated unions for
+files, directory, component, repository and explicit all-source selection.
+Import and scan accept only their supported root-selection variants.
+
+Extraction, matching, import, dependencies, call graphs, local-variable flow,
+scanning and index rebuilds each have their own request, job and result schemas.
+A completed extraction returns a `V2ExtractionResult` summary, never an
+unrestricted JSON object. Large record arrays are optional in result schemas
+and are read through paginated result collections; ordinary polling and `.wait()`
+only fetch scalar summaries and counts. AST bindings form a named map of typed node records; arbitrary binding
+names remain valid. Graph and flow nodes, edges, boundaries and diagnostics each
+have defined properties. Result page alternatives are typed according to their
+`collection` query parameter; `anyOf` permits an empty page without falsely
+claiming that it belongs to only one node/edge alternative.
+
+Symbol lookup defaults to case-sensitive literal prefix matching. `match=exact`
+selects equality. Analysis root identities remain exact. Collection pages expose
+`items` and `next_cursor`; symbol pages also identify the stable index revision.
+All current collection limits default to 50 and have maximum 500.
+
+See [REST resources and jobs](02-requests-and-jobs.md) for HTTP examples and
+[Python REST client](../05-python-sdk/11-rest-client.md) for resource objects,
+typed jobs, lazy iteration and asynchronous use.
 
 ## Regenerate and check
 
-From `skeletons/facts-tool`, install the development tools and generate:
+From `skeletons/facts-tool`:
 
-```bash
+```sh
 python3.12 -m venv .venv-openapi
 .venv-openapi/bin/python -m pip install -r tests/e2e/requirements.txt
 .venv-openapi/bin/python scripts/generate_openapi.py
 .venv-openapi/bin/python scripts/generate_openapi.py --check
 ```
 
-The generator validates the contract and resolves its local references. It emits
-native route definitions, request limits and the embedded specification under
-`src/apis/generated`, plus the Python `rest/client.py`, `rest/async_client.py`
-and endpoint metadata under `python/src/facts_tool/rest/generated`.
-Commit the YAML and generated files
-together. `--check` reports stale generated files without rewriting them.
+The generator resolves local references and validates the complete document.
+It writes native route metadata, request limits and the embedded specification
+under `src/apis/generated`, and the existing v1 Python client adapters and
+metadata under `python/src/facts_tool/rest/generated`. The v2 Python resource
+models and adapters are maintained alongside that generated compatibility layer.
+They are checked against the v2 contract; they are not produced by an external
+OpenAPI client generator. Native analysis handlers are shared application
+services, not generated CLI wrappers.
 
-Native operation handlers and job execution remain small, handwritten functions.
-The generated route table selects those handlers; generated limits are used in
-HTTP parsing and argument validation. Python clients use generated operation
-bindings while retaining lifecycle and polling code from small source templates.
-Generated code is checked in, so a normal native build or installed Python
-client does not run the generator or require its development dependencies.
-Operation IDs connect the contract to native handlers and SDK adapters. Adding
-an operation also requires its handler and adapter; unsupported request shapes
-are rejected during generation before existing bindings are rewritten.
+The embedded specification is split into small include files to preserve the
+repository's generated-file line limit. `--check` reports drift without changing
+files. Commit YAML and generated outputs together. Checked-in output means
+normal native builds and installed clients do not require YAML or generation
+dependencies. `--bundle path.yaml` also exports a single portable document.
 
-## Asynchronous execution
+Contract validation includes method semantics and route identities. Standard
+OpenAPI tools can read the split source with relative-reference support, or the
+bundled document served by the application.
 
-Submitting extraction, matching or dependency analysis returns HTTP `202` with
-a job ID and a `Location` polling URL before the operation starts. Awaiting the
-submission waits for acceptance. Poll until `succeeded`, `failed` or `cancelled`,
-then inspect the structured `result` or `error`. Index publication follows
-successful extraction/matching asynchronously; inspect `GET /v1/index` before
-querying newly indexed symbols. See [Requests and jobs](02-requests-and-jobs.md).
+## Execution, cancellation and index visibility
 
-The server uses asynchronous sockets, timers and inotify. Typed handlers call
-shared native services on workers, with server-side identity and storage
-resolution. Symbol database queries also run off the HTTP event loop. Only the
-deprecated command compatibility API invokes CLI child processes. OpenAPI
-documents are prepared at startup and served from memory.
+Job submission returns `202 Accepted` and a `Location` header before analysis
+finishes. Read that resource until `succeeded`, `failed` or `cancelled`.
+Cancellation uses `DELETE`: queued jobs can cancel immediately, running work
+enters `cancelling` and stops at a safe checkpoint. Repeated cancellation is
+idempotent and terminal outcomes are retained.
 
-The generated `AsyncClient` operations await HTTPX asynchronous requests.
-Polling yields to the Python event loop:
+Results are operation-specific even though lifecycle fields are shared.
+Extraction and matching publish their updated facts to the global index before
+their v2 jobs report success. During refresh, queries use the last published
+index. Before initial index availability they return a readiness error.
 
-```python
-import asyncio
-from facts_tool.rest import AsyncClient
-
-async def main():
-    async with AsyncClient("http://127.0.0.1:42817") as api:
-        document = await api.openapi_yaml()
-        print(document)
-        status = await api.index_status()
-        if status.state == "ready" and not status.pending:
-            page = await api.find_symbols("example::Widget", kind="class")
-            print(page.items)
-
-asyncio.run(main())
-```
-
-Pass `token=` when required. `Client` provides the same contract operations for
-synchronous callers; see [Python REST client](../05-python-sdk/11-rest-client.md).
-Contract validation, generation checks and real-server BDD scenarios are covered
-in [Architecture and testing](04-architecture-and-testing.md).
+HTTP sockets, monitoring and polling remain asynchronous. Native work runs on
+workers and mutating work is serialized. Deprecated v1 compatibility operations and existing internal automatic watcher
+batches use the command worker. Public v2 handlers call native application
+services directly. Job snapshots are retained in memory and can be
+evicted or lost on restart; project facts and the global index persist.

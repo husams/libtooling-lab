@@ -1,0 +1,8 @@
+type: object
+required: []
+additionalProperties: false
+properties:
+  compilation_command:
+    $ref: '../../openapi.yaml#/components/schemas/V2CompilationCommand'
+description: Compiler settings replace the existing command; affected cached analyses
+  are invalidated.

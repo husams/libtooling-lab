@@ -1,0 +1,5 @@
+anyOf:
+- $ref: '../../openapi.yaml#/components/schemas/V2ExtractionFilePage'
+- $ref: '../../openapi.yaml#/components/schemas/V2DiagnosticPage'
+description: The collection query parameter determines the record schema. Empty pages
+  satisfy more than one alternative; each alternative is fully typed.

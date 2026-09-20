@@ -1,4 +1,5 @@
 #include "apis/runtime/State.h"
+#include <boost/asio/post.hpp>
 
 namespace facts::apis::runtime {
 Service::Service(boost::asio::io_context &io, Queue &legacy,
@@ -23,7 +24,35 @@ void Service::start() { state_->start(); }
 void Service::stop() { state_->stop(); }
 bool Service::busy() const { return state_->active || state_->queries != 0; }
 void Service::refresh() { state_->refresh(); }
-Json Service::status() const { return state_->indexStatus; }
+Json Service::status(bool v2) const {
+  auto result = state_->indexStatus;
+  if (!v2) result.erase("index_revision");
+  else if (!result.contains("index_revision")) result["index_revision"] = nullptr;
+  return result;
+}
+void Service::updateSettings(const Settings &settings) { state_->settings = settings; }
+void Service::perform(ResourceWork work, ResourceCompletion completion) {
+  if (state_->stopped || !state_->context) {
+    completion(std::unexpected(domain::Error{503, "service_not_ready", "Server initialization is incomplete"}));
+    return;
+  }
+  if (state_->work.size() >= 64) {
+    completion(std::unexpected(domain::Error{429, "queue_full", "Resource queue is full"}));
+    return;
+  }
+  state_->enqueue([state = state_, context = *state_->context,
+      work = std::move(work), completion = std::move(completion)]() mutable {
+    domain::Result<Json> result;
+    try { result = work(context); }
+    catch (const std::exception &error) {
+      result = std::unexpected(domain::Error{500, "operation_failed", error.what()});
+    }
+    boost::asio::post(state->io, [completion = std::move(completion),
+                               result = std::move(result)]() mutable {
+      completion(std::move(result));
+    });
+  });
+}
 domain::Result<Json> Service::submit(Request request) {
   return state_->submit(std::move(request));
 }

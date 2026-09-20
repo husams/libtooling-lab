@@ -1,0 +1,39 @@
+type: object
+required:
+- id
+- path
+- name
+- directory_id
+- component_id
+- component
+- repository_id
+- compilation_command
+- indexed
+additionalProperties: false
+properties:
+  id: &id001
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  path:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Filesystem path on the server host.
+  name:
+    type: string
+  directory_id: *id001
+  component_id: *id001
+  component:
+    type: string
+  repository_id:
+    anyOf:
+    - *id001
+    - type: 'null'
+  compilation_command:
+    anyOf:
+    - $ref: '../../openapi.yaml#/components/schemas/V2CompilationCommand'
+    - type: 'null'
+  indexed:
+    type: boolean

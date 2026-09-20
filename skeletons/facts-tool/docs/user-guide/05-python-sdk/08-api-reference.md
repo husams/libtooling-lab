@@ -187,33 +187,32 @@ large results).
 
 ## `facts_tool.rest` (optional `rest` extra)
 
-The [REST client chapter](11-rest-client.md) contains complete examples and
-job/error semantics. `AsyncClient` uses the same methods with `await`.
+The [REST client chapter](11-rest-client.md) contains complete synchronous and
+asynchronous examples. New clients use the `/api/v2` resource collections:
 
-| Name or method | Signature | Purpose |
-|---|---|---|
-| `Client`, `AsyncClient` | `(base_url, *, token=None, timeout=10.0, transport=None)` | Synchronous/asynchronous HTTP clients |
-| `FileSelector` | `(path, repo=None, clone=None, component=None)` | Registered server-side source identity |
-| `.find_symbols` | `(qualified_name, *, kind=None, usr=None, repo=None, component=None, limit=50, cursor=None) -> SymbolPage` | Search the global symbol index |
-| `.extract` | `(file, *, force=False) -> DomainJob` | Queue native extraction |
-| `.match` | `(file, query, *, traversal="AsIs", relation_kind=None, capture_source=False) -> DomainJob` | Queue a Clang DSL match |
-| `.dependencies` | `(file) -> DomainJob` | Queue dependency analysis |
-| `.index_status` | `() -> IndexStatus` | Inspect background global-index readiness and failures |
-| `.wait` | `(job_id, *, timeout=None, poll_interval=0.1) -> DomainJob \| Job` | Poll to completion; call `.raise_for_status()` to require success |
-| `.get_job`, `.cancel_job` | `(job_id) -> DomainJob \| Job` | Read a job or cancel queued native work; running native cancellation returns `409` |
-| `.list_jobs` | `() -> list[DomainJob \| Job]` | Retrieve retained job metadata |
-| `.health`, `.openapi`, `.watch_status`, `.shutdown` | `() -> dict` | Inspect or stop the server |
-| `.openapi_yaml` | `() -> str` | Read the live YAML contract |
-| `Symbol`, `SymbolPage` | Immutable symbol records and paginated results | Qualified name, kind, USR and defining-file identity |
-| `DomainJob`, `OperationError` | Immutable operation snapshots and structured errors | Native result data, state and failure details |
-| `IndexStatus` | Immutable state, counts, error and timestamp | Startup/refresh progress, separate from job completion |
-| `ApiError`, `TransportError`, `ProtocolError` | See [errors](11-rest-client.md#errors-deadlines-and-cancellation) | HTTP rejection, request failure or invalid response |
-| `JobFailedError`, `JobTimeoutError` | `.job_id`; failed error has `.job`, timeout error has `.timeout` | Completed failure or expired polling budget |
+| Resource or type | Methods / behavior |
+|---|---|
+| `Client`, `AsyncClient` | Context-managed clients; server URL, optional token and HTTP timeout |
+| `.repositories`, `.components`, `.files` | `list`, `get`, `create`, `update`, `delete` |
+| `.directories` | `list`, `get`, `delete` |
+| `.symbols` | Lazy `find`, `get`, `occurrences`, `relations` |
+| `.extractions`, `.matches`, `.dependencies` | Typed analysis `create`, job `get`, lazy `list` |
+| `.callgraphs`, `.variable_flow` | Typed graph and local-variable analysis jobs |
+| `.imports`, `.scans`, `.index` | Import, scan and index-rebuild resources |
+| `NewClone`, `CompilationCommand` | Nested repository/file configuration |
+| `FileSelection`, `FileReference`, `FileIdentity` | File selection by path or returned ID |
+| `RepositorySelection`, `DirectorySelection`, `ComponentSelection`, `AllSelection` | Explicit source scopes |
+| `SymbolReference`, `VariableReference`, `DeclarationLocation` | Precise graph and local-variable identities |
+| Typed job objects | `refresh()`, `wait()`, `cancel()`; operation-specific results |
+| Lazy collections | Iterate page-by-page, or `.collect()` explicitly |
 
-Deprecated compatibility methods remain: `.submit(*arguments)`,
-`.command(path, *arguments)`, `.run(*arguments, timeout=None, poll_interval=0.1,
-check=True)`, and `.commands()`. They expose CLI tokens and legacy `Job` records;
-use the resource methods above for new symbol and analysis clients.
+`symbols.find` defaults to literal case-sensitive prefix matching. Set
+`match="exact"` for equality. Async resource calls are awaited; async collections
+use `async for` or `await collection.collect()`.
 
-Use `with Client(...)` / `async with AsyncClient(...)`, or close explicitly with
-`.close()` / `await .aclose()`. REST clients do not change the database query API.
+Existing flat v1 methods such as `.find_symbols`, `.extract`, `.match`,
+`.get_job` and `.wait` remain for compatibility. `LegacyClient` and
+`LegacyAsyncClient`, and the clients' `.legacy` attribute, expose that older
+interface explicitly. Generic `.submit` and `.command` methods remain deprecated
+CLI compatibility operations. Local database query APIs remain independent of
+the HTTP server and keep their lazy/eager execution choices.
