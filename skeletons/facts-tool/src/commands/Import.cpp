@@ -1,4 +1,5 @@
 #include "commands/Import.h"
+#include "storage/astcache/Database.h"
 
 #include "commands/CallGraphInvalidation.h"
 #include "commands/CompilationDatabase.h"
@@ -267,6 +268,10 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
                                     options.configurationFile, false, true);
   if (!resolved)
     return std::unexpected(resolved.error());
+  if (options.noAstCache) {
+    auto cleared = storage::astcache::clearSnapshots(resolved->database);
+    if (!cleared) return std::unexpected(cleared.error());
+  }
   if (options.factsProvided && options.facts.empty())
     return std::unexpected(
         "facts-tool: usage error: --facts must not be empty");
@@ -281,6 +286,7 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = resolved->extraArguments;
   configured.astCache = resolved->astCache;
+  if (options.noAstCache) configured.astCache.enabled = false;
   configured.astCache.verbosity = options.verbosity;
   configured.sources = normalizeSourceSelectors(options.sources);
   const bool sourceTemplate =

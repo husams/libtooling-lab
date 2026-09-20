@@ -1,5 +1,7 @@
 # Workflow: Impact Analysis and Refactoring
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 You're about to change a method's signature or behavior and need to know

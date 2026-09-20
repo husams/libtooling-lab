@@ -1,5 +1,7 @@
 # Workflow: Using facts-tool from an AI Agent
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 An AI agent needs to answer a question like "how does X reach Y" against a

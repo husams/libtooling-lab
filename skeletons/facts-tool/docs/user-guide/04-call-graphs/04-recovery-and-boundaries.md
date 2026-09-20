@@ -1,5 +1,7 @@
 # Recovery and Boundaries
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 This chapter covers the two ways `analyse call-graph` deals with gaps in
 stored evidence: an explicit, opt-in **recovery** request that can fill in
 missing call evidence, and the different kinds of **boundary** the

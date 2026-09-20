@@ -1,5 +1,7 @@
 # Configuration files
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `facts-tool` resolves the paths to its two databases, and its compiler
 arguments and AST cache settings, through a layered configuration model rather than requiring
 every flag on every invocation. This chapter documents that model in full:

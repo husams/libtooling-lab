@@ -1,5 +1,7 @@
 # Batch Processing
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `facts-tool-batch` runs one native `facts-tool` process per source file with
 bounded parallelism. It is a process-fanout wrapper around the same
 `extract`/`analyse dependency` commands described elsewhere in this guide -

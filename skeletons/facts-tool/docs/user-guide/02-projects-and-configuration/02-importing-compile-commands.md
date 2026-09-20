@@ -1,5 +1,7 @@
 # Importing compile commands
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `import` is how compile commands - the exact compiler, flags, and working
 directory used to build each source file - get into the project database.
 Every later `extract`, `match`, or `analyse` run against a source file

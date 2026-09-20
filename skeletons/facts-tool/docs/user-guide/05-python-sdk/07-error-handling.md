@@ -1,9 +1,15 @@
 # Error handling
 
-The SDK exposes exactly **one** exception type. Every documented failure -
-schema mismatches, bad refs, invalid plans - is a
-`FactsToolError` distinguished by a stable string `.code`, never a
-subclass hierarchy.
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
+The SDK's local database query layer exposes **one** exception type. Query
+failures, such as schema mismatches, bad refs and invalid plans, use
+`FactsToolError`, distinguished by a stable string `.code`.
+
+The optional REST client has separate HTTP, transport and job exceptions. See
+[REST error handling](11-rest-client.md#errors-deadlines-and-cancellation) for
+`ApiError`, `TransportError`, `ProtocolError`, `JobFailedError` and
+`JobTimeoutError`.
 
 ## `FactsToolError`
 
@@ -16,8 +22,8 @@ class FactsToolError(Exception):
 ```
 
 `str(exc) == f"{code}: {message}"`. Internally, every raise site in the
-package goes through a single helper, `errors.fail(code, message) -> Never`
-- there is exactly one exception type exported; callers distinguish
+database query layer goes through a single helper,
+`errors.fail(code, message) -> Never`. Query callers distinguish these
 failures by `.code`, not by `isinstance` on a subclass.
 
 ```python

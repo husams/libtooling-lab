@@ -1,7 +1,10 @@
 # API reference
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 A compact index of every public name. `facts_tool` (the top-level package)
-and `facts_tool.queryplan` are the two public import surfaces; nothing
+and `facts_tool.queryplan` provide the local query surfaces. The optional
+`facts_tool.rest` module provides HTTP clients; see its reference below. Nothing
 under `facts_tool.budgets`, `facts_tool.ids`, `facts_tool.errors`, or any
 other submodule is meant to be imported directly except where noted below
 (`Budgets`, `SymbolId`, and `FactsToolError` are re-exported at the top
@@ -26,7 +29,7 @@ level for convenience).
 | `Method` | `Callable` + `.record()` | Typed wrapper for a method symbol | [05](05-relations-and-graph-queries.md) |
 | `Record` | `Entity` + `.bases()/.subclasses()/.methods()/.fields()` | Typed wrapper for a struct/class symbol | [05](05-relations-and-graph-queries.md) |
 | `SymbolId` | `(file_id: int, index: int)`; `.packed/.sqlite/.to_dict()`; `SymbolId.unpack(value)` | Two-half packed symbol identity | [02](02-opening-databases.md) |
-| `FactsToolError` | `(code: str, message: str)`; `.code/.message` | The single public exception type | [07](07-error-handling.md) |
+| `FactsToolError` | `(code: str, message: str)`; `.code/.message` | The local query layer's public exception type | [07](07-error-handling.md) |
 | `CallGraphRun` | see [06](06-persisted-callgraph-runs.md) field table | One persisted `analyse call-graph` invocation | [06](06-persisted-callgraph-runs.md) |
 | `CallGraphPage[T]` | `.items/.total/.next_cursor/.complete/.truncated`; iterable/sized/indexable | One bounded page of a run's child collection | [06](06-persisted-callgraph-runs.md) |
 | `CallGraphEdge` | `source, target, kind_id, kind, semantic_kind, position, file_id, file, line, column, offset, depth, cycle, site` | One persisted call-graph edge | [06](06-persisted-callgraph-runs.md) |
@@ -181,3 +184,26 @@ kinds/relations), [05](05-relations-and-graph-queries.md) (`GraphQuery`/
 [07](07-error-handling.md) (`FactsToolError` and every code), and
 [10](10-query-performance.md) (lazy/eager execution, indexed queries, and
 large results).
+
+## `facts_tool.rest` (optional `rest` extra)
+
+The [REST client chapter](11-rest-client.md) contains complete examples and
+job/error semantics. `AsyncClient` uses the same methods with `await`.
+
+| Name or method | Signature | Purpose |
+|---|---|---|
+| `Client`, `AsyncClient` | `(base_url, *, token=None, timeout=10.0, transport=None)` | Sync/async HTTP client; HTTPX transport override supports integration/testing |
+| `.submit` | `(*arguments) -> Job` | Submit CLI tokens to the job endpoint |
+| `.command` | `(path, *arguments) -> Job` | Submit to a named command endpoint |
+| `.wait` | `(job_id, *, timeout=None, poll_interval=0.1) -> Job` | Poll for a terminal state without raising for CLI failure |
+| `.run` | `(*arguments, timeout=None, poll_interval=0.1, check=True) -> Job` | Submit and wait, raising for failed/cancelled jobs by default |
+| `.get_job`, `.cancel_job` | `(job_id) -> Job` | Read a job or request cancellation |
+| `.list_jobs` | `() -> list[Job]` | Retrieve retained job metadata |
+| `.commands` | `() -> list[dict]` | Discover live command paths and endpoints |
+| `.health`, `.openapi`, `.watch_status`, `.shutdown` | `() -> dict` | Inspect or stop the server |
+| `Job` | Immutable fields; `.done`, `.succeeded`, `.raise_for_status()` | Typed job state and captured output |
+| `ApiError`, `TransportError`, `ProtocolError` | See [errors](11-rest-client.md#errors-deadlines-and-cancellation) | HTTP rejection, request failure or invalid response |
+| `JobFailedError`, `JobTimeoutError` | `.job_id`; failed error has `.job`, timeout error has `.timeout` | Completed failure or expired client polling deadline |
+
+Use `with Client(...)` / `async with AsyncClient(...)`, or close explicitly with
+`.close()` / `await .aclose()`. REST clients do not change the database query API.

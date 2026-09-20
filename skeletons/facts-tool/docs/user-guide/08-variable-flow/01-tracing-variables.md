@@ -1,5 +1,7 @@
 # Tracing local variables and parameters
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `analyse variable-flow` follows one local variable or parameter through its
 function, calls, assignments, returns and control-flow paths. It writes a
 standalone SQLite artifact and records source locations for every retained

@@ -1,5 +1,7 @@
 # The `config` command
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `facts-tool config show` is the primary discoverability and debugging tool
 for the configuration model described in
 [03-configuration-files](03-configuration-files.md). It prints the fully

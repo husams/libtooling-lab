@@ -1,5 +1,7 @@
 # Relations and graph queries
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `CodeBase.graph` is a `GraphQuery` - a typed facade over the same
 `Executor`/`Plan` machinery from
 [03-query-model.md](03-query-model.md), returning `Entity` objects (and

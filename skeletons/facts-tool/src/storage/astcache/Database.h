@@ -10,6 +10,12 @@
 
 namespace facts::storage::astcache {
 
+// Discard every command variant's metadata. Serialized files are unusable
+// without their snapshot and can be overwritten by a later cached parse.
+// A missing project is valid before its first import and is not created.
+std::expected<void, std::string>
+clearSnapshots(const std::filesystem::path &project);
+
 std::expected<std::optional<facts::astcache::Snapshot>, std::string>
 readSnapshot(const std::filesystem::path &project, std::string_view key);
 

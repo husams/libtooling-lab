@@ -1,5 +1,7 @@
 # Workflow: Onboarding a Codebase
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 Bring a real C++ codebase under `facts-tool` analysis end to end: register

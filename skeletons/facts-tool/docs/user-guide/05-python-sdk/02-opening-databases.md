@@ -1,5 +1,7 @@
 # Opening databases
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Every SDK session starts by pairing a facts database with a project
 database through `open_codebase`. This chapter covers what that call
 validates, exactly what fails and why, and what read-only guarantees you

@@ -1,5 +1,7 @@
 # Workflow: Problem Investigation
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 Use the Python SDK to answer the questions that come up while debugging or

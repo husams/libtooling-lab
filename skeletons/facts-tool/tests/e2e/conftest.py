@@ -7,6 +7,12 @@ import pytest
 from support.scenario import FactsToolContext
 
 pytest_plugins = (
+    "steps.rest_setup_steps",
+    "steps.rest_access_steps",
+    "steps.rest_job_steps",
+    "steps.rest_cancel_steps",
+    "steps.rest_lifecycle_steps",
+    "steps.rest_watch_steps",
     "steps.ast_cache_steps",
     "steps.ast_cache_project_access_steps",
     "steps.ast_cache_import_commands_steps",

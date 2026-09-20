@@ -1,5 +1,7 @@
 # Lazy queries and performance
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Plan queries are lazy by default. `cb.executor.run(plan)` and
 `cb.query(...).run()` validate the plan and return a `Result`; iteration
 executes it. Simple enumeration, filtering, projection, and limits can yield

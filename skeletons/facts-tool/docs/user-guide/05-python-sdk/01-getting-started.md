@@ -1,12 +1,20 @@
 # Getting started with the Python SDK
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 The Python SDK is a separate, installable package named `facts-tool-query`
-(import name `facts_tool`). It is a **read-only query layer**: it opens a
+(import name `facts_tool`). Its base **read-only query layer** opens a
 facts database and a project database that were already produced by the
 `facts-tool` command-line tool, and lets you query them with a declarative,
-immutable query language, a typed graph API, and a fluent API. It never
+immutable query language, a typed graph API, and a fluent API. That layer never
 indexes, imports, extracts, migrates, or writes to either database, and it
 never invokes Clang, libclang, or the native `facts-tool` binary.
+
+The optional `facts_tool.rest` module adds `Client` and `AsyncClient` wrappers
+for a running REST server. Those clients can submit imports, extraction, matching
+and other CLI commands; execution and database writes happen on the server.
+They do not require local database files or a local native binary. See
+[Python REST client](11-rest-client.md) for the remote workflow.
 
 This chapter covers installing the SDK two different ways, telling a
 checkout install apart from an installed wheel, and running your first
@@ -15,8 +23,8 @@ query. Later chapters in this part cover the query model in depth; see
 
 ## Requirements
 
-Runtime dependencies are the Python standard library only. Supported
-interpreters are CPython 3.12 and 3.13, on macOS and Linux (including
+The base query layer uses the Python standard library only. The `rest` extra
+adds HTTPX. Supported interpreters are CPython 3.12 and 3.13, on macOS and Linux (including
 RHEL-compatible distributions).
 
 ## Installing from a checkout with uv
@@ -29,9 +37,22 @@ editable `.venv` from the committed lockfile:
 $ cd python && uv sync --locked
 ```
 
-`python/.venv/bin/python` then has `facts_tool` importable directly against
-the checkout's source tree. This is what every example in this user guide
-was run against.
+Include `--extra rest` when you need HTTP clients:
+
+```bash
+uv sync --locked --extra rest
+```
+
+Or install directly from the **repository root** into a Python 3.12 environment:
+
+```bash
+python3.12 -m venv .venv-api
+.venv-api/bin/python -m pip install './skeletons/facts-tool/python[rest]'
+```
+
+With `uv sync`, `python/.venv/bin/python` imports `facts_tool` directly from
+the checkout's source tree. The pip command creates a separate installed copy
+in `.venv-api`.
 
 ## Building and installing a wheel
 
@@ -43,18 +64,18 @@ install it into a fresh virtual environment:
 $ cd python && uv build --out-dir /path/to/dist
 Building source distribution...
 Building wheel from source distribution...
-Successfully built .../facts_tool_query-0.2.0.tar.gz
-Successfully built .../facts_tool_query-0.2.0-py3-none-any.whl
+Successfully built .../facts_tool_query-0.3.0.tar.gz
+Successfully built .../facts_tool_query-0.3.0-py3-none-any.whl
 
 $ uv venv --seed --python 3.12 /path/to/install-venv
-$ /path/to/install-venv/bin/python -m pip install /path/to/dist/facts_tool_query-0.2.0-py3-none-any.whl
-Successfully installed facts-tool-query-0.2.0
+$ /path/to/install-venv/bin/python -m pip install /path/to/dist/facts_tool_query-0.3.0-py3-none-any.whl
+Successfully installed facts-tool-query-0.3.0
 ```
 
 Plain `pip` works against a built wheel or against the source tree:
 
 ```console
-python -m pip install /path/to/dist/facts_tool_query-0.2.0-py3-none-any.whl
+python -m pip install /path/to/dist/facts_tool_query-0.3.0-py3-none-any.whl
 ```
 
 The package is not published to any index at the moment; `pip install
@@ -87,7 +108,7 @@ print(
 Against the checkout's editable `.venv`:
 
 ```text
-0.2.0
+0.3.0
 /Users/husam/.../facts-tool/python/src/facts_tool/__init__.py
 editable? True
 ```
@@ -95,7 +116,7 @@ editable? True
 Against an isolated venv with the wheel installed:
 
 ```text
-0.2.0
+0.3.0
 ```
 
 (`facts_tool.__file__` there points under that venv's

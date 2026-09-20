@@ -1,5 +1,7 @@
 # Limitations and known issues
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 This chapter separates three kinds of gaps: **deliberate exclusions** (design
 choices, not bugs), **known bugs** still affecting the current build, and
 **call-graph completeness caveats** (things a "complete" traversal status

@@ -1,5 +1,7 @@
 # facts-tool User Guide: Table of Contents
 
+← [User guide index](README.md)
+
 | # | Chapter | Section |
 |---|---------|---------|
 | 1.1 | Introduction | [What is facts-tool?](01-introduction/01-what-is-facts-tool.md) |
@@ -29,6 +31,7 @@
 | 5.8 | Python SDK | [API reference](05-python-sdk/08-api-reference.md) |
 | 5.9 | Python SDK | [Local-variable and parameter flow](05-python-sdk/09-variable-flow.md) |
 | 5.10 | Python SDK | [Lazy queries and performance](05-python-sdk/10-query-performance.md) |
+| 5.11 | Python SDK | [Python REST client](05-python-sdk/11-rest-client.md) |
 | 6.1 | Workflows | [Onboarding a codebase](06-workflows/01-onboarding-a-codebase.md) |
 | 6.2 | Workflows | [Architecture analysis](06-workflows/02-architecture-analysis.md) |
 | 6.3 | Workflows | [Tracing calls and paths](06-workflows/03-tracing-calls-and-paths.md) |
@@ -43,3 +46,10 @@
 | 7.4 | Reference | [Limitations and known issues](07-reference/04-limitations-and-known-issues.md) |
 | 7.5 | Reference | [In flight: F-013](07-reference/05-in-flight-f-013.md) |
 | 8.1 | Variable flow | [Tracing local variables and parameters](08-variable-flow/01-tracing-variables.md) |
+| 9.1 | REST API | [Running the server](09-rest-api/01-running-the-server.md) |
+| 9.2 | REST API | [Requests and asynchronous jobs](09-rest-api/02-requests-and-jobs.md) |
+| 9.3 | REST API | [Watching directories](09-rest-api/03-watching-directories.md) |
+| 9.4 | REST API | [Architecture and testing](09-rest-api/04-architecture-and-testing.md) |
+| 9.5 | REST API | [Installing the REST server and Python client](09-rest-api/05-installation.md) |
+| 9.6 | REST API | [Deployment and operation](09-rest-api/06-deployment.md) |
+| 9.7 | REST API | [REST implementation classes](09-rest-api/07-class-reference.md) |
