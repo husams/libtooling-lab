@@ -31,6 +31,9 @@
 #     FETCHCONTENT_SOURCE_DIR_LIBGIT2. It builds with its bundled zlib, regex
 #     and hash code and no network backends, so no dnf package is needed and
 #     it links statically.
+#   * REST headers. Reuse suitable Boost/nlohmann JSON installations or cache
+#     checksum-verified releases under .deps/api-headers. No Boost libraries
+#     are built; the fallback also supports hosts using SKIP_DEPS=1.
 #
 # Knobs (env vars):
 #   GCC_TOOLSET             gcc-toolset major for C++23 (default 15; 14 is the
@@ -41,6 +44,9 @@
 #   SQLITE_AMALGAMATION_URL amalgamation zip URL (default 3.53.4).
 #   YAML_SOURCE_DIR      unpacked yaml-cpp 0.9.0 source override/cache.
 #   LIBGIT2_SOURCE_DIR      unpacked libgit2 1.9.7 source override/cache.
+#   BOOST_SOURCE_DIR        unpacked Boost source or include directory override.
+#   JSON_SOURCE_DIR         unpacked nlohmann JSON source or include override.
+#   API_HEADER_CACHE_DIR    REST header cache (default <root>/.deps/api-headers).
 #   FORCE_SQLITE=1          re-fetch the amalgamation even if cached, and
 #                           ignore any system libsqlite3.a.
 #   BUILD_DIR               cmake build dir (default <root>/build-rhel9).
@@ -120,6 +126,11 @@ else
   echo "==> reusing pinned libgit2 1.9.7 in $LIBGIT2_SOURCE_DIR"
 fi
 LIBGIT2_ARGS=(-DFETCHCONTENT_SOURCE_DIR_LIBGIT2="$LIBGIT2_SOURCE_DIR")
+
+# Probe through the same CMake dependency logic used by the real build. This
+# also prepares headers for DEPS_ONLY without requiring a compiler/toolset.
+# shellcheck source=dependencies/headers.sh
+source "$SCRIPT_DIR/dependencies/headers.sh"
 
 if [ "${DEPS_ONLY:-0}" = "1" ]; then
   echo "==> DEPS_ONLY: dependencies installed; skipping build"
@@ -206,6 +217,7 @@ source "$TOOLSET_ENABLE"
 LLVM_CMAKEDIR="$(llvm-config --cmakedir)"
 CLANG_CMAKEDIR="$(dirname "$LLVM_CMAKEDIR")/clang"
 cmake -G Ninja -S "$FACTS_ROOT" -B "$BUILD_DIR" \
+  "${HEADER_ARGS[@]}" \
   "${SQLITE_ARGS[@]}" \
   "${YAML_ARGS[@]}" \
   "${LIBGIT2_ARGS[@]}" \

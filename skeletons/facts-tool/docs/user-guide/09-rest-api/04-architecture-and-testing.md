@@ -44,9 +44,12 @@ database schema, a persistent job scheduler, WebSockets or live output streaming
 
 The REST server adds build dependencies on Boost headers version 1.74 or later
 and nlohmann/json version 3.9 or later, alongside the existing CLI11 and yaml-cpp
-dependencies. Install `libboost-dev nlohmann-json3-dev` on Ubuntu, or run
-`brew install boost nlohmann-json` on macOS. The RHEL build script installs
-`boost-devel` and `json-devel`.
+dependencies. Compatible installed packages or headers are preferred; otherwise
+the build fetches checksum-verified, pinned header-only sources. The RHEL helper
+caches these under `.deps/api-headers`, covering older distribution headers
+and headers missing when using `SKIP_DEPS=1`. See the
+[installation guide](../01-introduction/03-installation.md#cached-headers-and-offline-builds)
+for source overrides and offline preparation.
 
 ```sh
 python3 -m pytest tests/apis \

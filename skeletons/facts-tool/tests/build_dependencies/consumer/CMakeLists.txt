@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.20)
+project(api-dependency-consumer LANGUAGES CXX)
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
+include("${FACTS_ROOT}/cmake/ApiDependencies.cmake")
+find_package(Threads REQUIRED)
+add_executable(api-consumer main.cpp)
+target_compile_features(api-consumer PRIVATE cxx_std_17)
+target_compile_definitions(api-consumer PRIVATE BOOST_ERROR_CODE_HEADER_ONLY)
+target_link_libraries(api-consumer PRIVATE Boost::headers
+  nlohmann_json::nlohmann_json Threads::Threads)
