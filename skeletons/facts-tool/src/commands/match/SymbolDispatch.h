@@ -19,6 +19,8 @@ class FileManager;
 } // namespace facts
 
 namespace facts::commands::match {
+bool supportsSymbol(const clang::NamedDecl &node);
+
 struct PersistedSymbol {
   SymbolId id;
   std::string kind;

@@ -1,6 +1,7 @@
 #include "commands/match/MatchContract.h"
 
 #include "commands/match/RelationKinds.h"
+#include "commands/match/SymbolDispatch.h"
 
 #include <clang/AST/Expr.h>
 
@@ -10,25 +11,23 @@ namespace facts::commands::match {
 namespace {
 using Map = clang::ast_matchers::BoundNodes::IDToNodeMap;
 
-bool exactKeys(const Map &nodes, std::initializer_list<std::string_view> keys) {
-  const std::set<std::string, std::less<>> expected(keys.begin(), keys.end());
-  if (nodes.size() != expected.size())
-    return false;
-  for (const auto &[key, value] : nodes)
-    if (!expected.contains(key))
-      return false;
-  return true;
+template <typename Node>
+const Node *boundNode(const Map &nodes, const std::string &binding) {
+  const auto found = nodes.find(binding);
+  return found == nodes.end() ? nullptr : found->second.get<Node>();
 }
 
 std::expected<Contract, std::string>
-relationContract(const Map &nodes, RelationKind kind, bool hasSite) {
-  auto *source = nodes.at("source").get<clang::NamedDecl>();
-  auto *target = nodes.at("target").get<clang::NamedDecl>();
+relationContract(const Map &nodes, RelationKind kind,
+                 const BindingNames &bindings) {
+  const auto *source = boundNode<clang::NamedDecl>(nodes, bindings.source);
+  const auto *target = boundNode<clang::NamedDecl>(nodes, bindings.target);
   if (!source || !target)
-    return std::unexpected("source and target bindings must be declarations");
-  const auto *stmt = hasSite ? nodes.at("site").get<clang::Stmt>() : nullptr;
-  const auto *decl =
-      hasSite ? nodes.at("site").get<clang::NamedDecl>() : nullptr;
+    return std::unexpected("source and target bindings must be declarations (" +
+                           bindings.source + ", " + bindings.target + ")");
+  const bool hasSite = nodes.contains(bindings.site);
+  const auto *stmt = boundNode<clang::Stmt>(nodes, bindings.site);
+  const auto *decl = boundNode<clang::NamedDecl>(nodes, bindings.site);
   if (hasSite && !stmt && !decl)
     return std::unexpected("site binding must be a statement or declaration");
   if (kind == RelationKind::Uses && !hasSite)
@@ -42,57 +41,68 @@ relationContract(const Map &nodes, RelationKind kind, bool hasSite) {
   if (!siteBacked(kind) && hasSite)
     return std::unexpected(std::string{relationName(kind)} +
                            " forbids site binding");
-  if (kind == RelationKind::Calls)
-    return std::unexpected("Calls requires call and callee bindings");
   return Contract{RelationMatch{*source, *target, stmt, decl, kind}};
+}
+
+std::expected<Contract, std::string>
+callContract(const Map &nodes, const BindingNames &bindings) {
+  const auto *call = boundNode<clang::CallExpr>(nodes, bindings.call);
+  const auto *callee = boundNode<clang::FunctionDecl>(nodes, bindings.callee);
+  if (!call || !callee)
+    return std::unexpected(
+        "call must bind CallExpr and callee must bind FunctionDecl (" +
+        bindings.call + ", " + bindings.callee + ")");
+  return Contract{DirectCallMatch{*call, *callee}};
+}
+
+Contracts nodeContracts(const Map &nodes) {
+  Contracts contracts;
+  std::set<const void *> persisted;
+  for (const auto &[name, node] : nodes) {
+    if (const auto *decl = node.get<clang::NamedDecl>();
+        decl && supportsSymbol(*decl)) {
+      if (persisted.insert(decl).second)
+        contracts.emplace_back(SymbolMatch{*decl});
+    } else if (const auto *expression = node.get<clang::Expr>()) {
+      if (persisted.insert(expression).second)
+        contracts.emplace_back(ExpressionMatch{*expression});
+    } else {
+      contracts.emplace_back(NodeMatch{name, node});
+    }
+  }
+  return contracts;
 }
 } // namespace
 
-std::expected<Contract, std::string>
+std::expected<Contracts, std::string>
+classify(const Map &nodes,
+         const std::optional<std::string> &relationKind,
+         const BindingNames &bindings) {
+  if (relationKind)
+    return parseRelationKind(*relationKind)
+        .and_then([&](RelationKind kind) {
+          return kind == RelationKind::Calls
+                     ? callContract(nodes, bindings)
+                     : relationContract(nodes, kind, bindings);
+        })
+        .transform([](Contract contract) {
+          return Contracts{std::move(contract)};
+        });
+  // Keep the existing direct-call shorthand, without reserving these names
+  // for other node types or constraining additional helper bindings.
+  if (boundNode<clang::CallExpr>(nodes, bindings.call) &&
+      boundNode<clang::FunctionDecl>(nodes, bindings.callee))
+    return callContract(nodes, bindings).transform([](Contract contract) {
+      return Contracts{std::move(contract)};
+    });
+  return nodeContracts(nodes);
+}
+
+std::expected<Contracts, std::string>
 classify(const clang::ast_matchers::BoundNodes &bound,
-         const std::optional<std::string> &relationKind) {
-  const auto &nodes = bound.getMap();
-  if (exactKeys(nodes, {"symbol"})) {
-    if (relationKind)
-      return std::unexpected("symbol binding forbids --relation-kind");
-    auto *symbol = nodes.at("symbol").get<clang::NamedDecl>();
-    if (!symbol)
-      return std::unexpected("symbol binding must be a supported declaration");
-    return Contract{SymbolMatch{*symbol}};
-  }
-  if (exactKeys(nodes, {"expression"})) {
-    if (relationKind)
-      return std::unexpected("expression binding forbids --relation-kind");
-    auto *expression = nodes.at("expression").get<clang::Expr>();
-    if (!expression)
-      return std::unexpected("expression binding must bind Expr");
-    return Contract{ExpressionMatch{*expression}};
-  }
-  if (exactKeys(nodes, {"call", "callee"})) {
-    if (relationKind && *relationKind != "Calls")
-      return std::unexpected("call and callee bindings only support Calls");
-    auto *call = nodes.at("call").get<clang::CallExpr>();
-    auto *callee = nodes.at("callee").get<clang::FunctionDecl>();
-    if (!call || !callee)
-      return std::unexpected(
-          "call must bind CallExpr and callee must bind FunctionDecl");
-    return Contract{DirectCallMatch{*call, *callee}};
-  }
-  const bool noSite = exactKeys(nodes, {"source", "target"});
-  const bool withSite = exactKeys(nodes, {"source", "target", "site"});
-  if (!noSite && !withSite)
-    return std::unexpected(
-        "bindings must exactly match a supported contract: bind(\"symbol\"), "
-        "bind(\"expression\"), "
-        "bind(\"call\")+bind(\"callee\"), or "
-        "bind(\"source\")+bind(\"target\")[+bind(\"site\")] with "
-        "--relation-kind");
-  if (!relationKind)
-    return std::unexpected(
-        "source and target bindings require --relation-kind");
-  return parseRelationKind(*relationKind).and_then([&](RelationKind kind) {
-    return relationContract(nodes, kind, withSite);
-  });
+         const std::optional<std::string> &relationKind,
+         const BindingNames &bindings) {
+  return classify(bound.getMap(), relationKind, bindings);
 }
 
 } // namespace facts::commands::match

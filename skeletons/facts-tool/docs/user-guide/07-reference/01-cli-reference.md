@@ -93,7 +93,7 @@ Full precedence and YAML schema are in
 
 ## Shared options
 
-Every leaf command accepts the same three configuration flags. Their help
+Every leaf command accepts the same optional configuration flags. Their help
 text is reproduced once here and elided below as **[[config-help]]**:
 
 | Flag | Type | Default | Meaning |
@@ -284,9 +284,11 @@ facts-tool match [OPTIONS] [sources...]
 | `-c`, `--conf` | `FILE` | - | [[config-help]] |
 | `--config` | `FILE` | - | [[config-help]] |
 | `-v`, `--verbose` | `INT [0-3]` | `1` | Verbosity |
-| `--matcher` | `EXPR` (required) | - | Clang dynamic matcher expression; bind `symbol`, `call`+`callee`, or `source`+`target`[+`site`] |
+| `--matcher` | `EXPR` (required) | - | Clang dynamic matcher expression; arbitrary binding names and helper bindings are accepted; unbound matches expose `root` |
 | `--traversal` | `AsIs` or `IgnoreUnlessSpelledInSource` | `AsIs` | Include implicit AST nodes or skip nodes not spelled in source; omission preserves existing behavior |
 | `--relation-kind` | `KIND` | - | Relation kind for `source`/`target` bindings; required for relation contracts |
+| `--source-binding`, `--target-binding`, `--site-binding` | `NAME` | `source`, `target`, `site` | Map your binding names to relation roles; requires `--relation-kind` |
+| `--call-binding`, `--callee-binding` | `NAME` | `call`, `callee` | Map your binding names to call roles; requires `--relation-kind Calls` |
 
 **Exit codes**: standard contract above.
 
@@ -445,7 +447,7 @@ facts-tool analyse call-graph-entry [OPTIONS]
 
 | Flag | Type | Default | Meaning |
 |---|---|---|---|
-| `-f`, `--facts` | `FILE` (required) | - | SQLite facts database |
+| `-f`, `--facts` | `FILE` | `facts_template` | SQLite facts database |
 | `-c`, `--conf` | `FILE` | - | [[config-help]] |
 | `--config` | `FILE` | - | [[config-help]] |
 | `-v`, `--verbose` | `INT [0-3]` | `1` | Verbosity |
@@ -621,8 +623,9 @@ facts-tool symbol [OPTIONS] SUBCOMMAND
 ```
 
 Group-level options: `-f`/`--facts` (defaults to `facts_template`,
-project-scoped templates only), `-c`/`--conf` (optional - enables full
-source-path and repository/component join columns), `--config`,
+project-scoped templates only), `-c`/`--conf` (optional override of the
+discovered project DB, which supplies source paths and repository/component
+join columns), `--config`,
 `-v`/`--verbose`.
 
 | Leaf | Positionals | Extra options |

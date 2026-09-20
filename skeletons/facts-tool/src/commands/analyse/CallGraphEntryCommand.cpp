@@ -4,7 +4,7 @@
 #include "analysis/callgraph/CallGraphEntryQuery.h"
 #include "analysis/callgraph/CallGraphSelection.h"
 #include "analysis/callgraph/CallGraphTraversal.h"
-#include "commands/ConfigurationSupport.h"
+#include "commands/FactConfiguration.h"
 #include "commands/FactPairValidation.h"
 
 #include <algorithm>
@@ -24,7 +24,12 @@ std::expected<int, std::string>
 runCallGraphEntry(const cli::CallGraphEntryOptions &options) {
   if (options.function.empty())
     return usage("--function must not be empty");
-  return callgraph::loadCallGraph(options.facts)
+  auto resolved = loadFactConfiguration(
+      options.configuration, options.configurationFile, options.facts);
+  if (!resolved)
+    return std::unexpected(resolved.error());
+  const auto facts = resolved->facts.string();
+  return callgraph::loadCallGraph(facts)
       .and_then([&](const auto &graph) {
         auto selected = callgraph::selectOne(graph, options.function, "root");
         if (!selected) {
@@ -36,27 +41,20 @@ runCallGraphEntry(const cli::CallGraphEntryOptions &options) {
         }
         std::optional<callgraph::CoverageReport> coverage;
         auto paired = [&]() -> std::expected<void, std::string> {
-          if (options.configuration.empty() &&
-              options.configurationFile.empty() &&
-              !config::detail::present("FACTS_TOOL_CONF"))
+          if (!resolved->projectSelected)
             return {};
-          return loadConfiguration(options.configuration,
-                                   options.configurationFile, false)
-              .and_then([&](const auto &resolved) {
-                return validateFactPairForRead(options.facts,
-                                               resolved.database.string())
-                    .and_then([&] {
-                      return callgraph::loadCoverage(
-                          resolved.database.string(), options.facts, graph);
-                    })
-                    .transform(
-                        [&](auto report) { coverage = std::move(report); });
-              });
+          return validateFactPairForRead(facts,
+                                         resolved->project.database.string())
+              .and_then([&] {
+                return callgraph::loadCoverage(
+                    resolved->project.database.string(), facts, graph);
+              })
+              .transform([&](auto report) { coverage = std::move(report); });
         }();
         if (!paired)
           return std::expected<int, std::string>{
               std::unexpected(paired.error())};
-        return callgraph::loadCallGraphEntry(options.facts, (*selected)->id)
+        return callgraph::loadCallGraphEntry(facts, (*selected)->id)
             .transform([&](auto record) {
               record.leaf =
                   std::none_of(graph.edges.begin(), graph.edges.end(),

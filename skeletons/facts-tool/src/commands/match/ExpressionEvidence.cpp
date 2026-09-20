@@ -323,6 +323,14 @@ captureExpression(const clang::Expr &expression, clang::ASTContext &context,
     result.access = "unknown";
   }
 
+  if (result.freshness == "current" && targetDecl &&
+      !supportsSymbol(*targetDecl)) {
+    if (!result.unavailableReason)
+      result.unavailableReason =
+          std::string{"expression target symbol kind is not supported: "} +
+          targetDecl->getDeclKindName();
+    targetDecl = nullptr;
+  }
   if (result.freshness == "current" && targetDecl) {
     auto target = persistSymbol(*targetDecl, context, files, store);
     if (!target)

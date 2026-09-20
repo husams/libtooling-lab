@@ -37,12 +37,12 @@ void MatchCallback::run(
   }
   auto persisted = policy_ == BindingPolicy::Any && !options_.relationKind
       ? persistBindings(result, options_, internalRoot_, files_, store_, fingerprints_)
-      : persistContract(result, options_, files_, store_, fingerprints_, text_);
+      : persistContract(result, options_, files_, store_, fingerprints_, text_, internalRoot_);
   if (!persisted)
     error_ = persisted.error();
   else {
     if (options_.format == "json")
-      results_.push_back(describeMatch(result, options_.relationKind,
+      results_.push_back(describeMatch(result, options_,
                                         internalRoot_, policy_));
     matches_.insert(matches_.end(), std::make_move_iterator(persisted->begin()),
                     std::make_move_iterator(persisted->end()));

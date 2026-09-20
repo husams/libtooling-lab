@@ -93,7 +93,7 @@ instead.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `match` accepted the command but bound nothing useful, or a contract-validation error | Binding `source` alone (without `target`) fails contract validation - the shipped contract requires exactly one of `symbol`, `call`+`callee`, or `source`+`target`[+`site`, with `--relation-kind` required for the last form] | See [matchers](../03-extracting-facts/03-match-dynamic-matchers.md) for worked examples of each binding form |
+| `match --relation-kind` reports invalid endpoints or a missing site | The selected relation requires typed endpoint and occurrence roles; arbitrary query bindings themselves are allowed | Check `--source-binding`, `--target-binding`, `--site-binding`, or the `Calls` role options. See [matchers](../03-extracting-facts/03-match-dynamic-matchers.md) for examples |
 | `symbol find` returns nothing for a symbol you know exists | `matched_symbol_index` is populated **only** by a prior successful `match`, never by `extract` | Run a targeted `match --matcher 'functionDecl(hasName("X")).bind("symbol")'` first; an empty `find` result never proves absence |
 
 ## Missing SDK headers / resource dir
