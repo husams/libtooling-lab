@@ -147,6 +147,9 @@ private:
 
   void configureImport(CLI::App &command) {
     importCommand_ = &command;
+    command.add_option("--existing-clone", import_.existingClone,
+                       "Reimport into this active clone without changing its identity")
+        ->check(CLI::PositiveNumber);
     command.add_flag("--no-ast-cache", import_.noAstCache,
                      "Discard project cache metadata and discover current working-tree files");
     configureVerbosity(command, import_.verbosity);

@@ -24,6 +24,17 @@ namespace {
 std::expected<std::int64_t, std::error_code>
 currentUpsertRepository(storage::Database &database,
                         const ProjectConfiguration &configuration) {
+  // Watch refreshes preserve catalog identity and cannot reactivate a clone
+  // that the user switched while this import was queued.
+  if (configuration.activeClone.id != 0) {
+    auto ids = storage::detail::toItlibGenerator(database.query(
+        "SELECT r.id FROM repository r JOIN clone c ON c.id=r.active_clone_id "
+        "WHERE c.id=?1 AND c.path=?2 AND c.repository_id=r.id AND r.id=?3",
+        [](const storage::Row &row) { return row.get<std::int64_t>(0); },
+        configuration.activeClone.id, configuration.activeClone.path,
+        configuration.activeClone.repositoryId));
+    return storage::detail::collectOne(std::move(ids));
+  }
   // A checkout already belongs to one repository even if its imported name
   // changes (for example, a directory fallback becomes a git remote name).
   // Reuse that identity so the component/directory/file upserts below retain
@@ -46,6 +57,7 @@ currentUpsertRepository(storage::Database &database,
 std::expected<std::int64_t, std::error_code>
 currentUpsertClone(storage::Database &database, std::int64_t repositoryId,
                    const ProjectClone &clone) {
+  if (clone.id != 0) return clone.id;
   auto ids = storage::detail::toItlibGenerator(database.query(
       "INSERT INTO clone(repository_id,path,label) VALUES(?1,?2,?3) "
       "ON CONFLICT(path) DO UPDATE SET label=excluded.label RETURNING id",

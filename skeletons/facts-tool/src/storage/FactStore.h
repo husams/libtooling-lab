@@ -33,6 +33,12 @@ public:
   }
 
   std::expected<void, std::error_code>
+  refreshCloneFiles(std::span<const storage::FactProvenance> rows,
+                     std::span<const FileId> selected) {
+    return storage_.refreshCloneFiles(rows, selected);
+  }
+
+  std::expected<void, std::error_code>
   upsertMatchedSymbols(std::span<const MatchedSymbol> symbols) {
     return storage_.upsertMatchedSymbols(symbols);
   }

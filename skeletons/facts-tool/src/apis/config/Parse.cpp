@@ -17,8 +17,6 @@ std::expected<Settings, int> parseSettings(int argc, char **argv) {
         (app.count("--conf") && arguments.project.empty()) ||
         (app.count("--working-directory") && arguments.workingDirectory.empty()))
       throw std::runtime_error("configuration paths must not be empty");
-    for (const auto &watch : arguments.watches)
-      if (watch.empty()) throw std::runtime_error("--watch must not be empty");
     auto settings = loadSettings(std::filesystem::absolute(arguments.serverConfig))
         .transform([&](Settings saved) {
           return mergeSettings(app, arguments, std::move(saved));

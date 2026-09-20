@@ -1,4 +1,5 @@
 #include "storage/Storage.h"
+#include "storage/CloneRefresh.h"
 
 #include "storage/MatchedSymbolIndex.h"
 #include "storage/Schema.h"
@@ -49,6 +50,12 @@ std::expected<void, std::error_code>
 Storage::registerFactProvenance(std::span<const storage::FactProvenance> rows,
                                 std::span<const FileId> selected) {
   return storage::registerFactProvenance(database_, rows, selected);
+}
+
+std::expected<void, std::error_code>
+Storage::refreshCloneFiles(std::span<const storage::FactProvenance> rows,
+                           std::span<const FileId> selected) {
+  return storage::refreshCloneFiles(database_, rows, selected);
 }
 
 std::expected<void, std::error_code> Storage::begin() {

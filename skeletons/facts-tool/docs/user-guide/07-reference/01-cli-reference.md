@@ -19,6 +19,32 @@ See [Tracing variables](../08-variable-flow/01-tracing-variables.md) for
 `analyse variable-flow` and [Running the server](../09-rest-api/01-running-the-server.md)
 for the complete `serve` options and persistence rules.
 
+## `serve` — REST server and repository monitoring
+
+```sh
+facts-tool serve --server-config /workspace/server.yaml --conf /workspace/project.db
+```
+
+On Linux the server monitors every registered repository's active clone by
+default. The project database supplies the roots and the watcher follows
+repository registrations, removals and active-clone switches while running.
+
+| Flag | Meaning |
+|---|---|
+| `--watch` | Enable database-driven monitoring; takes no directory argument |
+| `--no-watch` | Disable monitoring and preserve configured exclusions |
+| `--debounce-ms N` | Coalesce filesystem events before refresh; default `500` |
+| `--import-arg=VALUE` | Pass an argument token to automatic reimport |
+| `--extract-arg=VALUE` | Pass an argument token to automatic extraction |
+
+The flags override and persist `watch.enabled` in the server YAML. Use its
+`watch.exclude_repositories`, `watch.exclude_clones`, `watch.exclude_directories`
+and `watch.exclude_patterns` lists to narrow monitoring and automatic source
+processing. Git ignore rules apply separately for each clone. The old
+`--watch DIR` syntax and saved `watch_directories` list are no longer used.
+See [Repository monitoring](../09-rest-api/03-watching-directories.md) for examples
+and [Running the server](../09-rest-api/01-running-the-server.md) for all options.
+
 ## Exit-code contract
 
 Every subcommand shares one exit-code contract
@@ -200,6 +226,7 @@ facts-tool import [OPTIONS] [sources...]
 | `-v`, `--verbose` | `INT [0-3]` | `1` | Verbosity |
 | `-p`, `--compilation-database` | `DIR` | none | Directory containing `compile_commands.json` |
 | `--component` | `NAME=PATH` (repeatable) | none | Project component as `name=path` |
+| `--existing-clone` | positive clone ID | none | Reimport into an existing active clone, preserving its repository, label and components; rejects missing/inactive clones and `--component` |
 | `--extra-arg` | `ARG` (repeatable) | YAML `extra_args` | Compiler argument for fixed-command or `compile_commands.json` imports |
 | `--no-ast-cache` | flag | off | Discard prior project cache metadata and bypass AST/dependency caching for this import |
 

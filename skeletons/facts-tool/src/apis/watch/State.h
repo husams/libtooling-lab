@@ -1,37 +1,32 @@
 #pragma once
 #include "apis/watch/Watcher.h"
 #include "apis/watch/Paths.h"
-#include "apis/watch/Scan.h"
+#include "apis/watch/Update.h"
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <array>
 #include <cstddef>
 #include <deque>
 #include <map>
-#include <set>
 #ifdef __linux__
 #include <boost/asio/posix/stream_descriptor.hpp>
 #endif
 
 namespace facts::apis {
 struct Watcher::Impl : std::enable_shared_from_this<Impl> {
-  Impl(boost::asio::io_context &io, Queue &queue, const Settings &settings);
+  Impl(boost::asio::io_context &, Queue &, const Settings &);
   std::expected<void, std::string> start();
   void stop();
   Json status() const;
   void changed();
   void refresh();
-  void importNext();
-  void extract();
+  void nextCommand();
   void finished(bool success);
-  std::vector<std::string> arguments(std::string command,
-                                    std::vector<std::string> values) const;
-  void prepareImports();
 #ifdef __linux__
   void scan();
-  void scanned(std::expected<watch::Scan, std::string> result);
-  void retry();
-  std::expected<void, std::string> applyScan(const watch::Scan &result);
+  void scanned(std::expected<watch::Update, std::string>);
+  void poll();
+  std::expected<void, std::string> applyScan(const watch::Scan &);
   void read();
   void consume(std::size_t bytes);
   void event(int descriptor, unsigned mask, const std::string &name);
@@ -46,8 +41,9 @@ struct Watcher::Impl : std::enable_shared_from_this<Impl> {
   boost::asio::steady_timer recovery;
   boost::asio::thread_pool scanner{1};
   std::atomic_bool cancelled{false};
-  std::set<std::filesystem::path> compilationDirectories;
-  std::deque<std::vector<std::string>> imports;
+  std::shared_ptr<const watch::Scan> snapshot;
+  std::vector<watch::Event> pendingEvents;
+  std::deque<std::vector<std::string>> commands;
   std::vector<std::string> latestJobs;
   std::string error;
   std::uint64_t events = 0;

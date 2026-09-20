@@ -50,6 +50,10 @@ public:
   registerFactProvenance(std::span<const storage::FactProvenance> rows,
                          std::span<const FileId> selected = {});
 
+  std::expected<void, std::error_code>
+  refreshCloneFiles(std::span<const storage::FactProvenance> rows,
+                     std::span<const FileId> selected);
+
   template <typename Model>
   std::expected<SymbolId, std::error_code> save(const Model &object);
 

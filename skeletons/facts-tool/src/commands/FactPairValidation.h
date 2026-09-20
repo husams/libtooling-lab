@@ -35,7 +35,8 @@ validateFactPairForRead(const std::string &factsPath,
                         const std::string &projectPath);
 
 // Validate and register the project file identities before facts are written.
-// Existing rows are never rewritten; an incompatible row rejects the pair.
+// Only the same logical file's explicitly registered clone paths are compatible;
+// unrelated physical paths or semantic universes reject the pair.
 std::expected<void, std::string>
 validateFactPairForWrite(const std::string &factsPath,
                          const std::string &projectPath);

@@ -13,7 +13,7 @@ snapshotVector(const detail::ProvenanceSnapshot &snapshot) {
   FactPairProvenanceSnapshot result;
   result.reserve(snapshot.size());
   for (const auto &[file, value] : snapshot) {
-    result.push_back({file, value.path, value.universe});
+    result.push_back({file, value.path, value.universe, value.aliases});
   }
   return result;
 }

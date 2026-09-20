@@ -9,8 +9,7 @@ std::filesystem::path absolute(const std::filesystem::path &path,
 }
 
 bool ignored(const std::filesystem::path &path, const Settings &settings) {
-  static const std::set<std::string> directories{
-      ".git", ".cache", ".facts", ".facts-tool", ".deps", "node_modules"};
+  static const std::set<std::string> directories{".git"};
   for (const auto &part : path)
     if (directories.contains(part.string())) return true;
   const auto name = path.filename().string();

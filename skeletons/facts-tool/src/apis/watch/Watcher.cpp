@@ -15,18 +15,21 @@ Watcher::Impl::Impl(boost::asio::io_context &io, Queue &jobs,
       queue(jobs), io(io), settings(configuration), debounce(io), recovery(io) {}
 
 std::expected<void, std::string> Watcher::Impl::start() {
-  if (running || settings.directories.empty()) return {};
+  if (running || !settings.watchEnabled) return {};
 #ifdef __linux__
   const int handle = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
   if (handle < 0) return std::unexpected(std::strerror(errno));
   descriptor.assign(handle);
   cancelled = false;
-  auto result = watch::discover(settings, cancelled)
-      .and_then([&](const auto &plan) { return applyScan(plan); });
+  auto initial = watch::update(settings, {}, {}, false, cancelled);
+  if (!initial) { descriptor.close(); return std::unexpected(initial.error()); }
+  auto result = applyScan(*initial->snapshot);
   if (!result) { descriptor.close(); return result; }
+  snapshot = std::move(initial->snapshot);
   running = true;
-  ready = true;
+  ready = snapshot->notices.empty();
   read();
+  poll();
   return {};
 #else
   return std::unexpected("filesystem monitoring requires Linux inotify");
@@ -39,6 +42,8 @@ void Watcher::Impl::stop() {
   ready = false;
   active = false;
   dirty = false;
+  pendingEvents.clear();
+  commands.clear();
   debounce.cancel();
   recovery.cancel();
 #ifdef __linux__

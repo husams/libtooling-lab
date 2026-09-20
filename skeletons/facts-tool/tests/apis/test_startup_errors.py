@@ -24,7 +24,9 @@ def test_explicit_occupied_port_fails(executable, tmp_path):
 
 
 def test_daemon_watch_error_reaches_parent(executable, tmp_path):
-    result = serve(executable, tmp_path, "--daemon", "--watch", tmp_path / "missing")
+    database = tmp_path / "broken.db"
+    database.write_text("not a SQLite project database")
+    result = serve(executable, tmp_path, "--daemon", "--watch", "--conf", database)
     assert result.returncode != 0
     assert not (tmp_path / "server.yaml").exists()
 

@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -55,7 +56,7 @@ def test_native_metadata_and_failures(rest_url: str):
         assert client.health()["status"] == "ok"
         assert any(item["path"] == "extract" for item in client.commands())
         assert "/v1/jobs" in client.openapi()["paths"]
-        assert client.watch_status()["enabled"] is False
+        assert client.watch_status()["enabled"] is (sys.platform == "linux")
         job = client.submit("config", "show")
         assert client.wait(job.id, timeout=5).succeeded
         assert client.get_job(job.id).stdout

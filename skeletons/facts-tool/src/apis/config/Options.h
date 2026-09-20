@@ -9,8 +9,8 @@ struct Arguments {
   std::string configuration;
   std::string project;
   std::string workingDirectory;
-  std::vector<std::string> watches;
-  bool clearWatches = false;
+  bool enableWatch = false;
+  bool disableWatch = false;
 };
 void configureOptions(CLI::App &app, Arguments &arguments);
 Settings mergeSettings(const CLI::App &app, const Arguments &arguments,

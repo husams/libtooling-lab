@@ -1,3 +1,5 @@
+import sys
+
 from pytest_bdd import scenarios, then, when
 
 from facts_tool import open_codebase
@@ -77,4 +79,4 @@ def capabilities(world):
     assert world["health"]["status"] == "ok"
     assert {"import", "extract"}.issubset({c["path"] for c in world["commands"]})
     assert "/v1/jobs" in world["openapi"]["paths"]
-    assert world["watch"]["enabled"] is False
+    assert world["watch"]["enabled"] is (sys.platform == "linux")

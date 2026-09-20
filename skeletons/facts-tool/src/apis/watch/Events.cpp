@@ -2,13 +2,13 @@
 #ifdef __linux__
 #include <boost/asio/buffer.hpp>
 #include <sys/inotify.h>
+#include <algorithm>
 #include <cstring>
 
 namespace facts::apis {
 void Watcher::Impl::read() {
   descriptor.async_read_some(boost::asio::buffer(buffer),
-      [weak = weak_from_this()](boost::system::error_code result,
-                                std::size_t bytes) {
+      [weak = weak_from_this()](boost::system::error_code result, std::size_t bytes) {
         auto self = weak.lock();
         if (!self || !self->running) return;
         if (result) { self->error = result.message(); self->stop(); return; }
@@ -39,21 +39,28 @@ void Watcher::Impl::event(int handle, unsigned mask, const std::string &name) {
   const auto found = watches.find(handle);
   if (found == watches.end()) return;
   const auto path = name.empty() ? found->second : found->second / name;
-  if (mask & IN_IGNORED) { watches.erase(found); return; }
-  if (watch::ignored(path, settings)) return;
-  if (mask & (IN_DELETE_SELF | IN_MOVE_SELF)) {
+  if (mask & IN_IGNORED) {
+    watches.erase(found);
     needsScan = true;
     changed();
     return;
   }
+  const bool control = snapshot && (snapshot->controlFiles.contains(path) ||
+      std::ranges::any_of(snapshot->controlFiles, [&](const auto &file) {
+        return file.parent_path() == path;
+      }));
+  if (!control && watch::ignored(path, settings)) return;
+  if (mask & (IN_DELETE_SELF | IN_MOVE_SELF)) needsScan = true;
+  const bool directory = mask & (IN_ISDIR | IN_DELETE_SELF | IN_MOVE_SELF);
   const bool saved = mask & (IN_CLOSE_WRITE | IN_MOVED_TO | IN_MOVED_FROM |
-                             IN_DELETE);
-  if ((mask & IN_ISDIR) || (saved && watch::relevant(path))) {
-    needsScan = needsScan || (mask & IN_ISDIR) ||
-                path.filename() == "compile_commands.json";
-    ++events;
-    changed();
-  }
+                             IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF);
+  if (!directory && (!saved || (!control && !watch::relevant(path) &&
+                                path.filename() != ".gitignore"))) return;
+  if (pendingEvents.size() >= 4096) {
+    pendingEvents.clear();
+    needsScan = true;
+  } else pendingEvents.push_back({path, directory, control});
+  changed();
 }
 }
 #endif

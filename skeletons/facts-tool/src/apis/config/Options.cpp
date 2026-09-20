@@ -13,9 +13,9 @@ void configureOptions(CLI::App &app, Arguments &arguments) {
   app.add_option("-c,--conf", arguments.project, "Default CLI project database");
   app.add_option("--working-directory", arguments.workingDirectory,
                  "Working directory for CLI requests");
-  app.add_option("--watch", arguments.watches, "Directory to monitor; repeatable")
-      ->expected(1)->take_all();
-  app.add_flag("--no-watch", arguments.clearWatches, "Clear saved watch directories")
+  app.add_flag("--watch", arguments.enableWatch,
+               "Monitor active clones of repositories in the project database");
+  app.add_flag("--no-watch", arguments.disableWatch, "Disable filesystem monitoring")
       ->excludes("--watch");
   app.add_option("--token", settings.token,
                  "Bearer token; prefer FACTS_TOOL_API_TOKEN to avoid shell history");

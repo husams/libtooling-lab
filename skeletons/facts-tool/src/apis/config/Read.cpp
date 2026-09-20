@@ -1,5 +1,6 @@
 #include "apis/config/Persistence.h"
 #include "apis/config/Defaults.h"
+#include "apis/config/Watch.h"
 #include <yaml-cpp/yaml.h>
 
 namespace facts::apis {
@@ -23,9 +24,7 @@ loadSettings(const std::filesystem::path &path) {
     }
     if (root["working_directory"])
       settings.workingDirectory = root["working_directory"].as<std::string>();
-    if (root["watch_directories"])
-      for (const auto &directory : root["watch_directories"].as<std::vector<std::string>>())
-        settings.directories.emplace_back(directory);
+    readWatch(root["watch"], settings);
     if (root["defaults"]) settings.defaults = root["defaults"].as<std::vector<std::string>>();
     if (root["import_arguments"])
       settings.importArguments = root["import_arguments"].as<std::vector<std::string>>();

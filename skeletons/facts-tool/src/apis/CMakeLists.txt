@@ -12,6 +12,7 @@ add_library(facts-apis STATIC
   config/Paths.cpp
   config/Read.cpp
   config/Write.cpp
+  config/Watch.cpp
   daemon/Detach.cpp
   daemon/Lifecycle.cpp
   daemon/Lock.cpp
@@ -33,17 +34,31 @@ add_library(facts-apis STATIC
   jobs/QueueRun.cpp
   jobs/Spawn.cpp
   watch/Apply.cpp
-  watch/Commands.cpp
   watch/Events.cpp
+  watch/Filter.cpp
   watch/Paths.cpp
   watch/Refresh.cpp
   watch/Rescan.cpp
   watch/Scan.cpp
   watch/Status.cpp
+  watch/Update.cpp
   watch/Watcher.cpp
+  watch/catalog/Read.cpp
+  watch/catalog/Exclusions.cpp
+  watch/ignore/Ignore.cpp
+  watch/ignore/Repository.cpp
+  watch/ignore/Controls.cpp
+  watch/ignore/Rules.cpp
+  watch/ignore/Layered.cpp
+  watch/plan/Options.cpp
+  watch/plan/Sources.cpp
+  watch/plan/Selection.cpp
+  watch/plan/Batches.cpp
+  watch/plan/Plan.cpp
 )
 target_include_directories(facts-apis PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(facts-apis
   PUBLIC Boost::headers nlohmann_json::nlohmann_json Threads::Threads
-  PRIVATE CLI11::CLI11 yaml-cpp::yaml-cpp)
+  PRIVATE CLI11::CLI11 yaml-cpp::yaml-cpp facts-config facts-storage
+          facts-tooling facts-clang facts-git)
 target_compile_definitions(facts-apis PRIVATE BOOST_ERROR_CODE_HEADER_ONLY)

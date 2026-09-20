@@ -15,7 +15,15 @@ struct Settings {
   bool daemon = false;
   std::string token;
   std::vector<std::string> defaults;
-  std::vector<std::filesystem::path> directories;
+#ifdef __linux__
+  bool watchEnabled = true;
+#else
+  bool watchEnabled = false;
+#endif
+  std::vector<std::string> excludedRepositories;
+  std::vector<std::string> excludedClones;
+  std::vector<std::string> excludedDirectories;
+  std::vector<std::string> excludePatterns;
   std::vector<std::string> importArguments;
   std::vector<std::string> extractArguments;
   unsigned debounceMs = 500;

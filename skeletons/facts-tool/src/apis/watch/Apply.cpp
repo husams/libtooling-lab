@@ -22,7 +22,6 @@ Watcher::Impl::applyScan(const watch::Scan &result) {
     inotify_rm_watch(descriptor.native_handle(), it->first);
     it = watches.erase(it);
   }
-  compilationDirectories = result.databases;
   return {};
 }
 }
