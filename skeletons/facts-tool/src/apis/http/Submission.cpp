@@ -10,7 +10,8 @@ Response Router::submit(const Request &request, std::string path) {
   auto id = jobs.submit(std::move(*argv));
   if (!id) return error(429, "Job queue is full or shutting down");
   auto reply = response(202, *jobs.get(*id));
-  reply.set(boost::beast::http::field::location, "/v1/jobs/" + *id);
+  reply.set(boost::beast::http::field::location,
+            endpoint(generated::Operation::getJob, *id));
   return reply;
 }
 }

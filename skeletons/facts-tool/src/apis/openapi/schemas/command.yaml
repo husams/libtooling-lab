@@ -1,0 +1,12 @@
+type: object
+required: [path, endpoint]
+additionalProperties: false
+properties:
+  path:
+    type: string
+    description: Registered command components separated by literal slashes.
+    examples: [repo/list, symbol/list]
+  endpoint:
+    type: string
+    description: Relative POST endpoint accepting extra command arguments.
+    examples: [/v1/commands/repo/list]

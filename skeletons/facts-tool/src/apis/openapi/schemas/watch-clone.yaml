@@ -1,0 +1,27 @@
+type: object
+required: [repository_id, repository, clone_id, label, path, active, excluded]
+additionalProperties: false
+properties:
+  repository_id:
+    type: integer
+    format: int64
+    description: Repository identifier in the project database.
+  repository:
+    type: string
+    description: Configured repository name.
+  clone_id:
+    type: integer
+    format: int64
+    description: Clone identifier in the project database.
+  label:
+    type: string
+    description: Configured clone label.
+  path:
+    type: string
+    description: Filesystem path stored for this clone in the project database.
+  active:
+    type: boolean
+    description: True when selected as the active clone of its repository in the database.
+  excluded:
+    type: string
+    description: Repository or clone configuration exclusion reason; empty if none applies.

@@ -178,6 +178,7 @@ work. The client does not follow redirects or use proxy environment settings.
 | `health()` | Health response dictionary |
 | `commands()` | List of command dictionaries with `path` and `endpoint` |
 | `openapi()` | OpenAPI document dictionary |
+| `openapi_yaml()` | The same OpenAPI contract as a YAML string |
 | `watch_status()` | Watcher state and recent job IDs |
 | `get_job(id)` | One `Job` including available captured output |
 | `list_jobs()` | List of retained `Job` metadata snapshots |
@@ -188,3 +189,7 @@ Await these methods on `AsyncClient`. `shutdown()` stops the server and cancels
 queued or active work. See [Deployment and operation](../09-rest-api/06-deployment.md)
 for service management and [Requests and jobs](../09-rest-api/02-requests-and-jobs.md)
 for HTTP limits and status codes.
+
+Endpoint operations are generated from the
+[OpenAPI YAML contract](../09-rest-api/08-openapi-contract.md). Async operations
+await HTTPX directly, and both clients retain their existing polling helpers.

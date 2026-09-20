@@ -1,0 +1,9 @@
+type: object
+required: [error]
+additionalProperties: false
+properties:
+  error:
+    type: string
+    description: Human-readable rejection or failure reason.
+examples:
+  - error: Unknown job

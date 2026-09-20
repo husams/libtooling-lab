@@ -554,6 +554,9 @@ include(GNUInstallDirs)
 set_property(TARGET facts-tool PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
 install(TARGETS facts-tool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   COMPONENT facts-tool)
+install(DIRECTORY src/apis/openapi/
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/facts-tool/openapi
+  COMPONENT facts-tool FILES_MATCHING PATTERN "*.yaml")
 
 add_executable(sqlite-generator-demo examples/sqlite_generator_demo.cpp)
 target_link_libraries(sqlite-generator-demo PRIVATE facts-storage
@@ -563,18 +566,20 @@ include(CTest)
 if(BUILD_TESTING)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "import pytest, pytest_bdd"
+    COMMAND ${Python3_EXECUTABLE} -c
+      "import pytest, pytest_bdd, yaml, openapi_spec_validator, jsonschema"
     RESULT_VARIABLE FACTS_TOOL_PYTEST_IMPORT_RESULT
     OUTPUT_QUIET
     ERROR_QUIET
   )
   if(NOT FACTS_TOOL_PYTEST_IMPORT_RESULT EQUAL 0)
     message(FATAL_ERROR
-      "pytest and pytest-bdd are required when BUILD_TESTING is enabled; "
+      "Python test and OpenAPI validation dependencies are required when BUILD_TESTING is enabled; "
       "install tests/e2e/requirements.txt"
     )
   endif()
   add_subdirectory(tests/implicit)
+  add_subdirectory(tests/openapi)
   add_test(NAME api-build-dependencies
     COMMAND ${Python3_EXECUTABLE} -m pytest
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/build_dependencies -q

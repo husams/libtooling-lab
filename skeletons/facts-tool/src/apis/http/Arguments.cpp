@@ -1,4 +1,5 @@
 #include "apis/http/Arguments.h"
+#include "apis/generated/Limits.h"
 #include <algorithm>
 #include <sstream>
 
@@ -47,12 +48,13 @@ arguments(const Json &body, const std::string &path,
   for (const auto &item : body["arguments"]) {
     if (!item.is_string()) return std::unexpected("Arguments must be strings");
     const auto value = item.get<std::string>();
-    if (value.find('\0') != std::string::npos || value.size() > 65536)
+    if (value.find('\0') != std::string::npos || value.size() > generated::maxArgumentBytes)
       return std::unexpected("Invalid argument length or embedded NUL");
     result.push_back(value);
   }
-  if (result.empty() || result.size() > 4096)
-    return std::unexpected("Expected between 1 and 4096 arguments");
+  if (result.empty() || result.size() > generated::maxArguments)
+    return std::unexpected("Expected between 1 and " +
+                           std::to_string(generated::maxArguments) + " arguments");
   const auto &first = result.front();
   if (first != "--help" && !std::ranges::any_of(commands, [&](const auto &p) {
         return p == first || p.starts_with(first + "/");

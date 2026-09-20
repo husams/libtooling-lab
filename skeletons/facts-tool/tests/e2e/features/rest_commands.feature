@@ -32,7 +32,7 @@ Feature: Native REST command interface
     Then the REST results contain extracted functions, the match, and a complete graph
 
   Scenario: Cancelling native work preserves responsive HTTP service
-    When a native CLI job is waiting for a configuration pipe and another job is queued
+    When a native CLI job is waiting for a database lock and another job is queued
     Then health responds while the native command is blocked
     When I cancel the queued and running REST jobs
     Then both jobs are cancelled and the server can run another CLI command

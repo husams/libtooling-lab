@@ -1,0 +1,46 @@
+parameters:
+  - name: id
+    in: path
+    required: true
+    description: Server-local job identifier returned by submission.
+    schema: {type: string, minLength: 1}
+    example: '1'
+get:
+  operationId: getJob
+  tags: [jobs]
+  summary: Read job state and captured output
+  description: |
+    Poll until state is succeeded, failed, or cancelled. stdout and stderr are
+    populated on completion, with each stream capped at 4 MiB. A failed CLI
+    command remains a successful HTTP response; inspect state and exit_code.
+  responses:
+    '200':
+      description: Current state and output of a retained job.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/Job'
+    '404':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'
+delete:
+  operationId: cancelJob
+  tags: [jobs]
+  summary: Request cancellation of a retained job
+  description: |
+    Queued jobs become cancelled immediately. Running jobs receive a process
+    group termination request and can remain running in this response; poll for
+    their final state. Completed jobs are returned unchanged. This operation
+    preserves the retained job record rather than deleting it.
+  responses:
+    '200':
+      description: Current job state after the cancellation request.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/Job'
+    '404':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

@@ -1,0 +1,53 @@
+type: object
+required:
+  - id
+  - state
+  - arguments
+  - exit_code
+  - truncated
+  - timed_out
+  - created_at
+additionalProperties: false
+description: |
+  Server-local asynchronous CLI job. stdout and stderr are omitted from list
+  responses; individual responses include both, populated when execution ends.
+  Each output stream is capped at 4 MiB. Terminal states are succeeded, failed,
+  and cancelled. Retention is bounded; records do not survive a server restart.
+properties:
+  id:
+    type: string
+    description: Server-local identifier; used in the job polling URL.
+  state:
+    type: string
+    enum: [queued, running, succeeded, failed, cancelled]
+  arguments:
+    type: array
+    items: {type: string}
+    description: Effective CLI arguments, including any configured defaults.
+  exit_code:
+    type: [integer, 'null']
+    description: Child process exit status; null before completion.
+  stdout:
+    type: string
+    description: Captured standard output, decoded as UTF-8 with replacement.
+  stderr:
+    type: string
+    description: Captured standard error, decoded as UTF-8 with replacement.
+  truncated:
+    type: boolean
+    description: True if captured output is incomplete, including stream capture limits.
+  timed_out:
+    type: boolean
+    description: True when the configured job deadline expired.
+  created_at:
+    type: integer
+    format: int64
+    description: Submission time in Unix epoch milliseconds.
+  started_at:
+    type: [integer, 'null']
+    format: int64
+    description: Start time in Unix epoch milliseconds; absent before execution.
+  finished_at:
+    type: [integer, 'null']
+    format: int64
+    description: Completion time in Unix epoch milliseconds; absent until terminal.

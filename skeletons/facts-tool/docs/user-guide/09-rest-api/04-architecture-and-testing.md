@@ -9,6 +9,8 @@ The REST layer lives in `src/apis`, divided by responsibility:
 | `config` | CLI server options, YAML persistence and normalized paths |
 | `daemon` | Instance locking, background startup, logs and readiness |
 | `http` | Asynchronous listener, HTTP sessions, routing and validation |
+| `openapi` | Authoritative OpenAPI 3.1 YAML, split into paths and schemas |
+| `generated` | Contract-generated native routes, limits and embedded document |
 | `jobs` | Bounded job queue, subprocess lifetime, output and cancellation |
 | `watch` | Inotify events, asynchronous scans, debounce and refresh scheduling |
 | `watch/catalog` | Read registered repositories/clones and apply repository/clone exclusions |
@@ -26,6 +28,11 @@ processes using the same executable and CLI parser as normal terminal commands.
 This preserves CLI behavior and keeps expensive Clang work off the HTTP event
 loop. The command catalog is generated from CLI registrations, including aliases,
 so new CLI commands are automatically discoverable through the generic API.
+
+The [OpenAPI contract](08-openapi-contract.md) generates the native route table
+and Python clients. Native handlers implement each operation; async Python
+methods await HTTPX requests. Both live contract formats are cached at startup.
+The generator's `--check` mode verifies that committed bindings match the YAML.
 
 One queue serializes API and watcher command processes to avoid concurrent writes
 from this server. A background scan reads repository and active-clone changes
@@ -52,6 +59,8 @@ and headers missing when using `SKIP_DEPS=1`. See the
 for source overrides and offline preparation.
 
 ```sh
+python3 -m pip install -r tests/e2e/requirements.txt
+python3 scripts/generate_openapi.py --check
 python3 -m pytest tests/apis \
   --api-facts-tool /absolute/path/to/build/facts-tool \
   --api-compiler /absolute/path/to/clang++
@@ -61,6 +70,8 @@ The tests start real servers in temporary directories with isolated configuratio
 They check the live command catalog against CLI help, execute actual C++ import,
 extraction, matching and call-graph workflows, and exercise concurrent clients,
 protocol errors, authentication, daemon startup, instance exclusion and restart.
+OpenAPI tests validate the source and live JSON/YAML documents, response schemas,
+generated routes and limits, encoded command paths, and HTTP responsiveness.
 Linux tests verify source/header edits, same-commit edits with AST caching enabled,
 atomic saves, new nested directories and failed reimport reporting. Repository
 monitoring scenarios cover database-driven roots, clone switches, exclusions,
@@ -82,6 +93,7 @@ These scenarios use real HTTP requests and native CLI workers. They cover comman
 discovery, authentication, actual C++ analysis, daemon readiness and instance
 locking, saved ports, and Linux inotify refreshes. Watcher scenarios verify that
 source/header edits become visible even when the Git commit has not changed.
+Contract scenarios exercise both document formats and generated async clients.
 Inotify scenarios require Linux.
 
 The SDK has separate Gherkin scenarios for both `Client` and `AsyncClient`.

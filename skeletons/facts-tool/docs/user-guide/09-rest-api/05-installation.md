@@ -35,6 +35,11 @@ or fetches checksum-verified Boost 1.83.0 and nlohmann/json 3.11.3 sources into
 `.deps/api-headers`. No Boost binary libraries are required. This also handles
 hosts whose distribution Boost package is older than the required version 1.74.
 
+Generated OpenAPI bindings are included in the checkout. Normal builds do not
+require code generation; test-enabled builds install the OpenAPI validation
+tools through the helper's existing test requirements step. `SKIP_TESTS=1`
+keeps those Python development tools out of the native build.
+
 Dependency installation uses `sudo` when needed. `SKIP_DEPS=1` skips `dnf`, while
 still preparing source dependencies; `SKIP_TESTS=1` skips the tests. Use
 `BOOST_SOURCE_DIR` and `JSON_SOURCE_DIR` for predownloaded headers, and see
@@ -67,7 +72,11 @@ inotify watching requires a Linux server.
 ```
 
 The `facts-tool` installation component installs the binary in `bin/` under your
-chosen prefix. It does not bundle linked LLVM/Clang libraries. Keep the matching
+chosen prefix, with the editable OpenAPI YAML in `share/facts-tool/openapi/`.
+The running server uses its embedded contract; changing installed YAML requires
+regenerating and rebuilding from source. See
+[OpenAPI contract and generated code](08-openapi-contract.md).
+The installation does not bundle linked LLVM/Clang libraries. Keep the matching
 Homebrew LLVM installation on macOS, or `clang-libs` and `llvm-libs` on RHEL-family
 hosts. Build for the target platform and use compatible runtime versions when
 copying a binary to another host. Check linked libraries with `otool -L` on macOS

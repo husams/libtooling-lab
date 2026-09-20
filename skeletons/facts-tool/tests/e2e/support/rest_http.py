@@ -22,6 +22,10 @@ class RestApi:
         self.port, self.token = port, token
 
     def request(self, method, path, body=None, token=None):
+        status, _, content = self.exchange(method, path, body, token)
+        return status, json.loads(content) if content else None
+
+    def exchange(self, method, path, body=None, token=None):
         connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
         bearer = self.token if token is None else token
         headers = {"Content-Type": "application/json"}
@@ -31,7 +35,7 @@ class RestApi:
             connection.request(method, path, json.dumps(body) if body else None, headers)
             response = connection.getresponse()
             content = response.read()
-            return response.status, json.loads(content) if content else None
+            return response.status, dict(response.getheaders()), content.decode()
         finally:
             connection.close()
 

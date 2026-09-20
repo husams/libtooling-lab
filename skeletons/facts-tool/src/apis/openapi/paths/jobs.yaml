@@ -1,0 +1,46 @@
+get:
+  operationId: listJobs
+  tags: [jobs]
+  summary: List retained job metadata
+  description: |
+    Lists up to 128 retained jobs in submission order. stdout and stderr are
+    omitted here; GET /v1/jobs/{id} includes captured output. Completed jobs may
+    be evicted when new jobs arrive, and all jobs are lost on server restart.
+  responses:
+    '200':
+      description: Metadata for retained queued, running, and completed jobs.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/Jobs'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'
+post:
+  operationId: submit
+  tags: [jobs]
+  summary: Submit a complete CLI argument array asynchronously
+  description: |
+    Include the command and subcommand as individual argument strings, followed
+    by options. HTTP 202 means accepted, not completed. Poll the Location URL
+    until state is succeeded, failed, or cancelled. One CLI process runs at a
+    time; queued work does not block the HTTP event loop. Server defaults may
+    add configuration arguments. The terminal symbol browser maps to symbol
+    list; recursive server invocations are prohibited.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/JobRequest'
+        example: {arguments: [repo, list]}
+  responses:
+    '202':
+      $ref: '../openapi.yaml#/components/responses/AcceptedJob'
+    '400':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    '413':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    '429':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

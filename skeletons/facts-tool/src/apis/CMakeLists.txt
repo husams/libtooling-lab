@@ -19,11 +19,15 @@ add_library(facts-apis STATIC
   daemon/Lock.cpp
   daemon/Readiness.cpp
   daemon/Redirect.cpp
+  generated/Spec.cpp
+  http/Access.cpp
   http/Arguments.cpp
   http/Listener.cpp
   http/OpenApi.cpp
+  http/OpenApiYaml.cpp
   http/Response.cpp
   http/Router.cpp
+  http/Routing.cpp
   http/Session.cpp
   http/Submission.cpp
   jobs/Process.cpp

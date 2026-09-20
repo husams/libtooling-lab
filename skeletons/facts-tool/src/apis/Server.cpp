@@ -23,7 +23,8 @@ int serve(Settings settings, const std::vector<std::string> &commands) {
   Watcher watcher(io, jobs, settings);
   boost::asio::steady_timer shutdownTimer(io);
   bool stopping = false;
-  Router router{jobs, settings, commands, [&] { return watcher.status(); }, {}};
+  const auto documents = openApiDocuments(commands, !settings.token.empty());
+  Router router{jobs, settings, commands, documents, [&] { return watcher.status(); }, {}};
   Listener listener(io, router);
   router.shutdown = [&] {
     if (stopping) return;

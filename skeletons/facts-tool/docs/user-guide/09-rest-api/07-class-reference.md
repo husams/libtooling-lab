@@ -2,7 +2,7 @@
 
 ← [User guide index](../README.md) · [Table of contents](../toc.md)
 
-The REST server and Python wrapper include 30 C++ classes/structs and eight
+The REST server and Python wrapper include 34 C++ classes/structs and eight
 Python classes. This inventory includes internal implementation types; only the
 Python classes below form the public Python REST interface.
 
@@ -19,6 +19,10 @@ Names are relative to `facts::apis`; names prefixed with `watch::` belong to
 | `Listener` | Bind the TCP endpoint and accept connections asynchronously. | [http/Listener.h](../../../src/apis/http/Listener.h) |
 | `Session` | Read, parse and answer one HTTP request asynchronously. | [http/Session.h](../../../src/apis/http/Session.h) |
 | `Router` | Authenticate requests and dispatch REST operations. | [http/Router.h](../../../src/apis/http/Router.h) |
+| `OpenApiDocuments` | Hold the live JSON and YAML contracts prepared at startup. | [http/OpenApi.h](../../../src/apis/http/OpenApi.h) |
+| `MatchedRoute` | Pair a generated operation with its decoded path parameter. | [http/Routing.h](../../../src/apis/http/Routing.h) |
+| `HttpError` | Carry an HTTP status and validation or access error. | [http/Routing.h](../../../src/apis/http/Routing.h) |
+| `generated::Route` | Describe a method, path template, parameter and operation from the YAML contract. | [generated/Routes.h](../../../src/apis/generated/Routes.h) |
 | `Job` | Hold a native job record and its completion callback. | [jobs/Job.h](../../../src/apis/jobs/Job.h) |
 | `Queue` | Expose job submission, listing, lookup, cancellation and shutdown. | [jobs/Queue.h](../../../src/apis/jobs/Queue.h) |
 | `Queue::Impl` | Keep queue implementation state behind its public interface. | [jobs/Queue.cpp](../../../src/apis/jobs/Queue.cpp) |
@@ -69,14 +73,17 @@ to `python/src/facts_tool/rest`.
 
 The native and Python `Job` types are separate representations of the same REST
 record. `JobState` is a Python type alias, not an additional class.
+`Client` and `AsyncClient` are generated from the OpenAPI contract and small
+lifecycle/polling templates; they do not add a generated class hierarchy.
 
 ## Components implemented as functions
 
 Server orchestration, configuration parsing and persistence, command discovery,
-OpenAPI generation, catalog reading, exclusion selection, watcher path discovery
+OpenAPI document expansion, catalog reading, exclusion selection, watcher path discovery
 and AST-cache invalidation use free functions. There is no `Server` class.
 Python argument validation, configuration,
 response decoding, HTTP transport and polling also use functions, without extra
 class hierarchies. See [Architecture and testing](04-architecture-and-testing.md)
-for execution and test coverage, and [Python REST client](../05-python-sdk/11-rest-client.md)
+for execution and test coverage, [OpenAPI generation](08-openapi-contract.md),
+and [Python REST client](../05-python-sdk/11-rest-client.md)
 for SDK usage.

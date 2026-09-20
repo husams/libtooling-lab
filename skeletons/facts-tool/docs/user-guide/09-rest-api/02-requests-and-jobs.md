@@ -16,6 +16,7 @@ Add `-H "Authorization: Bearer $FACTS_TOOL_API_TOKEN"` to requests when configur
 |---|---|
 | `GET /health` | `200`, `{"status":"ok"}` |
 | `GET /openapi.json` | `200`, OpenAPI 3.1 schema for the live commands, requests, jobs and authentication |
+| `GET /openapi.yaml` | `200`, the same OpenAPI 3.1 contract as readable YAML |
 | `GET /v1/commands` | `200`, `{"commands":[{"path":"import","endpoint":"/v1/commands/import"}, ...]}` |
 | `POST /v1/commands/{path}` | `202`, asynchronous job; body contains command arguments |
 | `POST /v1/jobs` | `202`, asynchronous job; body contains the complete CLI argument vector |
@@ -27,7 +28,10 @@ Add `-H "Authorization: Bearer $FACTS_TOOL_API_TOKEN"` to requests when configur
 
 Command paths mirror CLI nesting: `analyse/call-graph`, `symbol/index/clear`,
 `repo/add-clone`, and so on. Discovery comes from the live CLI parser, including
-aliases. Agents can read `/openapi.json` for the machine-readable interface.
+aliases. Agents can read `/openapi.json` or `/openapi.yaml` for the
+[generated OpenAPI interface](08-openapi-contract.md). The generic OpenAPI path
+parameter encodes nested slashes, for example `repo%2Fadd-clone`; the existing
+unencoded command URLs also work.
 Groups accept their child name in the argument list. `serve` itself is
 excluded from jobs; shutdown uses its dedicated endpoint.
 

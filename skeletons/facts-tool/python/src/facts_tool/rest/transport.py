@@ -22,10 +22,10 @@ def response_body(response: httpx.Response) -> dict[str, object]:
     return object_value(value)
 
 
-def request(
+def send(
     client: httpx.Client, method: str, path: str,
     body: dict[str, object] | None = None, *, budget: float | None = None,
-) -> dict[str, object]:
+) -> httpx.Response:
     timeout = client.timeout if budget is None else min(
         budget, client.timeout.read or budget,
     )
@@ -34,13 +34,13 @@ def request(
     except httpx.HTTPError as error:
         message = f"{method} {path} failed: {type(error).__name__}"
         raise TransportError(message) from error
-    return response_body(response)
+    return response
 
 
-async def async_request(
+async def async_send(
     client: httpx.AsyncClient, method: str, path: str,
     body: dict[str, object] | None = None, *, budget: float | None = None,
-) -> dict[str, object]:
+) -> httpx.Response:
     timeout = client.timeout if budget is None else min(
         budget, client.timeout.read or budget,
     )
@@ -49,4 +49,32 @@ async def async_request(
     except httpx.HTTPError as error:
         message = f"{method} {path} failed: {type(error).__name__}"
         raise TransportError(message) from error
-    return response_body(response)
+    return response
+
+
+def request(
+    client: httpx.Client, method: str, path: str,
+    body: dict[str, object] | None = None, *, budget: float | None = None,
+) -> dict[str, object]:
+    return response_body(send(client, method, path, body, budget=budget))
+
+
+async def async_request(
+    client: httpx.AsyncClient, method: str, path: str,
+    body: dict[str, object] | None = None, *, budget: float | None = None,
+) -> dict[str, object]:
+    return response_body(await async_send(client, method, path, body, budget=budget))
+
+
+def text_body(response: httpx.Response) -> str:
+    if not response.is_success:
+        response_body(response)
+    return response.text
+
+
+def request_text(client: httpx.Client, method: str, path: str) -> str:
+    return text_body(send(client, method, path))
+
+
+async def async_request_text(client: httpx.AsyncClient, method: str, path: str) -> str:
+    return text_body(await async_send(client, method, path))

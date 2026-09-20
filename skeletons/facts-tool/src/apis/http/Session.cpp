@@ -1,10 +1,11 @@
 #include "apis/http/Session.h"
+#include "apis/generated/Limits.h"
 
 namespace facts::apis {
 Session::Session(boost::asio::ip::tcp::socket socket, Router &router)
     : stream_(std::move(socket)), router_(router) {
-  parser_.body_limit(1024 * 1024);
-  parser_.header_limit(16384);
+  parser_.body_limit(generated::maxBodyBytes);
+  parser_.header_limit(generated::maxHeaderBytes);
 }
 void Session::start() {
   stream_.expires_after(std::chrono::seconds(30));

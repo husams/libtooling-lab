@@ -27,3 +27,7 @@ For a new server or client machine, follow [REST installation](09-rest-api/05-in
 and [Deployment and operation](09-rest-api/06-deployment.md). Python applications
 and agents can use the [REST client](05-python-sdk/11-rest-client.md) to submit
 CLI commands, await results, cancel jobs, and inspect the server.
+
+The [OpenAPI YAML contract](09-rest-api/08-openapi-contract.md) defines the REST
+interface and generates native routes and Python operation bindings. Download
+the live contract from `/openapi.yaml` or `/openapi.json`.

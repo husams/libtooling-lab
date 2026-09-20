@@ -16,6 +16,7 @@ pytest_plugins = (
     "steps.watch_catalog_provenance_steps",
     "steps.rest_setup_steps",
     "steps.rest_access_steps",
+    "steps.rest_openapi_steps",
     "steps.rest_job_steps",
     "steps.rest_cancel_steps",
     "steps.rest_lifecycle_steps",

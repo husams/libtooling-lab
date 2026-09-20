@@ -1,0 +1,17 @@
+get:
+  operationId: commands
+  tags: [discovery]
+  summary: List the CLI commands registered by this server
+  description: |
+    Includes nested command paths and aliases. Submit extra CLI arguments to
+    each endpoint, or supply the complete command as arguments to POST /v1/jobs.
+    The server command itself is excluded to prevent recursive server launches.
+  responses:
+    '200':
+      description: Available CLI command paths and their submission endpoints.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/CommandCatalog'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

@@ -1,0 +1,87 @@
+openapi: 3.1.0
+info:
+  title: facts-tool REST API
+  version: 1.1.0
+  description: |
+    Asynchronous access to every non-server facts-tool CLI command. Submit an
+    argument array, receive HTTP 202 and a job URL immediately, and poll until
+    the job reaches succeeded, failed, or cancelled. Arguments are passed
+    directly to a child process; no shell expansion occurs. The HTTP event
+    loop remains available while jobs execute or the filesystem is scanned.
+
+    Token-configured servers require Bearer authentication on every endpoint,
+    including health and schema documents. The served document reflects that
+    setting. Without a token, the Host header must match the local listener
+    address or localhost (with its optional configured port). Requests carrying
+    Origin or Sec-Fetch-Site are rejected. Use a native client or download this
+    contract for Swagger tooling; browser calls to the server are unsupported.
+servers:
+  - url: /
+security: []
+tags:
+  - name: discovery
+    description: Health, command catalog, and machine-readable API contracts.
+  - name: jobs
+    description: Submit CLI jobs, poll their state, and request cancellation.
+  - name: server
+    description: Inspect database-driven filesystem monitoring and stop the server.
+x-facts-limits:
+  maxBodyBytes: 1048576
+  maxHeaderBytes: 16384
+  maxArguments: 4096
+  maxArgumentBytes: 65536
+paths:
+  /health:
+    $ref: paths/health.yaml
+  /openapi.json:
+    $ref: paths/openapi-json.yaml
+  /openapi.yaml:
+    $ref: paths/openapi-yaml.yaml
+  /v1/commands:
+    $ref: paths/commands.yaml
+  /v1/commands/{commandPath}:
+    $ref: paths/command.yaml
+  /v1/jobs:
+    $ref: paths/jobs.yaml
+  /v1/jobs/{id}:
+    $ref: paths/job.yaml
+  /v1/watch:
+    $ref: paths/watch.yaml
+  /v1/shutdown:
+    $ref: paths/shutdown.yaml
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Required for all requests when server.token is configured.
+  schemas:
+    Argument:
+      $ref: schemas/argument.yaml
+    Arguments:
+      $ref: schemas/arguments.yaml
+    JobRequest:
+      $ref: schemas/job-request.yaml
+    Job:
+      $ref: schemas/job.yaml
+    Jobs:
+      $ref: schemas/jobs.yaml
+    Health:
+      $ref: schemas/health.yaml
+    Shutdown:
+      $ref: schemas/shutdown.yaml
+    Command:
+      $ref: schemas/command.yaml
+    CommandCatalog:
+      $ref: schemas/command-catalog.yaml
+    WatchStatus:
+      $ref: schemas/watch-status.yaml
+    WatchClone:
+      $ref: schemas/watch-clone.yaml
+    Error:
+      $ref: schemas/error.yaml
+  responses:
+    Error:
+      $ref: responses/error.yaml
+    AcceptedJob:
+      $ref: responses/accepted-job.yaml

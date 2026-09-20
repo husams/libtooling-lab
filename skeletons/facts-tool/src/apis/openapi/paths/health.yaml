@@ -1,0 +1,15 @@
+get:
+  operationId: health
+  tags: [discovery]
+  summary: Check that the HTTP server is responsive
+  description: Returns immediately; does not wait for jobs or filesystem scans.
+  responses:
+    '200':
+      description: Server is accepting HTTP requests.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/Health'
+          example: {status: ok}
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

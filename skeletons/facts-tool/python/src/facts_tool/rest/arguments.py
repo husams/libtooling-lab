@@ -2,6 +2,8 @@
 
 import re
 
+from .generated.routes import MAX_ARGUMENT_BYTES, MAX_ARGUMENTS
+
 _SEGMENT = re.compile(r"[A-Za-z0-9_-]+")
 
 
@@ -20,13 +22,15 @@ def command_path(value: str) -> str:
 
 
 def arguments(values: tuple[str, ...], *, prefix_count: int = 0) -> dict[str, object]:
-    if not 1 <= len(values) + prefix_count <= 4096:
-        raise ValueError("Expected between 1 and 4096 CLI arguments")
+    if not 1 <= len(values) + prefix_count <= MAX_ARGUMENTS:
+        raise ValueError(f"Expected between 1 and {MAX_ARGUMENTS} CLI arguments")
     for value in values:
         if not isinstance(value, str):
             raise ValueError("CLI arguments must be strings")
         try:
-            valid = "\0" not in value and len(value.encode("utf-8")) <= 65536
+            valid = (
+                "\0" not in value and len(value.encode("utf-8")) <= MAX_ARGUMENT_BYTES
+            )
         except UnicodeEncodeError:
             valid = False
         if not valid:
