@@ -11,15 +11,15 @@ level for convenience).
 
 | Name | Signature | Purpose | Chapter |
 |---|---|---|---|
-| `open_codebase` | `(*, facts_db, project_db, budgets=None) -> CodeBase` | Open a paired facts/project database read-only | [02](02-opening-databases.md) |
+| `open_codebase` | `(*, facts_db, project_db, budgets=None, lazy=True) -> CodeBase` | Open a paired facts/project database read-only | [02](02-opening-databases.md) |
 | `open_variable_flow` | `(path) -> VariableFlowReader` | Open a standalone variable-flow artifact read-only | [09](09-variable-flow.md) |
 | `VariableFlowReader` | `.get(run_id)`, `.runs()`, context manager, `.close()` | Read exact persisted variable-flow runs | [09](09-variable-flow.md) |
 | `VariableFlowRun` | `.nodes/.edges/.boundaries/.graph`, `.status/.assumptions/.root_variable`, `.to_dict()` | Immutable local-variable or parameter-flow evidence | [09](09-variable-flow.md) |
 | `VariableFlowGraph` | `.node/.nodes/.reads/.writes/.incoming/.outgoing/.boundaries` | Query occurrences, exact identities, and callsite-preserving links | [09](09-variable-flow.md) |
 | `CodeBase` | `.executor`, `.provenance`, `.graph`, `.callgraphs`, `.get/.find/.query`, context manager, `.close()` | The session object returned by `open_codebase` | [02](02-opening-databases.md) |
-| `Executor` | `(loader, provenance, budgets=None)`; `.run(plan, after_id=None, result_cap=None) -> Result`; `.explain(plan) -> dict` | Runs a frozen `Plan` against a paired database | [03](03-query-model.md) |
-| `Result` | `.shape/.view/.values/.scalar/.truncated/.partial/.unknown/.cursor/.provenance`; `.nodes/.rows/.paths`; `.to_dict()/.to_json()` | The outcome of running a plan | [03](03-query-model.md) |
-| `Budgets` | `enumeration=10_000, traversal=10_000, result_cap=1_000, max_depth=32, path_expansion=10_000, witness_reconstruction=200_000` | Explicit, opt-in limits on every executor operation | [03](03-query-model.md) |
+| `Executor` | `(loader, provenance, budgets=None, *, lazy=True)`; `.run(plan, after_id=None, result_cap=None, *, lazy=None) -> Result`; `.explain(plan) -> dict` | Validates a frozen `Plan`; returns a lazy result by default | [03](03-query-model.md) |
+| `Result` | `.shape/.view/.values/.scalar/.truncated/.partial/.unknown/.cursor/.provenance`; `.nodes/.rows/.paths`; iterable; `.materialize()/.to_dict()/.to_json()` | Lazy iteration or explicitly materialized query results | [03](03-query-model.md) |
+| `Budgets` | `enumeration=10_000, traversal=10_000, result_cap=1_000, max_depth=32, path_expansion=10_000, witness_reconstruction=200_000` | Default limits, configurable for each session | [03](03-query-model.md) |
 | `GraphQuery` | `.get/.find/.query/.neighbors/.reaches/.callers/.callees/.bases/.subclasses/.members/.parameters/.definitions/.references` | Typed graph navigation | [05](05-relations-and-graph-queries.md) |
 | `Entity` | row-proxying `__getattr__`; `.to_dict()/.outgoing()/.incoming()/.definitions()/.references()` | Base typed wrapper over a symbol row | [05](05-relations-and-graph-queries.md) |
 | `Callable` | `Entity` + `.callers()/.callees()/.parameters()` | Typed wrapper for a function/method symbol | [05](05-relations-and-graph-queries.md) |
@@ -163,7 +163,8 @@ Every one of these is worked through in [03](03-query-model.md).
 | `EntityQuery.limit` | `(value: int) -> EntityQuery` | Truncate output |
 | `EntityQuery.filter` | `(callback: Callable[[Row], bool]) -> EntityQuery` | Local, never serialized |
 | `EntityQuery.plan` / `.to_plan()` | `-> Plan` | Expose the frozen plan |
-| `EntityQuery.run` | `() -> Result` | Execute |
+| `EntityQuery.run` | `(*, lazy: bool \| None = None) -> Result` | Return raw rows; inherit session mode unless overridden |
+| `EntityQuery.__iter__` | `() -> Iterator[object]` | Iterate typed entities or selected row dictionaries; inherit session mode |
 | `EntityQuery.all` | `() -> list[object]` | Execute; upgrade node rows to typed `Entity` objects |
 | `EntityQuery.names` | `() -> list[str]` | Execute; project `name` field |
 | `EntityQuery.count` | `() -> int \| None` | Execute as a scalar count |
@@ -176,5 +177,7 @@ query), [02](02-opening-databases.md) (`open_codebase`/`CodeBase`/
 `Result`, `Budgets`, `EntityQuery`), [04](04-views-and-catalog.md) (views/
 kinds/relations), [05](05-relations-and-graph-queries.md) (`GraphQuery`/
 `Entity`/`Callable`/`Method`/`Record`), [06](06-persisted-callgraph-runs.md)
-(`CallGraphReader` and every `CallGraph*` model), and
-[07](07-error-handling.md) (`FactsToolError` and every code).
+(`CallGraphReader` and every `CallGraph*` model),
+[07](07-error-handling.md) (`FactsToolError` and every code), and
+[10](10-query-performance.md) (lazy/eager execution, indexed queries, and
+large results).

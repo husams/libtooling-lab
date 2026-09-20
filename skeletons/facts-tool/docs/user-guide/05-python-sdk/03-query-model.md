@@ -49,7 +49,7 @@ from facts_tool.queryplan import start, symbol, select
 
 with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
     q = start(symbol("app::save")) | select(("qualified_name", "usr", "kind"))
-    for row in cb.executor.run(q.plan).to_dict()["rows"]:
+    for row in cb.executor.run(q.plan):
         print(row)
 ```
 
@@ -59,8 +59,9 @@ with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
 ```
 
 A raw plan built with `symbol(...)` returns **both** overloads as separate
-nodes, in ascending persisted identity order. The typed API instead takes
-the first match silently:
+nodes, in ascending persisted identity order. The fluent `cb.query(ref)`
+also retains every match. The typed `cb.get(ref)` and `cb.find(ref)` instead
+take the first match silently:
 
 ```python
 entity = cb.get("app::save")
@@ -74,7 +75,7 @@ app::save c:@N@app@F@save#I#
 There is no ambiguity check anywhere in the source or entity resolution
 code paths. If your `ref` might be overloaded, prefer an exact USR, or
 build a raw plan with `symbol(ref)` and inspect every returned row yourself
-rather than relying on `cb.get`/`cb.query`/`cb.find`.
+rather than relying on `cb.get`/`cb.find`.
 
 ## Predicates
 
@@ -123,7 +124,7 @@ with open_codebase(
     print(r.unknown, len(r.to_dict()["nodes"]))
 
     q2 = start(codebase()) | nodes(exists("calls", eq("name", "save")), unknown="error")
-    cb.executor.run(q2.plan)
+    cb.executor.run(q2.plan, lazy=False)  # raise during this call
 ```
 
 ```text
@@ -135,10 +136,11 @@ facts_tool.errors.FactsToolError: E_UNKNOWN: predicate evidence is unknown for s
 truncate, which makes it a convenient way to reproduce unknown-evidence
 behavior deterministically for docs or tests.
 
-The `unknown` policy is the third argument to `nodes`/`where` (default
+The `unknown` policy is an argument to `nodes`/`where` (default
 `"exclude"`): drop unknown rows silently, `"include"` keep them and set
 `Result.unknown = True`, or `"error"` raise `E_UNKNOWN` the moment one is
-found.
+found during execution. With lazy results, this can happen while iterating;
+use `lazy=False` as above when the call itself must report the error.
 
 ## Relationship quantifiers
 
@@ -483,15 +485,22 @@ nodes
 
 ```python
 class Executor:
-    def __init__(self, loader, provenance, budgets: Budgets | None = None): ...
-    def run(self, plan, after_id=None, result_cap=None) -> Result: ...
+    def __init__(self, loader, provenance, budgets=None, *, lazy: bool = True): ...
+    def run(self, plan, after_id=None, result_cap=None, *, lazy: bool | None = None) -> Result: ...
     def explain(self, plan) -> dict[str, Any]: ...
 ```
 
 `.run` validates the plan, checks every stage's depth against
-`Budgets.max_depth`, executes, then applies `result_cap` (defaulting to
-`Budgets.result_cap = 1000`). Hitting the cap sets `Result.truncated = True`
-and `Result.cursor` to the last kept row's `id`/`_key`.
+`Budgets.max_depth`, and validates `result_cap` immediately. It then returns
+a lazy result by default. `lazy=None` inherits the session setting;
+`lazy=False` executes and materializes before returning, while `lazy=True`
+overrides an eager session for this call.
+
+Execution applies `result_cap` (defaulting to `Budgets.result_cap = 1000`).
+If more rows are available than the cap permits, `Result.truncated` is
+`True` and `Result.cursor` identifies the last kept row's `id`/`_key`.
+Lazy mode preserves the same budgets, ordering, and result flags as eager
+mode; it does not mean unlimited results.
 
 ```python
 class Result:
@@ -513,6 +522,7 @@ class Result:
     def paths(self) -> tuple[Row, ...]: ...   # non-empty only when shape == "path"
     def __iter__(self) -> Iterator[Row]: ...
     def __len__(self) -> int: ...
+    def materialize(self) -> "Result": ...
     def to_dict(self) -> dict[str, Any]: ...
     def to_json(self) -> str: ...
 ```
@@ -522,6 +532,42 @@ class Result:
 payload key (`nodes`, `rows`, or `paths`, or `scalar` for a `count()`
 result). A truncated `count()` returns `scalar=None`, so a truncated count
 can never look falsely exact.
+
+### Streaming and materialization
+
+Iterating a `Result` yields plain row dictionaries without retaining all
+emitted rows. Simple enumeration, supported filters, projections, and
+limits can stream; sorting, graph traversal, path queries, and set
+operations still buffer. See [Query performance](10-query-performance.md)
+for the exact scope and indexed query patterns.
+
+```python
+with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
+    q = start(codebase()) | nodes(eq("kind", "function"))
+    result = cb.executor.run(q.plan)
+    for row in result:
+        print(row["name"])
+    print(result.truncated)  # final metadata is available after exhaustion
+```
+
+Each iteration of an unmaterialized result runs the query again. Call
+`.materialize()` to cache the complete bounded result; it returns the same
+`Result`. Reading `.values`, the matching `.nodes`/`.rows`/`.paths`, calling
+`len(result)`, `.to_dict()`, or `.to_json()` also materializes it.
+`list(result)` and `tuple(result)` can request its length and therefore
+materialize too; use a `for` loop when streaming matters.
+
+Reading `.scalar`, `.truncated`, `.partial`, `.unknown`, or `.cursor`
+**before a complete iteration** executes and materializes the query so the
+metadata is final. After an uninterrupted iteration reaches exhaustion,
+these fields are available without collecting rows. `.shape`, `.view`, and
+`.provenance` do not execute the query. If you stop early, metadata access
+may rerun and materialize the complete bounded result.
+
+Keep the session open until lazy consumption finishes. To use rows after
+closing it, materialize inside the context. Data-dependent errors can arise
+while iterating or materializing; plan-validation errors still arise from
+`.run()` immediately. See [Error handling](07-error-handling.md).
 
 Real pagination, walking four functions two at a time via `after_id` +
 `result_cap`:
@@ -588,7 +634,8 @@ class EntityQuery:
     def order_by(self, fields: Sequence[str]) -> "EntityQuery": ...
     def limit(self, value: int) -> "EntityQuery": ...
     def filter(self, callback: Callable[[Row], bool]) -> "EntityQuery": ...
-    def run(self) -> Result: ...
+    def run(self, *, lazy: bool | None = None) -> Result: ...
+    def __iter__(self) -> Iterator[object]: ...
     def all(self) -> list[object]: ...
     def names(self) -> list[str]: ...
     def count(self) -> int | None: ...
@@ -599,8 +646,22 @@ Every chaining method (`nodes`, `where`, `view`, `relation`, `select`,
 `order_by`, `limit`) returns a **new** `EntityQuery` wrapping a new `Query`
 prefix, exactly like the raw `query | stage` syntax. `.relation(name,
 inbound=...)` is sugar for `out`/`in_` depending on the `inbound` flag.
-`.all()` upgrades node rows back into typed `Entity` objects (see
-[05-relations-and-graph-queries.md](05-relations-and-graph-queries.md)).
+Direct iteration and `.all()` upgrade node rows to typed `Entity` objects
+(see [05-relations-and-graph-queries.md](05-relations-and-graph-queries.md)).
+Selected rows remain plain dictionaries. Direct iteration follows the
+session's lazy/eager setting; `.run(lazy=...)` overrides it for one result,
+which yields raw row dictionaries.
+
+```python
+with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
+    for function in cb.query().nodes(eq("kind", "function")):
+        print(function.qualified_name)
+    for row in cb.query().nodes().select(("name", "file")):
+        print(row["name"], row["file"])
+```
+
+`.all()` and `.names()` remain eager collection helpers. `.count()` computes
+its scalar immediately; `.first()` executes a query limited to one result.
 
 ```python
 base = cb.query("app::run").relation("calls")
@@ -643,8 +704,9 @@ the raw `Result`. Absolute paths in the last line are abbreviated.
 ### `.filter()` is local, not serializable
 
 `.filter(callback)` stores the Python callback **outside** the plan; it
-never appears in `canonical_json` and is applied client-side, after
-`Executor.run` completes:
+never appears in `canonical_json` and is applied client-side as the
+executor's rows are consumed. It streams with a lazy result and is evaluated
+immediately with `.run(lazy=False)`, `.all()`, or `.names()`:
 
 ```python
 from facts_tool.queryplan import canonical_json
