@@ -1,5 +1,7 @@
 # Local-variable and parameter flow
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Generate a graph with native `facts-tool analyse variable-flow`, then read the
 exact saved run through `facts_tool.open_variable_flow`. The graph lives in a
 standalone artifact; it does not require a `CodeBase` or a facts/project pair

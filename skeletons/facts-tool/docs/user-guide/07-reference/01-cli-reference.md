@@ -1,5 +1,7 @@
 # CLI reference
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Reference for every `facts-tool` subcommand: synopsis, positionals, options,
 exit codes, and one example. All output shown was captured from a real run
 against `$FT/build/facts-tool` (never `~/.local/bin/facts-tool`), trimmed for

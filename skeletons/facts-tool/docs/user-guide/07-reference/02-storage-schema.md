@@ -1,5 +1,7 @@
 # Storage schema
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `facts-tool` always writes into two SQLite databases: the **facts database**
 and the **project (configuration) database**. This chapter documents every
 table and column in both and their current schema versions for conceptual

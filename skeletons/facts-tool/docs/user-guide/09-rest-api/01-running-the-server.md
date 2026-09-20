@@ -1,7 +1,12 @@
 # Running facts-tool as a server
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `facts-tool` remains a CLI. The additional `serve` command exposes its commands
 over HTTP for applications and agents. Existing CLI invocations are unchanged.
+Install it using [REST installation](05-installation.md); see
+[Deployment and operation](06-deployment.md) for foreground, daemon and Linux
+systemd service setup.
 
 ```sh
 facts-tool serve --server-config /workspace/server.yaml \

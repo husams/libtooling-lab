@@ -1,5 +1,7 @@
 # Workflow: Large Codebases and Batching
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 You need to extract facts from a codebase too large to comfortably run as

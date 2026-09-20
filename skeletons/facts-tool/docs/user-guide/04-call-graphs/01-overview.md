@@ -1,5 +1,7 @@
 # Call Graphs: Overview
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `analyse call-graph` is a separate, explicitly requested command that reads
 the `Calls`/`Overrides`/`DispatchCalls` relations `extract` already recorded
 and traverses them. Ordinary `extract` never builds or maintains any

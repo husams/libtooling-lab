@@ -546,6 +546,10 @@ target_link_libraries(facts-cli PRIVATE facts-commands CLI11::CLI11)
 add_subdirectory(src/apis)
 add_executable(facts-tool src/main.cpp)
 target_link_libraries(facts-tool PRIVATE facts-cli facts-apis)
+include(GNUInstallDirs)
+set_property(TARGET facts-tool PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
+install(TARGETS facts-tool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  COMPONENT facts-tool)
 
 add_executable(sqlite-generator-demo examples/sqlite_generator_demo.cpp)
 target_link_libraries(sqlite-generator-demo PRIVATE facts-storage

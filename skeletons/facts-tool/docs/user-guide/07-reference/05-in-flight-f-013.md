@@ -1,5 +1,7 @@
 # In flight: F-013 (as of 2026-09-08)
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 **Everything under S-030 and S-031 in this chapter is NOT ON MAIN.** It
 describes open pull requests, not shipped behavior. Do not use anything
 below as a reference for what `facts-tool` currently does - for that, see

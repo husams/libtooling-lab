@@ -1,5 +1,7 @@
 # REST requests and asynchronous jobs
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Use the host and allocated port saved by `serve`. Examples below assume:
 
 ```sh
@@ -92,3 +94,9 @@ Unknown endpoints or missing/evicted jobs return `404`; wrong methods return
 `405`; queue saturation returns `429`. Authentication failures return `401`,
 and browser-origin requests return `403`. Bodies are limited to 1 MiB, headers
 to 16 KiB, and each HTTP request has a 30-second I/O deadline.
+
+## Python clients
+
+Use the SDK's optional [REST client](../05-python-sdk/11-rest-client.md) for
+synchronous `Client` or asynchronous `AsyncClient` access to every endpoint.
+Both expose typed job results, polling, cancellation and distinct HTTP/job errors.

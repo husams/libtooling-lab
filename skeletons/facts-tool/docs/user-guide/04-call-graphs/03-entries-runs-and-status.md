@@ -1,5 +1,7 @@
 # Entries, Runs, and Status
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 A call graph in facts-tool has two independent kinds of persisted record:
 **function entries**, which say whether a symbol's call evidence has ever
 been fully collected, and **runs**, which say what one specific

@@ -1,5 +1,7 @@
 # Extracting Facts
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `facts-tool extract` walks the Clang AST of already-imported translation
 units and writes symbols, relations, and call evidence into a facts
 database. It never parses a file that has not first been registered by

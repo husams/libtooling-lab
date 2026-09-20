@@ -1,5 +1,7 @@
 # The query model
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 The SDK's core is a small, immutable declarative query language under
 `facts_tool.queryplan`. Every constructor there returns a frozen dataclass
 (`Source`, `Pred`, `TargetSet`, `Stage`, `Plan`, `Query`) with no database

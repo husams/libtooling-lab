@@ -1,5 +1,7 @@
 # What is facts-tool?
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `facts-tool` is a standalone Clang LibTooling executable that walks the
 Clang AST of a C++ codebase and records what it finds as structured facts in
 a SQLite database. Its own build description puts it plainly: it is a
@@ -11,11 +13,12 @@ Around that native extractor sits a small family of companion tools:
 
 - **`facts-tool`** (C++, this guide's core subject) - extracts facts from a
   compilation database or a fixed list of sources, manages a project
-  catalog, and runs call-graph traversals.
+  catalog, and runs call-graph traversals. Its `serve` command provides the
+  same commands over REST, with background jobs and Linux directory watching.
 - **`facts-tool-query`** (Python package, import name `facts_tool`) - a
-  separate, read-only SDK that opens the SQLite databases `facts-tool`
-  produces and lets you query them with a declarative, composable query
-  language instead of hand-written SQL.
+  separate SDK whose base query layer opens the SQLite databases `facts-tool`
+  produces read-only, using a declarative, composable query language. Its optional
+  `rest` extra adds synchronous and asynchronous clients for remote CLI jobs.
 - **`facts-tool-batch`** - a process-fanout wrapper that runs one
   `facts-tool` invocation per source file with bounded parallelism, for
   large codebases.
@@ -65,8 +68,8 @@ databases, always used together:
   them, project components, indexed directories, registered files, and the
   compile configuration used to extract each file.
 
-The native CLI writes to both. The Python SDK only ever opens them
-read-only. Chapter [02-projects-and-configuration/01-repositories-and-projects](../02-projects-and-configuration/01-repositories-and-projects.md)
+The native CLI writes to both. The Python database query layer opens them
+read-only; the optional REST client asks the server to execute native commands. Chapter [02-projects-and-configuration/01-repositories-and-projects](../02-projects-and-configuration/01-repositories-and-projects.md)
 covers the project database's catalog in detail, and
 [07-reference/02-storage-schema.md](../07-reference/02-storage-schema.md)
 documents both schemas table by table.

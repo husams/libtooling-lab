@@ -1,5 +1,7 @@
 # Views and catalog
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Every query has a **current view** - the shape of node the query is
 enumerating. `view(name)` switches it; `select(fields)`, `where(pred)`, and
 the relation-taking stages all validate field and relation names against

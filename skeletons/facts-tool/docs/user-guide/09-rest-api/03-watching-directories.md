@@ -1,5 +1,7 @@
 # Automatic reimport and indexing
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Linux servers can recursively monitor source directories using inotify:
 
 ```sh

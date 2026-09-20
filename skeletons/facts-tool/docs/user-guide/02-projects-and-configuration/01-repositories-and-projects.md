@@ -1,5 +1,7 @@
 # Repositories and projects
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 The **project database** (also called the project/configuration database or
 catalog) is where `facts-tool` records everything about a codebase that
 isn't a Clang fact: which repositories exist, which checkout clones back

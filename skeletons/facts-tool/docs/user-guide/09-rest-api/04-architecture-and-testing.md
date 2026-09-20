@@ -1,5 +1,7 @@
 # Architecture and testing
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 The REST layer lives in `src/apis`, divided by responsibility:
 
 | Directory | Responsibility |

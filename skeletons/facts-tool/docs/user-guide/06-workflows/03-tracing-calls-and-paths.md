@@ -1,5 +1,7 @@
 # Workflow: Tracing Calls and Paths
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 Build a persisted call-graph run with `analyse call-graph`, read it back

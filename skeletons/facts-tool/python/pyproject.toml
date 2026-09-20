@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "facts-tool-query"
-version = "0.2.0"
-description = "Read-only Python query SDK for facts-tool SQLite databases"
+version = "0.3.0"
+description = "Python query SDK and optional REST clients for facts-tool"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
@@ -19,9 +19,13 @@ classifiers = [
 ]
 dependencies = []
 
+[project.optional-dependencies]
+rest = ["httpx>=0.28,<1"]
+
 [dependency-groups]
 dev = [
   "build>=1.2.2",
+  "httpx>=0.28,<1",
   "mypy>=1.15",
   "pytest>=8.3",
   "pytest-bdd>=8.1",
