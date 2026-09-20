@@ -1,5 +1,6 @@
 #include "apis/config/Persistence.h"
 #include "apis/config/Defaults.h"
+#include "apis/config/Logging.h"
 #include "apis/config/Watch.h"
 #include <yaml-cpp/yaml.h>
 
@@ -25,6 +26,7 @@ loadSettings(const std::filesystem::path &path) {
     if (root["working_directory"])
       settings.workingDirectory = root["working_directory"].as<std::string>();
     readWatch(root["watch"], settings);
+    readLogging(root["logging"], settings.logging);
     if (root["defaults"]) settings.defaults = root["defaults"].as<std::vector<std::string>>();
     if (root["import_arguments"])
       settings.importArguments = root["import_arguments"].as<std::vector<std::string>>();

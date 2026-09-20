@@ -10,6 +10,14 @@ except ModuleNotFoundError as error:
         ) from error
     raise
 
+from .domain_models import (
+    DomainJob,
+    FileSelector,
+    IndexStatus,
+    OperationError,
+    Symbol,
+    SymbolPage,
+)
 from .errors import (
     ApiError,
     JobFailedError,
@@ -20,6 +28,7 @@ from .errors import (
 from .models import Job
 
 __all__ = [
-    "ApiError", "AsyncClient", "Client", "Job", "JobFailedError",
+    "ApiError", "AsyncClient", "Client", "DomainJob", "FileSelector", "IndexStatus",
+    "Job", "JobFailedError", "OperationError", "Symbol", "SymbolPage",
     "JobTimeoutError", "ProtocolError", "TransportError",
 ]

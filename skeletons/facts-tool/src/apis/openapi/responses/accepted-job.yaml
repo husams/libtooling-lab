@@ -1,0 +1,13 @@
+description: |
+  Job accepted for asynchronous execution. Poll Location until the job reaches
+  a terminal state. Acceptance does not guarantee successful CLI execution.
+headers:
+  Location:
+    description: Relative URL for polling and cancelling this job.
+    required: true
+    schema: {type: string}
+    example: /v1/jobs/1
+content:
+  application/json:
+    schema:
+      $ref: '../openapi.yaml#/components/schemas/Job'

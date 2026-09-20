@@ -1,4 +1,5 @@
 #include "storage/FileManager.h"
+#include "storage/CloneContext.h"
 
 #include "cli/Verbose.h"
 #include "storage/FileDatabase.h"
@@ -125,7 +126,8 @@ std::expected<void, std::string> FileManager::replaceProjectConfiguration(
 std::expected<void, std::error_code>
 FileManager::switchActiveClone(std::string_view repositoryName,
                                std::string_view clonePathOrLabel) {
-  return database_->switchActiveClone(repositoryName, clonePathOrLabel);
+  return database_->switchActiveClone(repositoryName, clonePathOrLabel)
+      .transform([&] { fileIds_.clear(); });
 }
 
 std::expected<void, std::error_code>
@@ -145,6 +147,11 @@ FileManager::markRegistryComplete(std::string_view fingerprint) {
 
 std::expected<FileId, std::error_code>
 FileManager::getId(std::string_view path) {
+  if (const auto revision = cloneContextRevision();
+      revision != cloneContextRevision_) {
+    fileIds_.clear();
+    cloneContextRevision_ = revision;
+  }
   cli::logVerbose(verbosity_, 3,
                   "facts-tool: trace: file resolve requested='{}'", path);
   const auto getCachedOrStored = [this](const std::string &identity) {

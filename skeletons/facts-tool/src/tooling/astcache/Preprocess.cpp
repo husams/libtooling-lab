@@ -1,3 +1,4 @@
+#include "tooling/DiagnosticScope.h"
 #include "tooling/astcache/Preprocess.h"
 
 #include "storage/astcache/Database.h"
@@ -48,6 +49,7 @@ int preprocess(const clang::tooling::CompilationDatabase &database,
   // A separate Clang FileManager prevents relative names in different
   // compilation directories from sharing stale file information.
   clang::tooling::ClangTool tool(database, {source});
+  configureDiagnostics(tool);
   if (!options.enabled)
     return tool.run(createIncludeVisitorFactory(includes).get());
   report(options, "miss", source);

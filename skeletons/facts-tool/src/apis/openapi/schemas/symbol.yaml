@@ -1,0 +1,13 @@
+type: object
+required: [qualified_name, kind, usr, file_id, is_definition, path, repo, clone, component]
+additionalProperties: false
+properties:
+  qualified_name: {type: string}
+  kind: {type: string, description: Symbol category such as function or class.}
+  usr: {type: string, description: Clang Unified Symbol Resolution identifier.}
+  file_id: {type: integer, format: int64, description: Defining file in project.db.}
+  is_definition: {type: boolean, description: Whether this file is a known definition.}
+  path: {type: string, description: Definition path or declaration fallback.}
+  repo: {type: string}
+  clone: {type: string}
+  component: {type: string}

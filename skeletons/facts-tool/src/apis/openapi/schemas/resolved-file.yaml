@@ -1,0 +1,9 @@
+type: object
+required: [id, path, repo, component, clone]
+additionalProperties: false
+properties:
+  id: {type: integer, format: int64}
+  path: {type: string}
+  repo: {type: string}
+  component: {type: string}
+  clone: {type: [string, 'null']}

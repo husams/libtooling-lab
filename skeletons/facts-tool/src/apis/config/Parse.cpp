@@ -15,6 +15,7 @@ std::expected<Settings, int> parseSettings(int argc, char **argv) {
       throw std::runtime_error("--server-config must not be empty");
     if ((app.count("--config") && arguments.configuration.empty()) ||
         (app.count("--conf") && arguments.project.empty()) ||
+        (app.count("--log-file") && arguments.logFile.empty()) ||
         (app.count("--working-directory") && arguments.workingDirectory.empty()))
       throw std::runtime_error("configuration paths must not be empty");
     auto settings = loadSettings(std::filesystem::absolute(arguments.serverConfig))

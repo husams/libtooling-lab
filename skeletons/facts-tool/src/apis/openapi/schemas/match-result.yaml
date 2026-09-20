@@ -1,0 +1,16 @@
+type: object
+required: [operation, file, complete, facts_committed, match_count, matches]
+additionalProperties: false
+properties:
+  operation: {type: string, const: match}
+  file:
+    $ref: resolved-file.yaml
+  diagnostics:
+    $ref: diagnostics.yaml
+  complete: {type: boolean}
+  facts_committed: {type: boolean}
+  match_count: {type: integer, minimum: 0}
+  matches:
+    type: array
+    items:
+      $ref: matcher-row.yaml

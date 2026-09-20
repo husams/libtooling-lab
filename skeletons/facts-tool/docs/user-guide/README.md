@@ -19,11 +19,19 @@ on facts-tool's own source code.
 Run `facts-tool serve` for the asynchronous REST interface, optional daemon mode,
 automatic port allocation and Linux repository monitoring. See
 [Running the server](09-rest-api/01-running-the-server.md) for startup and saved
-configuration, [Requests and jobs](09-rest-api/02-requests-and-jobs.md) for command
-parity, and [Repository monitoring](09-rest-api/03-watching-directories.md) for
+configuration, [Requests and jobs](09-rest-api/02-requests-and-jobs.md) for global
+symbol lookup and typed source analysis, and [Repository monitoring](09-rest-api/03-watching-directories.md) for
 automatic reimport and forced reindexing.
 
 For a new server or client machine, follow [REST installation](09-rest-api/05-installation.md)
 and [Deployment and operation](09-rest-api/06-deployment.md). Python applications
 and agents can use the [REST client](05-python-sdk/11-rest-client.md) to submit
-CLI commands, await results, cancel jobs, and inspect the server.
+typed extraction, match and dependency requests, search symbols across repositories,
+await results, and inspect server and index status. Database paths remain server-owned.
+
+The [OpenAPI YAML contract](09-rest-api/08-openapi-contract.md) defines the REST
+interface and generates native routes and Python operation bindings. Download
+the live contract from `/openapi.yaml` or `/openapi.json`.
+
+[Logging and verbosity](09-rest-api/09-logging.md) explains independent log-file
+paths, YAML and CLI severity settings, and structured server events.

@@ -1,4 +1,5 @@
 #include "storage/FileDatabase.h"
+#include "storage/ActiveClone.h"
 
 #include "storage/FileIdentity.h"
 #include "storage/FilePersistence.h"
@@ -397,32 +398,18 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
 std::expected<void, std::error_code>
 FileDatabase::switchActiveClone(std::string_view repositoryName,
                                 std::string_view clonePathOrLabel) {
-  auto transaction = database_.write();
-  if (!transaction) {
-    return std::unexpected(transaction.error());
-  }
   constexpr auto sql =
-      "UPDATE repository SET active_clone_id=(SELECT id FROM clone "
-      "WHERE repository_id=repository.id AND (path=?2 OR label=?2)) "
-      "WHERE name=?1 AND EXISTS(SELECT 1 FROM clone "
-      "WHERE repository_id=repository.id AND (path=?2 OR label=?2))";
-  const std::array rows{std::string{repositoryName}};
-  return database_
-      .executeBulk(
-          sql, rows,
-          [clonePathOrLabel](sqlite3_stmt *statement, const std::string &name) {
-            return storage::bindParameters(statement, name, clonePathOrLabel);
-          },
-          {.atomic = false})
-      .and_then([](const storage::BulkResult &result)
-                    -> std::expected<void, std::error_code> {
-        return result.changes == 1
-                   ? std::expected<void, std::error_code>{}
-                   : std::expected<void, std::error_code>{
-                         std::unexpected(std::make_error_code(
-                             std::errc::no_such_file_or_directory))};
-      })
-      .and_then([&] { return transaction->commit(); });
+      "SELECT r.id,c.id FROM repository r JOIN clone c ON c.repository_id=r.id "
+      "WHERE r.name=?1 AND (c.path=?2 OR c.label=?2)";
+  auto selected = storage::detail::toItlibGenerator(database_.query(
+      sql, [](const storage::Row &row) {
+        return std::pair{row.integer(0), row.integer(1)};
+      }, std::string(repositoryName), std::string(clonePathOrLabel)));
+  return storage::detail::collectOne(std::move(selected))
+      .and_then([&](const auto &selection) {
+        return storage::activateRegisteredClone(database_, selection.first,
+                                                selection.second);
+      });
 }
 
 std::expected<void, std::error_code>

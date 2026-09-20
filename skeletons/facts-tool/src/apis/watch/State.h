@@ -2,6 +2,7 @@
 #include "apis/watch/Watcher.h"
 #include "apis/watch/Paths.h"
 #include "apis/watch/Update.h"
+#include "apis/logging/Logger.h"
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <array>
@@ -14,7 +15,7 @@
 
 namespace facts::apis {
 struct Watcher::Impl : std::enable_shared_from_this<Impl> {
-  Impl(boost::asio::io_context &, Queue &, const Settings &);
+  Impl(boost::asio::io_context &, Queue &, const Settings &, logging::Logger *);
   std::expected<void, std::string> start();
   void stop();
   Json status() const;
@@ -37,6 +38,7 @@ struct Watcher::Impl : std::enable_shared_from_this<Impl> {
   Queue &queue;
   boost::asio::io_context &io;
   Settings settings;
+  logging::Logger *logger;
   boost::asio::steady_timer debounce;
   boost::asio::steady_timer recovery;
   boost::asio::thread_pool scanner{1};

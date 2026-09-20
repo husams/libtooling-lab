@@ -2,6 +2,7 @@
 
 #include "cli/Options.h"
 #include "commands/match/MatchResultLocation.h"
+#include "commands/match/VisibleBindings.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/Basic/SourceManager.h>
@@ -11,15 +12,17 @@ namespace facts::commands::match {
 
 llvm::json::Object describeMatch(
     const clang::ast_matchers::MatchFinder::MatchResult &result,
-    const std::optional<std::string> &relationKind) {
+    const std::optional<std::string> &relationKind,
+    std::string_view internalRoot, BindingPolicy policy) {
   llvm::json::Object bindings;
-  for (const auto &[name, node] : result.Nodes.getMap())
+  for (const auto &[name, node] : visibleBindings(result.Nodes, internalRoot))
     bindings[name] = describeBinding(node, *result.Context);
   const auto &source = result.Context->getSourceManager();
   llvm::json::Value kind = nullptr;
   if (relationKind)
     kind = *relationKind;
-  else if (result.Nodes.getNodeAs<clang::CallExpr>("call"))
+  else if (policy == BindingPolicy::Contract &&
+           result.Nodes.getNodeAs<clang::CallExpr>("call"))
     kind = "Calls";
   return llvm::json::Object{{"translation_unit", sourcePath(
                source, source.getLocForStartOfFile(source.getMainFileID()))},
@@ -50,26 +53,28 @@ std::string describeLocation(const clang::Stmt &node,
   return nodeLocation(clang::DynTypedNode::create(node), context);
 }
 
-void writeResults(const cli::MatchOptions &options,
+MatchOutput describeResults(const cli::MatchOptions &options,
                   const std::vector<std::string> &sources,
-                  llvm::json::Array matches, const std::string &text,
-                  std::ostream &output) {
-  if (options.format == "text") {
-    output << text;
-    return;
-  }
+                  llvm::json::Array matches, std::string text) {
   llvm::json::Array selected;
   for (const auto &source : sources)
     selected.push_back(source);
-  llvm::json::Object document{
+  return {llvm::json::Object{
       {"schema_version", 1}, {"matcher", options.matcher},
       {"sources", std::move(selected)}, {"complete", true},
       {"facts_committed", true}, {"index_committed", true},
-      {"matches", std::move(matches)}};
-  std::string json;
-  llvm::raw_string_ostream stream(json);
-  stream << llvm::json::Value(std::move(document));
-  output << json << '\n';
+      {"matches", std::move(matches)}}, std::move(text)};
+}
+
+void writeResults(MatchOutput result, bool json, std::ostream &output) {
+  if (!json) {
+    output << result.text;
+    return;
+  }
+  std::string document;
+  llvm::raw_string_ostream stream(document);
+  stream << llvm::json::Value(std::move(result.document));
+  output << document << '\n';
 }
 
 } // namespace facts::commands::match

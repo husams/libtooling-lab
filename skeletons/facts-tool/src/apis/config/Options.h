@@ -9,6 +9,9 @@ struct Arguments {
   std::string configuration;
   std::string project;
   std::string workingDirectory;
+  std::string logFile;
+  std::string logLevel;
+  unsigned verbosity = 1;
   bool enableWatch = false;
   bool disableWatch = false;
 };

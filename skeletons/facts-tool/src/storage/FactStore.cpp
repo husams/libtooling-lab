@@ -1,4 +1,5 @@
 #include "storage/FactStore.h"
+#include "model/AnalysisDiagnostic.h"
 
 #include <iostream>
 #include <ranges>
@@ -19,7 +20,7 @@ std::expected<void, std::error_code> FactStore::end(bool reportSummary) {
   return storage_.commit().transform([this, reportSummary] {
     callableInvocations_.clear();
     pointerCallSites_.clear();
-    if (!reportSummary)
+    if (!reportSummary || embeddedAnalysis())
       return;
     const auto files = idsByUsr_ | std::views::values |
                        std::views::transform(&SymbolId::file) |

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "commands/match/MatchOutput.h"
+#include "commands/match/BindingPolicy.h"
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <llvm/Support/JSON.h>
 
@@ -16,16 +18,19 @@ namespace facts::commands::match {
 
 llvm::json::Object describeMatch(
     const clang::ast_matchers::MatchFinder::MatchResult &result,
-    const std::optional<std::string> &relationKind);
+    const std::optional<std::string> &relationKind,
+    std::string_view internalRoot = {},
+    BindingPolicy policy = BindingPolicy::Contract);
 
 std::string describeLocation(const clang::NamedDecl &node,
                              const clang::ASTContext &context);
 std::string describeLocation(const clang::Stmt &node,
                              const clang::ASTContext &context);
 
-void writeResults(const cli::MatchOptions &options,
+MatchOutput describeResults(const cli::MatchOptions &options,
                   const std::vector<std::string> &sources,
-                  llvm::json::Array matches, const std::string &text,
-                  std::ostream &output);
+                  llvm::json::Array matches, std::string text);
+
+void writeResults(MatchOutput result, bool json, std::ostream &output);
 
 } // namespace facts::commands::match

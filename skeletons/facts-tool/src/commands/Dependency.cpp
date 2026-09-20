@@ -1,3 +1,4 @@
+#include "model/AnalysisDiagnostic.h"
 #include "commands/Dependency.h"
 #include "commands/PreprocessTranslationUnit.h"
 
@@ -84,7 +85,8 @@ registerFiles(FileManager &files, const CompilationDatabase &database,
   return discoverCompilationFiles(database, sources)
       .and_then([&](CompilationFiles discovered) {
         for (const auto &diagnostic : discovered.diagnostics) {
-          std::cerr << "facts-tool: " << diagnostic << '\n';
+          if (!collectDiagnostic({"warning", diagnostic, ""}))
+            std::cerr << "facts-tool: " << diagnostic << '\n';
         }
         return files.addBulk(discovered.files)
             .transform_error([](std::error_code error) {
@@ -283,6 +285,12 @@ runDependency(const cli::DependencyOptions &options) {
   configured.defaultExtraArguments = std::move(resolved->extraArguments);
   configured.astCache = resolved->astCache;
   configured.astCache.verbosity = options.verbosity;
+  return runDependencyResolved(configured);
+}
+
+std::expected<int, std::string>
+runDependencyResolved(const cli::DependencyOptions &options) {
+  auto configured = options;
   return runDependencyStage(configured, "validate sources",
                             [&] { return validateSources(configured); })
       .and_then([&] {

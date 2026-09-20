@@ -1,0 +1,3 @@
+oneOf:
+  - $ref: '../openapi.yaml#/components/schemas/DomainJob'
+  - $ref: '../openapi.yaml#/components/schemas/Job'

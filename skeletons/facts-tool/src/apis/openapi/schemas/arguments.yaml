@@ -1,0 +1,16 @@
+type: object
+required: [arguments]
+additionalProperties: false
+properties:
+  arguments:
+    type: array
+    minItems: 0
+    maxItems: 4096
+    items:
+      $ref: '../openapi.yaml#/components/schemas/Argument'
+    description: |
+      Arguments after the command supplied in the URL. Command components and
+      these values together may contain at most 4096 items before defaults.
+x-max-combined-arguments: 4096
+examples:
+  - arguments: ['--help']

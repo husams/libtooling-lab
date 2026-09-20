@@ -1,0 +1,8 @@
+type: object
+required: [commands]
+additionalProperties: false
+properties:
+  commands:
+    type: array
+    items:
+      $ref: '../openapi.yaml#/components/schemas/Command'

@@ -15,17 +15,24 @@ def response_body(response: httpx.Response) -> dict[str, object]:
         raise ProtocolError("Server returned invalid JSON") from error
     if not response.is_success:
         message = value.get("error") if isinstance(value, dict) else None
+        code, details = None, None
+        if isinstance(message, dict):
+            code = message.get("code")
+            details = message.get("details")
+            message = message.get("message")
         raise ApiError(
             response.status_code,
             message if isinstance(message, str) else response.reason_phrase,
+            code=code if isinstance(code, str) else None,
+            details=object_value(details) if isinstance(details, dict) else None,
         )
     return object_value(value)
 
 
-def request(
+def send(
     client: httpx.Client, method: str, path: str,
     body: dict[str, object] | None = None, *, budget: float | None = None,
-) -> dict[str, object]:
+) -> httpx.Response:
     timeout = client.timeout if budget is None else min(
         budget, client.timeout.read or budget,
     )
@@ -34,13 +41,13 @@ def request(
     except httpx.HTTPError as error:
         message = f"{method} {path} failed: {type(error).__name__}"
         raise TransportError(message) from error
-    return response_body(response)
+    return response
 
 
-async def async_request(
+async def async_send(
     client: httpx.AsyncClient, method: str, path: str,
     body: dict[str, object] | None = None, *, budget: float | None = None,
-) -> dict[str, object]:
+) -> httpx.Response:
     timeout = client.timeout if budget is None else min(
         budget, client.timeout.read or budget,
     )
@@ -49,4 +56,32 @@ async def async_request(
     except httpx.HTTPError as error:
         message = f"{method} {path} failed: {type(error).__name__}"
         raise TransportError(message) from error
-    return response_body(response)
+    return response
+
+
+def request(
+    client: httpx.Client, method: str, path: str,
+    body: dict[str, object] | None = None, *, budget: float | None = None,
+) -> dict[str, object]:
+    return response_body(send(client, method, path, body, budget=budget))
+
+
+async def async_request(
+    client: httpx.AsyncClient, method: str, path: str,
+    body: dict[str, object] | None = None, *, budget: float | None = None,
+) -> dict[str, object]:
+    return response_body(await async_send(client, method, path, body, budget=budget))
+
+
+def text_body(response: httpx.Response) -> str:
+    if not response.is_success:
+        response_body(response)
+    return response.text
+
+
+def request_text(client: httpx.Client, method: str, path: str) -> str:
+    return text_body(send(client, method, path))
+
+
+async def async_request_text(client: httpx.AsyncClient, method: str, path: str) -> str:
+    return text_body(await async_send(client, method, path))

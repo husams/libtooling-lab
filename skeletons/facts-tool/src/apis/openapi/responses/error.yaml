@@ -1,0 +1,12 @@
+description: |
+  JSON error response. 400 indicates invalid HTTP, malformed JSON, an unknown
+  command, or invalid arguments; 401 requires a configured Bearer token; 403
+  rejects browser-origin requests or an invalid local Host header; 404 means
+  an unknown endpoint or unretained job; 405 means the method is unsupported;
+  413 exceeds the 1 MiB request-body limit; 429 means the queue is full or
+  shutting down; 500 indicates an unexpected server error. Headers are limited
+  to 16384 bytes. CLI execution failures are job states, not HTTP errors.
+content:
+  application/json:
+    schema:
+      $ref: '../openapi.yaml#/components/schemas/Error'

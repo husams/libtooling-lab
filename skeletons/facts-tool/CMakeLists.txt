@@ -228,6 +228,8 @@ add_library(facts-storage STATIC
   src/storage/DependencyDatabase.cpp
   src/storage/FileDatabase.cpp
   src/storage/FileIdentity.cpp
+  src/storage/CloneContext.cpp
+  src/storage/ActiveClone.cpp
   src/storage/FileIndexState.cpp
   src/storage/FileManager.cpp
   src/storage/FilePersistence.cpp
@@ -257,6 +259,7 @@ add_library(facts-storage STATIC
   src/storage/Sqlite.cpp
   src/storage/Storage.cpp
   src/storage/Symbol.cpp
+  src/storage/SymbolRefresh.cpp
   src/storage/Variable.cpp
   src/storage/variableflow/Database.cpp
   src/storage/variableflow/Schema.cpp
@@ -272,6 +275,10 @@ target_link_libraries(facts-storage
   PRIVATE facts-clang
 )
 
+add_library(facts-diagnostics STATIC src/tooling/DiagnosticScope.cpp)
+target_include_directories(facts-diagnostics PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(facts-diagnostics PRIVATE facts-clang)
+
 add_library(facts-tooling STATIC
   src/tooling/CompilationFiles.cpp
   src/tooling/CompilationCommandCodec.cpp
@@ -279,9 +286,11 @@ add_library(facts-tooling STATIC
   src/tooling/import/Identity.cpp
   src/tooling/StoredCompilationDatabase.cpp
   src/tooling/StoredCompilationReader.cpp
+  src/tooling/CompilationPathRemapping.cpp
+  src/tooling/CompilationContext.cpp
 )
 target_include_directories(facts-tooling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang
+target_link_libraries(facts-tooling PRIVATE facts-storage facts-clang facts-diagnostics
                                             facts-sqlite facts-config)
 
 add_library(facts-config STATIC
@@ -463,9 +472,16 @@ add_library(facts-commands STATIC
   src/commands/match/ExpressionEvidence.cpp
   src/commands/match/DirectCall.cpp
   src/commands/match/MatchCallback.cpp
+  src/commands/match/ContractMatch.cpp
+  src/commands/match/GenericMatch.cpp
+  src/commands/match/GenericSymbol.cpp
+  src/commands/match/ParsedMatcher.cpp
+  src/commands/match/VisibleBindings.cpp
   src/commands/match/MatchCancellation.cpp
   src/commands/match/MatchContract.cpp
   src/commands/match/MatchExecution.cpp
+  src/commands/match/MatchPreparation.cpp
+  src/commands/match/MatchResolved.cpp
   src/commands/match/MatchFrontend.cpp
   src/commands/match/MatchPublication.cpp
   src/commands/match/MatchResult.cpp
@@ -554,6 +570,9 @@ include(GNUInstallDirs)
 set_property(TARGET facts-tool PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
 install(TARGETS facts-tool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   COMPONENT facts-tool)
+install(DIRECTORY src/apis/openapi/
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/facts-tool/openapi
+  COMPONENT facts-tool FILES_MATCHING PATTERN "*.yaml")
 
 add_executable(sqlite-generator-demo examples/sqlite_generator_demo.cpp)
 target_link_libraries(sqlite-generator-demo PRIVATE facts-storage
@@ -563,18 +582,20 @@ include(CTest)
 if(BUILD_TESTING)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "import pytest, pytest_bdd"
+    COMMAND ${Python3_EXECUTABLE} -c
+      "import pytest, pytest_bdd, yaml, openapi_spec_validator, jsonschema"
     RESULT_VARIABLE FACTS_TOOL_PYTEST_IMPORT_RESULT
     OUTPUT_QUIET
     ERROR_QUIET
   )
   if(NOT FACTS_TOOL_PYTEST_IMPORT_RESULT EQUAL 0)
     message(FATAL_ERROR
-      "pytest and pytest-bdd are required when BUILD_TESTING is enabled; "
+      "Python test and OpenAPI validation dependencies are required when BUILD_TESTING is enabled; "
       "install tests/e2e/requirements.txt"
     )
   endif()
   add_subdirectory(tests/implicit)
+  add_subdirectory(tests/openapi)
   add_test(NAME api-build-dependencies
     COMMAND ${Python3_EXECUTABLE} -m pytest
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/build_dependencies -q
@@ -590,6 +611,24 @@ if(BUILD_TESTING)
       --api-compiler ${LLVM_TOOLS_BINARY_DIR}/clang++)
   set_tests_properties(facts-tool-rest-api PROPERTIES TIMEOUT 180)
   add_executable(api-queue-test tests/apis/native/QueueTest.cpp)
+  add_executable(api-global-index-test tests/apis/native/IndexTest.cpp
+    tests/apis/native/index/Fixture.cpp tests/apis/native/index/Snapshot.cpp
+    tests/apis/native/index/Failures.cpp tests/apis/native/index/Cursor.cpp
+    tests/apis/native/index/Migration.cpp tests/apis/native/index/Obsolete.cpp)
+  target_link_libraries(api-global-index-test PRIVATE facts-apis facts-storage)
+  add_test(NAME api-global-index COMMAND api-global-index-test)
+  set_tests_properties(api-global-index PROPERTIES TIMEOUT 30)
+  add_executable(api-logging-queue-test tests/apis/native/LoggingQueueTest.cpp)
+  target_link_libraries(api-logging-queue-test PRIVATE facts-apis)
+  add_test(NAME api-logging-queue COMMAND api-logging-queue-test)
+  set_tests_properties(api-logging-queue PROPERTIES TIMEOUT 30)
+  add_executable(api-logging-watch-test tests/apis/native/LoggingWatchTest.cpp)
+  target_link_libraries(api-logging-watch-test PRIVATE facts-apis)
+  add_test(NAME api-logging-watch COMMAND api-logging-watch-test)
+  add_executable(api-logging-sink-test tests/apis/native/LoggingSinkTest.cpp)
+  target_link_libraries(api-logging-sink-test PRIVATE facts-apis)
+  add_test(NAME api-logging-sink COMMAND api-logging-sink-test)
+  set_tests_properties(api-logging-sink PROPERTIES TIMEOUT 10)
   add_executable(api-ignore-test tests/apis/IgnoreTest.cpp
                  tests/apis/ignore/Rules.cpp tests/apis/ignore/Tracked.cpp)
   target_link_libraries(api-ignore-test PRIVATE facts-apis facts-git)
@@ -721,6 +760,15 @@ if(BUILD_TESTING)
   )
   add_executable(stored-compilation-database-test
                  tests/StoredCompilationDatabaseTest.cpp)
+  add_executable(clone-context-test tests/CloneContextTest.cpp)
+  add_executable(active-clone-test tests/ActiveCloneTest.cpp)
+  target_link_libraries(active-clone-test PRIVATE facts-storage facts-clang)
+  add_test(NAME active-clone COMMAND active-clone-test
+           ${CMAKE_CURRENT_BINARY_DIR}/active-clone-scratch)
+  target_link_libraries(clone-context-test
+                        PRIVATE facts-tooling facts-storage facts-clang)
+  add_test(NAME clone-context COMMAND clone-context-test
+           ${CMAKE_CURRENT_BINARY_DIR}/clone-context-scratch)
   target_link_libraries(stored-compilation-database-test
                         PRIVATE facts-tooling facts-storage facts-clang
                                 facts-sqlite)
@@ -741,6 +789,9 @@ if(BUILD_TESTING)
   )
   add_executable(platform-flags-test tests/PlatformFlagsTest.cpp)
   target_link_libraries(platform-flags-test PRIVATE facts-platform facts-clang)
+  add_executable(transferred-compilation-test tests/TransferredCompilationTest.cpp)
+  target_link_libraries(transferred-compilation-test PRIVATE facts-tooling facts-platform facts-clang)
+  add_test(NAME transferred-compilation COMMAND transferred-compilation-test)
   add_executable(driver-probe-cache-test tests/DriverProbeCacheTest.cpp)
   target_link_libraries(driver-probe-cache-test PRIVATE facts-platform facts-storage facts-clang)
   add_test(NAME driver-probe-cache COMMAND driver-probe-cache-test)
@@ -853,6 +904,15 @@ if(BUILD_TESTING)
   target_link_libraries(symbol-browser-test PRIVATE facts-symbol-ui)
   add_test(NAME symbol-browser COMMAND symbol-browser-test)
   add_executable(dependency-database-test tests/DependencyDatabaseTest.cpp)
+  add_executable(symbol-refresh-test tests/SymbolRefreshTest.cpp)
+  target_link_libraries(symbol-refresh-test PRIVATE facts-storage facts-clang)
+  add_test(NAME symbol-refresh COMMAND symbol-refresh-test
+    ${CMAKE_CURRENT_BINARY_DIR}/symbol-refresh.sqlite)
+
+  add_executable(dependency-clone-context-test tests/DependencyCloneContextTest.cpp)
+  target_link_libraries(dependency-clone-context-test PRIVATE facts-storage facts-clang)
+  add_test(NAME dependency-clone-context COMMAND dependency-clone-context-test
+           ${CMAKE_CURRENT_BINARY_DIR}/dependency-clone-context.sqlite)
   target_link_libraries(dependency-database-test PRIVATE facts-storage
                                                          facts-sqlite)
   add_test(NAME sqlite-generator-demo COMMAND sqlite-generator-demo)

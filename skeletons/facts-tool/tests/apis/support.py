@@ -24,6 +24,10 @@ class Api:
         self.token = token
 
     def request(self, method, path, body=None, raw=None, token=None, extra_headers=None):
+        status, _, content = self.exchange(method, path, body, raw, token, extra_headers)
+        return status, json.loads(content) if content else None
+
+    def exchange(self, method, path, body=None, raw=None, token=None, extra_headers=None):
         connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
         headers = {"Content-Type": "application/json"}
         headers.update(extra_headers or {})
@@ -35,7 +39,7 @@ class Api:
             connection.request(method, path, body=payload, headers=headers)
             response = connection.getresponse()
             content = response.read()
-            return response.status, json.loads(content) if content else None
+            return response.status, dict(response.getheaders()), content.decode()
         finally:
             connection.close()
 

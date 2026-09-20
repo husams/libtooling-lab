@@ -1,0 +1,20 @@
+get:
+  operationId: watchStatus
+  tags: [server]
+  summary: Read database-driven filesystem monitor status
+  description: |
+    Monitoring discovers repositories and clones from the configured project
+    database. Clone exclusions, directory exclusions, repository .gitignore
+    rules, and additional YAML patterns determine eligible files. On Linux,
+    inotify events schedule asynchronous reimport and extraction jobs. Catalog
+    scans run off the HTTP event loop. This endpoint returns the latest snapshot
+    immediately, even while scanning or extracting.
+  responses:
+    '200':
+      description: Monitor state, discovered clones, exclusions, and recent jobs.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/WatchStatus'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

@@ -1,6 +1,7 @@
 #include "tooling/StoredCompilationDatabase.h"
 
 #include "tooling/CompilationCommandCodec.h"
+#include "tooling/CompilationContext.h"
 #include "tooling/StoredCompilationReader.h"
 
 #include <filesystem>
@@ -41,17 +42,30 @@ private:
   CompileCommands commands_;
 };
 
+} // namespace
+
 std::unique_ptr<clang::tooling::CompilationDatabase>
 makeStoredCompilationDatabase(CompileCommands commands) {
   return std::make_unique<StoredCompilationDatabase>(std::move(commands));
 }
 
-} // namespace
-
 std::expected<std::unique_ptr<clang::tooling::CompilationDatabase>, std::string>
 loadStoredCompilationDatabase(std::string databasePath,
                               std::span<const std::string> requestedSources) {
-  return openStoredDatabase(normalizeCompilationPath(std::move(databasePath)))
+  const auto project = normalizeCompilationPath(std::move(databasePath));
+  if (const auto *context = invocationCompilation(project)) {
+    CompileCommands selected;
+    for (const auto &command : context->commands) {
+      const bool requested = requestedSources.empty() ||
+          std::ranges::any_of(requestedSources, [&](const auto &source) {
+            return normalizeCompilationPath(source) ==
+                   normalizeCompilationPath(command.Filename);
+          });
+      if (requested) selected.push_back(command);
+    }
+    if (!selected.empty()) return makeStoredCompilationDatabase(std::move(selected));
+  }
+  return openStoredDatabase(project)
       .and_then([requestedSources](StoredDatabase database) {
         return readStoredCompilation(database.get(), requestedSources);
       })

@@ -7,9 +7,11 @@ import httpx
 
 from .arguments import identifier
 from .configuration import seconds
-from .decoding import job
+from .domain_models import DomainJob
+from .endpoints import endpoint
 from .errors import JobTimeoutError, TransportError
 from .models import Job
+from .snapshots import snapshot
 from .transport import async_request, request
 
 
@@ -30,14 +32,14 @@ def remaining(stop: float | None, job_id: str, timeout: float | None) -> float |
 
 def wait(
     client: httpx.Client, job_id: str, timeout: float | None, poll_interval: float,
-) -> Job:
-    path = "v1/jobs/" + identifier(job_id)
+) -> Job | DomainJob:
+    method, path = endpoint("getJob", id=identifier(job_id))
     validate_wait(timeout, poll_interval)
     stop = None if timeout is None else time.monotonic() + timeout
     while True:
         budget = remaining(stop, job_id, timeout)
         try:
-            result = job(request(client, "GET", path, budget=budget))
+            result = snapshot(request(client, method, path, budget=budget))
         except TransportError:
             remaining(stop, job_id, timeout)
             raise
@@ -49,15 +51,16 @@ def wait(
 
 async def async_wait(
     client: httpx.AsyncClient, job_id: str, timeout: float | None, poll_interval: float,
-) -> Job:
-    path = "v1/jobs/" + identifier(job_id)
+) -> Job | DomainJob:
+    method, path = endpoint("getJob", id=identifier(job_id))
     validate_wait(timeout, poll_interval)
     stop = None if timeout is None else time.monotonic() + timeout
     while True:
         budget = remaining(stop, job_id, timeout)
         try:
             async with asyncio.timeout(budget):
-                result = job(await async_request(client, "GET", path, budget=budget))
+                result = snapshot(
+                    await async_request(client, method, path, budget=budget))
         except TimeoutError as error:
             raise JobTimeoutError(job_id, timeout) from error
         except TransportError:

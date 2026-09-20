@@ -30,13 +30,13 @@ std::expected<bool, std::string> Lifecycle::detach() {
     const auto result = awaitReadiness(descriptors[0], child);
     ::close(descriptors[0]);
     if (!result)
-      return std::unexpected(result.error() + "; inspect " + settings_.serverConfig.string() + ".log");
+      return std::unexpected(result.error() + "; inspect " + settings_.logging.file.string());
     return *result;
   }
   ::close(descriptors[0]);
   readiness_ = descriptors[1];
   ::signal(SIGPIPE, SIG_IGN);
-  return redirectDaemon(settings_.serverConfig.string() + ".log", settings_.workingDirectory)
+  return redirectDaemon(settings_.logging.file.string(), settings_.workingDirectory)
       .and_then([&] { return writePid(lock_); })
       .transform([] { return true; });
 }

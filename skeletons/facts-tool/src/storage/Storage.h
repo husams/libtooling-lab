@@ -15,6 +15,7 @@
 #include "model/UnresolvedCallSite.h"
 #include "storage/FactProvenance.h"
 #include "storage/SqliteDatabase.h"
+#include "storage/SymbolRefresh.h"
 
 #include <concepts>
 #include <cstdint>
@@ -43,6 +44,14 @@ public:
   std::expected<void, std::error_code> begin();
   std::expected<void, std::error_code> commit();
   std::expected<void, std::error_code> rollback();
+
+  std::expected<void, std::error_code>
+  beginSymbolRefresh(std::span<const FileId> selected) {
+    return storage::beginSymbolRefresh(database_, selected);
+  }
+  std::expected<void, std::error_code> finishSymbolRefresh() {
+    return storage::finishSymbolRefresh(database_);
+  }
 
   // Records only files used by facts, plus explicitly selected inputs, in the
   // caller's active transaction.

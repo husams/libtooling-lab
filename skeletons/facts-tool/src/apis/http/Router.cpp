@@ -1,70 +1,66 @@
 #include "apis/http/Router.h"
-#include "apis/http/OpenApi.h"
+#include "apis/http/Access.h"
+#include "apis/runtime/Service.h"
+#include <chrono>
 
 namespace facts::apis {
 Response Router::operator()(const Request &request) {
-  namespace http = boost::beast::http;
-  if (request.find(http::field::origin) != request.end())
-    return error(403, "Browser-origin requests are not supported");
-  if (request.find("Sec-Fetch-Site") != request.end())
-    return error(403, "Browser requests are not supported");
-  if (settings.token.empty()) {
-    const auto address = settings.host.find(':') == std::string::npos
-        ? settings.host : "[" + settings.host + "]";
-    const auto host = request[http::field::host];
-    const auto port = ":" + std::to_string(settings.port);
-    if (host != address && host != address + port &&
-        host != "localhost" && host != "localhost" + port)
-      return error(403, "Host must match the local listener address");
-  }
-  if (!settings.token.empty() &&
-      request[http::field::authorization] != "Bearer " + settings.token)
-    return error(401, "Bearer authentication required");
-  const std::string path(request.target());
-  const auto method = request.method();
-  if (path == "/openapi.json")
-    return method == http::verb::get
-        ? response(200, openApi(commands, !settings.token.empty()))
-        : error(405, "Use GET");
-  if (path == "/health")
-    return method == http::verb::get
-        ? response(200, {{"status", "ok"}}) : error(405, "Use GET");
-  if (path == "/v1/commands") {
-    if (method != http::verb::get) return error(405, "Use GET");
+  const auto started = std::chrono::steady_clock::now();
+  const auto method = request.method_string(), path = request.target();
+  const auto route = authorize(request, settings).and_then([&] {
+    return matchRoute({method.data(), method.size()}, {path.data(), path.size()});
+  });
+  auto reply = route ? dispatch(request, *route)
+                     : error(route.error().status, route.error().message);
+  const auto elapsed = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - started).count();
+  const auto safeMethod = request.method() == boost::beast::http::verb::unknown
+      ? "UNKNOWN" : boost::beast::http::to_string(request.method());
+  if (logger) logger->write(logging::Level::debug, "http.response",
+      {{"method", std::string(safeMethod)}, {"status", reply.result_int()},
+       {"route", route ? operationRoute(route->operation).path : "unmatched"},
+       {"duration_ms", elapsed}});
+  return reply;
+}
+Response Router::dispatch(const Request &request, const MatchedRoute &route) {
+  using enum generated::Operation;
+  switch (route.operation) {
+  case openapi: return textResponse(200, documents.json, "application/json");
+  case openapiYaml: return textResponse(200, documents.yaml, "application/yaml");
+  case health: return response(200, {{"status", "ok"}});
+  case commands: {
     Json catalog = Json::array();
-    for (const auto &command : commands)
-      catalog.push_back({{"path", command},
-                         {"endpoint", "/v1/commands/" + command}});
+    for (const auto &path : this->commands)
+      catalog.push_back({{"path", path}, {"endpoint", endpoint(command, path)}});
     return response(200, {{"commands", catalog}});
   }
-  if (path == "/v1/watch")
-    return method == http::verb::get ? response(200, watchStatus())
-                                     : error(405, "Use GET");
-  if (path == "/v1/shutdown") {
-    if (method != http::verb::post) return error(405, "Use POST");
-    shutdown();
+  case watchStatus: return response(200, this->watchStatus());
+  case shutdown:
+    this->shutdown();
     return response(202, {{"status", "stopping"}});
+  case listJobs: {
+    auto list = jobs.list();
+    if (resources) for (auto &job : resources->list()) list.push_back(std::move(job));
+    return response(200, {{"jobs", list}});
   }
-  if (path == "/v1/jobs") {
-    if (method == http::verb::get)
-      return response(200, {{"jobs", jobs.list()}});
-    return method == http::verb::post ? submit(request, "")
-                                      : error(405, "Use GET or POST");
-  }
-  if (path.starts_with("/v1/commands/"))
-    return method == http::verb::post ? submit(request, path.substr(13))
-                                      : error(405, "Use POST");
-  if (path.starts_with("/v1/jobs/")) {
-    const auto id = path.substr(9);
-    const auto job = jobs.get(id);
+  case submit: return this->submit(request, "");
+  case command: return this->submit(request, route.parameter);
+  case getJob:
+  case cancelJob: {
+    if (resources && resources->contains(route.parameter))
+      return error(500, "Native job results require asynchronous dispatch");
+    const auto job = jobs.get(route.parameter);
     if (!job) return error(404, "Unknown job");
-    if (method == http::verb::get) return response(200, *job);
-    if (method == http::verb::delete_) {
-      jobs.cancel(id);
-      return response(200, *jobs.get(id));
-    }
-    return error(405, "Use GET or DELETE");
+    if (route.operation == getJob) return response(200, *job);
+    jobs.cancel(route.parameter);
+    return response(200, *jobs.get(route.parameter));
   }
-  return error(404, "Unknown endpoint");
+  case findSymbols: return error(500, "Symbol queries require asynchronous dispatch");
+  case indexStatus:
+  case extract:
+  case match:
+  case dependencies: return resource(request, route);
+  }
+  return error(500, "Operation has no handler");
 }
 }

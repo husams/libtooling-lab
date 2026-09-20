@@ -1,0 +1,25 @@
+type: object
+required: [node_kind, name, usr, location, range, location_unavailable_reason]
+additionalProperties: false
+properties:
+  node_kind: {type: string}
+  name: {type: [string, 'null']}
+  usr: {type: [string, 'null']}
+  location_unavailable_reason: {type: [string, 'null']}
+  location:
+    type: [object, 'null']
+    required: [path, line, column, offset]
+    additionalProperties: false
+    properties:
+      path: {type: string}
+      line: {type: integer}
+      column: {type: integer}
+      offset: {type: integer}
+  range:
+    type: [object, 'null']
+    required: [path, offset, size]
+    additionalProperties: false
+    properties:
+      path: {type: string}
+      offset: {type: integer}
+      size: {type: integer}

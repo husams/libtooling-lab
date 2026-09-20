@@ -1,0 +1,30 @@
+type: object
+required: [id, operation, state, created_at, result, error]
+additionalProperties: false
+description: |
+  Asynchronous resource operation. Individual job reads include a completed
+  result; lists contain null result metadata. Errors are structured. Index refresh
+  follows successful extraction or matching asynchronously; inspect /v1/index.
+properties:
+  id: {type: string, minLength: 1}
+  operation: {type: string, enum: [extract, match, dependencies]}
+  state: {type: string, enum: [queued, running, succeeded, failed, cancelled]}
+  created_at: {type: integer, format: int64}
+  started_at: {type: [integer, 'null'], format: int64}
+  finished_at: {type: [integer, 'null'], format: int64}
+  result:
+    $ref: operation-result.yaml
+  error:
+    type: [object, 'null']
+    required: [code, message]
+    additionalProperties: false
+    properties:
+      code: {type: string}
+      message: {type: string}
+      details:
+        type: object
+        description: Optional structured diagnostic context.
+        additionalProperties: true
+        properties:
+          diagnostics:
+            $ref: diagnostics.yaml

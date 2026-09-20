@@ -1,3 +1,4 @@
+#include "model/AnalysisDiagnostic.h"
 #include "commands/match/SymbolDispatch.h"
 
 #include "ast/StoreExtracted.h"
@@ -68,11 +69,16 @@ indexRecord(const clang::NamedDecl &node, std::string usr,
 }
 } // namespace
 
+bool supportsSymbol(const clang::NamedDecl &node) {
+  return supportedDeclaration(node).has_value();
+}
+
 void appendMatchedIndex(std::vector<MatchedSymbol> &matched,
                         PersistedSymbol symbol) {
   if (symbol.index)
     matched.push_back(std::move(*symbol.index));
-  else
+  else if (!collectDiagnostic({"warning", "match index skipped: " +
+                                           symbol.indexSkipReason, ""}))
     std::cerr << "facts-tool: match index skipped reason="
               << symbol.indexSkipReason << '\n';
 }

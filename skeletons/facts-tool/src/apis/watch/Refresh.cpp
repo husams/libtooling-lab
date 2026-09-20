@@ -41,6 +41,9 @@ void Watcher::Impl::finished(bool success) {
   active = false;
   commands.clear();
   if (!success) { ++failures; needsScan = true; }
+  if (logger) logger->write(success ? logging::Level::debug : logging::Level::warning,
+      "watch.cycle.completed", {{"cycle", cycles}, {"succeeded", success},
+                                {"jobs", latestJobs.size()}, {"failures", failures}});
   if (dirty && running) changed();
 }
 }

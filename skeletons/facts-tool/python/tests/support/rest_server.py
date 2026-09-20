@@ -9,7 +9,7 @@ from support.native_cli_helpers import tool
 
 
 @contextmanager
-def native_server(root: Path):
+def native_server(root: Path, options: tuple[str, ...] = ()):
     """Launch the real native API with isolated project/server configuration."""
     from facts_tool.rest import Client
 
@@ -31,10 +31,10 @@ def native_server(root: Path):
                 str(config),
                 "--port",
                 "0",
-                "--config",
-                str(defaults),
+                *(() if "--config" in options else ("--config", str(defaults))),
                 "--token",
                 "integration-token",
+                *options,
             ],
             cwd=root,
             env=environment,

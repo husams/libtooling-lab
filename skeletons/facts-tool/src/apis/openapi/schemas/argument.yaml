@@ -1,0 +1,9 @@
+type: string
+maxLength: 65536
+pattern: '^[^\u0000]*$'
+x-max-utf8-bytes: 65536
+description: |
+  One CLI argument, passed without shell expansion. Embedded NUL is forbidden.
+  The server limits each argument to 65536 UTF-8 bytes; maxLength is an additional
+  Unicode-character bound, not a replacement for the byte limit.
+examples: ['--help', 'directory with spaces']

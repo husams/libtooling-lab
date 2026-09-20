@@ -24,6 +24,12 @@ Settings mergeSettings(const CLI::App &app, const Arguments &arguments,
   if (app.count("--timeout")) saved.timeoutSeconds = requested.timeoutSeconds;
   if (app.count("--import-arg")) saved.importArguments = requested.importArguments;
   if (app.count("--extract-arg")) saved.extractArguments = requested.extractArguments;
+  if (app.count("--log-file"))
+    saved.logging.file = std::filesystem::absolute(arguments.logFile);
+  if (app.count("--log-level"))
+    saved.logging.level = logging::parseLevel(arguments.logLevel).value();
+  if (app.count("--verbose"))
+    saved.logging.level = logging::verbosityLevel(arguments.verbosity);
   if (app.count("--working-directory"))
     saved.workingDirectory = std::filesystem::absolute(arguments.workingDirectory);
   if (arguments.enableWatch) saved.watchEnabled = true;

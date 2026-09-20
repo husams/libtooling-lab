@@ -7,6 +7,8 @@ add_library(facts-apis STATIC
   Server.cpp
   config/Defaults.cpp
   config/Encode.cpp
+  config/Logging.cpp
+  config/LogPaths.cpp
   config/Merge.cpp
   config/Options.cpp
   config/Parse.cpp
@@ -19,11 +21,17 @@ add_library(facts-apis STATIC
   daemon/Lock.cpp
   daemon/Readiness.cpp
   daemon/Redirect.cpp
+  generated/Spec.cpp
+  http/Access.cpp
+  http/AsyncDispatch.cpp
   http/Arguments.cpp
   http/Listener.cpp
   http/OpenApi.cpp
+  http/OpenApiYaml.cpp
   http/Response.cpp
+  http/Resources.cpp
   http/Router.cpp
+  http/Routing.cpp
   http/Session.cpp
   http/Submission.cpp
   jobs/Process.cpp
@@ -34,6 +42,11 @@ add_library(facts-apis STATIC
   jobs/QueueRecords.cpp
   jobs/QueueRun.cpp
   jobs/Spawn.cpp
+  logging/Level.cpp
+  logging/Sink.cpp
+  logging/Record.cpp
+  logging/Logger.cpp
+  logging/Worker.cpp
   watch/Apply.cpp
   watch/Events.cpp
   watch/Filter.cpp
@@ -57,9 +70,13 @@ add_library(facts-apis STATIC
   watch/plan/Batches.cpp
   watch/plan/Plan.cpp
 )
+add_subdirectory(domain)
+add_subdirectory(index)
+add_subdirectory(operations)
+add_subdirectory(runtime)
 target_include_directories(facts-apis PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(facts-apis
   PUBLIC Boost::headers nlohmann_json::nlohmann_json Threads::Threads
   PRIVATE CLI11::CLI11 yaml-cpp::yaml-cpp facts-config facts-storage
-          facts-tooling facts-clang facts-git)
+          facts-tooling facts-clang facts-git facts-commands)
 target_compile_definitions(facts-apis PRIVATE BOOST_ERROR_CODE_HEADER_ONLY)

@@ -7,9 +7,16 @@ The REST layer lives in `src/apis`, divided by responsibility:
 | Directory | Responsibility |
 |---|---|
 | `config` | CLI server options, YAML persistence and normalized paths |
-| `daemon` | Instance locking, background startup, logs and readiness |
+| `daemon` | Instance locking, background startup and readiness |
+| `logging` | Severity filtering, bounded event queue and asynchronous log file writes |
 | `http` | Asynchronous listener, HTTP sessions, routing and validation |
-| `jobs` | Bounded job queue, subprocess lifetime, output and cancellation |
+| `openapi` | Authoritative OpenAPI 3.1 YAML, split into paths and schemas |
+| `generated` | Contract-generated native routes, limits and embedded document |
+| `jobs` | Bounded queue, native work scheduling and legacy subprocess lifetime |
+| `domain` | Registered-file selection, server configuration and facts-location resolution |
+| `operations` | Typed extraction, match and dependency services shared with native command handlers |
+| `index` | Persistent global symbol index, background refresh and paged lookup |
+| `runtime` | Async resource scheduling, worker execution and index lifecycle |
 | `watch` | Inotify events, asynchronous scans, debounce and refresh scheduling |
 | `watch/catalog` | Read registered repositories/clones and apply repository/clone exclusions |
 | `watch/ignore` | Git ignore precedence, tracked-file rules and YAML path exclusions |
@@ -17,28 +24,59 @@ The REST layer lives in `src/apis`, divided by responsibility:
 
 Every new C++ source/header and Python test module is kept within 100 lines.
 `Server.cpp` connects these components and manages signals and shutdown.
-The [class reference](07-class-reference.md) lists native types and eight
-Python REST classes, including internal implementation types and source files.
+The [class reference](07-class-reference.md) lists native and Python REST types,
+including internal implementation types and source files.
 
-Boost.Asio runs asynchronous socket, pipe, timer and inotify operations; Beast
-parses and writes HTTP. Long-running commands run in isolated `posix_spawn`
-processes using the same executable and CLI parser as normal terminal commands.
-This preserves CLI behavior and keeps expensive Clang work off the HTTP event
-loop. The command catalog is generated from CLI registrations, including aliases,
-so new CLI commands are automatically discoverable through the generic API.
+Boost.Asio runs asynchronous sockets, timers and inotify; Beast parses and writes
+HTTP. Resource handlers validate typed requests and return accepted jobs before
+expensive work starts. Worker threads resolve registered identities and invoke
+shared native extraction, matching and dependency services. There is no CLI-token
+translation in the resource endpoints. A per-invocation clone context resolves
+an explicitly selected clone without changing the repository's persisted active
+clone. Symbol queries and result JSON serialization run on background executors
+too. Retained results are stored separately from small job metadata; listing jobs
+does not copy their result data on the HTTP event loop.
 
-One queue serializes API and watcher command processes to avoid concurrent writes
-from this server. A background scan reads repository and active-clone changes
-from the catalog every second. Path filters are applied both when registering
-watches and when selecting automatic import/extraction sources. Per-clone Git
-ignore rules and the index are reloaded after relevant control-file changes.
-External CLI processes or a second server with a different
-configuration still follow the existing SQLite concurrency rules. Cancellation
-and timeout apply to the worker process group, including compiler subprocesses.
+For headers without stored compile commands, a background resolver verifies
+registered including translation units and groups equivalent compilation
+contexts. An invocation-local scope supplies the unique context to native
+analysis without changing stored compiler options. Conflicting contexts and
+headers with no registered includer produce structured job failures.
 
-The API is a command service: successful commands persist their existing database
-results and return captured terminal output. It does not introduce a second
-database schema, a persistent job scheduler, WebSockets or live output streaming.
+The deprecated command compatibility API retains isolated `posix_spawn`
+processes, CLI discovery and captured output. It supports existing clients while
+new clients use symbol and file resources.
+
+The [OpenAPI contract](08-openapi-contract.md) generates the native route table
+and Python clients. Native handlers implement each operation; async Python
+methods await HTTPX requests. Both live contract formats are cached at startup.
+The generator's `--check` mode verifies that committed bindings match the YAML.
+
+Structured server events enter a bounded queue and are written by a dedicated
+logging worker, keeping file writes off the HTTP event loop. Shutdown drains
+queued records. See [Logging and verbosity](09-logging.md) for configuration,
+event levels and the distinction between server logs and captured command output.
+
+Coordinated queues serialize mutating native, compatibility and watcher work. Native
+analysis cannot be interrupted safely after it starts; queued work is cancellable,
+while cancellation of running native work returns HTTP `409`. Shutdown waits for
+native work to finish. Compatibility process jobs retain process-group cancellation
+and deadlines. External CLI processes still follow SQLite concurrency rules.
+
+A background task creates and refreshes `global_symbol_index` in `project.db`
+from known facts databases on startup. It stores fully qualified name, kind, USR
+and defining file ID, with a composite lookup index. Refresh builds replacement
+rows and publishes them transactionally. Queries see a completed generation, and
+a failed scan preserves the prior index. Successful extraction/matching and
+watcher completion request another refresh after the operation response. Clients
+inspect `/v1/index` to distinguish HTTP readiness, job completion and index
+publication. Database files remain owned and resolved by the server.
+
+A background watcher scan reads repository and active-clone changes every second.
+Path filters apply when registering watches and selecting refresh sources.
+Per-clone Git ignore rules reload after relevant control-file changes. Job records
+remain in memory; the symbol index and analysis results persist in databases.
+There is no persistent job scheduler, WebSocket or live terminal-output stream.
 
 ## Run the integration tests
 
@@ -52,15 +90,25 @@ and headers missing when using `SKIP_DEPS=1`. See the
 for source overrides and offline preparation.
 
 ```sh
+python3 -m pip install -r tests/e2e/requirements.txt
+python3 scripts/generate_openapi.py --check
 python3 -m pytest tests/apis \
   --api-facts-tool /absolute/path/to/build/facts-tool \
   --api-compiler /absolute/path/to/clang++
 ```
 
 The tests start real servers in temporary directories with isolated configuration.
-They check the live command catalog against CLI help, execute actual C++ import,
+They check typed symbol lookup, source selectors and structured job results,
+then check the compatibility command catalog against CLI help and execute C++ import,
 extraction, matching and call-graph workflows, and exercise concurrent clients,
 protocol errors, authentication, daemon startup, instance exclusion and restart.
+OpenAPI tests validate the source and live JSON/YAML documents, response schemas,
+generated routes and limits, encoded command paths, and HTTP responsiveness.
+Resource tests cover cross-repository symbols, optional kind/USR filters, startup
+indexing, post-extraction/match refresh, clone selection, ambiguity and traversal
+errors, async responsiveness and preservation of the previous index on failure.
+Logging tests check destination and verbosity precedence, structured event
+filtering, daemon readiness and log failures, and redaction of request values.
 Linux tests verify source/header edits, same-commit edits with AST caching enabled,
 atomic saves, new nested directories and failed reimport reporting. Repository
 monitoring scenarios cover database-driven roots, clone switches, exclusions,
@@ -78,10 +126,14 @@ included automatically in the existing `facts-tool-e2e` CTest gate. From
 bash scripts/run-e2e.sh /absolute/path/to/build
 ```
 
-These scenarios use real HTTP requests and native CLI workers. They cover command
+These scenarios use real HTTP requests, typed native services and compatibility
+workers. They cover global symbols and index readiness, resource jobs, command
 discovery, authentication, actual C++ analysis, daemon readiness and instance
 locking, saved ports, and Linux inotify refreshes. Watcher scenarios verify that
 source/header edits become visible even when the Git commit has not changed.
+Contract scenarios exercise both document formats and generated async clients.
+Logging scenarios exercise foreground and daemon files, saved settings, severity
+filtering and real HTTP/job events.
 Inotify scenarios require Linux.
 
 The SDK has separate Gherkin scenarios for both `Client` and `AsyncClient`.

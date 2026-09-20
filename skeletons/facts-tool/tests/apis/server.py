@@ -21,7 +21,7 @@ def persisted_port(path):
 
 
 class Server:
-    def __init__(self, executable, root, options=(), token=None):
+    def __init__(self, executable, root, options=(), token=None, cwd=None):
         self.root = root
         root.mkdir(parents=True, exist_ok=True)
         self.config = root / "server.yaml"
@@ -32,7 +32,7 @@ class Server:
             self.env["FACTS_TOOL_API_TOKEN"] = token
         self.log = root / "process.log"
         self.output = self.log.open("w")
-        self.process = subprocess.Popen(self.command, cwd=root, env=self.env,
+        self.process = subprocess.Popen(self.command, cwd=cwd or root, env=self.env,
                                         stdout=self.output, stderr=subprocess.STDOUT)
         try:
             def ready_port():

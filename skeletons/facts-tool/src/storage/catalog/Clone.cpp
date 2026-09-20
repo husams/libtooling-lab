@@ -1,5 +1,6 @@
 #include "storage/catalog/Component.h"
 #include "storage/catalog/Repository.h"
+#include "storage/ActiveClone.h"
 #include <algorithm>
 
 namespace facts::catalog {
@@ -95,10 +96,8 @@ Result<void> switchClone(Database &database, const Repository &repo,
               return validateCloneFiles(database, repo, clone);
             })
             .and_then([&] {
-              return execute(
-                  database,
-                  "UPDATE repository SET active_clone_id=? WHERE id=?",
-                  clone.id, repo.id);
+              return storage::activateRegisteredClone(database, repo.id, clone.id)
+                  .transform_error([](auto error) { return error.message(); });
             });
       });
 }

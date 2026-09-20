@@ -1,4 +1,5 @@
 #include "storage/DependencyDatabase.h"
+#include "storage/CloneRefresh.h"
 
 #include "storage/Schema.h"
 #include "storage/SchemaMigration.h"
@@ -73,7 +74,12 @@ replace(storage::Database &database, std::span<const FileId> visitedSources,
         std::span<const storage::FactProvenance> provenance) {
   const auto selected = provenanceSelection(visitedSources, edges);
   return database.write().and_then([&](storage::Transaction transaction) {
-    return database.execute("DELETE FROM callgraph_entry")
+    auto refreshed = provenance.empty()
+                         ? std::expected<void, std::error_code>{}
+                         : storage::refreshCloneFiles(database, provenance,
+                                                       selected);
+    return refreshed
+        .and_then([&] { return database.execute("DELETE FROM callgraph_entry"); })
         .and_then(
             [&] { return deleteVisitedSources(database, visitedSources); })
         .and_then([&] { return insertDependencies(database, edges); })

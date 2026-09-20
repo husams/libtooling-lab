@@ -192,18 +192,28 @@ job/error semantics. `AsyncClient` uses the same methods with `await`.
 
 | Name or method | Signature | Purpose |
 |---|---|---|
-| `Client`, `AsyncClient` | `(base_url, *, token=None, timeout=10.0, transport=None)` | Sync/async HTTP client; HTTPX transport override supports integration/testing |
-| `.submit` | `(*arguments) -> Job` | Submit CLI tokens to the job endpoint |
-| `.command` | `(path, *arguments) -> Job` | Submit to a named command endpoint |
-| `.wait` | `(job_id, *, timeout=None, poll_interval=0.1) -> Job` | Poll for a terminal state without raising for CLI failure |
-| `.run` | `(*arguments, timeout=None, poll_interval=0.1, check=True) -> Job` | Submit and wait, raising for failed/cancelled jobs by default |
-| `.get_job`, `.cancel_job` | `(job_id) -> Job` | Read a job or request cancellation |
-| `.list_jobs` | `() -> list[Job]` | Retrieve retained job metadata |
-| `.commands` | `() -> list[dict]` | Discover live command paths and endpoints |
+| `Client`, `AsyncClient` | `(base_url, *, token=None, timeout=10.0, transport=None)` | Synchronous/asynchronous HTTP clients |
+| `FileSelector` | `(path, repo=None, clone=None, component=None)` | Registered server-side source identity |
+| `.find_symbols` | `(qualified_name, *, kind=None, usr=None, repo=None, component=None, limit=50, cursor=None) -> SymbolPage` | Search the global symbol index |
+| `.extract` | `(file, *, force=False) -> DomainJob` | Queue native extraction |
+| `.match` | `(file, query, *, traversal="AsIs", relation_kind=None, capture_source=False) -> DomainJob` | Queue a Clang DSL match |
+| `.dependencies` | `(file) -> DomainJob` | Queue dependency analysis |
+| `.index_status` | `() -> IndexStatus` | Inspect background global-index readiness and failures |
+| `.wait` | `(job_id, *, timeout=None, poll_interval=0.1) -> DomainJob \| Job` | Poll to completion; call `.raise_for_status()` to require success |
+| `.get_job`, `.cancel_job` | `(job_id) -> DomainJob \| Job` | Read a job or cancel queued native work; running native cancellation returns `409` |
+| `.list_jobs` | `() -> list[DomainJob \| Job]` | Retrieve retained job metadata |
 | `.health`, `.openapi`, `.watch_status`, `.shutdown` | `() -> dict` | Inspect or stop the server |
-| `Job` | Immutable fields; `.done`, `.succeeded`, `.raise_for_status()` | Typed job state and captured output |
+| `.openapi_yaml` | `() -> str` | Read the live YAML contract |
+| `Symbol`, `SymbolPage` | Immutable symbol records and paginated results | Qualified name, kind, USR and defining-file identity |
+| `DomainJob`, `OperationError` | Immutable operation snapshots and structured errors | Native result data, state and failure details |
+| `IndexStatus` | Immutable state, counts, error and timestamp | Startup/refresh progress, separate from job completion |
 | `ApiError`, `TransportError`, `ProtocolError` | See [errors](11-rest-client.md#errors-deadlines-and-cancellation) | HTTP rejection, request failure or invalid response |
-| `JobFailedError`, `JobTimeoutError` | `.job_id`; failed error has `.job`, timeout error has `.timeout` | Completed failure or expired client polling deadline |
+| `JobFailedError`, `JobTimeoutError` | `.job_id`; failed error has `.job`, timeout error has `.timeout` | Completed failure or expired polling budget |
+
+Deprecated compatibility methods remain: `.submit(*arguments)`,
+`.command(path, *arguments)`, `.run(*arguments, timeout=None, poll_interval=0.1,
+check=True)`, and `.commands()`. They expose CLI tokens and legacy `Job` records;
+use the resource methods above for new symbol and analysis clients.
 
 Use `with Client(...)` / `async with AsyncClient(...)`, or close explicitly with
 `.close()` / `await .aclose()`. REST clients do not change the database query API.

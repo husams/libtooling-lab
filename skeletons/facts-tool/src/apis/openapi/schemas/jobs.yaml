@@ -1,0 +1,8 @@
+type: object
+required: [jobs]
+additionalProperties: false
+properties:
+  jobs:
+    type: array
+    items:
+      $ref: '../openapi.yaml#/components/schemas/JobSnapshot'

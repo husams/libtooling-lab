@@ -1,0 +1,12 @@
+type: array
+description: Structured Clang diagnostics without captured console output.
+items:
+  type: object
+  required: [severity, message, file, line, column]
+  additionalProperties: false
+  properties:
+    severity: {type: string}
+    message: {type: string}
+    file: {type: string}
+    line: {type: integer, minimum: 0}
+    column: {type: integer, minimum: 0}

@@ -1,4 +1,5 @@
 #include "apis/config/Paths.h"
+#include "apis/config/Logging.h"
 #include <cstdlib>
 #include <sstream>
 #include <unistd.h>
@@ -56,6 +57,7 @@ std::expected<Settings, std::string> normalizeSettings(Settings settings,
     if (settings.timeoutSeconds < 1 || settings.timeoutSeconds > 86400)
       throw std::runtime_error("timeout_seconds must be between 1 and 86400");
     settings.executable = executablePath(executable);
+    normalizeLogging(settings);
     return settings;
   } catch (const std::exception &error) {
     return std::unexpected(error.what());

@@ -4,7 +4,11 @@
 namespace facts::apis {
 std::optional<std::string> QueueState::submit(std::vector<std::string> arguments,
                                             JobCallback completion) {
-  if (stopped || pending.size() >= 64 || arguments.empty()) return std::nullopt;
+  if (stopped || pending.size() >= 64 || arguments.empty()) {
+    if (logger) logger->write(logging::Level::warning, "queue.rejected",
+        {{"reason", stopped ? "stopping" : arguments.empty() ? "empty" : "capacity"}});
+    return std::nullopt;
+  }
   if (std::any_of(arguments.begin(), arguments.end(), [](const auto &argument) {
         return argument.find('\0') != std::string::npos;
       })) return std::nullopt;
@@ -12,7 +16,11 @@ std::optional<std::string> QueueState::submit(std::vector<std::string> arguments
     auto oldest = std::find_if(order.begin(), order.end(), [this](const auto &id) {
       return jobs.at(id)->finished;
     });
-    if (oldest == order.end()) return std::nullopt;
+    if (oldest == order.end()) {
+      if (logger) logger->write(logging::Level::warning, "queue.rejected",
+                               {{"reason", "retention_capacity"}});
+      return std::nullopt;
+    }
     jobs.erase(*oldest);
     order.erase(oldest);
   }
@@ -25,6 +33,8 @@ std::optional<std::string> QueueState::submit(std::vector<std::string> arguments
   jobs.emplace(id, job);
   order.push_back(id);
   pending.push_back(std::move(job));
+  if (logger) logger->write(logging::Level::info, "job.accepted",
+                           {{"job_id", id}, {"queued", pending.size()}});
   schedule();
   return id;
 }

@@ -76,6 +76,7 @@ private:
   std::string databasePath_;
   std::unique_ptr<FileDatabase> database_;
   std::unordered_map<std::string, FileId> fileIds_;
+  std::uint64_t cloneContextRevision_ = 0;
   int verbosity_ = 0;
 };
 

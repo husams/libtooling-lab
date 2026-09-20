@@ -1,4 +1,5 @@
 #include "tooling/CompilationCommandCodec.h"
+#include "tooling/CompilationPathRemapping.h"
 
 #include <llvm/Support/Error.h>
 #include <llvm/Support/JSON.h>
@@ -230,11 +231,18 @@ std::string resolvePath(std::string value,
 
 std::vector<std::string>
 resolveIncludePaths(std::vector<std::string> options,
-                    const StoredCommandAliases &aliases) {
+                    const StoredCommandAliases &aliases,
+                    const CompilePathRemapping &remapping) {
   constexpr std::string_view includeFlags[] = {
       "-I",           "-isystem",    "-iquote",   "-idirafter",
-      "-F",           "-iframework", "-include",  "-imacros",
-      "-include-pch", "--sysroot",   "-isysroot", "-resource-dir"};
+      "-F",           "-iframework", "-include-pch", "-include",
+      "-imacros",     "--sysroot",   "-isysroot", "-resource-dir"};
+  const auto resolve = [&](std::string value) {
+    const bool equals = value.starts_with('=');
+    if (equals) value.erase(0, 1);
+    return (equals ? "=" : "") +
+           remapCompilePath(resolvePath(std::move(value), aliases), remapping);
+  };
   std::vector<std::string> result;
   for (std::size_t index = 0; index < options.size();) {
     auto option = std::move(options[index++]);
@@ -242,7 +250,7 @@ resolveIncludePaths(std::vector<std::string> options,
     if (separate != std::ranges::end(includeFlags)) {
       result.push_back(std::move(option));
       if (index < options.size()) {
-        result.push_back(resolvePath(std::move(options[index++]), aliases));
+        result.push_back(resolve(std::move(options[index++])));
       }
       continue;
     }
@@ -255,7 +263,7 @@ resolveIncludePaths(std::vector<std::string> options,
       continue;
     }
     result.push_back(std::string(*joined) +
-                     resolvePath(option.substr(joined->size()), aliases));
+                     resolve(option.substr(joined->size())));
   }
   return result;
 }
@@ -278,11 +286,13 @@ assembleCompileCommand(const StoredCompileFile &file,
   restoreSourceArgument(arguments, file.path);
   arguments.insert(arguments.begin(), file.driver.empty()
                                           ? defaultCompilerDriver(file.path)
-                                          : file.driver);
+                                          : remapCompilePath(file.driver,
+                                                             file.remapping));
   const auto directory =
       file.workingDirectory.empty()
           ? file.root
-          : std::filesystem::path(resolvePath(file.workingDirectory, aliases));
+          : std::filesystem::path(remapCompilePath(
+                resolvePath(file.workingDirectory, aliases), file.remapping));
   return {directory.string(), file.path.string(), std::move(arguments), ""};
 }
 
@@ -398,7 +408,8 @@ decodeStoredCommand(const StoredCompileFile &file,
   return decodeCompileOptions(file.options)
       .transform(sanitizeCommandArguments)
       .transform([&](auto arguments) {
-        return resolveIncludePaths(std::move(arguments), fileAliases);
+        return resolveIncludePaths(std::move(arguments), fileAliases,
+                                   file.remapping);
       })
       .transform([&](auto arguments) {
         return assembleCompileCommand(file, fileAliases, std::move(arguments));
