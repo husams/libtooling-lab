@@ -9,10 +9,13 @@ length but not invented. For narrative walkthroughs, see
 [matchers](../03-extracting-facts/03-match-dynamic-matchers.md), and
 [call graphs](../04-call-graphs/01-overview.md).
 
-`facts-tool` has 10 top-level subcommands: `extract`, `import`, `match`,
-`analyse` (3 leaves), `repo` (7 leaves), `component` (6 leaves), `dir` (2
+`facts-tool` provides `extract`, `import`, `match`,
+`analyse` (4 leaves), `repo` (7 leaves), `component` (6 leaves), `dir` (2
 leaves), `file` (6 leaves), `symbol` (5 leaves, one of which - `index` - has
-its own leaf `clear`), and `config` (1 leaf `show`).
+its own leaf `clear`), `config` (1 leaf `show`), and `serve` for the REST server.
+See [Tracing variables](../08-variable-flow/01-tracing-variables.md) for
+`analyse variable-flow` and [Running the server](../09-rest-api/01-running-the-server.md)
+for the complete `serve` options and persistence rules.
 
 ## Exit-code contract
 
@@ -113,6 +116,7 @@ facts-tool extract [OPTIONS] [sources...]
 | `-v`, `--verbose` | `INT [0-3]` | `1` | Verbosity |
 | `--extra-arg` | `ARG` (repeatable) | YAML `extra_args` | Compiler argument, overrides matching YAML options at runtime |
 | `--force` | flag | off | Re-extract sources whose recorded index state is still up to date |
+| `--no-ast-cache` | flag | off | Discard prior project cache metadata and bypass AST/dependency caching; used by directory monitoring for uncommitted edits |
 
 **Exit codes**: standard contract above.
 
@@ -195,6 +199,7 @@ facts-tool import [OPTIONS] [sources...]
 | `-p`, `--compilation-database` | `DIR` | none | Directory containing `compile_commands.json` |
 | `--component` | `NAME=PATH` (repeatable) | none | Project component as `name=path` |
 | `--extra-arg` | `ARG` (repeatable) | YAML `extra_args` | Compiler argument for fixed-command or `compile_commands.json` imports |
+| `--no-ast-cache` | flag | off | Discard prior project cache metadata and bypass AST/dependency caching for this import |
 
 **Exit codes**: standard contract above.
 

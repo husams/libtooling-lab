@@ -1,4 +1,5 @@
 #include "commands/Extract.h"
+#include "storage/astcache/Database.h"
 
 #include "commands/CompilationDatabase.h"
 #include "commands/ConfigurationSupport.h"
@@ -368,6 +369,10 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
                                     options.configurationFile, false, true);
   if (!resolved)
     return std::unexpected(resolved.error());
+  if (options.noAstCache) {
+    auto cleared = storage::astcache::clearSnapshots(resolved->database);
+    if (!cleared) return std::unexpected(cleared.error());
+  }
   auto configured = options;
   if (!configured.outputProvided) {
     auto output = resolveFactsOutput(*resolved, options.sources);
@@ -382,6 +387,7 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = std::move(resolved->extraArguments);
   configured.astCache = resolved->astCache;
+  if (options.noAstCache) configured.astCache.enabled = false;
   configured.astCache.verbosity = options.verbosity;
   return runExtractResolved(configured);
 }

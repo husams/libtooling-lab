@@ -15,3 +15,10 @@ Python plan queries use lazy iteration by default. See
 [Lazy queries and performance](05-python-sdk/10-query-performance.md) for
 streaming examples, eager compatibility, index coverage, and measurements
 on facts-tool's own source code.
+
+Run `facts-tool serve` for the asynchronous REST interface, optional daemon mode,
+automatic port allocation and Linux directory monitoring. See
+[Running the server](09-rest-api/01-running-the-server.md) for startup and saved
+configuration, [Requests and jobs](09-rest-api/02-requests-and-jobs.md) for command
+parity, and [Watching directories](09-rest-api/03-watching-directories.md) for
+automatic reimport and forced reindexing.

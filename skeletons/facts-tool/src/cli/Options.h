@@ -19,12 +19,14 @@ struct ExtractOptions {
   std::vector<std::string> extraArguments;
   bool extraArgumentsProvided = false;
   bool force = false;
+  bool noAstCache = false;
   std::vector<std::string> sources;
   astcache::Options astCache;
 };
 
 struct ImportOptions {
   int verbosity = 0;
+  bool noAstCache = false;
   std::string configuration;
   std::string configurationFile;
   std::string facts;

@@ -87,7 +87,7 @@ if [ "${SKIP_DEPS:-0}" != "1" ]; then
     "gcc-toolset-${GCC_TOOLSET}" "gcc-toolset-${GCC_TOOLSET}-libstdc++-devel" \
     cmake ninja-build make git tar xz unzip which curl \
     python3 python3-pip python3.12 python3.12-pip \
-    clang-devel llvm-devel clang-libs llvm-libs
+    clang-devel llvm-devel clang-libs llvm-libs boost-devel json-devel
 fi
 
 YAML_ARGS=()
