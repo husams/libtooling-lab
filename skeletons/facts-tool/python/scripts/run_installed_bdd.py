@@ -17,7 +17,20 @@ def environment_python(environment: Path) -> Path:
     return environment / suffix
 
 
+def native_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    for name in ("FACTS_TOOL_NATIVE", "FACTS_CLANGXX"):
+        executable = Path(environment.get(name, "")).resolve()
+        if not executable.is_file() or not os.access(executable, os.X_OK):
+            raise SystemExit(f"Set {name} to an executable to run every BDD scenario")
+        environment[name] = str(executable)
+    for name in ("PYTHONHOME", "PYTHONPATH", "PYTEST_ADDOPTS"):
+        environment.pop(name, None)
+    return environment
+
+
 def main() -> int:
+    clean_env = native_environment()
     with tempfile.TemporaryDirectory(prefix="facts-tool-installed-bdd-") as raw:
         work = Path(raw)
         dist, environment = work / "dist", work / "venv"
@@ -32,11 +45,8 @@ def main() -> int:
             "install",
             f"pytest=={version('pytest')}",
             f"pytest-bdd=={version('pytest-bdd')}",
-            str(wheel),
+            f"{wheel}[rest]",
         )
-        clean_env = os.environ.copy()
-        clean_env.pop("PYTHONHOME", None)
-        clean_env.pop("PYTHONPATH", None)
         run(
             str(python),
             "-m",

@@ -52,3 +52,4 @@
 | 9.4 | REST API | [Architecture and testing](09-rest-api/04-architecture-and-testing.md) |
 | 9.5 | REST API | [Installing the REST server and Python client](09-rest-api/05-installation.md) |
 | 9.6 | REST API | [Deployment and operation](09-rest-api/06-deployment.md) |
+| 9.7 | REST API | [REST implementation classes](09-rest-api/07-class-reference.md) |
