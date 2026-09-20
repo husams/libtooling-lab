@@ -2,7 +2,6 @@
 import sys
 
 import pytest
-
 from project import create_project, write_commands
 from support import eventually
 from watch_support import symbols, wait_cycle, watch_status
@@ -16,11 +15,12 @@ def watched(server_factory, compiler, tmp_path):
     source, header = create_project(root, compiler)
     config = tmp_path / "defaults.yaml"
     config.write_text(f"facts_template: {root / 'facts.db'}\n")
-    server = server_factory("--watch", root, "--conf", root / "project.db",
+    server = server_factory("--watch", "--conf", root / "project.db",
                             "--config", config, "--debounce-ms", "50")
     server.api.run(["-p", str(root)], "import")
     server.api.run([], "extract")
-    state = watch_status(server.api)
+    state = eventually(lambda: (status if str(root) in status["directories"] else None)
+                       if (status := watch_status(server.api)) else None)
     assert state["backend"] == "inotify"
     assert state["enabled"]
     assert str(root) in state["directories"]

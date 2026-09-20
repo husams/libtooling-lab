@@ -10,11 +10,14 @@ The REST layer lives in `src/apis`, divided by responsibility:
 | `daemon` | Instance locking, background startup, logs and readiness |
 | `http` | Asynchronous listener, HTTP sessions, routing and validation |
 | `jobs` | Bounded job queue, subprocess lifetime, output and cancellation |
-| `watch` | Recursive inotify registration, events and refresh scheduling |
+| `watch` | Inotify events, asynchronous scans, debounce and refresh scheduling |
+| `watch/catalog` | Read registered repositories/clones and apply repository/clone exclusions |
+| `watch/ignore` | Git ignore precedence, tracked-file rules and YAML path exclusions |
+| `watch/plan` | Select eligible source files and build identity-preserving command batches |
 
 Every new C++ source/header and Python test module is kept within 100 lines.
 `Server.cpp` connects these components and manages signals and shutdown.
-The [class reference](07-class-reference.md) lists all 19 native types and eight
+The [class reference](07-class-reference.md) lists native types and eight
 Python REST classes, including internal implementation types and source files.
 
 Boost.Asio runs asynchronous socket, pipe, timer and inotify operations; Beast
@@ -25,7 +28,11 @@ loop. The command catalog is generated from CLI registrations, including aliases
 so new CLI commands are automatically discoverable through the generic API.
 
 One queue serializes API and watcher command processes to avoid concurrent writes
-from this server. External CLI processes or a second server with a different
+from this server. A background scan reads repository and active-clone changes
+from the catalog every second. Path filters are applied both when registering
+watches and when selecting automatic import/extraction sources. Per-clone Git
+ignore rules and the index are reloaded after relevant control-file changes.
+External CLI processes or a second server with a different
 configuration still follow the existing SQLite concurrency rules. Cancellation
 and timeout apply to the worker process group, including compiler subprocesses.
 
@@ -52,7 +59,9 @@ They check the live command catalog against CLI help, execute actual C++ import,
 extraction, matching and call-graph workflows, and exercise concurrent clients,
 protocol errors, authentication, daemon startup, instance exclusion and restart.
 Linux tests verify source/header edits, same-commit edits with AST caching enabled,
-atomic saves, new nested directories and failed reimport reporting.
+atomic saves, new nested directories and failed reimport reporting. Repository
+monitoring scenarios cover database-driven roots, clone switches, exclusions,
+nested Git ignore rules and source filtering during automatic refreshes.
 The native queue tests cover output limits, timeouts,
 cancellation, process cleanup and queue capacity deterministically.
 

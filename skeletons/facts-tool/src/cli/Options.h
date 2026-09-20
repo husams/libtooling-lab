@@ -26,6 +26,7 @@ struct ExtractOptions {
 
 struct ImportOptions {
   int verbosity = 0;
+  std::int64_t existingClone = 0;
   bool noAstCache = false;
   std::string configuration;
   std::string configurationFile;

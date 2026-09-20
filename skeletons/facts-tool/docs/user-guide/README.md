@@ -17,10 +17,10 @@ streaming examples, eager compatibility, index coverage, and measurements
 on facts-tool's own source code.
 
 Run `facts-tool serve` for the asynchronous REST interface, optional daemon mode,
-automatic port allocation and Linux directory monitoring. See
+automatic port allocation and Linux repository monitoring. See
 [Running the server](09-rest-api/01-running-the-server.md) for startup and saved
 configuration, [Requests and jobs](09-rest-api/02-requests-and-jobs.md) for command
-parity, and [Watching directories](09-rest-api/03-watching-directories.md) for
+parity, and [Repository monitoring](09-rest-api/03-watching-directories.md) for
 automatic reimport and forced reindexing.
 
 For a new server or client machine, follow [REST installation](09-rest-api/05-installation.md)

@@ -8,13 +8,17 @@ std::string encodeSettings(const Settings &settings) {
   if (!root.IsMap()) throw std::runtime_error("server configuration must be a map");
   root.remove("token");
   root.remove("daemon");
+  root.remove("watch_directories");
   root["schema_version"] = 1;
   root["host"] = settings.host;
   root["port"] = settings.port;
   root["working_directory"] = settings.workingDirectory.string();
-  root["watch_directories"] = YAML::Node(YAML::NodeType::Sequence);
-  for (const auto &directory : settings.directories)
-    root["watch_directories"].push_back(directory.string());
+  auto watch = root["watch"];
+  watch["enabled"] = settings.watchEnabled;
+  watch["exclude_repositories"] = settings.excludedRepositories;
+  watch["exclude_clones"] = settings.excludedClones;
+  watch["exclude_directories"] = settings.excludedDirectories;
+  watch["exclude_patterns"] = settings.excludePatterns;
   root["defaults"] = settings.defaults;
   root["import_arguments"] = settings.importArguments;
   root["extract_arguments"] = settings.extractArguments;

@@ -4,6 +4,7 @@ import sys
 
 import pytest
 from pytest_bdd import given
+from support.rest_http import eventually
 from support.rest_project import create_project, watch_status
 from support.rest_server import RestServer
 
@@ -53,14 +54,15 @@ def watched_project(rest_server, pytestconfig, cache=False):
                         "-c", "user.email=bdd@example.invalid", "commit", "-qm", "fixture"],
                        check=True)
         rest_server.commit = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"])
-    rest_server.start(["--watch", root, "--conf", root / "project.db",
+    rest_server.start(["--watch", "--conf", root / "project.db",
                        "--config", defaults, "--debounce-ms", "50"])
     imported = rest_server.api.run(["-p", str(root), "-v", "2"], "import")
     extracted = rest_server.api.run(["-v", "2"], "extract")
     if cache:
         assert "ast-cache: stored" in imported["stderr"]
         assert "ast-cache: hit" in extracted["stderr"]
-    state = watch_status(rest_server)
+    state = eventually(lambda: (status if str(root) in status["directories"] else None)
+                       if (status := watch_status(rest_server)) else None)
     assert state["backend"] == "inotify" and state["enabled"]
     assert str(root) in state["directories"]
 

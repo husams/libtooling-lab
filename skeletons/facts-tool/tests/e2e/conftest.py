@@ -7,6 +7,13 @@ import pytest
 from support.scenario import FactsToolContext
 
 pytest_plugins = (
+    "steps.watch_catalog_setup_steps",
+    "steps.watch_catalog_assert_steps",
+    "steps.watch_catalog_git_steps",
+    "steps.watch_catalog_changes_steps",
+    "steps.watch_catalog_registration_steps",
+    "steps.watch_catalog_recovery_steps",
+    "steps.watch_catalog_provenance_steps",
     "steps.rest_setup_steps",
     "steps.rest_access_steps",
     "steps.rest_job_steps",

@@ -9,6 +9,7 @@
 #include "commands/ExtractionSetup.h"
 #include "commands/ExtractTranslationUnits.h"
 #include "commands/FactPairValidation.h"
+#include "commands/RefreshCloneFacts.h"
 
 #include "ast/Indexing.h"
 #include "cli/Verbose.h"
@@ -266,6 +267,12 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
         if (!started) {
           return std::expected<int, std::string>{std::unexpected(
               "cannot begin output transaction: " + started.error().message())};
+        }
+        auto refreshed = refreshCloneFacts(
+            store, *pairing, files, filesToMark(stale, discovered.perSource));
+        if (!refreshed) {
+          (void)store.rollback();
+          return std::expected<int, std::string>{std::unexpected(refreshed.error())};
         }
         const auto toolResult =
             runExtractStage(options, "extract facts from AST", [&] {

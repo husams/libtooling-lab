@@ -51,17 +51,21 @@ not persisted; omit it on a later invocation to run in the foreground.
 | `--working-directory DIR` | Working directory for all CLI jobs |
 | `--conf FILE`, `-c FILE` | Default project database for jobs |
 | `--config FILE` | Default CLI YAML for jobs |
-| `--watch DIR` | Recursive directory watch; repeat for multiple roots |
-| `--no-watch` | Clear all saved watch directories |
+| `--watch` | Enable recursive monitoring of registered repositories |
+| `--no-watch` | Disable monitoring while keeping its exclusion settings |
 | `--debounce-ms N` | Watch debounce, default `500`; range `1`–`3600000` |
 | `--timeout N` | Per-job deadline in seconds, default `3600`; range `1`–`86400` |
 | `--import-arg=VALUE` | Repeated argument tokens for automatic reimport |
 | `--extract-arg=VALUE` | Repeated argument tokens for automatic extraction |
 | `--token TOKEN` | Bearer token; alternatively set `FACTS_TOOL_API_TOKEN` |
 
-Explicit server options override saved values. An explicit `--watch` list replaces
-the saved list. Job arguments override the server's default `--conf`/`--config`.
-Configuration paths and watch roots are normalized to absolute paths.
+Explicit server options override saved values. `--watch` and `--no-watch` persist
+the monitoring enablement flag. Job arguments override the server's default
+`--conf`/`--config`. Configuration paths are normalized to absolute paths.
+Watch roots come from the project database: the active clone of every registered
+repository, subject to exclusions. There is no separate directory list to maintain.
+Monitoring defaults to enabled on Linux and disabled on other platforms.
+An explicit `--watch` on a platform without inotify fails at startup.
 
 ## Saved configuration
 
@@ -70,8 +74,12 @@ schema_version: 1
 host: 127.0.0.1
 port: 42817
 working_directory: /workspace/project
-watch_directories:
-  - /workspace/project
+watch:
+  enabled: true
+  exclude_repositories: []
+  exclude_clones: []
+  exclude_directories: []
+  exclude_patterns: []
 defaults:
   - --conf
   - /workspace/project.db
@@ -85,6 +93,9 @@ timeout_seconds: 3600
 
 The port above is illustrative. Settings are atomically rewritten after successful
 startup. Changes to this file take effect on restart. Tokens are never saved.
+The former `watch_directories` setting is ignored and removed when settings are
+saved; register repositories in the project database instead. Repository and
+active-clone changes are detected while the server runs.
 
 All endpoints require `Authorization: Bearer TOKEN` when a token is configured,
 including health checks. Binding to a non-loopback address requires a token.

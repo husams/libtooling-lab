@@ -1,4 +1,5 @@
 import asyncio
+import sys
 
 from facts_tool.rest import AsyncClient
 
@@ -17,7 +18,7 @@ def test_async_native_jobs_and_health(rest_url: str):
             assert len({job.id for job in results}) == 6
             assert any(item["path"] == "extract" for item in await client.commands())
             assert "/v1/jobs" in (await client.openapi())["paths"]
-            assert not (await client.watch_status())["enabled"]
+            assert (await client.watch_status())["enabled"] is (sys.platform == "linux")
             assert len(await client.list_jobs()) == 6
             assert (await client.get_job(jobs[0].id)).done
             assert (await client.cancel_job(jobs[0].id)).succeeded

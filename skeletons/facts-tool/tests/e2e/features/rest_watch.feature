@@ -1,5 +1,5 @@
 Feature: Native REST filesystem monitoring
-  Linux inotify automatically reimports and reindexes configured source directories.
+  Linux inotify automatically reimports and reindexes active clones from the project database.
 
   Scenario Outline: Source and header saves publish new symbols and matcher results
     Given a native inotify server watching an indexed C++ project

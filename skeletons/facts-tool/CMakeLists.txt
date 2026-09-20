@@ -236,6 +236,7 @@ add_library(facts-storage STATIC
   src/storage/Enumeration.cpp
   src/storage/Enumerator.cpp
   src/storage/FactStore.cpp
+  src/storage/CloneRefresh.cpp
   src/storage/Function.cpp
   src/storage/FunctionInstance.cpp
   src/storage/FunctionTemplate.cpp
@@ -275,6 +276,7 @@ add_library(facts-tooling STATIC
   src/tooling/CompilationFiles.cpp
   src/tooling/CompilationCommandCodec.cpp
   src/tooling/ProjectImport.cpp
+  src/tooling/import/Identity.cpp
   src/tooling/StoredCompilationDatabase.cpp
   src/tooling/StoredCompilationReader.cpp
 )
@@ -442,6 +444,8 @@ add_library(facts-commands STATIC
   src/commands/CallGraphFactPaths.cpp
   src/commands/CallGraphProjectState.cpp
   src/commands/FactPairValidation.cpp
+  src/commands/FactPairCloneAliases.cpp
+  src/commands/RefreshCloneFacts.cpp
   src/commands/FactPairValidationLegacy.cpp
   src/commands/FactPairValidationProject.cpp
   src/commands/FactPairValidationFacts.cpp
@@ -578,6 +582,10 @@ if(BUILD_TESTING)
       --api-compiler ${LLVM_TOOLS_BINARY_DIR}/clang++)
   set_tests_properties(facts-tool-rest-api PROPERTIES TIMEOUT 180)
   add_executable(api-queue-test tests/apis/native/QueueTest.cpp)
+  add_executable(api-ignore-test tests/apis/IgnoreTest.cpp
+                 tests/apis/ignore/Rules.cpp tests/apis/ignore/Tracked.cpp)
+  target_link_libraries(api-ignore-test PRIVATE facts-apis facts-git)
+  add_test(NAME api-ignore COMMAND api-ignore-test)
   target_link_libraries(api-queue-test PRIVATE facts-apis)
   add_test(NAME api-queue COMMAND api-queue-test ${Python3_EXECUTABLE})
   set_tests_properties(api-queue PROPERTIES TIMEOUT 30)

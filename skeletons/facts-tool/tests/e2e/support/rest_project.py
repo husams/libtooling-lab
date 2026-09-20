@@ -32,5 +32,6 @@ def wait_cycle(server, previous):
         return state if state["cycles"] > previous and not (
             state["active"] or state["pending"]) else None
     state = eventually(completed)
-    assert not state["last_error"], state
+    assert not state["last_error"], (
+        state, [server.api.job(identifier) for identifier in state["latest_jobs"]])
     return state

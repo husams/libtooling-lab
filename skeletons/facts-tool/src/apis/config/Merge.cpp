@@ -26,11 +26,8 @@ Settings mergeSettings(const CLI::App &app, const Arguments &arguments,
   if (app.count("--extract-arg")) saved.extractArguments = requested.extractArguments;
   if (app.count("--working-directory"))
     saved.workingDirectory = std::filesystem::absolute(arguments.workingDirectory);
-  if (app.count("--watch") || arguments.clearWatches) {
-    saved.directories.clear();
-    for (const auto &path : arguments.watches)
-      saved.directories.push_back(std::filesystem::absolute(path));
-  }
+  if (arguments.enableWatch) saved.watchEnabled = true;
+  if (arguments.disableWatch) saved.watchEnabled = false;
   if (app.count("--config"))
     replaceDefault(saved.defaults, "--config",
                    std::filesystem::absolute(arguments.configuration).string());

@@ -128,23 +128,33 @@ change. After editing the unit itself, run `daemon-reload` before restarting.
 If the service must start at boot and continue after logout, enable user lingering
 with `loginctl enable-linger "$USER"`; local policy may require an administrator.
 
-## Monitor and refresh source directories
+## Monitor and refresh registered repositories
 
-On Linux, add `--watch /workspace/project` to the initial server command or the
-service's `ExecStart`. Repeat `--watch` for multiple roots. The list is saved;
-`--no-watch` clears it on a later start. If the compilation database lives
-elsewhere, supply explicit import arguments:
+On Linux, monitoring is enabled by default. The server discovers all repositories
+in its project database and monitors each repository's active clone. Register
+repositories through `repo add` or `import`; switch an active clone with
+`repo switch`. The running watcher follows these database changes automatically.
+There is no separate list of source roots in the service command or server YAML.
+
+Use `--no-watch` to disable monitoring and `--watch` to enable it again. These
+flags persist the setting. Repository, clone, directory and pattern exclusions
+belong in the server YAML's `watch` section; each clone's `.gitignore` rules apply
+by default. Restart the service after changing YAML exclusions.
+
+If a compilation database lives outside the monitored clones or in an ignored
+build directory, supply explicit import arguments. The server watches that
+`compile_commands.json` as a control input; source exclusions still apply:
 
 ```text
---watch /workspace/project/src
---import-arg=-p --import-arg=/workspace/project/build
+--import-arg=-p --import-arg=/workspace/project-build
 --extract-arg=-o --extract-arg=/workspace/facts.db
 ```
 
 Perform the initial import and extraction before relying on watching; startup
 itself does not index. Inotify events trigger debounced reimport and forced
-reindexing. See [Watching directories](03-watching-directories.md) for ignored
-paths, cache invalidation and failure reporting. Inspect `/v1/watch` or
+reindexing of included sources. See
+[Repository monitoring](03-watching-directories.md) for exclusions, Git ignore
+rules, cache invalidation and failure reporting. Inspect `/v1/watch` or
 `Client.watch_status()` and the reported job IDs when a refresh fails.
 
 ## Network access and upgrades

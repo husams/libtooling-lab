@@ -2,6 +2,7 @@
 
 #include "storage/Sqlite.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace facts::commands::detail {
@@ -67,7 +68,8 @@ validateFactsProvenance(storage::Database &database,
     }
     auto current = snapshot.find(id);
     if (current == snapshot.end() ||
-        current->second.path != knownValue->second.path ||
+        (current->second.path != knownValue->second.path &&
+         !std::ranges::contains(current->second.aliases, knownValue->second.path)) ||
         current->second.universe != knownValue->second.universe) {
       return std::unexpected(mismatch("facts file identity differs", id));
     }

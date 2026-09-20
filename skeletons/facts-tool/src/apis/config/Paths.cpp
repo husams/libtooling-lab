@@ -1,5 +1,4 @@
 #include "apis/config/Paths.h"
-#include <algorithm>
 #include <cstdlib>
 #include <sstream>
 #include <unistd.h>
@@ -43,14 +42,6 @@ std::expected<Settings, std::string> normalizeSettings(Settings settings,
     if (!fs::is_directory(settings.workingDirectory))
       throw std::runtime_error("working directory does not exist: " +
                                settings.workingDirectory.string());
-    for (auto &path : settings.directories) {
-      path = absolutePath(path, settings.workingDirectory);
-      if (!fs::is_directory(path))
-        throw std::runtime_error("watch directory does not exist: " + path.string());
-    }
-    std::sort(settings.directories.begin(), settings.directories.end());
-    settings.directories.erase(std::unique(settings.directories.begin(),
-        settings.directories.end()), settings.directories.end());
     for (std::size_t i = 0; i < settings.defaults.size(); ++i) {
       if (settings.defaults[i] != "--config" && settings.defaults[i] != "--conf")
         continue;

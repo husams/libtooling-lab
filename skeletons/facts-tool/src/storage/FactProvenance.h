@@ -7,6 +7,7 @@
 #include <span>
 #include <string>
 #include <system_error>
+#include <vector>
 
 namespace facts::storage {
 
@@ -16,10 +17,12 @@ struct FactProvenance {
   FileId file = builtinFileId;
   std::string path;
   std::string universe;
+  // The same logical file in another explicitly registered repository clone.
+  std::vector<std::string> aliases;
 };
 
-// Insert the rows selected by file id while retaining the caller's active
-// transaction; an empty selection records no rows.
+// Retain compatible existing rows, including registered alternate-clone paths.
+// Clone refresh changes those paths only when that file is actually re-extracted.
 std::expected<void, std::error_code>
 registerFactProvenance(Database &database, std::span<const FactProvenance> rows,
                        std::span<const FileId> selected = {});
