@@ -1,3 +1,5 @@
+from itertools import islice
+
 from .errors import fail
 from .queryplan.types import Source
 from .rows import Row
@@ -18,23 +20,32 @@ def resolve_source(source: Source, loader: ViewLoader) -> ExecutionState:
 
 
 def enumerate_view(
-    state: ExecutionState, loader: ViewLoader, after_id: str | int | None
+    state: ExecutionState,
+    loader: ViewLoader,
+    after_id: str | int | None,
+    cap: int = 10_000,
 ) -> list[Row]:
-    rows = loader.load(state.view)
+    stream = loader.iter(state.view)
+    rows = iter(stream)
     if state.context_ids is not None and state.view != "symbol":
-        rows = [
+        rows = (
             row
             for row in rows
             if row.get("owner_id", row.get("symbol_id")) in state.context_ids
-        ]
+        )
     if after_id is not None:
         try:
             boundary = int(after_id)
-            rows = [
+            rows = (
                 row
                 for row in rows
                 if isinstance(row.get("id"), int) and int(row["id"]) > boundary
-            ]
+            )
         except ValueError:
-            rows = [row for row in rows if str(row["_key"]) > str(after_id)]
-    return rows
+            rows = (row for row in rows if str(row["_key"]) > str(after_id))
+    try:
+        return list(islice(rows, cap + 1))
+    finally:
+        close = getattr(stream, "close", None)
+        if close is not None:
+            close()

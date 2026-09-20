@@ -15,6 +15,7 @@ def open_codebase(
     facts_db: str | os.PathLike[str],
     project_db: str | os.PathLike[str],
     budgets: Budgets | None = None,
+    lazy: bool = True,
 ) -> CodeBase:
     facts_path, project_path, facts, project = open_pair(facts_db, project_db)
     try:
@@ -27,7 +28,7 @@ def open_codebase(
         )
         loader = ViewLoader(facts, project)
         return CodeBase(
-            facts, project, Executor(loader, provenance, budgets), provenance
+            facts, project, Executor(loader, provenance, budgets, lazy=lazy), provenance
         )
     except Exception:
         facts.close()

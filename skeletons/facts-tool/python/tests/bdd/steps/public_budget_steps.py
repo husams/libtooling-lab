@@ -12,7 +12,7 @@ def traversal_budget(paired_databases, world):
         budgets=Budgets(traversal=1),
     ) as cb:
         query = start(symbol("app::run")) | out("calls", 1, 2)
-        world["budget_result"] = cb.executor.run(query.plan)
+        world["budget_result"] = cb.executor.run(query.plan, lazy=False)
 
 
 @then("the result reports truncation")
@@ -29,7 +29,7 @@ def reconstruction_budget(paired_databases, world):
     ) as cb:
         target = start(symbol("app::persist"))
         query = start(symbol("app::run")) | path(target, "calls")
-        world["path_budget_result"] = cb.executor.run(query.plan)
+        world["path_budget_result"] = cb.executor.run(query.plan, lazy=False)
 
 
 @then("the path result reports truncation")

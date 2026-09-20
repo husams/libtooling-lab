@@ -66,7 +66,7 @@ def invalid_data(cb, world):
         )
         for plan in plans:
             with pytest.raises(FactsToolError) as raised:
-                database.executor.run(plan.plan)
+                database.executor.run(plan.plan, lazy=False)
             failures.append(raised.value.code)
         return failures
 

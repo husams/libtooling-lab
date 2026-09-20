@@ -33,7 +33,7 @@ def test_predicates_traversal_and_shaping(paired_databases: tuple[Path, Path]) -
             | select(("name",))
             | order_by(("name",))
         )
-        result = cb.executor.run(query.plan)
+        result = cb.executor.run(query.plan, lazy=False)
     assert result.to_dict()["rows"] == [{"name": "run"}, {"name": "save"}]
 
 

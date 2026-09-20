@@ -1,20 +1,16 @@
-import json
 from collections.abc import Iterator
-from dataclasses import dataclass
-from typing import Any, cast
+from dataclasses import dataclass, field
+from typing import Any
 
 from .provenance import PairProvenance
-from .rows import Row, public_row
+from .result_payload import payload, serialized
+from .result_stream import ResultData, StreamFactory
+from .rows import Row
+from .state import ExecutionState
 
-
-def _safe(value: Any) -> Any:
-    if isinstance(value, int) and abs(value) > (1 << 53) - 1:
-        return str(value)
-    if isinstance(value, dict):
-        return {key: _safe(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_safe(item) for item in value]
-    return value
+_LAZY_FIELDS = frozenset(
+    {"shape", "view", "values", "scalar", "truncated", "partial", "unknown", "cursor"}
+)
 
 
 @dataclass(frozen=True)
@@ -28,6 +24,32 @@ class Result:
     unknown: bool
     cursor: str | None
     provenance: PairProvenance
+    _data: ResultData | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
+
+    def __getattribute__(self, name: str) -> Any:
+        if name in _LAZY_FIELDS:
+            data: ResultData | None = object.__getattribute__(self, "_data")
+            if data is not None:
+                if name == "values":
+                    return data.materialize()
+                state = data.state if name in {"shape", "view"} else data.metadata()
+                return getattr(state, name)
+        return object.__getattribute__(self, name)
+
+    @classmethod
+    def lazy(
+        cls,
+        shape: str,
+        view: str,
+        factory: StreamFactory,
+        provenance: PairProvenance,
+    ) -> "Result":
+        data = ResultData(ExecutionState(view=view, shape=shape), None, factory)
+        result = cls(shape, view, (), None, False, False, False, None, provenance)
+        object.__setattr__(result, "_data", data)
+        return result
 
     @property
     def nodes(self) -> tuple[Row, ...]:
@@ -41,29 +63,18 @@ class Result:
     def paths(self) -> tuple[Row, ...]:
         return self.values if self.shape == "path" else ()
 
+    def materialize(self) -> "Result":
+        _ = self.values
+        return self
+
     def __iter__(self) -> Iterator[Row]:
-        return iter(self.values)
+        return self._data.iterate() if self._data is not None else iter(self.values)
 
     def __len__(self) -> int:
         return len(self.values)
 
     def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "shape": self.shape,
-            "view": self.view,
-            "truncated": self.truncated,
-            "partial": self.partial,
-            "unknown": self.unknown,
-            "cursor": self.cursor,
-            "provenance": self.provenance.to_dict(),
-        }
-        if self.shape == "scalar":
-            payload["scalar"] = self.scalar
-        else:
-            payload[{"nodes": "nodes", "rows": "rows", "path": "paths"}[self.shape]] = [
-                public_row(row) for row in self.values
-            ]
-        return cast(dict[str, Any], _safe(payload))
+        return payload(self)
 
     def to_json(self) -> str:
-        return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True)
+        return serialized(self)

@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from collections import OrderedDict
 from pathlib import Path
 from typing import cast
 
@@ -7,8 +8,11 @@ from .errors import fail
 
 
 class FileResolver:
+    """Resolve paths with a bounded cache scoped to this database reader."""
+
     def __init__(self, project: sqlite3.Connection):
         self.project = project
+        self._paths: OrderedDict[int, str | None] = OrderedDict()
 
     def row(self, file_id: int) -> sqlite3.Row | None:
         value = self.project.execute(
@@ -25,10 +29,19 @@ class FileResolver:
     def path(self, file_id: int, *, required: bool = True) -> str | None:
         if file_id == 0:
             return None
+        if file_id not in self._paths:
+            self._paths[file_id] = self._resolve_path(file_id)
+            if len(self._paths) > 4096:
+                self._paths.popitem(last=False)
+        self._paths.move_to_end(file_id)
+        value = self._paths[file_id]
+        if value is None and required:
+            fail("E_IDENTITY", f"FileId {file_id} is absent from project database")
+        return value
+
+    def _resolve_path(self, file_id: int) -> str | None:
         row = self.row(file_id)
         if row is None:
-            if required:
-                fail("E_IDENTITY", f"FileId {file_id} is absent from project database")
             return None
         component = Path(str(row["component_path"]))
         clone = row["clone_path"]

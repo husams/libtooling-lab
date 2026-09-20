@@ -9,8 +9,8 @@ from .callgraph_models import CallGraphSymbol
 from .callgraph_outcomes import path_flags
 from .callgraph_page import CallGraphPage
 from .callgraph_page_build import make_page
-from .callgraph_pointer import decode as decode_pointer_call
 from .callgraph_pointer import CallGraphPointerCall, pointer_calls
+from .callgraph_pointer import decode as decode_pointer_call
 from .callgraph_recovery import decode as decode_recovery
 from .callgraph_result import CallGraphRun
 from .paths import FileResolver
