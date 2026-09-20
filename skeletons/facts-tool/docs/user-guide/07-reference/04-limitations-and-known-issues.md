@@ -134,16 +134,35 @@ Specific caveats:
   edges even if a future native writer started persisting them under the
   same tables.
 
+## Python query streaming limits
+
+- Query results are lazy by default, but graph traversal, `sites`, paths,
+  reverse type use, and set operations still buffer intermediate results.
+  Sorting and distinct also buffer their input; a count consumes its input
+  before the scalar is available.
+- Accessing result collections (`values`, or the matching `nodes`/`rows`/
+  `paths` property), `len(result)`, serialization, `.all()`, and `.names()`
+  materializes results. Reading completeness metadata before iteration
+  finishes also forces materialization. Keep the codebase open until the
+  result has been consumed.
+- Lazy mode retains the existing enumeration and result budgets. A large
+  database can still produce a truncated result; iteration alone does not
+  remove the caps. Check completeness metadata after iteration and set
+  appropriate budgets or paginate when needed.
+- `GraphQuery.references(ref)` still loads the `edge` -> `sites()` view and
+  filters client-side by `destination_id`. Its cost scales with relation
+  sites in the database; indexed symbol lookup does not remove this scan.
+
+See [query performance](../05-python-sdk/10-query-performance.md) for
+indexed lookup behavior, eager mode, and measured results on the facts-tool
+codebase.
+
 ## Platform notes
 
 - SQLite is vendored (amalgamation, statically linked) specifically so
   behavior is identical across macOS and RHEL regardless of the system
   SQLite version - RHEL 9's system SQLite (3.34) lacks `RETURNING`, which
   the storage layer relies on.
-- `GraphQuery.references(ref)` in the Python SDK is `O(all relation sites in
-  the database)` - it loads the entire `edge` -> `sites()` view and filters
-  client-side by `destination_id`. Fine for a demo database; a scaling
-  caveat for large codebases.
 - `pip` is not present in a `uv`-managed virtual environment (such as the
   package's own dev `.venv`); use `uv pip`/`uv run`, or a separate `uv venv
   --seed` environment, when a plain `pip` is needed.

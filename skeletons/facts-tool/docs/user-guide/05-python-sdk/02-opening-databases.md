@@ -13,6 +13,7 @@ def open_codebase(
     facts_db: str | os.PathLike[str],
     project_db: str | os.PathLike[str],
     budgets: Budgets | None = None,
+    lazy: bool = True,
 ) -> CodeBase
 ```
 
@@ -59,6 +60,33 @@ whatever SQLite's default is - `0` here.)
 fails *during* opening (schema inspection, pairing validation) after the
 raw connections were already made - you never leak a file handle from a
 failed open.
+
+## Lazy and eager sessions
+
+`lazy=True` is the default. Opening still validates both databases
+immediately, while `cb.executor.run(plan)` and `cb.query(...).run()` defer
+query execution until the result is consumed. Override the session default
+with `run(..., lazy=False)` to execute and materialize one query immediately,
+or `run(..., lazy=True)` to request lazy execution from an eager session.
+
+```python
+with open_codebase(
+    facts_db="facts.sqlite", project_db="project.sqlite", lazy=False,
+) as cb:
+    result = cb.query().nodes().limit(10).run()  # eager for this session
+    rows = result.values
+
+# Materialized rows remain available after the connections close.
+print(rows)
+```
+
+Iterate lazy results and fluent queries **inside** the session context.
+An unmaterialized result needs the open connections each time it is
+iterated, even if an earlier iteration completed. To retain rows beyond the
+session, call `result.materialize()` before leaving it. Typed entities retain
+their stored fields, but navigation such as `.callees()` still requires an
+open session. See [03-query-model.md](03-query-model.md) for result lifetime
+and [10-query-performance.md](10-query-performance.md) for large queries.
 
 ## Supported schema versions
 

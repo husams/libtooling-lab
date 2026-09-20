@@ -28,6 +28,7 @@
 | 5.7 | Python SDK | [Error handling](05-python-sdk/07-error-handling.md) |
 | 5.8 | Python SDK | [API reference](05-python-sdk/08-api-reference.md) |
 | 5.9 | Python SDK | [Local-variable and parameter flow](05-python-sdk/09-variable-flow.md) |
+| 5.10 | Python SDK | [Lazy queries and performance](05-python-sdk/10-query-performance.md) |
 | 6.1 | Workflows | [Onboarding a codebase](06-workflows/01-onboarding-a-codebase.md) |
 | 6.2 | Workflows | [Architecture analysis](06-workflows/02-architecture-analysis.md) |
 | 6.3 | Workflows | [Tracing calls and paths](06-workflows/03-tracing-calls-and-paths.md) |

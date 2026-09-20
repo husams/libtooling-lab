@@ -7,6 +7,27 @@ the view's catalog. This chapter documents the two catalogs (facts and
 project), the raw symbol-kind mapping, and the relation catalog including
 its SDK-only pseudo-joins.
 
+## Iterating a view
+
+Queries are lazy by default. Plain view enumeration, filtering, projection,
+and limits can yield rows from database cursors without retaining every row
+in Python. Keep the codebase open while consuming the result:
+
+```python
+from facts_tool import open_codebase
+
+with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
+    result = cb.query().view("file").nodes().select(("id", "path")).run()
+    for row in result:
+        print(row["path"])
+```
+
+Accessing `result.values`, the matching `nodes`/`rows`/`paths` property, or
+serializing the result materializes it. Sorting, distinct, and graph stages
+also have buffering requirements. See
+[query performance](10-query-performance.md) for eager mode, limits, and
+the full streaming boundaries.
+
 ## Facts views vs. project views
 
 ```text
@@ -16,12 +37,14 @@ Facts views:   symbol, parameter, template_parameter, template_argument,
 Project views: repository, clone, component, directory, file
 ```
 
-`view(name)` fails `E_VIEW` for any name outside these two lists:
+An unknown `view(name)` fails `E_VIEW` when the plan is validated by
+`Executor.run` (or explicitly with `validate`):
 
 ```python
 from facts_tool.queryplan import start, codebase, view, nodes
 
-start(codebase()) | view("not_a_view") | nodes()
+query = start(codebase()) | view("not_a_view") | nodes()
+cb.executor.run(query.plan)
 ```
 
 ```text
@@ -32,7 +55,8 @@ An unlisted field on `select`/`order_by`/predicates fails `E_FIELD` against
 the *current* view, even on a query that would return zero rows:
 
 ```python
-start(codebase()) | select(("not_a_field",))
+query = start(codebase()) | select(("not_a_field",))
+cb.executor.run(query.plan)
 ```
 
 ```text
@@ -237,7 +261,8 @@ was expected - `has_field` is a helper predicate, not a stored or
 pseudo-joined relation:
 
 ```python
-start(symbol("app::Box")) | out("has_field")
+query = start(symbol("app::Box")) | out("has_field")
+cb.executor.run(query.plan)
 ```
 
 ```text

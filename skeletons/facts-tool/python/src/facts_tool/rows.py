@@ -3,6 +3,19 @@ from typing import Any
 Row = dict[str, Any]
 
 
+class ProjectedRow(dict[str, Any]):
+    def __init__(self, values: Row, cursor: str | None):
+        super().__init__(values)
+        self.cursor = cursor
+
+
+def row_cursor(row: Row) -> str | None:
+    value = (
+        row.cursor if isinstance(row, ProjectedRow) else row.get("id", row.get("_key"))
+    )
+    return None if value is None else str(value)
+
+
 def public_row(row: Row) -> Row:
     return {key: value for key, value in row.items() if not key.startswith("_")}
 

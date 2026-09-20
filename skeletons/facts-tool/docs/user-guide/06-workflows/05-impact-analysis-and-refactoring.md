@@ -78,7 +78,7 @@ the wrong question.
 ### 3. Resolve the override's base declaration via `overrides`
 
 ```python
-cb.query(NAME).relation("overrides").select(("qualified_name", "file", "line")).run()
+cb.query(NAME).relation("overrides").select(("qualified_name", "file", "line")).run().rows
 ```
 
 ```text
@@ -94,7 +94,7 @@ evidence is recorded against.
 
 ```python
 base = "clang::tooling::CompilationDatabase::getCompileCommands"
-cb.query(base).relation("dispatch_calls", inbound=True).select(("qualified_name", "file", "line")).run()
+cb.query(base).relation("dispatch_calls", inbound=True).select(("qualified_name", "file", "line")).run().rows
 ```
 
 ```text

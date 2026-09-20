@@ -25,6 +25,27 @@ Both paths are mandatory and must identify different existing files. The SDK
 opens each with SQLite `mode=ro` and query-only semantics, validates its role,
 and refuses unsupported facts schema versions or missing FileId mappings.
 
+## Lazy and eager queries
+
+Queries are lazy by default. Keep the codebase open while consuming rows:
+
+```python
+from facts_tool.queryplan import eq
+
+with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
+    for function in cb.query().nodes(eq("kind", "function")):
+        print(function.name)
+    saved = cb.query().nodes(eq("name", "run")).run(lazy=False)
+print(saved.to_dict())
+```
+
+Use `executor.run(plan, lazy=False)` or `EntityQuery.run(lazy=False)` for one
+eager query, or `open_codebase(..., lazy=False)` to change the default.
+`Result.values`, shape-specific collections, `len`, serialization, and
+`materialize()` collect the result; fluent `all()` and `names()` return lists.
+See [result lifecycle and streaming limits](docs/results.md) before processing
+large results.
+
 ## Documentation
 
 - [Quickstart](docs/quickstart.md)
@@ -33,6 +54,7 @@ and refuses unsupported facts schema versions or missing FileId mappings.
 - [Relations](docs/relations.md), [views](docs/views.md), and [symbol kinds](docs/symbol-kinds.md)
 - [Database lifecycle and mapping](docs/databases.md)
 - [Results, errors, and budgets](docs/results.md)
+- [Query performance and index audit](docs/query-performance.md)
 - [Native matcher results](docs/match-results.md)
 - [Persisted call-graph runs](docs/callgraph-runs.md)
 - [Variable-flow runs](docs/variable-flow.md)

@@ -2,14 +2,17 @@ import json
 
 from .errors import fail
 from .fields import FIELDS
-from .rows import Row, public_row
+from .rows import ProjectedRow, Row, public_row, row_cursor
 
 
 def select_rows(rows: list[Row], view: str, fields: tuple[str, ...]) -> list[Row]:
     unknown = [field for field in fields if field not in FIELDS.get(view, set())]
     if unknown:
         fail("E_FIELD", f"unknown {view} field(s): {', '.join(unknown)}")
-    return [{field: row.get(field) for field in fields} for row in rows]
+    return [
+        ProjectedRow({field: row.get(field) for field in fields}, row_cursor(row))
+        for row in rows
+    ]
 
 
 def distinct_rows(rows: list[Row]) -> list[Row]:

@@ -128,12 +128,12 @@ with open_codebase(facts_db="facts.sqlite", project_db="project.sqlite") as cb:
         | nodes(eq("kind", "function"))
         | select(("name", "file", "line"))
     )
-    print(cb.executor.run(query.plan).to_dict())
+    for row in cb.executor.run(query.plan):
+        print(row)
 ```
 
 Run against a small real demo database (one translation unit with ten
-functions). Printing `.to_dict()["rows"]` one row per line, with absolute
-paths abbreviated to `.../api.hpp`:
+functions), with absolute paths abbreviated to `.../api.hpp`:
 
 ```text
 {'name': 'persist', 'file': '.../api.hpp', 'line': 24}
@@ -154,8 +154,21 @@ Rows come back in persisted identity order, not alphabetical order. Append
 
 `start(codebase())` begins an immutable query at the "enumerate everything"
 source; `nodes(...)` filters it; `select(...)` turns matching symbol nodes
-into plain rows. `cb.executor.run(query.plan)` executes the frozen plan and
-returns a `Result`. Chapters
+into plain rows. `cb.executor.run(query.plan)` validates the frozen plan and
+returns a **lazy `Result` by default**. Iteration fetches rows as they are
+needed; keep the loop inside the `with open_codebase(...)` block so the
+database connections remain open.
+
+Use `cb.executor.run(query.plan, lazy=False)` to execute and collect the
+result immediately, or set `open_codebase(..., lazy=False)` for the whole
+session. Collection helpers such as `.values`, `.to_dict()`, and
+`.to_json()` also materialize a lazy result. For large queries, prefer the
+loop above and configure the query budgets for the amount of data you need;
+the default result cap is 1,000 rows. See
+[Query performance and large results](10-query-performance.md) for streaming,
+index usage, and benchmark results.
+
+Chapters
 [03-query-model.md](03-query-model.md) and
 [04-views-and-catalog.md](04-views-and-catalog.md) build up this language
 piece by piece; chapter [08-api-reference.md](08-api-reference.md) is a

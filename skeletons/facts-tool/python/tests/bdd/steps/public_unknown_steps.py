@@ -17,7 +17,7 @@ def unknown_policies(paired_databases, world):
             results.append((len(cb.executor.run(query.plan)), policy))
         with pytest.raises(FactsToolError) as raised:
             query = start(symbol("app::run")) | where(exists("calls"), "error")
-            cb.executor.run(query.plan)
+            cb.executor.run(query.plan, lazy=False)
     with open_codebase(facts_db=facts, project_db=project) as cb:
         empty_all = start(symbol("app::run")) | where(all_of(()))
         empty_any = start(symbol("app::run")) | where(any_of(()))

@@ -11,7 +11,9 @@ def apply_nodes(state: ExecutionState, stage: Stage, context: ExecutionContext) 
     rows = state.values
     if not context.enumerated:
         if not rows:
-            rows = enumerate_view(state, context.loader, context.after_id)
+            rows = enumerate_view(
+                state, context.loader, context.after_id, context.budgets.enumeration
+            )
         context.enumerated = True
         if len(rows) > context.budgets.enumeration:
             rows = rows[: context.budgets.enumeration]
