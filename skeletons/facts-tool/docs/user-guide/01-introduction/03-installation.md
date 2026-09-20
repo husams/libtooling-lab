@@ -48,10 +48,11 @@ worth knowing before you do:
 - The build also needs C enabled at the `project()` level, because some of
   LLVM's own CMake modules (`FindLibEdit`) run C header checks even though
   the tool itself is pure C++.
-- The REST server uses [Boost](https://formulae.brew.sh/formula/boost) and
-  [nlohmann-json](https://formulae.brew.sh/formula/nlohmann-json) headers. They
-  must already be installed; the RHEL helper installs `boost-devel` and
-  `json-devel` for this purpose.
+- The REST server uses Boost headers version 1.74 or later and nlohmann/json
+  version 3.9 or later. CMake prefers installed package configurations, then
+  suitable installed headers. If neither is available, it downloads pinned,
+  SHA-256-verified Boost 1.83.0 and nlohmann/json 3.11.3 sources. These are
+  header-only dependencies; no Boost libraries are built or linked.
 
 Once the build finishes, the binary is at `build/facts-tool` relative to
 wherever you ran `cmake -B build` from. Run it directly or install the native
@@ -98,9 +99,8 @@ DEPS_ONLY=1 ./scripts/build-rhel9.sh  # install dependencies only, no build
 SKIP_TESTS=1 ./scripts/build-rhel9.sh # build only, no pytest venv, no ctest
 ```
 
-This produces `build-rhel9/facts-tool` under the project root. The extra
-plumbing exists because RHEL 9 differs from the macOS lab environment in
-three ways the script accounts for:
+This produces `build-rhel9/facts-tool` under the project root. The helper
+accounts for these dependencies:
 
 - **Compiler.** The tool uses C++23 features (`std::expected`,
   `std::ranges::to`) that need GCC 14 or newer; RHEL 9's system GCC is 11.
@@ -114,11 +114,47 @@ three ways the script accounts for:
   needs, and stay dynamically linked - running the resulting binary on
   another host requires that host to have `clang-libs`/`llvm-libs`
   installed too.
+- **REST headers.** A distribution's `boost-devel` package may be older than
+  the required Boost 1.74. The helper checks for usable Boost and JSON headers
+  and downloads the pinned fallback when necessary. Dependency installation
+  includes `boost-devel` and `json-devel`, but the build can use the fallback
+  when those headers are unsuitable or missing with `SKIP_DEPS=1`.
+  Downloads are verified before use and unpacked sources are reused from
+  `.deps/api-headers`. `DEPS_ONLY=1` prepares
+  these headers too. CMake uses package `CONFIG` discovery rather than the
+  removed `FindBoost` module, avoiding the
+  [CMP0167 warning](https://cmake.org/cmake/help/latest/policy/CMP0167.html)
+  on newer CMake versions.
 
 Environment variables documented in the script's own header let you skip
 dependency installation (`SKIP_DEPS=1`), point at a different build
 directory (`BUILD_DIR`), or control job parallelism (`JOBS`); see the
 script itself for the full list.
+
+### Cached headers and offline builds
+
+`SKIP_DEPS=1` skips `dnf`; it still prepares source dependencies and can download
+missing ones. Set `API_HEADER_CACHE_DIR` to relocate the REST header cache.
+To supply your own Boost and JSON source trees or include directories, use:
+
+```bash
+SKIP_DEPS=1 \
+BOOST_SOURCE_DIR=/opt/deps/boost_1_83_0 \
+JSON_SOURCE_DIR=/opt/deps/json-3.11.3 \
+./scripts/build-rhel9.sh
+```
+
+The helper validates the header versions. These paths may also point directly
+at include directories containing `boost/` or `nlohmann/`. For direct CMake
+builds, use `-DFETCHCONTENT_SOURCE_DIR_BOOST=/absolute/path` and
+`-DFETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=/absolute/path`. Without overrides,
+direct CMake builds cache downloaded sources under the build's `_deps` directory.
+
+A fully offline run also needs the compiler and LLVM packages installed and all
+other source dependencies cached or supplied through their existing overrides.
+The helper still invokes `pip` for tests: configure a local package source with
+the test and Python build dependencies, or use `SKIP_TESTS=1` for a build without
+tests. Caching only the REST headers does not make the entire build offline.
 
 ## Installing the Python SDK
 

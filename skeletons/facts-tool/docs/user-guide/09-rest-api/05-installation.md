@@ -29,10 +29,17 @@ cd skeletons/facts-tool
 cmake --install build-rhel9 --prefix "$HOME/.local" --component facts-tool
 ```
 
-The helper installs build dependencies, including Boost and JSON headers,
-selects GCC Toolset 15, builds the native binary, and runs its tests. Dependency
-installation uses `sudo` when needed. If dependencies are already installed,
-use `SKIP_DEPS=1 ./scripts/build-rhel9.sh`. `SKIP_TESTS=1` skips the tests.
+The helper installs build dependencies, selects GCC Toolset 15, builds the native
+binary, and runs its tests. It uses compatible installed Boost and JSON headers
+or fetches checksum-verified Boost 1.83.0 and nlohmann/json 3.11.3 sources into
+`.deps/api-headers`. No Boost binary libraries are required. This also handles
+hosts whose distribution Boost package is older than the required version 1.74.
+
+Dependency installation uses `sudo` when needed. `SKIP_DEPS=1` skips `dnf`, while
+still preparing source dependencies; `SKIP_TESTS=1` skips the tests. Use
+`BOOST_SOURCE_DIR` and `JSON_SOURCE_DIR` for predownloaded headers, and see
+[cached headers and offline builds](../01-introduction/03-installation.md#cached-headers-and-offline-builds)
+for cache locations and the remaining offline requirements.
 
 ### macOS with Homebrew
 

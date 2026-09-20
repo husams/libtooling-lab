@@ -575,6 +575,14 @@ if(BUILD_TESTING)
     )
   endif()
   add_subdirectory(tests/implicit)
+  add_test(NAME api-build-dependencies
+    COMMAND ${Python3_EXECUTABLE} -m pytest
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/build_dependencies -q
+      --dependency-cmake ${CMAKE_COMMAND}
+      --dependency-cxx ${CMAKE_CXX_COMPILER}
+      --boost-headers ${FACTS_BOOST_INCLUDE_DIR}
+      --json-headers ${FACTS_JSON_INCLUDE_DIR})
+  set_tests_properties(api-build-dependencies PROPERTIES TIMEOUT 240)
   add_test(NAME facts-tool-rest-api
     COMMAND ${Python3_EXECUTABLE} -m pytest
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/apis -q

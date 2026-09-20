@@ -1,5 +1,6 @@
-find_package(Boost 1.74 REQUIRED)
-find_package(nlohmann_json 3.9 REQUIRED)
+include(${PROJECT_SOURCE_DIR}/cmake/ApiDependencies.cmake)
+set(FACTS_BOOST_INCLUDE_DIR "${FACTS_BOOST_INCLUDE_DIR}" PARENT_SCOPE)
+set(FACTS_JSON_INCLUDE_DIR "${FACTS_JSON_INCLUDE_DIR}" PARENT_SCOPE)
 find_package(Threads REQUIRED)
 
 add_library(facts-apis STATIC
