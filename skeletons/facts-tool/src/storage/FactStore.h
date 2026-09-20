@@ -27,6 +27,14 @@ public:
   std::expected<void, std::error_code> rollback();
 
   std::expected<void, std::error_code>
+  beginSymbolRefresh(std::span<const FileId> selected) {
+    return storage_.beginSymbolRefresh(selected);
+  }
+  std::expected<void, std::error_code> finishSymbolRefresh() {
+    return storage_.finishSymbolRefresh();
+  }
+
+  std::expected<void, std::error_code>
   registerFactProvenance(std::span<const storage::FactProvenance> rows,
                          std::span<const FileId> selected = {}) {
     return storage_.registerFactProvenance(rows, selected);

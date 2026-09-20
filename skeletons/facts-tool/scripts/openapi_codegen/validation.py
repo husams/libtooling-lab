@@ -3,6 +3,7 @@ import re
 
 from openapi_spec_validator import validate_spec
 
+from .domain_requests import validate_domain_requests
 from .requests import validate_requests
 
 METHODS = {"get", "post", "delete", "put", "patch", "head", "options", "trace"}
@@ -21,6 +22,7 @@ def validate(document: dict) -> None:
         raise ValueError("The generator requires OpenAPI 3.1.0")
     validate_spec(document)
     validate_requests(document)
+    validate_domain_requests(document)
     limits = document.get("x-facts-limits", {})
     for name in LIMITS:
         ceiling = (1 << (64 if name == "maxBodyBytes" else 32)) - 1

@@ -3,9 +3,9 @@ get:
   tags: [jobs]
   summary: List retained job metadata
   description: |
-    Lists up to 128 retained jobs in submission order. stdout and stderr are
-    omitted here; GET /v1/jobs/{id} includes captured output. Completed jobs may
-    be evicted when new jobs arrive, and all jobs are lost on server restart.
+    Lists retained domain and compatibility job metadata. Domain result is null
+    here and CLI output is omitted; read /v1/jobs/{id} for the full result.
+    Retention is bounded and all jobs are lost on server restart.
   responses:
     '200':
       description: Metadata for retained queued, running, and completed jobs.
@@ -16,6 +16,7 @@ get:
     default:
       $ref: '../openapi.yaml#/components/responses/Error'
 post:
+  deprecated: true
   operationId: submit
   tags: [jobs]
   summary: Submit a complete CLI argument array asynchronously

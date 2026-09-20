@@ -1,5 +1,6 @@
 #include "apis/http/Router.h"
 #include "apis/http/Access.h"
+#include "apis/runtime/Service.h"
 #include <chrono>
 
 namespace facts::apis {
@@ -37,17 +38,28 @@ Response Router::dispatch(const Request &request, const MatchedRoute &route) {
   case shutdown:
     this->shutdown();
     return response(202, {{"status", "stopping"}});
-  case listJobs: return response(200, {{"jobs", jobs.list()}});
+  case listJobs: {
+    auto list = jobs.list();
+    if (resources) for (auto &job : resources->list()) list.push_back(std::move(job));
+    return response(200, {{"jobs", list}});
+  }
   case submit: return this->submit(request, "");
   case command: return this->submit(request, route.parameter);
   case getJob:
   case cancelJob: {
+    if (resources && resources->contains(route.parameter))
+      return error(500, "Native job results require asynchronous dispatch");
     const auto job = jobs.get(route.parameter);
     if (!job) return error(404, "Unknown job");
     if (route.operation == getJob) return response(200, *job);
     jobs.cancel(route.parameter);
     return response(200, *jobs.get(route.parameter));
   }
+  case findSymbols: return error(500, "Symbol queries require asynchronous dispatch");
+  case indexStatus:
+  case extract:
+  case match:
+  case dependencies: return resource(request, route);
   }
   return error(500, "Operation has no handler");
 }

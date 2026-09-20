@@ -8,7 +8,7 @@ void QueueState::schedule() {
   });
 }
 void QueueState::pump() {
-  if (stopped || active || pending.empty()) return;
+  if (stopped || paused || active || pending.empty()) return;
   active = pending.front();
   pending.pop_front();
   active->record["state"] = "running";
@@ -44,5 +44,6 @@ void QueueState::complete(const std::shared_ptr<Job> &job, ProcessResult result)
   auto completion = std::move(job->completion);
   schedule();
   if (completion) completion(success);
+  if (observer) observer(job->record);
 }
 }

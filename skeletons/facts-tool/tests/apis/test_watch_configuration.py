@@ -1,11 +1,14 @@
 """Validate and migrate persisted repository monitoring settings."""
 import json
 import re
+import sqlite3
 import subprocess
 import sys
 
 import pytest
 from server import Server, isolated_environment
+from domain_http import index_ready
+from support import eventually
 
 
 @pytest.mark.parametrize("watch", [False, [], "yes", {"enabled": "invalid"},
@@ -61,10 +64,19 @@ def test_legacy_directories_are_removed_without_being_watched(executable, tmp_pa
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="inotify requires Linux")
-def test_missing_catalog_is_not_created_by_monitoring(server_factory, tmp_path):
+def test_initialized_empty_catalog_does_not_invent_watched_repositories(server_factory, tmp_path):
     database = tmp_path / "future-project.db"
     server = server_factory("--watch", "--conf", database)
-    _, state = server.api.request("GET", "/v1/watch")
+    index = index_ready(server.api)
+    def ready():
+        status, state = server.api.request("GET", "/v1/watch")
+        assert status == 200
+        return state if state["ready"] and not state["last_error"] else None
+    state = eventually(ready)
     assert state["enabled"]
-    assert state["directories"] == []
-    assert not database.exists()
+    assert state["directories"] == [] and state["clones"] == []
+    assert state["cycles"] == 0 and state["latest_jobs"] == []
+    assert index["files"] == 0 and index["symbols"] == 0 and database.is_file()
+    with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as connection:
+        for table in ("repository", "clone", "file", "global_symbol_index"):
+            assert connection.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)

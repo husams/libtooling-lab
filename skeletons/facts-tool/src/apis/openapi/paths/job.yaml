@@ -8,18 +8,18 @@ parameters:
 get:
   operationId: getJob
   tags: [jobs]
-  summary: Read job state and captured output
+  summary: Read job state and structured result
   description: |
-    Poll until state is succeeded, failed, or cancelled. stdout and stderr are
-    populated on completion, with each stream capped at 4 MiB. A failed CLI
-    command remains a successful HTTP response; inspect state and exit_code.
+    Poll until state is succeeded, failed, or cancelled. Domain operations expose
+    a structured result or error. Deprecated CLI jobs retain captured stdout,
+    stderr and exit_code. Job failures remain successful HTTP reads.
   responses:
     '200':
       description: Current state and output of a retained job.
       content:
         application/json:
           schema:
-            $ref: '../openapi.yaml#/components/schemas/Job'
+            $ref: '../openapi.yaml#/components/schemas/JobSnapshot'
     '404':
       $ref: '../openapi.yaml#/components/responses/Error'
     default:
@@ -29,17 +29,17 @@ delete:
   tags: [jobs]
   summary: Request cancellation of a retained job
   description: |
-    Queued jobs become cancelled immediately. Running jobs receive a process
-    group termination request and can remain running in this response; poll for
-    their final state. Completed jobs are returned unchanged. This operation
-    preserves the retained job record rather than deleting it.
+    Queued jobs become cancelled immediately. Running domain operations return
+    HTTP 409 cannot_cancel_running and finish safely. Running legacy CLI jobs
+    receive process-group termination and may remain running until reaped.
+    Completed jobs return unchanged. This retains rather than deletes records.
   responses:
     '200':
       description: Current job state after the cancellation request.
       content:
         application/json:
           schema:
-            $ref: '../openapi.yaml#/components/schemas/Job'
+            $ref: '../openapi.yaml#/components/schemas/JobSnapshot'
     '404':
       $ref: '../openapi.yaml#/components/responses/Error'
     default:

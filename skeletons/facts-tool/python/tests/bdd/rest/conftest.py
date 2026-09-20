@@ -5,6 +5,7 @@ from importlib.util import find_spec
 
 import pytest
 from pytest_bdd import given, parsers
+from support.domain_fixture import domain_rest  # noqa: F401
 from support.native_cli_helpers import tool
 from support.rest_server import native_server
 

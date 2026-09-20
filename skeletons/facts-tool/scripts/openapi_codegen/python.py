@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from .python_domain import resource_clients
 from .python_methods import methods
 from .python_routes import routes
 
@@ -15,7 +16,7 @@ def render_python(spec: dict) -> dict[str, str]:
         )
         for name in ("client.py", "async_client.py")
     }
-    return clients | {
+    return clients | resource_clients(spec) | {
         package + "generated/__init__.py": '"""Generated OpenAPI endpoint metadata."""\n',
         package + "generated/routes.py": routes(spec),
     }

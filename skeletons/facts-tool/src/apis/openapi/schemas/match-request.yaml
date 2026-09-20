@@ -1,0 +1,29 @@
+type: object
+required:
+- file
+- query
+additionalProperties: false
+properties:
+  file:
+    $ref: ../openapi.yaml#/components/schemas/FileSelector
+  query:
+    type: string
+    minLength: 1
+    maxLength: 262144
+    x-max-utf8-bytes: 262144
+    description: Clang AST matcher DSL expression.
+    example: cxxRecordDecl(hasName("example::Widget"))
+  traversal:
+    type: string
+    enum:
+    - AsIs
+    - IgnoreUnlessSpelledInSource
+    default: AsIs
+  relation_kind:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    x-max-utf8-bytes: 4096
+  capture_source:
+    type: boolean
+    default: false

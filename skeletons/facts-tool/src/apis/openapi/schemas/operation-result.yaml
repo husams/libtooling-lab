@@ -1,0 +1,5 @@
+oneOf:
+  - type: 'null'
+  - $ref: extraction-result.yaml
+  - $ref: match-result.yaml
+  - $ref: dependencies-result.yaml

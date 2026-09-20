@@ -14,6 +14,17 @@ std::string_view specification() {
 #include "SpecPart007.inc"
 #include "SpecPart008.inc"
 #include "SpecPart009.inc"
+#include "SpecPart010.inc"
+#include "SpecPart011.inc"
+#include "SpecPart012.inc"
+#include "SpecPart013.inc"
+#include "SpecPart014.inc"
+#include "SpecPart015.inc"
+#include "SpecPart016.inc"
+#include "SpecPart017.inc"
+#include "SpecPart018.inc"
+#include "SpecPart019.inc"
+#include "SpecPart020.inc"
 ;
   return document;
 }

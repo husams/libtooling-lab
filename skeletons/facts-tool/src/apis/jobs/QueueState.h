@@ -27,6 +27,8 @@ struct QueueState : std::enable_shared_from_this<QueueState> {
   std::shared_ptr<Process> process;
   std::shared_ptr<Job> active;
   std::uint64_t nextId = 1;
+  std::function<void(const Json &)> observer;
+  bool paused = false;
   bool stopped = false;
 };
 }

@@ -9,8 +9,8 @@ Edit this contract when changing the HTTP interface, then regenerate its binding
 
 ## Read the running server's contract
 
-Both formats describe the same interface, including the current CLI command
-catalog and authentication requirements:
+Both formats describe the same typed symbol, file-analysis and job interface,
+including authentication requirements and deprecated command compatibility:
 
 ```bash
 API=http://127.0.0.1:42817
@@ -24,12 +24,16 @@ Import the downloaded YAML into Swagger Editor or other OpenAPI tooling to
 inspect requests, responses and examples. The server rejects browser-origin
 requests; use command-line or Python clients to call it.
 
-The contract includes `/v1/jobs`, job polling and cancellation, health, command
-discovery, watcher status, shutdown and the two contract endpoints. The generic
-`/v1/commands/{commandPath}` operation accepts nested CLI names such as
-`repo/add`; encode its slash as `repo%2Fadd` when substituting the path parameter.
-Existing `/v1/commands/repo/add` requests also work. The live document adds
-concrete endpoints for all registered CLI commands and aliases automatically.
+The resource contract includes symbol lookup (`GET /v1/symbols`), extraction,
+matching, dependency analysis and global index status. Analysis request schemas
+use a typed `file` selector; match also requires a Clang DSL `query`. Additional
+properties are rejected. Database paths and CLI arguments are absent from these
+schemas. Jobs return structured results and errors.
+
+The contract also defines polling, cancellation, health, watcher status and
+shutdown. `/v1/commands/{commandPath}` and `POST /v1/jobs` are marked deprecated
+for existing command clients. Their live CLI catalog remains discoverable for
+compatibility; it does not define the resource API.
 
 ## Regenerate and check
 
@@ -61,15 +65,18 @@ are rejected during generation before existing bindings are rewritten.
 
 ## Asynchronous execution
 
-Submitting a CLI command returns HTTP `202` with a job ID and a `Location`
-polling URL. Awaiting that submission waits only for acceptance. Poll the job
-until it reaches `succeeded`, `failed` or `cancelled`, then inspect its exit code
-and captured output. See [Requests and jobs](02-requests-and-jobs.md).
+Submitting extraction, matching or dependency analysis returns HTTP `202` with
+a job ID and a `Location` polling URL before the operation starts. Awaiting the
+submission waits for acceptance. Poll until `succeeded`, `failed` or `cancelled`,
+then inspect the structured `result` or `error`. Index publication follows
+successful extraction/matching asynchronously; inspect `GET /v1/index` before
+querying newly indexed symbols. See [Requests and jobs](02-requests-and-jobs.md).
 
-The native server uses asynchronous socket, pipe, timer and inotify operations.
-CLI commands run in child processes; repository scanning runs on a worker.
-The OpenAPI documents are prepared at startup and served from memory.
-One queue serializes CLI jobs while HTTP requests remain responsive.
+The server uses asynchronous sockets, timers and inotify. Typed handlers call
+shared native services on workers, with server-side identity and storage
+resolution. Symbol database queries also run off the HTTP event loop. Only the
+deprecated command compatibility API invokes CLI child processes. OpenAPI
+documents are prepared at startup and served from memory.
 
 The generated `AsyncClient` operations await HTTPX asynchronous requests.
 Polling yields to the Python event loop:
@@ -81,9 +88,11 @@ from facts_tool.rest import AsyncClient
 async def main():
     async with AsyncClient("http://127.0.0.1:42817") as api:
         document = await api.openapi_yaml()
-        job = await api.command("repo/list")
-        result = await api.wait(job.id, timeout=30)
-        print(result.raise_for_status().stdout)
+        print(document)
+        status = await api.index_status()
+        if status.state == "ready" and not status.pending:
+            page = await api.find_symbols("example::Widget", kind="class")
+            print(page.items)
 
 asyncio.run(main())
 ```

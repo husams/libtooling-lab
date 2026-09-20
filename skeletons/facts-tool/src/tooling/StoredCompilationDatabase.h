@@ -11,6 +11,9 @@
 
 namespace facts {
 
+std::unique_ptr<clang::tooling::CompilationDatabase> makeStoredCompilationDatabase(
+    std::vector<clang::tooling::CompileCommand> commands);
+
 std::expected<std::unique_ptr<clang::tooling::CompilationDatabase>, std::string>
 loadStoredCompilationDatabase(
     std::string databasePath,

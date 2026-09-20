@@ -23,11 +23,13 @@ add_library(facts-apis STATIC
   daemon/Redirect.cpp
   generated/Spec.cpp
   http/Access.cpp
+  http/AsyncDispatch.cpp
   http/Arguments.cpp
   http/Listener.cpp
   http/OpenApi.cpp
   http/OpenApiYaml.cpp
   http/Response.cpp
+  http/Resources.cpp
   http/Router.cpp
   http/Routing.cpp
   http/Session.cpp
@@ -68,9 +70,13 @@ add_library(facts-apis STATIC
   watch/plan/Batches.cpp
   watch/plan/Plan.cpp
 )
+add_subdirectory(domain)
+add_subdirectory(index)
+add_subdirectory(operations)
+add_subdirectory(runtime)
 target_include_directories(facts-apis PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(facts-apis
   PUBLIC Boost::headers nlohmann_json::nlohmann_json Threads::Threads
   PRIVATE CLI11::CLI11 yaml-cpp::yaml-cpp facts-config facts-storage
-          facts-tooling facts-clang facts-git)
+          facts-tooling facts-clang facts-git facts-commands)
 target_compile_definitions(facts-apis PRIVATE BOOST_ERROR_CODE_HEADER_ONLY)

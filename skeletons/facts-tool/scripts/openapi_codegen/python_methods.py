@@ -1,5 +1,6 @@
 """Operation semantics for the stable SDK signatures and typed return values."""
 
+from .python_domain import OPERATIONS
 from .python_routes import operations
 
 METHODS = {
@@ -7,11 +8,11 @@ METHODS = {
     "openapi": ("openapi(self) -> dict[str, object]", "return value"),
     "openapiYaml": ("openapi_yaml(self) -> str", "return value"),
     "commands": ("commands(self) -> list[dict[str, object]]", "return command_catalog(value)"),
-    "listJobs": ("list_jobs(self) -> list[Job]",
-                 'return [job(item, metadata=True) for item in object_list(value, "jobs")]'),
+    "listJobs": ("list_jobs(self) -> list[Job | DomainJob]",
+                 'return [snapshot(item, metadata=True) for item in object_list(value, "jobs")]'),
     "submit": ("submit(self, *argv: str) -> Job", "return job(value)"),
-    "getJob": ("get_job(self, job_id: str) -> Job", "return job(value)"),
-    "cancelJob": ("cancel_job(self, job_id: str) -> Job", "return job(value)"),
+    "getJob": ("get_job(self, job_id: str) -> Job | DomainJob", "return snapshot(value)"),
+    "cancelJob": ("cancel_job(self, job_id: str) -> Job | DomainJob", "return snapshot(value)"),
     "watchStatus": ("watch_status(self) -> dict[str, object]", "return value"),
     "shutdown": ("shutdown(self) -> dict[str, object]", "return value"),
     "command": ("command(self, path: str, *argv: str) -> Job", "return job(value)"),
@@ -51,6 +52,6 @@ def method(name: str, asynchronous: bool) -> str:
 
 def methods(spec: dict, *, asynchronous: bool) -> str:
     declared = operations(spec)
-    if set(declared) != set(METHODS):
-        raise ValueError(f"Unsupported Python operations: {set(declared) ^ set(METHODS)}")
+    if set(declared) != set(METHODS) | OPERATIONS:
+        raise ValueError(f"Unsupported Python operations: {set(declared) ^ (set(METHODS) | OPERATIONS)}")
     return "\n\n".join(method(name, asynchronous) for name in METHODS)

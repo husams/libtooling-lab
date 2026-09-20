@@ -20,6 +20,11 @@ struct StoredCompilationComponent {
   std::filesystem::path root;
 };
 
+struct CompilePathRemapping {
+  std::filesystem::path from;
+  std::filesystem::path to;
+};
+
 struct StoredCompileFile {
   std::filesystem::path root;
   std::filesystem::path path;
@@ -28,6 +33,7 @@ struct StoredCompileFile {
   std::string workingDirectory;
   std::string options;
   FileId id = 0;
+  CompilePathRemapping remapping;
 };
 
 using StoredCommandAliases = std::map<std::string, std::string>;

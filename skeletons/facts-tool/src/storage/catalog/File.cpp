@@ -1,4 +1,5 @@
 #include "storage/catalog/File.h"
+#include "storage/CloneContext.h"
 #include "storage/catalog/Component.h"
 #include "storage/catalog/Directory.h"
 #include <algorithm>
@@ -164,6 +165,8 @@ Result<std::vector<File>> files(Database &database) {
                 value.clone = ProjectClone{row.integer(8), row.integer(9),
                                            row.string(10), row.string(11)};
               }
+              value.clone = invocationClone(value.component.repositoryId,
+                                             value.clone);
               value.componentName = row.string(3);
               value.directory = row.string(12);
               value.name = row.string(13);

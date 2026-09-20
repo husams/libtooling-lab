@@ -1,3 +1,4 @@
+#include "tooling/DiagnosticScope.h"
 #include "commands/ExtractTranslationUnits.h"
 
 #include "ast/FactExtractor.h"
@@ -18,6 +19,7 @@ int extractTranslationUnits(const clang::tooling::CompilationDatabase &database,
     for (const auto &source : sources)
       reportFrontendActivity(cache.verbosity, "ast-parse", source);
     clang::tooling::ClangTool tool(database, sources);
+    configureDiagnostics(tool);
     return tool.run(createFactExtractorFactory(files, store, status).get());
   }
   // Consume one TU at a time: caching must not retain the entire project's

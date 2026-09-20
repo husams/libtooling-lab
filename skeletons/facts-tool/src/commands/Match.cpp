@@ -1,4 +1,5 @@
 #include "commands/Match.h"
+#include "commands/match/MatchResolved.h"
 
 #include "commands/CompilationDatabase.h"
 #include "commands/ConfigurationSupport.h"
@@ -6,6 +7,8 @@
 #include "commands/ExtractionSetup.h"
 #include "commands/FactPairValidation.h"
 #include "commands/match/MatchExecution.h"
+#include "commands/match/MatchResult.h"
+#include <iostream>
 #include "commands/match/RelationKinds.h"
 #include "storage/FileManager.h"
 #include "tooling/StoredCompilationDatabase.h"
@@ -72,33 +75,12 @@ std::expected<int, std::string> runMatch(const cli::MatchOptions &options) {
     if (!pairing)
       return std::unexpected(pairing.error());
   }
-  auto loaded = loadStoredCompilationDatabase(configured.configuration,
-                                              configured.sources);
-  if (!loaded)
-    return std::unexpected(
-        "cannot load project configuration: " + loaded.error() +
-        (configured.factsProvided && !explicitConfiguration
-             ? "; pass --conf <project db> for a separate project database, "
-               "or omit --facts to use facts_template"
-             : ""));
-  auto commands = requireStoredCommands(
-      appendExtraArguments(std::move(*loaded), resolved->extraArguments));
-  if (!commands)
-    return std::unexpected(commands.error());
-  auto opened =
-      FileManager::openImported(configured.configuration,
-                                configured.astCache.enabled, configured.verbosity);
-  if (!opened)
-    return std::unexpected(opened.error());
-  auto registry = requireCompletedRegistry(**opened);
-  if (!registry)
-    return std::unexpected(registry.error());
-  auto sources = selectSources(**commands, configured.sources);
-  auto factsDirectory = materializeFactsDirectory(configured.facts);
-  if (!factsDirectory)
-    return std::unexpected(factsDirectory.error());
-  return match::execute(configured, std::move(*commands), **opened, sources,
-                       *registry);
+  configured.defaultExtraArguments = resolved->extraArguments;
+  return runMatchResolved(configured).transform([&](match::MatchOutput output) {
+    match::writeResults(std::move(output), configured.format == "json", std::cout);
+    return 0;
+  });
 }
+
 
 } // namespace facts::commands

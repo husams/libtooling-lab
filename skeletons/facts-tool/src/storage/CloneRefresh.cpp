@@ -1,8 +1,10 @@
 #include "storage/CloneRefresh.h"
+#include "storage/CloneContext.h"
 #include "storage/SqliteDatabase.h"
 #include <algorithm>
 #include <array>
 #include <set>
+#include <ranges>
 
 namespace facts::storage {
 namespace {
@@ -71,6 +73,11 @@ refreshCloneFiles(Database &database, std::span<const FactProvenance> rows,
   if (!requested.empty())
     return std::unexpected(std::make_error_code(std::errc::invalid_argument));
   return changed.empty() ? std::expected<void, std::error_code>{}
-                         : clearFiles(database, changed);
+                         : clearFiles(database, changed).transform([&] {
+                             auto ids = changed | std::views::transform(
+                                 [](const auto *row) { return row->file; }) |
+                                 std::ranges::to<std::vector>();
+                             recordRefreshedCloneFiles(ids);
+                           });
 }
 }

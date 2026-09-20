@@ -2,20 +2,23 @@
 # Lifecycle source: scripts/openapi_codegen/templates/client.py.in
 
 from types import TracebackType
-from typing import Self
+from typing import Self, cast
 
 import httpx
 
 from .arguments import arguments, command_path, identifier
 from .configuration import auth_headers, base_address, seconds
 from .decoding import command_catalog, job, object_list
+from .domain_models import DomainJob
 from .endpoints import endpoint
+from .generated.resources import ResourceOperations
 from .models import Job
 from .polling import validate_wait, wait
+from .snapshots import snapshot
 from .transport import request, request_text
 
 
-class Client:
+class Client(ResourceOperations):
     """A reusable HTTP client; close it or use a ``with`` block."""
 
     def __init__(
@@ -53,19 +56,20 @@ class Client:
     def commands(self) -> list[dict[str, object]]:
         return command_catalog(request(self._http, *endpoint("commands")))
 
-    def list_jobs(self) -> list[Job]:
+    def list_jobs(self) -> list[Job | DomainJob]:
         route = endpoint("listJobs")
         value = request(self._http, *route)
-        return [job(item, metadata=True) for item in object_list(value, "jobs")]
+        return [snapshot(item, metadata=True) for item in object_list(value, "jobs")]
 
     def submit(self, *argv: str) -> Job:
         return job(request(self._http, *endpoint("submit"), body=arguments(argv)))
 
-    def get_job(self, job_id: str) -> Job:
-        return job(request(self._http, *endpoint("getJob", id=identifier(job_id))))
+    def get_job(self, job_id: str) -> Job | DomainJob:
+        return snapshot(request(self._http, *endpoint("getJob", id=identifier(job_id))))
 
-    def cancel_job(self, job_id: str) -> Job:
-        return job(request(self._http, *endpoint("cancelJob", id=identifier(job_id))))
+    def cancel_job(self, job_id: str) -> Job | DomainJob:
+        route = endpoint("cancelJob", id=identifier(job_id))
+        return snapshot(request(self._http, *route))
 
     def watch_status(self) -> dict[str, object]:
         return request(self._http, *endpoint("watchStatus"))
@@ -81,7 +85,7 @@ class Client:
 
     def wait(
         self, job_id: str, *, timeout: float | None = None, poll_interval: float = 0.1,
-    ) -> Job:
+    ) -> Job | DomainJob:
         return wait(self._http, job_id, timeout, poll_interval)
 
     def run(
@@ -92,4 +96,4 @@ class Client:
         result = self.wait(
             self.submit(*argv).id, timeout=timeout, poll_interval=poll_interval,
         )
-        return result.raise_for_status() if check else result
+        return cast(Job, result.raise_for_status() if check else result)

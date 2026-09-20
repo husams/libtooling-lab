@@ -19,6 +19,14 @@ bool Queue::cancel(const std::string &id) {
   auto state = impl_->state;
   return state->cancel(id);
 }
+void Queue::pause(bool paused) {
+  impl_->state->paused = paused;
+  if (!paused) impl_->state->schedule();
+}
+bool Queue::busy() const { return bool(impl_->state->active); }
+void Queue::observe(std::function<void(const Json &)> observer) {
+  impl_->state->observer = std::move(observer);
+}
 void Queue::stop() {
   auto state = impl_->state;
   state->stop();

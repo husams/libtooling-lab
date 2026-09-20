@@ -47,17 +47,12 @@ For example, `facts-tool serve -v 2` selects `debug`. YAML also accepts
 Use only one of those YAML keys, and only one of `--log-level` or `-v` on the CLI.
 The saved configuration always uses the canonical named `logging.level`.
 
-Server verbosity controls the REST service. Verbosity passed inside a submitted
-job's arguments controls that CLI command's captured stdout/stderr independently:
-
-```bash
-curl -X POST "$API/v1/commands/extract" \
-  -H 'Content-Type: application/json' -d '{"arguments":["-v","2"]}'
-```
-
-Read command output from `GET /v1/jobs/{id}` after completion. It is not copied
-into the server log. Watcher command verbosity similarly belongs in
-`import_arguments` or `extract_arguments`.
+Server verbosity controls the REST service. Typed resource operations return
+structured results and errors through `GET /v1/jobs/{id}`; clients do not submit
+per-command verbosity or parse terminal output. Server logs are independent of
+those operation results. Only deprecated command compatibility jobs retain
+captured stdout/stderr and CLI verbosity arguments. Watcher command verbosity
+belongs in `import_arguments` or `extract_arguments`.
 
 ## Structured events and operation
 
@@ -72,6 +67,7 @@ to retrieve the complete job through REST.
 | `job.accepted`, `job.started` | info | Command queue and worker progress |
 | `job.completed` | info, warning or error | Completion; timeout warns, failure errors |
 | `queue.rejected` | warning | Job queue refused submission |
+| `index.completed`, `index.failed` | info, error | Background global-index publication or failure |
 | `http.response` | debug | Method, route template, status and processing duration |
 | `http.read`, `http.write` | trace | HTTP I/O byte counts and failure status |
 | `http.invalid`, `http.failed` | warning, error | Invalid HTTP or handler failure |

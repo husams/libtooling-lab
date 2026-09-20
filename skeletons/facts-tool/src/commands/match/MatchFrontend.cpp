@@ -1,3 +1,4 @@
+#include "tooling/DiagnosticScope.h"
 #include "commands/match/MatchFrontend.h"
 #include "tooling/FrontendActivity.h"
 #include "tooling/astcache/Cache.h"
@@ -12,12 +13,10 @@
 
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace facts::commands::match {
 namespace {
-
 class MatchAction final : public clang::ASTFrontendAction {
 public:
   MatchAction(clang::ast_matchers::MatchFinder &finder,
@@ -59,7 +58,7 @@ private:
 
 void announceProgress(std::size_t index, std::size_t total,
                       const std::string &source) {
-  if (total > 1)
+  if (total > 1 && !embeddedAnalysis())
     llvm::errs() << "[" << index + 1 << "/" << total << "] Processing file "
                  << clang::tooling::getAbsolutePath(source) << ".\n";
 }
@@ -83,7 +82,6 @@ MatchFrontendResult matchCachedTranslationUnit(
 }
 
 } // namespace
-
 MatchFrontendResult runTranslationUnit(
     const clang::tooling::CompilationDatabase &database,
     clang::ast_matchers::MatchFinder &finder, const std::string &source,
@@ -94,6 +92,7 @@ MatchFrontendResult runTranslationUnit(
   reportFrontendActivity(astCache.verbosity, "ast-parse", source);
   IncludeGraphFacts includes;
   clang::tooling::ClangTool tool(database, std::vector<std::string>{source});
+  configureDiagnostics(tool);
   auto factory = std::make_unique<MatchActionFactory>(finder, includes);
   return {.status = tool.run(factory.get()), .includes = std::move(includes)};
 }

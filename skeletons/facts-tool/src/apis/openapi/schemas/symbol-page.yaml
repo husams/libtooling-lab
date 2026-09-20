@@ -1,0 +1,11 @@
+type: object
+required: [items, next_cursor]
+additionalProperties: false
+properties:
+  items:
+    type: array
+    items:
+      $ref: '../openapi.yaml#/components/schemas/Symbol'
+  next_cursor:
+    type: [string, 'null']
+    description: Opaque cursor for the same query, or null when exhausted.

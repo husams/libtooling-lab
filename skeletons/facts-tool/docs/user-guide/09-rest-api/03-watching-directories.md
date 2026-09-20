@@ -97,7 +97,9 @@ remain; invalidated metadata prevents their reuse. Shared AST/cache and call-gra
 entry metadata can be invalidated across the project for dependency correctness,
 even though excluded translation units are not compiled or reindexed.
 
-Startup establishes watches without indexing. Import and extract initially
+Watcher startup establishes watches without parsing source files. Separately,
+the server indexes known existing facts databases into its global symbol index
+asynchronously; inspect `/v1/index` for readiness. Import and extract initially
 through the CLI or REST endpoints. A new translation unit is imported on a
 subsequent refresh when it appears in a compilation database and passes the
 filters. Updating that database remains the build system's responsibility.

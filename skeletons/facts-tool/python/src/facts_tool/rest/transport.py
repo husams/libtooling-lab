@@ -15,9 +15,16 @@ def response_body(response: httpx.Response) -> dict[str, object]:
         raise ProtocolError("Server returned invalid JSON") from error
     if not response.is_success:
         message = value.get("error") if isinstance(value, dict) else None
+        code, details = None, None
+        if isinstance(message, dict):
+            code = message.get("code")
+            details = message.get("details")
+            message = message.get("message")
         raise ApiError(
             response.status_code,
             message if isinstance(message, str) else response.reason_phrase,
+            code=code if isinstance(code, str) else None,
+            details=object_value(details) if isinstance(details, dict) else None,
         )
     return object_value(value)
 

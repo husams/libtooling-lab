@@ -4,12 +4,17 @@
 #include <string_view>
 
 namespace facts::apis::generated {
-enum class Operation { health, openapi, openapiYaml, commands, command, listJobs, submit, getJob, cancelJob, watchStatus, shutdown };
+enum class Operation { findSymbols, indexStatus, extract, match, dependencies, health, openapi, openapiYaml, commands, command, listJobs, submit, getJob, cancelJob, watchStatus, shutdown };
 struct Route {
   std::string_view method, path, parameter;
   Operation operation;
 };
-inline constexpr std::array<Route, 11> routes{{
+inline constexpr std::array<Route, 16> routes{{
+  Route{"GET", "/v1/symbols", "", Operation::findSymbols},
+  Route{"GET", "/v1/index", "", Operation::indexStatus},
+  Route{"POST", "/v1/extractions", "", Operation::extract},
+  Route{"POST", "/v1/matches", "", Operation::match},
+  Route{"POST", "/v1/dependencies", "", Operation::dependencies},
   Route{"GET", "/health", "", Operation::health},
   Route{"GET", "/openapi.json", "", Operation::openapi},
   Route{"GET", "/openapi.yaml", "", Operation::openapiYaml},

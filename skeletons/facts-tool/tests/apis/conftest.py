@@ -1,10 +1,15 @@
 """Run independently: pytest tests/apis --api-facts-tool /path/to/facts-tool."""
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
 
 from server import Server
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+pytest_plugins = ("domain_fixtures",)
 
 
 def pytest_addoption(parser):

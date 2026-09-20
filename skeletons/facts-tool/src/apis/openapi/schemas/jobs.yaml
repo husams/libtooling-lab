@@ -4,6 +4,5 @@ additionalProperties: false
 properties:
   jobs:
     type: array
-    maxItems: 128
     items:
-      $ref: '../openapi.yaml#/components/schemas/Job'
+      $ref: '../openapi.yaml#/components/schemas/JobSnapshot'

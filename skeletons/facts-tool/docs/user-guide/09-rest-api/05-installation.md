@@ -120,7 +120,8 @@ is not a substitute for installing this revision.
 ## Verify a running server
 
 Use [Deployment and operation](06-deployment.md) to start the server. Read its
-allocated port from the startup message or server YAML, then call `/health` or
+allocated port from the startup message or server YAML, then call `/health` and
+inspect `/v1/index` for the asynchronous global-index scan, or
 run the [Python REST client example](../05-python-sdk/11-rest-client.md).
 Installing the SDK does not start a server.
 Server logging uses the native binary's existing dependencies. Configure its

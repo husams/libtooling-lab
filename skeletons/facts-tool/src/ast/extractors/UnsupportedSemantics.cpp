@@ -1,3 +1,4 @@
+#include "model/AnalysisDiagnostic.h"
 #include "ast/extractors/UnsupportedSemantics.h"
 
 #include "ast/extractors/File.h"
@@ -22,6 +23,8 @@ void reportUnsupportedSemantic(std::string_view kind,
                         ? std::format("{}:{}:{}", presumed.getFilename(),
                                       presumed.getLine(), presumed.getColumn())
                         : std::string{"unknown"};
+  if (collectDiagnostic({"warning", "coverage.unsupported_semantics: " +
+                                   std::string(kind), site})) return;
   cli::logVerbose(store.verbosity(), 0,
                   "facts-tool: coverage.unsupported_semantics kind={} site={}",
                   kind, site);

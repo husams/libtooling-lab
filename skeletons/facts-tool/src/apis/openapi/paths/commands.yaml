@@ -1,4 +1,5 @@
 get:
+  deprecated: true
   operationId: commands
   tags: [discovery]
   summary: List the CLI commands registered by this server

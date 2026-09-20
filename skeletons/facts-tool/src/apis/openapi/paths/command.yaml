@@ -9,6 +9,7 @@ parameters:
     schema: {type: string, minLength: 1}
     example: repo/list
 post:
+  deprecated: true
   operationId: command
   tags: [jobs]
   summary: Submit a registered CLI command asynchronously

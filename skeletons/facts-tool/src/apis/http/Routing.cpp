@@ -43,6 +43,7 @@ bool matches(const generated::Route &route, std::string_view path) {
 }
 std::expected<MatchedRoute, HttpError>
 matchRoute(std::string_view method, std::string_view path) {
+  path = path.substr(0, path.find('?'));
   bool knownPath = false;
   for (const auto &route : generated::routes) {
     if (!matches(route, path)) continue;

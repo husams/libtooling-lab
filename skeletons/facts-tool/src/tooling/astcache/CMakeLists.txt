@@ -18,4 +18,4 @@ add_library(facts-ast-cache STATIC
 )
 target_include_directories(facts-ast-cache PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(facts-ast-cache PUBLIC facts-clang
-  PRIVATE facts-storage facts-config facts-git facts-ast)
+  PRIVATE facts-storage facts-config facts-git facts-ast facts-diagnostics)

@@ -24,7 +24,11 @@ void Session::start() {
           }
           return;
         }
-        try { self->respond(self->router_(self->parser_.get())); }
+        try {
+          self->router_.handle(self->parser_.get(), [self](Response reply) {
+            self->respond(std::move(reply));
+          });
+        }
         catch (const std::exception &) {
           if (self->router_.logger) self->router_.logger->write(
               logging::Level::error, "http.failed", {{"status", 500}});

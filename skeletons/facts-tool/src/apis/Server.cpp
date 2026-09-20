@@ -6,6 +6,8 @@
 #include "apis/logging/Logger.h"
 #include "apis/logging/Record.h"
 #include "apis/watch/Watcher.h"
+#include "apis/runtime/Service.h"
+#include "apis/runtime/Drain.h"
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <csignal>
@@ -25,12 +27,13 @@ int serve(Settings settings, const std::vector<std::string> &commands) {
     std::filesystem::current_path(settings.workingDirectory);
     boost::asio::io_context io;
     Queue jobs(io, settings, &logger);
+    runtime::Service resources(io, jobs, settings, &logger);
     Watcher watcher(io, jobs, settings, &logger);
     boost::asio::steady_timer shutdownTimer(io);
     bool stopping = false;
     const auto documents = openApiDocuments(commands, !settings.token.empty());
     Router router{jobs, settings, commands, documents,
-                  [&] { return watcher.status(); }, {}, &logger};
+                  [&] { return watcher.status(); }, {}, &logger, &resources};
     Listener listener(io, router);
     router.shutdown = [&] {
       if (stopping) return;
@@ -38,10 +41,10 @@ int serve(Settings settings, const std::vector<std::string> &commands) {
       logger.write(logging::Level::info, "server.stopping");
       listener.stop();
       watcher.stop();
+      resources.stop();
       jobs.stop();
       // Allow the accepted shutdown response and cancellation callbacks to drain.
-      shutdownTimer.expires_after(std::chrono::milliseconds(200));
-      shutdownTimer.async_wait([&](auto) { io.stop(); });
+      runtime::drain(io, resources, shutdownTimer);
     };
     stage = "listener";
     auto port = listener.bind(settings);
@@ -56,6 +59,7 @@ int serve(Settings settings, const std::vector<std::string> &commands) {
     boost::asio::signal_set signals(io, SIGINT, SIGTERM);
     signals.async_wait([&](auto ec, int) { if (!ec) router.shutdown(); });
     listener.accept();
+    resources.start();
     stage = "readiness";
     auto ready = lifecycle.ready(settings.host, settings.port);
     if (!ready) throw std::runtime_error(ready.error());

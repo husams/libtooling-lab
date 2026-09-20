@@ -1,3 +1,4 @@
+#include "model/AnalysisDiagnostic.h"
 #include "commands/IncludedFiles.h"
 
 #include "commands/PreprocessTranslationUnit.h"
@@ -23,7 +24,7 @@ namespace {
 // the per-source tools stay silent and the span keeps the same lines it had.
 void announceProgress(std::size_t index, std::size_t total,
                       const std::string &source) {
-  if (total > 1) {
+  if (total > 1 && !embeddedAnalysis()) {
     llvm::errs() << "[" << index + 1 << "/" << total << "] Processing file "
                  << clang::tooling::getAbsolutePath(source) << ".\n";
   }

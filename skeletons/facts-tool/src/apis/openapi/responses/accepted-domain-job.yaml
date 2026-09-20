@@ -1,0 +1,11 @@
+description: Accepted for background execution; poll Location for completion.
+headers:
+  Location:
+    required: true
+    description: Relative URL for this operation's state and structured result.
+    schema: {type: string}
+    example: /v1/jobs/domain-1
+content:
+  application/json:
+    schema:
+      $ref: '../openapi.yaml#/components/schemas/DomainJob'
