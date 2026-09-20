@@ -8,6 +8,7 @@
 #include <iterator>
 #include <optional>
 #include <ranges>
+#include <set>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -207,30 +208,75 @@ bool compilableInput(const std::filesystem::path &path,
          !name.starts_with('.') && !projectMetadata(name);
 }
 
+bool allowedTarget(const std::filesystem::path &target, const Discovery &discovery) {
+  const auto inside = [&](const std::filesystem::path &path) {
+    std::error_code error;
+    const auto root = std::filesystem::canonical(path, error);
+    if (error) return false;
+    const auto relative = target.lexically_relative(root);
+    return !relative.empty() && !relative.is_absolute() && *relative.begin() != "..";
+  };
+  return std::ranges::any_of(discovery.sourceRoots, inside) ||
+         std::ranges::any_of(discovery.includeRoots, inside);
+}
+
 std::expected<void, std::string>
 appendDirectoryEntries(const std::filesystem::path &root,
                        SuffixlessNames suffixless, Discovery &discovery) {
   std::error_code error;
-  std::filesystem::recursive_directory_iterator entry(root, error);
-  const std::filesystem::recursive_directory_iterator end;
-  while (!error && entry != end) {
-    if (compilableInput(entry->path(), suffixless) &&
-        entry->is_regular_file(error)) {
-      std::error_code identityError;
-      auto identity = std::filesystem::canonical(entry->path(), identityError);
-      if (identityError && !missing(identityError)) {
-        return std::unexpected(
-            describe("cannot resolve file", entry->path(), identityError));
+  const auto identity = std::filesystem::canonical(root, error);
+  if (error) return std::unexpected(describe("cannot resolve include directory", root, error));
+  std::set<std::filesystem::path> visited{identity};
+  std::vector<std::filesystem::path> pending{root};
+  while (!pending.empty()) {
+    const auto directory = std::move(pending.back());
+    pending.pop_back();
+    auto entry = std::filesystem::directory_iterator(directory, error);
+    const std::filesystem::directory_iterator end;
+    if (error) {
+      if (directory == root && !missing(error))
+        return std::unexpected(describe("cannot scan include directory", root, error));
+      discovery.diagnostics.push_back(describe("skipping unavailable directory", directory, error));
+      error.clear();
+      continue;
+    }
+    while (entry != end) {
+      const auto path = entry->path();
+      const auto linkStatus = std::filesystem::symlink_status(path, error);
+      const bool link = !error && std::filesystem::is_symlink(linkStatus);
+      const auto status = error ? linkStatus : std::filesystem::status(path, error);
+      if (error || !std::filesystem::exists(status)) {
+        discovery.diagnostics.push_back(describe(link ? "skipping broken symlink" :
+            "skipping unavailable file", path,
+            error ? error : std::make_error_code(std::errc::no_such_file_or_directory)));
+        error.clear();
+      } else if (std::filesystem::is_directory(status) ||
+                 (std::filesystem::is_regular_file(status) && compilableInput(path, suffixless))) {
+        const auto target = std::filesystem::canonical(path, error);
+        if (error) {
+          discovery.diagnostics.push_back(describe("skipping unavailable file", path, error));
+          error.clear();
+        } else if (link && !allowedTarget(target, discovery)) {
+          discovery.diagnostics.push_back("skipping symlink outside source/include roots '" + path.string() + "'");
+        } else if (std::filesystem::is_directory(status)) {
+          if (visited.insert(target).second) pending.push_back(path);
+          else if (link) discovery.diagnostics.push_back(
+              "skipping repeated or cyclic symlink directory '" + path.string() + "'");
+        } else {
+          // File registry identities have always been canonical; traversal keeps
+          // lexical aliases separately in the server's monitoring snapshot.
+          discovery.files.push_back(target.lexically_normal().string());
+        }
       }
-      if (!identityError) {
-        discovery.files.push_back(identity.lexically_normal().string());
+      entry.increment(error);
+      if (error) {
+        discovery.diagnostics.push_back(describe("cannot finish scanning directory", directory, error));
+        error.clear();
+        break;
       }
     }
-    entry.increment(error);
   }
-  return error ? std::unexpected(
-                     describe("cannot scan include directory", root, error))
-               : std::expected<void, std::string>{};
+  return {};
 }
 
 std::expected<void, std::string>
@@ -238,7 +284,7 @@ appendDirectoryFiles(const std::filesystem::path &root,
                      SuffixlessNames suffixless, Discovery &discovery) {
   std::error_code error;
   const bool directory = std::filesystem::is_directory(root, error);
-  if (missing(error)) {
+  if (missing(error) || error == std::errc::too_many_symbolic_link_levels) {
     discovery.diagnostics.push_back(
         describe("skipping unavailable include directory", root, error));
     return {};

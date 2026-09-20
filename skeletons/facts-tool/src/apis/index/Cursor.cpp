@@ -7,7 +7,9 @@ namespace facts::apis::index {
 namespace {
 std::string identity(const Query &query) {
   const auto value = nlohmann::json::array({query.qualifiedName, query.kind.value_or(""),
-      query.usr.value_or(""), query.repository.value_or(""), query.component.value_or("")});
+      query.usr.value_or(""), query.repository.value_or(""), query.component.value_or(""),
+      query.match == NameMatch::Prefix ? "prefix" : "exact",
+      query.symbolId.value_or(""), query.distinct});
   llvm::SHA256 hash;
   hash.update(value.dump());
   constexpr char digits[] = "0123456789abcdef";

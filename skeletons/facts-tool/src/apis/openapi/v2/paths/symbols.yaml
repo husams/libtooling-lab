@@ -1,0 +1,97 @@
+get:
+  operationId: v2FindSymbols
+  tags:
+  - resources-v2
+  summary: Find symbols by a case-sensitive literal name prefix
+  responses:
+    '200':
+      description: Find symbols by a case-sensitive literal name prefix
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2SymbolPage'
+    '400':
+      $ref: '../../openapi.yaml#/components/responses/V2Error400'
+    '401':
+      $ref: '../../openapi.yaml#/components/responses/V2Error401'
+    '405':
+      $ref: '../../openapi.yaml#/components/responses/V2Error405'
+    '415':
+      $ref: '../../openapi.yaml#/components/responses/V2Error415'
+    '404':
+      $ref: '../../openapi.yaml#/components/responses/V2Error404'
+    '409':
+      $ref: '../../openapi.yaml#/components/responses/V2Error409'
+    '422':
+      $ref: '../../openapi.yaml#/components/responses/V2Error422'
+    '429':
+      $ref: '../../openapi.yaml#/components/responses/V2Error429'
+    '503':
+      $ref: '../../openapi.yaml#/components/responses/V2Error503'
+    default:
+      $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'
+  description: At least one of qualified_name or usr is required. qualified_name uses
+    literal case-sensitive prefix matching by default; match=exact requests equality.
+    Percent signs and underscores are literal characters, not SQL wildcards. USRs
+    always use exact equality. Filters and cursors are bound to an index revision.
+    Return 409 if that revision expires; restart pagination with no cursor.
+  parameters:
+  - name: qualified_name
+    in: query
+    required: false
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+  - name: usr
+    in: query
+    required: false
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+  - name: match
+    in: query
+    required: false
+    schema:
+      type: string
+      enum:
+      - prefix
+      - exact
+      default: prefix
+  - name: kind
+    in: query
+    required: false
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+  - name: repository
+    in: query
+    required: false
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+  - name: component
+    in: query
+    required: false
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+  - name: limit
+    in: query
+    required: false
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 500
+      default: 50
+  - name: cursor
+    in: query
+    required: false
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096

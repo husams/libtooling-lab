@@ -24,7 +24,7 @@ std::string snapshot(Json metadata, const std::shared_ptr<const std::string> &pa
 }
 void State::get(const std::string &id, Completion completion) {
   const auto found = jobs.find(id);
-  if (found == jobs.end()) {
+  if (found == jobs.end() || found->second.at("operation").get<std::string>().starts_with("v2.")) {
     completion(std::unexpected(domain::Error{404, "job_not_found", "Unknown job"}));
     return;
   }

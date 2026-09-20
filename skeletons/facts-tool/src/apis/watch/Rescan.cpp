@@ -1,4 +1,5 @@
 #include "apis/watch/State.h"
+#include "apis/watch/Snapshot.h"
 #ifdef __linux__
 #include <boost/asio/post.hpp>
 #include <chrono>
@@ -35,6 +36,7 @@ void Watcher::Impl::scanned(std::expected<watch::Update, std::string> result) {
   const bool previouslyReady = ready;
   ready = applied.has_value();
   if (!applied) {
+    checkpointPending = false;
     if (logger && (previouslyReady || error != applied.error()))
       logger->write(logging::Level::warning, "watch.failed", {{"stage", "scan"}});
     error = applied.error();
@@ -49,6 +51,16 @@ void Watcher::Impl::scanned(std::expected<watch::Update, std::string> result) {
       {{"ready", ready}, {"notices", snapshot->notices.size()},
        {"events", result->events}, {"refresh", result->refresh}});
   if (result->refresh) {
+    checkpointPending = false;
+    auto invalidated = watch::forget(settings);
+    if (!invalidated) {
+      error = invalidated.error();
+      ready = false;
+      ++failures;
+      needsScan = true;
+      return;
+    }
+    resumed = false;
     active = true;
     ++cycles;
     error.clear();
@@ -60,6 +72,8 @@ void Watcher::Impl::scanned(std::expected<watch::Update, std::string> result) {
     nextCommand();
   } else if (dirty) {
     changed();
+  } else if (checkpointPending && !needsScan && pendingEvents.empty()) {
+    checkpoint();
   }
 }
 

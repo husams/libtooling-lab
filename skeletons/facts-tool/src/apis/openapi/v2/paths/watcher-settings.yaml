@@ -1,0 +1,108 @@
+get:
+  operationId: v2GetWatcherSettings
+  tags:
+  - resources-v2
+  summary: Read watcher settings
+  responses:
+    '200':
+      description: Read watcher settings
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2WatcherSettings'
+    '400':
+      $ref: '../../openapi.yaml#/components/responses/V2Error400'
+    '401':
+      $ref: '../../openapi.yaml#/components/responses/V2Error401'
+    '405':
+      $ref: '../../openapi.yaml#/components/responses/V2Error405'
+    '415':
+      $ref: '../../openapi.yaml#/components/responses/V2Error415'
+    '404':
+      $ref: '../../openapi.yaml#/components/responses/V2Error404'
+    '409':
+      $ref: '../../openapi.yaml#/components/responses/V2Error409'
+    '422':
+      $ref: '../../openapi.yaml#/components/responses/V2Error422'
+    '429':
+      $ref: '../../openapi.yaml#/components/responses/V2Error429'
+    '503':
+      $ref: '../../openapi.yaml#/components/responses/V2Error503'
+    default:
+      $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'
+put:
+  operationId: v2ReplaceWatcherSettings
+  tags:
+  - resources-v2
+  summary: Replace all watcher settings
+  responses:
+    '200':
+      description: Replace all watcher settings
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2WatcherSettings'
+    '400':
+      $ref: '../../openapi.yaml#/components/responses/V2Error400'
+    '401':
+      $ref: '../../openapi.yaml#/components/responses/V2Error401'
+    '405':
+      $ref: '../../openapi.yaml#/components/responses/V2Error405'
+    '415':
+      $ref: '../../openapi.yaml#/components/responses/V2Error415'
+    '404':
+      $ref: '../../openapi.yaml#/components/responses/V2Error404'
+    '409':
+      $ref: '../../openapi.yaml#/components/responses/V2Error409'
+    '422':
+      $ref: '../../openapi.yaml#/components/responses/V2Error422'
+    '429':
+      $ref: '../../openapi.yaml#/components/responses/V2Error429'
+    '503':
+      $ref: '../../openapi.yaml#/components/responses/V2Error503'
+    default:
+      $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../openapi.yaml#/components/schemas/V2WatcherSettings'
+patch:
+  operationId: v2UpdateWatcherSettings
+  tags:
+  - resources-v2
+  summary: Update selected watcher settings
+  responses:
+    '200':
+      description: Update selected watcher settings
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2WatcherSettings'
+    '400':
+      $ref: '../../openapi.yaml#/components/responses/V2Error400'
+    '401':
+      $ref: '../../openapi.yaml#/components/responses/V2Error401'
+    '405':
+      $ref: '../../openapi.yaml#/components/responses/V2Error405'
+    '415':
+      $ref: '../../openapi.yaml#/components/responses/V2Error415'
+    '404':
+      $ref: '../../openapi.yaml#/components/responses/V2Error404'
+    '409':
+      $ref: '../../openapi.yaml#/components/responses/V2Error409'
+    '422':
+      $ref: '../../openapi.yaml#/components/responses/V2Error422'
+    '429':
+      $ref: '../../openapi.yaml#/components/responses/V2Error429'
+    '503':
+      $ref: '../../openapi.yaml#/components/responses/V2Error503'
+    default:
+      $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../openapi.yaml#/components/schemas/V2UpdateWatcherSettingsRequest'

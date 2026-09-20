@@ -1,0 +1,4 @@
+oneOf:
+- $ref: '../../openapi.yaml#/components/schemas/V2DirectorySelection'
+- $ref: '../../openapi.yaml#/components/schemas/V2RepositorySelection'
+- $ref: '../../openapi.yaml#/components/schemas/V2AllSelection'

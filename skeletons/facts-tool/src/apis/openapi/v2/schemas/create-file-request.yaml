@@ -1,0 +1,13 @@
+type: object
+required:
+- path
+- compilation_command
+additionalProperties: false
+properties:
+  path:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Filesystem path on the server host.
+  compilation_command:
+    $ref: '../../openapi.yaml#/components/schemas/V2CompilationCommand'

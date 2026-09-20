@@ -23,6 +23,7 @@ struct Watcher::Impl : std::enable_shared_from_this<Impl> {
   void refresh();
   void nextCommand();
   void finished(bool success);
+  void checkpoint();
 #ifdef __linux__
   void scan();
   void scanned(std::expected<watch::Update, std::string>);
@@ -58,5 +59,7 @@ struct Watcher::Impl : std::enable_shared_from_this<Impl> {
   bool needsScan = false;
   bool scanning = false;
   bool ready = false;
+  bool resumed = false;
+  bool checkpointPending = false;
 };
 }

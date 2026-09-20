@@ -3,6 +3,7 @@
 #include "apis/http/OpenApi.h"
 #include "apis/http/Routing.h"
 #include "apis/logging/Logger.h"
+#include "apis/domain/Selection.h"
 #include <boost/beast/http.hpp>
 #include <functional>
 
@@ -20,6 +21,8 @@ struct Router {
   std::function<void()> shutdown;
   logging::Logger *logger = nullptr;
   runtime::Service *resources = nullptr;
+  std::function<domain::Result<Json>(const Json &, bool)> updateWatch;
+  std::function<void()> reconcile;
   Response operator()(const Request &request);
   void handle(const Request &request, Reply reply);
   Response resource(const Request &request, const MatchedRoute &route);

@@ -37,6 +37,16 @@ def bundle(source: Path) -> dict:
             return [walk(item, current, trail) for item in value]
         if not isinstance(value, dict):
             return value
+        if position.endswith("/discriminator/mapping"):
+            result = {}
+            for key, reference in value.items():
+                if not isinstance(reference, str) or "#" not in reference:
+                    result[key] = reference
+                    continue
+                target = location(reference, current, root)
+                result[key] = ("#" + target[1] if target[0] == source else
+                               aliases.get(target, reference))
+            return result
         siblings = {key: walk(item, current, trail, f"{position}/{key}")
                     for key, item in value.items() if key != "$ref"}
         reference = value.get("$ref")

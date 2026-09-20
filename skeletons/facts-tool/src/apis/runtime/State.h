@@ -5,6 +5,7 @@
 #include <boost/asio/thread_pool.hpp>
 #include <deque>
 #include <unordered_map>
+#include <atomic>
 
 namespace facts::apis::runtime {
 struct Task {
@@ -23,7 +24,8 @@ struct State : std::enable_shared_from_this<State> {
   domain::Result<Json> submit(Request request);
   void run(std::string id, Request request, domain::Context context);
   void complete(std::string id, bool success, Json error,
-                std::shared_ptr<const std::string> payload);
+                std::shared_ptr<const std::string> payload,
+                std::shared_ptr<const Json> document = nullptr);
   void search(index::Query query, Completion completion);
   Json list() const;
   void get(const std::string &id, Completion completion);
@@ -38,7 +40,9 @@ struct State : std::enable_shared_from_this<State> {
   std::optional<domain::Context> context;
   std::deque<Task> work;
   std::unordered_map<std::string, Json> jobs;
+  std::unordered_map<std::string, std::shared_ptr<std::atomic_bool>> cancellations;
   std::unordered_map<std::string, std::shared_ptr<const std::string>> payloads;
+  std::unordered_map<std::string, std::shared_ptr<const Json>> documents;
   std::deque<std::string> order;
   Json indexStatus{{"state", "queued"}, {"pending", true}, {"files", 0},
                    {"symbols", 0}, {"error", nullptr}, {"updated_at", nullptr}};

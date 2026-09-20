@@ -14,21 +14,27 @@ def header(body: str, includes: str) -> str:
 
 
 def render_native(document: dict) -> dict[str, str]:
-    rows = list(operations(document))
+    rows = sorted(operations(document), key=lambda row: row[0].startswith("/api/v2/"))
     identifiers = ", ".join(operation["operationId"] for _, _, operation in rows)
     entries = []
     for path, method, operation in rows:
         parameter = next(iter(re.findall(r"\{([^}]+)\}", path)), "")
         literals = ", ".join(json.dumps(value) for value in (method.upper(), path, parameter))
         entries.append(f"  Route{{{literals}, Operation::{operation['operationId']}}},")
+    extra_routes = {}
+    inline_entries = entries[:65]
+    for offset in range(65, len(entries), 90):
+        filename = f"RoutesPart{offset // 90:03}.inc"
+        extra_routes[PREFIX + filename] = NOTICE + "\n".join(entries[offset:offset + 90]) + "\n"
+        inline_entries.append(f'#include "{filename}"')
     routes = (f"enum class Operation {{ {identifiers} }};\n"
               "struct Route {\n  std::string_view method, path, parameter;\n"
               "  Operation operation;\n};\n"
               f"inline constexpr std::array<Route, {len(rows)}> routes{{{{\n"
-              + "\n".join(entries) + "\n}};\n")
+              + "\n".join(inline_entries) + "\n}};\n")
     limits = "".join(f"inline constexpr std::size_t {name} = "
                      f"{document['x-facts-limits'][name]};\n" for name in LIMITS)
-    output = {
+    output = extra_routes | {
         PREFIX + "Routes.h": header(routes, "#include <array>\n#include <string_view>\n"),
         PREFIX + "Limits.h": header(limits, "#include <cstddef>\n"),
         PREFIX + "Spec.h": header("std::string_view specification();\n", "#include <string_view>\n"),
@@ -41,7 +47,12 @@ def render_native(document: dict) -> dict[str, str]:
         filename = f"SpecPart{index:03}.inc"
         output[PREFIX + filename] = NOTICE + "".join(json.dumps(line) + "\n" for line in part)
         includes.append(f'#include "{filename}"')
+    sections = []
+    for offset in range(0, len(includes), 90):
+        filename = f"SpecSection{offset // 90:03}.inc"
+        output[PREFIX + filename] = NOTICE + "\n".join(includes[offset:offset + 90]) + "\n"
+        sections.append(f'#include "{filename}"')
     output[PREFIX + "Spec.cpp"] = (NOTICE + '#include "Spec.h"\n\n' + NAMESPACE
         + "std::string_view specification() {\n  static constexpr char document[] =\n"
-        + "\n".join(includes) + "\n;\n  return document;\n}\n}\n")
+        + "\n".join(sections) + "\n;\n  return document;\n}\n}\n")
     return output

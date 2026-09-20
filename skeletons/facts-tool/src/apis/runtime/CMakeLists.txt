@@ -5,6 +5,8 @@ target_sources(facts-apis PRIVATE
   Initialize.cpp
   Indexing.cpp
   Search.cpp
+  Read.cpp
+  Inspect.cpp
   Serialization.cpp
   Validation.cpp
   ParseRequest.cpp

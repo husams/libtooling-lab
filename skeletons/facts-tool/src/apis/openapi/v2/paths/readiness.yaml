@@ -1,0 +1,36 @@
+get:
+  operationId: v2Readiness
+  tags:
+  - resources-v2
+  summary: Read server readiness
+  responses:
+    '200':
+      description: Read server readiness
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2Readiness'
+    '400':
+      $ref: '../../openapi.yaml#/components/responses/V2Error400'
+    '401':
+      $ref: '../../openapi.yaml#/components/responses/V2Error401'
+    '405':
+      $ref: '../../openapi.yaml#/components/responses/V2Error405'
+    '415':
+      $ref: '../../openapi.yaml#/components/responses/V2Error415'
+    '404':
+      $ref: '../../openapi.yaml#/components/responses/V2Error404'
+    '409':
+      $ref: '../../openapi.yaml#/components/responses/V2Error409'
+    '422':
+      $ref: '../../openapi.yaml#/components/responses/V2Error422'
+    '429':
+      $ref: '../../openapi.yaml#/components/responses/V2Error429'
+    '503':
+      description: Server is still initializing or a required subsystem is unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2Readiness'
+    default:
+      $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'

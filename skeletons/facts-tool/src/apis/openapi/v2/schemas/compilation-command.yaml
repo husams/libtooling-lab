@@ -1,0 +1,22 @@
+type: object
+required:
+- driver
+- working_directory
+- arguments
+additionalProperties: false
+properties:
+  driver:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  working_directory:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Filesystem path on the server host.
+  arguments:
+    type: array
+    items:
+      type: string
+      maxLength: 65536
+    maxItems: 4096

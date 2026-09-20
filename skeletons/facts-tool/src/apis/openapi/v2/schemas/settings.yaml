@@ -1,0 +1,14 @@
+type: object
+required:
+- watcher
+- timeout_seconds
+- authenticated
+additionalProperties: false
+properties:
+  watcher:
+    $ref: '../../openapi.yaml#/components/schemas/V2WatcherSettings'
+  timeout_seconds:
+    type: integer
+    minimum: 0
+  authenticated:
+    type: boolean

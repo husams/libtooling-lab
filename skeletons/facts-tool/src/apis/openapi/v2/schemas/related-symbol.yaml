@@ -1,0 +1,18 @@
+type: object
+required:
+- symbol_id
+- qualified_name
+- usr
+additionalProperties: false
+properties:
+  symbol_id:
+    anyOf:
+    - type: string
+      minLength: 1
+      maxLength: 4096
+      description: Opaque server resource identifier. Do not infer database row numbers.
+    - type: 'null'
+  qualified_name:
+    type: string
+  usr:
+    type: string

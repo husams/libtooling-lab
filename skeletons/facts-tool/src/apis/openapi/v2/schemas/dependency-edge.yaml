@@ -1,0 +1,20 @@
+type: object
+required:
+- source_file_id
+- destination_file_id
+- source_path
+- destination_path
+additionalProperties: false
+properties:
+  source_file_id: &id001
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  destination_file_id: *id001
+  source_path: &id002
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Filesystem path on the server host.
+  destination_path: *id002

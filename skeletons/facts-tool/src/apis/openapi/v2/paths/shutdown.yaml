@@ -1,0 +1,32 @@
+post:
+  operationId: v2Shutdown
+  tags:
+  - resources-v2
+  summary: Request orderly server shutdown
+  responses:
+    '202':
+      description: Request orderly server shutdown
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2Shutdown'
+    '400':
+      $ref: '../../openapi.yaml#/components/responses/V2Error400'
+    '401':
+      $ref: '../../openapi.yaml#/components/responses/V2Error401'
+    '405':
+      $ref: '../../openapi.yaml#/components/responses/V2Error405'
+    '415':
+      $ref: '../../openapi.yaml#/components/responses/V2Error415'
+    '404':
+      $ref: '../../openapi.yaml#/components/responses/V2Error404'
+    '409':
+      $ref: '../../openapi.yaml#/components/responses/V2Error409'
+    '422':
+      $ref: '../../openapi.yaml#/components/responses/V2Error422'
+    '429':
+      $ref: '../../openapi.yaml#/components/responses/V2Error429'
+    '503':
+      $ref: '../../openapi.yaml#/components/responses/V2Error503'
+    default:
+      $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'

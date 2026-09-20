@@ -1,0 +1,29 @@
+type: object
+required:
+- name
+- path
+additionalProperties: false
+properties:
+  name:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  path:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Filesystem path on the server host.
+  kind:
+    type: string
+    enum:
+    - repo
+    - external
+    default: repo
+  version:
+    anyOf:
+    - type: string
+    - type: 'null'
+  repository:
+    type: string
+    minLength: 1
+    maxLength: 4096

@@ -1,0 +1,15 @@
+type: object
+required: []
+additionalProperties: false
+properties:
+  repository:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  compilation_database:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Filesystem path on the server host.
+  selection:
+    $ref: '../../openapi.yaml#/components/schemas/V2ScanSelection'

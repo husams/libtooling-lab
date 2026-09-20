@@ -10,8 +10,9 @@ facts-tool serve --daemon --server-config /workspace/server.yaml \
   --conf /workspace/project.db --config /workspace/defaults.yaml
 ```
 
-There is no separate directory list to maintain. Register repositories with
-`repo add` or `import` and inspect them with `repo list` and `repo show`.
+There is no separate directory list to maintain. Register repositories with `POST /api/v2/repositories` or the CLI and inspect
+them with `GET /api/v2/repositories`. Clone registrations and the active clone
+are fields updated with `PATCH /api/v2/repositories/{id}`.
 The running server follows repository registrations, removals and `repo switch`
 changes automatically, checking the catalog every second. Only active clones
 are monitored, matching the CLI's source-selection model; a registered inactive
@@ -83,13 +84,24 @@ saves and newly created nested directories are handled. Changes during an active
 refresh are coalesced into a later refresh.
 
 The watcher discovers compilation databases below eligible clones. A refresh
-reimports compilation commands for included sources, then runs `extract --force`
-for included stored sources. Both steps use shared project and CLI defaults and
-the API's serialized worker queue. Import must succeed before extraction starts.
+reimports compilation commands for included sources, then runs `extract --force` for eligible stored sources. A changed-content
+cycle reparses those translation units to account for uncommitted source and
+header changes. Unchanged restarts can skip the entire cycle using the verified
+successful content fingerprint described below. Both steps use shared project and CLI defaults and
+the API's serialized worker queue. Import must succeed before extraction starts. Conflicting commands for the
+same source across discovered compilation databases are rejected before
+mutation; select one database explicitly to resolve the conflict. Compiler
+settings explicitly changed with `PATCH /api/v2/files/{id}` survive automatic
+server reimports and restarts. An intentional ordinary CLI import retains its
+existing replacement behavior.
 The source set is filtered again for automatic jobs; an event in one included
 file cannot cause an excluded repository, clone or source to be reprocessed.
 
-Both commands receive `--no-ast-cache`, discarding prior project cache metadata
+Automatic batches currently use the existing serialized command worker; their
+internal job IDs are exposed in `latest_jobs`. Public `/api/v2` job endpoints
+call native typed services directly.
+
+Both automatic commands receive `--no-ast-cache`, discarding prior project cache metadata
 and bypassing commit-keyed AST and dependency caching. Uncommitted edits are
 therefore reparsed even when the Git commit has not changed. This also prevents
 later matcher jobs from reusing an older snapshot. Physical cache files can
@@ -97,16 +109,26 @@ remain; invalidated metadata prevents their reuse. Shared AST/cache and call-gra
 entry metadata can be invalidated across the project for dependency correctness,
 even though excluded translation units are not compiled or reindexed.
 
-Watcher startup establishes watches without parsing source files. Separately,
-the server indexes known existing facts databases into its global symbol index
-asynchronously; inspect `/v1/index` for readiness. Import and extract initially
-through the CLI or REST endpoints. A new translation unit is imported on a
-subsequent refresh when it appears in a compilation database and passes the
-filters. Updating that database remains the build system's responsibility.
+Watcher startup establishes watches, then schedules an initial background
+import/extraction reconciliation. Existing facts are also indexed in the
+background; inspect `/api/v2/index` and `/api/v2/watcher` for progress. The HTTP
+listener starts before this work finishes. A new translation unit is imported
+when it appears in a compilation database and passes the filters. Registering a
+repository or changing its active clone triggers the same reconciliation.
+After a successful automatic cycle the server saves a content fingerprint.
+On restart an unchanged fingerprint reuses that completed state instead of
+reimporting or reparsing; `resumed: true` reports this case, and `cycles` can be
+zero. Changed source/header contents, links, settings or catalog state trigger
+a new reconciliation. Failed, cancelled or unreadable scans do not establish a
+reusable successful baseline. Updating that database remains the build system's responsibility.
 Without a discovered or explicitly selected compilation database, the watcher
 extracts eligible sources using stored compilation commands and reports
 `import_mode: "stored_commands"`.
-Register new translation units explicitly or configure import arguments.
+If neither a compilation database nor stored commands exist, the watcher does
+not invent compiler settings or schedule an extraction. Register compiler
+settings through the file resource or configure a compilation database. A
+malformed compilation database is reported in `last_error`; the server continues
+running.
 
 ## Explicit automatic command arguments
 
@@ -125,8 +147,8 @@ also watches each explicit database's parent for changes to `compile_commands.js
 this allows an ignored or out-of-tree build directory to supply commands without
 monitoring its other ignored files. `extract_arguments` supplies extraction
 options. The watcher still restricts source processing to eligible active clones
-and enforces `--force` for extraction
-and `--no-ast-cache` for both commands. Do not include the executable or command
+and enforces `--force` for extraction and `--no-ast-cache` for both commands
+when a changed-content cycle is needed. Do not include the executable or command
 token. The equals form permits values beginning with a dash.
 
 Automatic arguments accept `--config`, `--extra-arg` and verbosity options;
@@ -139,7 +161,7 @@ to preserve registered names, clone labels and component definitions.
 ## Check progress and failures
 
 ```sh
-curl -sS "$API/v1/watch"
+curl -sS "$API/api/v2/watcher"
 ```
 
 | Field | Meaning |
@@ -147,14 +169,16 @@ curl -sS "$API/v1/watch"
 | `enabled`, `running` | Watch configuration and event processing state |
 | `ready`, `scanning` | Directory registration readiness and rescan activity |
 | `active`, `pending` | Refresh in progress and additional changes waiting |
-| `source`, `project_database` | Root source (`project_database`) and resolved catalog path |
+| `source` | Root source (`project_database`); v2 does not expose its storage path |
 | `clones` | Registered clones with repository/clone IDs, names, paths, active flags and exclusions |
 | `directories`, `watched_directories` | Eligible, available active clone roots and active directory-watch count |
-| `notices` | Nonfatal monitoring notices, including unavailable clone paths |
+| `notices` | Monitoring notices, including unavailable clone roots |
+| `warnings` | Structured skipped-link and filesystem warnings; broken links do not block readiness |
 | `events`, `cycles` | Relevant event count and started refresh count |
+| `resumed` | Optional flag indicating verified reuse of the last successful startup content fingerprint |
 | `failures`, `last_error` | Failed refresh count and latest refresh error |
 | `overflows` | Inotify event queue overflow count |
-| `latest_jobs` | IDs to inspect using `GET /v1/jobs/{id}` |
+| `latest_jobs` | Internal automatic-batch IDs; inspect with `GET /v1/jobs/{id}` |
 | `import_mode`, `backend` | Import strategy and operating-system watcher |
 
 `ready` stays false while `notices` reports an unavailable clone or compilation
@@ -173,5 +197,33 @@ extension. See [Logging and verbosity](09-logging.md) for watcher event levels. 
 directories are excluded from source traversal; specific Git control files are
 still watched to reload ignore rules and tracked-file state. Other directory
 names, including `.cache`, `.facts`, `.facts-tool`, `.deps` and `node_modules`,
-are excluded only when Git ignore rules or YAML exclusions match them. Symlinked
-directories are not traversed.
+are excluded only when Git ignore rules or YAML exclusions match them.
+
+## Symlinks and broken targets
+
+Valid file and directory symlinks are followed when their targets are inside an
+active, non-excluded registered clone root. Each canonical directory is traversed
+once per clone; link paths are retained as aliases. Cycles and targets outside
+these roots are skipped with a warning. Explicit source/include roots used for
+compilation import continue to work; there is no separate external-roots
+watcher setting.
+
+The scanner inspects a link before resolving its target. A broken link is
+skipped, a warning is logged, and traversal continues with its siblings. Broken
+links do not make the server unready. Link parents and valid targets are watched;
+missing targets are checked again so a repaired link is discovered without a
+restart. Repeated unchanged warnings are suppressed.
+
+Watcher `warnings` contain `code`, `severity`, `path`, `target`, `action` and
+`message`. Codes include `broken_symlink`, `symlink_cycle`,
+`symlink_outside_roots`, `unavailable_entry` and `unreadable_directory`. A warning
+about one entry is separate from a missing registered clone root, which still
+affects watcher readiness. Manual `/api/v2/scan/job` requests use the same
+traversal rules.
+
+Watcher settings can be read with `GET /api/v2/watcher/settings`, partially
+updated with `PATCH`, or completely replaced with `PUT`. JSON fields are
+`enabled`, `debounce_ms`, `exclude_repositories`, `exclude_clones`,
+`exclude_directories` and `exclude_patterns`. The debounce interval combines
+closely spaced filesystem events into one refresh; it is not an interval that
+unconditionally recompiles the repository.

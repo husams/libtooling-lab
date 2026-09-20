@@ -42,4 +42,9 @@ decodeStoredCommand(const StoredCompileFile &file,
 std::expected<CompileCommands, std::string>
 decodeCompileCommands(const StoredCompilationSnapshot &snapshot);
 
+// Expand stored path aliases for resource serialization without dropping flags
+// that extraction removes when constructing a syntax-only invocation.
+std::expected<CompileCommands, std::string>
+expandCompileCommands(const StoredCompilationSnapshot &snapshot);
+
 } // namespace facts

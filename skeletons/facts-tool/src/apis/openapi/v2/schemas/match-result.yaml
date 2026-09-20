@@ -1,0 +1,38 @@
+type: object
+required:
+- files_selected
+- files_processed
+- files_skipped
+- files_failed
+- coverage
+- match_count
+- index_revision
+additionalProperties: false
+properties:
+  files_selected: &id001
+    type: integer
+    minimum: 0
+  files_processed: *id001
+  files_skipped: *id001
+  files_failed: *id001
+  coverage:
+    type: string
+    enum:
+    - complete
+    - partial
+  diagnostics:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2Diagnostic'
+  match_count: *id001
+  matches:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2MatchRecord'
+  index_revision:
+    anyOf:
+    - type: string
+    - type: 'null'
+description: Job reads return scalar summary fields. Record arrays are optional and
+  are fetched lazily through the typed results endpoint with the appropriate collection
+  query parameter.

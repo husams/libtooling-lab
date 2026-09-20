@@ -1,0 +1,7 @@
+type: object
+required:
+- index_revision
+additionalProperties: false
+properties:
+  index_revision:
+    type: string

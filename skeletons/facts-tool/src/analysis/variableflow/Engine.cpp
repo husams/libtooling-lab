@@ -12,14 +12,20 @@ analyse(clang::tooling::CompilationDatabase &database,
     return std::unexpected("function selector is required");
   if (request.variable.empty())
     return std::unexpected("variable selector is required");
-  return detail::parse(database, sources, astCache)
-      .and_then([&](const detail::Parsed &parsed) {
+  if (request.cancelled && request.cancelled())
+    return std::unexpected("variable-flow cancelled");
+  return detail::parse(database, sources, astCache, request.cancelled)
+      .and_then([&](const detail::Parsed &parsed) -> std::expected<Graph, std::string> {
+        if (request.cancelled && request.cancelled())
+          return std::unexpected("variable-flow cancelled");
         return detail::selectFunction(parsed, request)
             .and_then([&](const detail::Function *function) {
               return detail::selectVariable(*function, request)
-                  .transform([&](const clang::VarDecl *variable) {
-                    return detail::runFlow(parsed, *function, variable,
-                                           request);
+                  .and_then([&](const clang::VarDecl *variable) -> std::expected<Graph, std::string> {
+                    auto result = detail::runFlow(parsed, *function, variable, request);
+                    if (result.status == "cancelled")
+                      return std::unexpected("variable-flow cancelled");
+                    return result;
                   });
             });
       });

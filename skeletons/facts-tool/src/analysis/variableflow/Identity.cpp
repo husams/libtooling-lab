@@ -11,6 +11,7 @@
 #include <llvm/ADT/SmallString.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <string_view>
 #include <utility>
 
@@ -125,19 +126,18 @@ selectVariable(const Function &function, const Request &request) {
   visitor.TraverseStmt(function.decl->getBody());
   if (candidates.empty())
     return std::unexpected("variable not found: " + request.variable);
-  if (request.line) {
+  if (request.line || request.column || request.file) {
     std::erase_if(candidates, [&](const auto *decl) {
-      const auto line = decl->getASTContext()
-                            .getSourceManager()
-                            .getPresumedLoc(decl->getLocation())
-                            .getLine();
-      return line != *request.line;
+      const auto location = locationOf(decl->getASTContext().getSourceManager(), decl->getLocation());
+      if (request.line && location.line != *request.line) return true;
+      if (request.column && location.column != *request.column) return true;
+      if (!request.file) return false;
+      return std::filesystem::absolute(location.file).lexically_normal() !=
+             std::filesystem::absolute(*request.file).lexically_normal();
     });
   }
   if (candidates.empty())
-    return std::unexpected("variable not found at line " +
-                           std::to_string(*request.line) + ": " +
-                           request.variable);
+    return std::unexpected("variable not found at the selected declaration: " + request.variable);
   std::ranges::sort(candidates, [&](const auto *left, const auto *right) {
     return left->getLocation().getRawEncoding() <
            right->getLocation().getRawEncoding();

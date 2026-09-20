@@ -1,0 +1,13 @@
+type: object
+required:
+- ready
+- index_ready
+- watcher_ready
+additionalProperties: false
+properties:
+  ready:
+    type: boolean
+  index_ready:
+    type: boolean
+  watcher_ready:
+    type: boolean

@@ -8,11 +8,15 @@
 
 namespace facts::apis::index {
 template <typename T> using Result = std::expected<T, std::string>;
+enum class NameMatch { Exact, Prefix };
 struct Query {
   std::string qualifiedName;
   std::optional<std::string> kind, usr, repository, component;
   unsigned limit = 50;
   std::optional<std::string> cursor;
+  NameMatch match = NameMatch::Exact;
+  std::optional<std::string> symbolId;
+  bool distinct = false;
 };
 struct Symbol {
   std::string qualifiedName, kind, usr;
@@ -20,6 +24,9 @@ struct Symbol {
   std::string path, repository, clone, component;
   bool definition = false;
   std::int64_t position = 0;
+  std::string symbolId;
+  std::int64_t scopeId = 0;
+  bool repositoryScope = false;
 };
 struct Page {
   std::vector<Symbol> items;
@@ -37,6 +44,7 @@ struct RefreshResult {
 Result<RefreshResult> refresh(const std::filesystem::path &project,
     const std::vector<std::filesystem::path> &configuredSources = {},
     const std::filesystem::path &factsBase = {});
+std::string symbolIdentity(const std::string &usr, std::int64_t scopeId, bool repositoryScope);
 Result<Page> search(const std::filesystem::path &project, const Query &query);
 Result<std::optional<RefreshResult>> published(const std::filesystem::path &project);
 }

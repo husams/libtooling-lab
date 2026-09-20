@@ -1,0 +1,46 @@
+type: object
+required:
+- kind
+- file_id
+- path
+- line
+- column
+- offset
+- size
+additionalProperties: false
+properties:
+  kind:
+    type: string
+    enum:
+    - declaration
+    - definition
+  file_id:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  path:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Filesystem path on the server host.
+  line:
+    anyOf:
+    - type: integer
+      minimum: 1
+    - type: 'null'
+  column:
+    anyOf:
+    - type: integer
+      minimum: 1
+    - type: 'null'
+  offset:
+    anyOf:
+    - &id001
+      type: integer
+      minimum: 0
+    - type: 'null'
+  size:
+    anyOf:
+    - *id001
+    - type: 'null'

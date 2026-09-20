@@ -1,0 +1,17 @@
+type: object
+required:
+- items
+- next_cursor
+- index_revision
+additionalProperties: false
+properties:
+  items:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2SymbolOccurrence'
+  next_cursor:
+    anyOf:
+    - type: string
+    - type: 'null'
+  index_revision:
+    type: string

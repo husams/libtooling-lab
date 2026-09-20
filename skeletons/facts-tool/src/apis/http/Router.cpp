@@ -40,7 +40,8 @@ Response Router::dispatch(const Request &request, const MatchedRoute &route) {
     return response(202, {{"status", "stopping"}});
   case listJobs: {
     auto list = jobs.list();
-    if (resources) for (auto &job : resources->list()) list.push_back(std::move(job));
+    if (resources) for (auto &job : resources->list())
+      if (!job.at("operation").get<std::string>().starts_with("v2.")) list.push_back(std::move(job));
     return response(200, {{"jobs", list}});
   }
   case submit: return this->submit(request, "");
@@ -60,6 +61,7 @@ Response Router::dispatch(const Request &request, const MatchedRoute &route) {
   case extract:
   case match:
   case dependencies: return resource(request, route);
+  default: return error(500, "Operation requires asynchronous dispatch");
   }
   return error(500, "Operation has no handler");
 }

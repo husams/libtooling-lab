@@ -1,0 +1,33 @@
+type: object
+required:
+- directories_scanned
+- compilation_databases
+- warning_count
+- coverage
+additionalProperties: false
+properties:
+  directories_scanned: &id001
+    type: integer
+    minimum: 0
+  compilation_databases: *id001
+  warning_count: *id001
+  coverage:
+    type: string
+    enum:
+    - complete
+    - partial
+  databases:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2DiscoveredDatabase'
+  warnings:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2ScanWarning'
+  diagnostics:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2Diagnostic'
+description: Job reads return scalar summary fields. Record arrays are optional and
+  are fetched lazily through the typed results endpoint with the appropriate collection
+  query parameter.

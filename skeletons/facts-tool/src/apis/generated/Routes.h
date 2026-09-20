@@ -4,12 +4,12 @@
 #include <string_view>
 
 namespace facts::apis::generated {
-enum class Operation { findSymbols, indexStatus, extract, match, dependencies, health, openapi, openapiYaml, commands, command, listJobs, submit, getJob, cancelJob, watchStatus, shutdown };
+enum class Operation { findSymbols, indexStatus, extract, match, dependencies, health, openapi, openapiYaml, commands, command, listJobs, submit, getJob, cancelJob, watchStatus, shutdown, v2ListRepositories, v2CreateRepository, v2GetRepository, v2UpdateRepository, v2DeleteRepository, v2ListComponents, v2CreateComponent, v2GetComponent, v2UpdateComponent, v2DeleteComponent, v2ListFiles, v2CreateFile, v2GetFile, v2UpdateFile, v2DeleteFile, v2ListDirectories, v2GetDirectory, v2DeleteDirectory, v2Health, v2Readiness, v2IndexStatus, v2WatcherStatus, v2GetWatcherSettings, v2ReplaceWatcherSettings, v2UpdateWatcherSettings, v2Settings, v2Shutdown, v2FindSymbols, v2GetSymbol, v2SymbolOccurrences, v2SymbolRelations, v2CreateExtractionJob, v2ListExtractionJobs, v2GetExtractionJob, v2CancelExtractionJob, v2ResultsExtractionJob, v2CreateMatchJob, v2ListMatchJobs, v2GetMatchJob, v2CancelMatchJob, v2ResultsMatchJob, v2CreateDependenciesJob, v2ListDependenciesJobs, v2GetDependenciesJob, v2CancelDependenciesJob, v2ResultsDependenciesJob, v2CreateImportJob, v2ListImportJobs, v2GetImportJob, v2CancelImportJob, v2ResultsImportJob, v2CreateScanJob, v2ListScanJobs, v2GetScanJob, v2CancelScanJob, v2ResultsScanJob, v2CreateCallGraphJob, v2ListCallGraphJobs, v2GetCallGraphJob, v2CancelCallGraphJob, v2ResultsCallGraphJob, v2CreateVariableFlowJob, v2ListVariableFlowJobs, v2GetVariableFlowJob, v2CancelVariableFlowJob, v2ResultsVariableFlowJob, v2CreateIndexJob, v2ListIndexJobs, v2GetIndexJob, v2CancelIndexJob, v2ResultsIndexJob };
 struct Route {
   std::string_view method, path, parameter;
   Operation operation;
 };
-inline constexpr std::array<Route, 16> routes{{
+inline constexpr std::array<Route, 87> routes{{
   Route{"GET", "/v1/symbols", "", Operation::findSymbols},
   Route{"GET", "/v1/index", "", Operation::indexStatus},
   Route{"POST", "/v1/extractions", "", Operation::extract},
@@ -26,5 +26,55 @@ inline constexpr std::array<Route, 16> routes{{
   Route{"DELETE", "/v1/jobs/{id}", "id", Operation::cancelJob},
   Route{"GET", "/v1/watch", "", Operation::watchStatus},
   Route{"POST", "/v1/shutdown", "", Operation::shutdown},
+  Route{"GET", "/api/v2/repositories", "", Operation::v2ListRepositories},
+  Route{"POST", "/api/v2/repositories", "", Operation::v2CreateRepository},
+  Route{"GET", "/api/v2/repositories/{id}", "id", Operation::v2GetRepository},
+  Route{"PATCH", "/api/v2/repositories/{id}", "id", Operation::v2UpdateRepository},
+  Route{"DELETE", "/api/v2/repositories/{id}", "id", Operation::v2DeleteRepository},
+  Route{"GET", "/api/v2/components", "", Operation::v2ListComponents},
+  Route{"POST", "/api/v2/components", "", Operation::v2CreateComponent},
+  Route{"GET", "/api/v2/components/{id}", "id", Operation::v2GetComponent},
+  Route{"PATCH", "/api/v2/components/{id}", "id", Operation::v2UpdateComponent},
+  Route{"DELETE", "/api/v2/components/{id}", "id", Operation::v2DeleteComponent},
+  Route{"GET", "/api/v2/files", "", Operation::v2ListFiles},
+  Route{"POST", "/api/v2/files", "", Operation::v2CreateFile},
+  Route{"GET", "/api/v2/files/{id}", "id", Operation::v2GetFile},
+  Route{"PATCH", "/api/v2/files/{id}", "id", Operation::v2UpdateFile},
+  Route{"DELETE", "/api/v2/files/{id}", "id", Operation::v2DeleteFile},
+  Route{"GET", "/api/v2/directories", "", Operation::v2ListDirectories},
+  Route{"GET", "/api/v2/directories/{id}", "id", Operation::v2GetDirectory},
+  Route{"DELETE", "/api/v2/directories/{id}", "id", Operation::v2DeleteDirectory},
+  Route{"GET", "/api/v2/health", "", Operation::v2Health},
+  Route{"GET", "/api/v2/readiness", "", Operation::v2Readiness},
+  Route{"GET", "/api/v2/index", "", Operation::v2IndexStatus},
+  Route{"GET", "/api/v2/watcher", "", Operation::v2WatcherStatus},
+  Route{"GET", "/api/v2/watcher/settings", "", Operation::v2GetWatcherSettings},
+  Route{"PUT", "/api/v2/watcher/settings", "", Operation::v2ReplaceWatcherSettings},
+  Route{"PATCH", "/api/v2/watcher/settings", "", Operation::v2UpdateWatcherSettings},
+  Route{"GET", "/api/v2/settings", "", Operation::v2Settings},
+  Route{"POST", "/api/v2/shutdown", "", Operation::v2Shutdown},
+  Route{"GET", "/api/v2/symbols", "", Operation::v2FindSymbols},
+  Route{"GET", "/api/v2/symbols/{id}", "id", Operation::v2GetSymbol},
+  Route{"GET", "/api/v2/symbols/{id}/occurrences", "id", Operation::v2SymbolOccurrences},
+  Route{"GET", "/api/v2/symbols/{id}/relations", "id", Operation::v2SymbolRelations},
+  Route{"POST", "/api/v2/extract/job", "", Operation::v2CreateExtractionJob},
+  Route{"GET", "/api/v2/extract/job", "", Operation::v2ListExtractionJobs},
+  Route{"GET", "/api/v2/extract/job/{id}", "id", Operation::v2GetExtractionJob},
+  Route{"DELETE", "/api/v2/extract/job/{id}", "id", Operation::v2CancelExtractionJob},
+  Route{"GET", "/api/v2/extract/job/{id}/results", "id", Operation::v2ResultsExtractionJob},
+  Route{"POST", "/api/v2/match/job", "", Operation::v2CreateMatchJob},
+  Route{"GET", "/api/v2/match/job", "", Operation::v2ListMatchJobs},
+  Route{"GET", "/api/v2/match/job/{id}", "id", Operation::v2GetMatchJob},
+  Route{"DELETE", "/api/v2/match/job/{id}", "id", Operation::v2CancelMatchJob},
+  Route{"GET", "/api/v2/match/job/{id}/results", "id", Operation::v2ResultsMatchJob},
+  Route{"POST", "/api/v2/dependencies/job", "", Operation::v2CreateDependenciesJob},
+  Route{"GET", "/api/v2/dependencies/job", "", Operation::v2ListDependenciesJobs},
+  Route{"GET", "/api/v2/dependencies/job/{id}", "id", Operation::v2GetDependenciesJob},
+  Route{"DELETE", "/api/v2/dependencies/job/{id}", "id", Operation::v2CancelDependenciesJob},
+  Route{"GET", "/api/v2/dependencies/job/{id}/results", "id", Operation::v2ResultsDependenciesJob},
+  Route{"POST", "/api/v2/import/job", "", Operation::v2CreateImportJob},
+  Route{"GET", "/api/v2/import/job", "", Operation::v2ListImportJobs},
+  Route{"GET", "/api/v2/import/job/{id}", "id", Operation::v2GetImportJob},
+#include "RoutesPart000.inc"
 }};
 }

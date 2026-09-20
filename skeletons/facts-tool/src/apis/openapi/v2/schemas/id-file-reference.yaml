@@ -1,0 +1,10 @@
+type: object
+required:
+- file_id
+additionalProperties: false
+properties:
+  file_id:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.

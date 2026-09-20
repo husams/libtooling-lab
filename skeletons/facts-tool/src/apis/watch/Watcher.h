@@ -13,6 +13,8 @@ public:
   ~Watcher();
   std::expected<void, std::string> start();
   void stop();
+  std::expected<void, std::string> reconfigure(const Settings &);
+  void reconcile();
   Json status() const;
 private:
   struct Impl;

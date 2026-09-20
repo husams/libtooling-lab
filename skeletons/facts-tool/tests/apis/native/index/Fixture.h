@@ -19,6 +19,10 @@ void execute(const fs::path &, const std::string &);
 void verifySnapshot(Fixture &fixture);
 void verifyFailures(Fixture &fixture);
 void verifyLongCursor();
+void verifyPrefix();
+void verifyGraphIdentity();
+void verifyInvalidatedSymbols();
+void verifySymbolResources();
 void verifyMigration();
 void verifyObsoleteSources();
 }

@@ -85,7 +85,8 @@ parseOne(clang::tooling::CompilationDatabase &database,
 std::expected<Parsed, std::string>
 parse(clang::tooling::CompilationDatabase &database,
       const std::vector<std::string> &requested,
-      const astcache::Options &astCache) {
+      const astcache::Options &astCache,
+      const std::function<bool()> &cancelled) {
   Parsed parsed;
   std::vector<std::string> sources = requested;
   if (sources.empty())
@@ -93,6 +94,8 @@ parse(clang::tooling::CompilationDatabase &database,
   std::ranges::sort(sources);
   sources.erase(std::ranges::unique(sources).begin(), sources.end());
   for (const auto &source : sources) {
+    if (cancelled && cancelled())
+      return std::unexpected("variable-flow cancelled");
     if (auto result = parseOne(database, source, parsed, astCache); !result)
       return std::unexpected(result.error());
   }

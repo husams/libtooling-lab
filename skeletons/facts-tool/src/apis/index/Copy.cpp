@@ -31,10 +31,19 @@ Result<bool> copySource(Database &database, const std::filesystem::path &path) {
   if (!exists) return false;
   if (!std::filesystem::is_regular_file(path, error) || error)
     return std::unexpected("facts database is not a regular file");
-  return Database::open(path.string(), Database::readOnly)
-      .transform_error([](auto error) { return error.message(); })
-      .and_then([&](Database source) {
-        return copy(database, source, path.string()).transform([] { return true; });
+  return catalog::query(database,
+      "SELECT EXISTS(SELECT 1 FROM temp.api_symbol_owner o WHERE o.facts_db=?1) "
+      "AND NOT EXISTS(SELECT 1 FROM temp.api_symbol_owner o "
+      "WHERE o.facts_db=?1 AND NOT EXISTS(SELECT 1 FROM api_index_invalidated_file invalid "
+      "WHERE invalid.file_id=o.file_id))",
+      [](const storage::Row &row) { return row.integer(0) != 0; }, path.string())
+      .and_then([&](const auto &blocked) -> Result<bool> {
+        if (blocked.at(0)) return true;
+        return Database::open(path.string(), Database::readOnly)
+            .transform_error([](auto error) { return error.message(); })
+            .and_then([&](Database source) {
+              return copy(database, source, path.string()).transform([] { return true; });
+            });
       });
 }
 }

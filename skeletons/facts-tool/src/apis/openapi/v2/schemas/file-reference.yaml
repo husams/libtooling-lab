@@ -1,0 +1,3 @@
+oneOf:
+- $ref: '../../openapi.yaml#/components/schemas/V2PathFileReference'
+- $ref: '../../openapi.yaml#/components/schemas/V2IdFileReference'

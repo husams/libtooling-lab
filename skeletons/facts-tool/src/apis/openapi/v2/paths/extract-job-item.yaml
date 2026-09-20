@@ -1,0 +1,86 @@
+get:
+  operationId: v2GetExtractionJob
+  tags:
+  - resources-v2
+  summary: Read extract job
+  responses:
+    '200':
+      description: Read extract job
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2ExtractionJob'
+    '400':
+      $ref: '../../openapi.yaml#/components/responses/V2Error400'
+    '401':
+      $ref: '../../openapi.yaml#/components/responses/V2Error401'
+    '405':
+      $ref: '../../openapi.yaml#/components/responses/V2Error405'
+    '415':
+      $ref: '../../openapi.yaml#/components/responses/V2Error415'
+    '404':
+      $ref: '../../openapi.yaml#/components/responses/V2Error404'
+    '409':
+      $ref: '../../openapi.yaml#/components/responses/V2Error409'
+    '422':
+      $ref: '../../openapi.yaml#/components/responses/V2Error422'
+    '429':
+      $ref: '../../openapi.yaml#/components/responses/V2Error429'
+    '503':
+      $ref: '../../openapi.yaml#/components/responses/V2Error503'
+    default:
+      $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'
+  parameters:
+  - &id001
+    name: id
+    in: path
+    required: true
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+      description: Opaque server resource identifier. Do not infer database row numbers.
+delete:
+  operationId: v2CancelExtractionJob
+  tags:
+  - resources-v2
+  summary: Cancel extract job
+  responses:
+    '200':
+      description: Cancel extract job
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2ExtractionJob'
+    '400':
+      $ref: '../../openapi.yaml#/components/responses/V2Error400'
+    '401':
+      $ref: '../../openapi.yaml#/components/responses/V2Error401'
+    '405':
+      $ref: '../../openapi.yaml#/components/responses/V2Error405'
+    '415':
+      $ref: '../../openapi.yaml#/components/responses/V2Error415'
+    '404':
+      $ref: '../../openapi.yaml#/components/responses/V2Error404'
+    '409':
+      $ref: '../../openapi.yaml#/components/responses/V2Error409'
+    '422':
+      $ref: '../../openapi.yaml#/components/responses/V2Error422'
+    '429':
+      $ref: '../../openapi.yaml#/components/responses/V2Error429'
+    '503':
+      $ref: '../../openapi.yaml#/components/responses/V2Error503'
+    default:
+      $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'
+    '202':
+      description: Cancellation accepted; poll this resource until terminal.
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2ExtractionJob'
+  description: Cancellation is idempotent. A queued job becomes cancelled immediately
+    (200); running work enters cancelling (202) and stops at a safe checkpoint. Native
+    transaction work can finish before cancellation is observed. Terminal jobs retain
+    their actual result and return 200.
+  parameters:
+  - *id001

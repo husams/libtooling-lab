@@ -8,6 +8,7 @@
 #include "apis/watch/Watcher.h"
 #include "apis/runtime/Service.h"
 #include "apis/runtime/Drain.h"
+#include "apis/v2/http/Dispatch.h"
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <csignal>
@@ -34,6 +35,21 @@ int serve(Settings settings, const std::vector<std::string> &commands) {
     const auto documents = openApiDocuments(commands, !settings.token.empty());
     Router router{jobs, settings, commands, documents,
                   [&] { return watcher.status(); }, {}, &logger, &resources};
+    router.reconcile = [&] { watcher.reconcile(); };
+    router.updateWatch = [&](const Json &body, bool replace) -> domain::Result<Json> {
+      return v2::http::patchSettings(settings, body, replace).and_then([&](const Settings &next) -> domain::Result<Json> {
+        auto saved = saveSettings(next);
+        if (!saved) return std::unexpected(domain::Error{500, "settings_failed", saved.error()});
+        auto changed = watcher.reconfigure(next);
+        if (!changed) {
+          (void)saveSettings(settings);
+          return std::unexpected(domain::Error{500, "watcher_failed", changed.error()});
+        }
+        settings = next;
+        resources.updateSettings(settings);
+        return v2::http::watchSettings(settings);
+      });
+    };
     Listener listener(io, router);
     router.shutdown = [&] {
       if (stopping) return;

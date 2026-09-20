@@ -1,0 +1,13 @@
+type: object
+required:
+- type
+- repository
+additionalProperties: false
+properties:
+  type:
+    type: string
+    const: repository
+  repository:
+    type: string
+    minLength: 1
+    maxLength: 4096

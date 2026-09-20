@@ -1,0 +1,71 @@
+get:
+  operationId: v2ResultsCallGraphJob
+  tags:
+  - resources-v2
+  summary: Read typed callgraphs result records
+  responses:
+    '200':
+      description: Read typed callgraphs result records
+      content:
+        application/json:
+          schema:
+            $ref: '../../openapi.yaml#/components/schemas/V2CallGraphResultPage'
+    '400':
+      $ref: '../../openapi.yaml#/components/responses/V2Error400'
+    '401':
+      $ref: '../../openapi.yaml#/components/responses/V2Error401'
+    '405':
+      $ref: '../../openapi.yaml#/components/responses/V2Error405'
+    '415':
+      $ref: '../../openapi.yaml#/components/responses/V2Error415'
+    '404':
+      $ref: '../../openapi.yaml#/components/responses/V2Error404'
+    '409':
+      $ref: '../../openapi.yaml#/components/responses/V2Error409'
+    '422':
+      $ref: '../../openapi.yaml#/components/responses/V2Error422'
+    '429':
+      $ref: '../../openapi.yaml#/components/responses/V2Error429'
+    '503':
+      $ref: '../../openapi.yaml#/components/responses/V2Error503'
+    default:
+      $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'
+  description: Read a bounded page from a completed job. Not-yet-completed, failed
+    or cancelled jobs return a conflict. The cursor must be reused with the original
+    collection and job.
+  parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+      description: Opaque server resource identifier. Do not infer database row numbers.
+  - name: collection
+    in: query
+    required: false
+    schema:
+      type: string
+      enum:
+      - edges
+      - nodes
+      - paths
+      - frontier
+      - diagnostics
+      default: edges
+  - name: limit
+    in: query
+    required: false
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 500
+      default: 50
+  - name: cursor
+    in: query
+    required: false
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096

@@ -1,0 +1,14 @@
+oneOf:
+- $ref: '../../openapi.yaml#/components/schemas/V2FilesSelection'
+- $ref: '../../openapi.yaml#/components/schemas/V2DirectorySelection'
+- $ref: '../../openapi.yaml#/components/schemas/V2ComponentSelection'
+- $ref: '../../openapi.yaml#/components/schemas/V2RepositorySelection'
+- $ref: '../../openapi.yaml#/components/schemas/V2AllSelection'
+discriminator:
+  propertyName: type
+  mapping:
+    files: ../../openapi.yaml#/components/schemas/V2FilesSelection
+    directory: ../../openapi.yaml#/components/schemas/V2DirectorySelection
+    component: ../../openapi.yaml#/components/schemas/V2ComponentSelection
+    repository: ../../openapi.yaml#/components/schemas/V2RepositorySelection
+    all: ../../openapi.yaml#/components/schemas/V2AllSelection

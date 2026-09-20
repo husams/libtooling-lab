@@ -51,7 +51,8 @@ def method(name: str, asynchronous: bool) -> str:
 
 
 def methods(spec: dict, *, asynchronous: bool) -> str:
-    declared = operations(spec)
+    declared = {name: route for name, route in operations(spec).items()
+                if not route[1].startswith("api/v2/")}
     if set(declared) != set(METHODS) | OPERATIONS:
         raise ValueError(f"Unsupported Python operations: {set(declared) ^ (set(METHODS) | OPERATIONS)}")
     return "\n\n".join(method(name, asynchronous) for name in METHODS)

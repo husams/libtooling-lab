@@ -43,6 +43,8 @@ struct ProjectConfiguration {
   ProjectClone activeClone;
   std::vector<ProjectComponent> components;
   std::vector<ProjectFile> files;
+  // Background imports retain explicit per-file compiler settings.
+  bool preserveCompilationOverrides = false;
 };
 
 // What 'facts-tool import' recorded about the registry it left behind: whether

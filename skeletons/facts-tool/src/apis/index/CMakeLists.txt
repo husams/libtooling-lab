@@ -2,6 +2,7 @@ target_sources(facts-apis PRIVATE
   Copy.cpp
   Cursor.cpp
   Kind.cpp
+  Identity.cpp
   Owners.cpp
   Page.cpp
   Positions.cpp

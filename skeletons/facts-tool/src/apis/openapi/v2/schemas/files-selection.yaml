@@ -1,0 +1,15 @@
+type: object
+required:
+- type
+- files
+additionalProperties: false
+properties:
+  type:
+    type: string
+    const: files
+  files:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2FileReference'
+    minItems: 1
+    maxItems: 10000

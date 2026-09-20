@@ -54,6 +54,7 @@ add_library(facts-apis STATIC
   watch/Refresh.cpp
   watch/Rescan.cpp
   watch/Scan.cpp
+  watch/Snapshot.cpp
   watch/Status.cpp
   watch/Update.cpp
   watch/Watcher.cpp
@@ -74,6 +75,7 @@ add_subdirectory(domain)
 add_subdirectory(index)
 add_subdirectory(operations)
 add_subdirectory(runtime)
+add_subdirectory(v2)
 target_include_directories(facts-apis PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(facts-apis
   PUBLIC Boost::headers nlohmann_json::nlohmann_json Threads::Threads

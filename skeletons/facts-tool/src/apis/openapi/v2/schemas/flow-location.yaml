@@ -1,0 +1,15 @@
+type: object
+required:
+- path
+- line
+- column
+- offset
+additionalProperties: false
+properties:
+  path:
+    type: string
+  line: &id001
+    type: integer
+    minimum: 0
+  column: *id001
+  offset: *id001

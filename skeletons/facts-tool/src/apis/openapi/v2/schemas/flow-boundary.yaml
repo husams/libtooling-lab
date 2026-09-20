@@ -1,0 +1,17 @@
+type: object
+required:
+- node
+- reason
+- detail
+- depth
+additionalProperties: false
+properties:
+  node:
+    type: integer
+  reason:
+    type: string
+  detail:
+    type: string
+  depth:
+    type: integer
+    minimum: 0

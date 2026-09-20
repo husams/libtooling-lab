@@ -1,0 +1,32 @@
+type: object
+required:
+- id
+- kind
+- function_usr
+- variable_usr
+- name
+- type
+- location
+- block
+- depth
+additionalProperties: false
+properties:
+  id:
+    type: integer
+  kind:
+    type: string
+  function_usr:
+    type: string
+  variable_usr:
+    type: string
+  name:
+    type: string
+  type:
+    type: string
+  location:
+    $ref: '../../openapi.yaml#/components/schemas/V2FlowLocation'
+  block:
+    type: integer
+  depth:
+    type: integer
+    minimum: 0

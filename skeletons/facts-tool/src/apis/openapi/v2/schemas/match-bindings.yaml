@@ -1,0 +1,24 @@
+type: object
+required: []
+additionalProperties: false
+properties:
+  source:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  target:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  site:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  call:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  callee:
+    type: string
+    minLength: 1
+    maxLength: 4096

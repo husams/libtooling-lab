@@ -55,15 +55,20 @@ void Watcher::Impl::event(int handle, unsigned mask, const std::string &name) {
     changed();
     return;
   }
-  const bool control = snapshot && (snapshot->controlFiles.contains(path) ||
+  std::error_code linkError;
+  const bool link = std::filesystem::is_symlink(std::filesystem::symlink_status(path, linkError));
+  std::error_code targetError;
+  const auto target = std::filesystem::weakly_canonical(path, targetError);
+  const bool control = link || (snapshot && (snapshot->controlFiles.contains(path) ||
+      (!targetError && snapshot->controlFiles.contains(target)) ||
       std::ranges::any_of(snapshot->controlFiles, [&](const auto &file) {
         return file.parent_path() == path;
-      }));
+      })));
   if (!control && watch::ignored(path, settings)) return;
   if (mask & (IN_DELETE_SELF | IN_MOVE_SELF)) needsScan = true;
   const bool directory = mask & (IN_ISDIR | IN_DELETE_SELF | IN_MOVE_SELF);
-  const bool saved = mask & (IN_CLOSE_WRITE | IN_MOVED_TO | IN_MOVED_FROM |
-                             IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF);
+  const bool saved = (control && (mask & IN_CREATE)) || (mask & (IN_CLOSE_WRITE | IN_MOVED_TO | IN_MOVED_FROM |
+                             IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF));
   if (!directory && (!saved || (!control && !watch::relevant(path) &&
                                 path.filename() != ".gitignore"))) return;
   if (pendingEvents.size() >= 4096) {

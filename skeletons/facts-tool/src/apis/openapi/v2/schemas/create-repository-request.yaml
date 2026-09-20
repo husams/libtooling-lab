@@ -1,0 +1,19 @@
+type: object
+required:
+- name
+- clones
+additionalProperties: false
+properties:
+  name:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  remote_url:
+    anyOf:
+    - type: string
+    - type: 'null'
+  clones:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2NewClone'
+    minItems: 1

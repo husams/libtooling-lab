@@ -1,0 +1,17 @@
+type: object
+required:
+- translation_unit
+- relation_kind
+- bindings
+additionalProperties: false
+properties:
+  translation_unit:
+    type: string
+  relation_kind:
+    type:
+    - string
+    - 'null'
+  bindings:
+    type: object
+    additionalProperties:
+      $ref: '../../openapi.yaml#/components/schemas/V2MatchNode'

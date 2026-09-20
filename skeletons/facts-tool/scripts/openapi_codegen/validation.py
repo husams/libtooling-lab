@@ -46,6 +46,12 @@ def validate(document: dict) -> None:
             raise ValueError(f"Duplicate operationId: {identifier}")
         identifiers.add(identifier)
         parameters = re.findall(r"\{([^}]+)\}", path)
+        if path.startswith("/api/v2/"):
+            if parameters not in ([], ["id"]):
+                raise ValueError(f"Unsupported v2 path parameters: {path}")
+            if _method in {"get", "delete"} and "requestBody" in operation:
+                raise ValueError(f"{_method.upper()} {path} must not require a JSON body")
+            continue
         expected = {"command": ["commandPath"], "getJob": ["id"],
                     "cancelJob": ["id"]}.get(identifier, [])
         if parameters != expected or (parameters and not path.endswith(

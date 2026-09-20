@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -12,6 +13,9 @@ struct Request {
   std::string variable;
   std::optional<unsigned> line;
   std::optional<unsigned> maxDepth;
+  std::optional<std::string> file;
+  std::optional<unsigned> column;
+  std::function<bool()> cancelled;
 };
 
 struct Location {

@@ -1,0 +1,28 @@
+type: object
+required:
+- file_id
+- path
+- line
+- column
+additionalProperties: false
+properties:
+  file_id:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  path:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Filesystem path on the server host.
+  line:
+    anyOf:
+    - type: integer
+      minimum: 1
+    - type: 'null'
+  column:
+    anyOf:
+    - type: integer
+      minimum: 1
+    - type: 'null'

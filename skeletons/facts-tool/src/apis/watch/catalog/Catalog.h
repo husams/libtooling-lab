@@ -16,6 +16,7 @@ struct Clone {
 struct Catalog {
   std::filesystem::path database;
   std::vector<Clone> clones;
+  std::string compilationState;
   bool operator==(const Catalog &) const = default;
 };
 std::expected<Catalog, std::string> readCatalog(const Settings &settings);

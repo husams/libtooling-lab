@@ -29,7 +29,7 @@ An occupied port supplied explicitly is a startup error.
 
 The server creates its project schema and indexes known existing facts files on a
 background worker. HTTP readiness does not mean indexing has finished: inspect
-`GET /v1/index`. Symbol queries return `503 index_not_ready` until an index is
+`GET /api/v2/index`. Symbol queries return `503 index_not_ready` until an index is
 available, while health and job-status requests remain responsive.
 
 ## Background operation
@@ -45,7 +45,7 @@ The PID and instance lock use `/workspace/server.yaml.pid`.
 The same configuration cannot start a second server
 while its lock is held. The PID file is left empty after shutdown.
 
-Stop with `POST /v1/shutdown`, `SIGTERM` or `SIGINT`. Shutdown stops watching,
+Stop with `POST /api/v2/shutdown`, `SIGTERM` or `SIGINT`. Shutdown stops watching,
 cancels queued jobs, waits for running native analysis, and reaps compatibility
 worker processes. The daemon flag is
 not persisted; omit it on a later invocation to run in the foreground.

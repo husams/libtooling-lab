@@ -37,15 +37,18 @@ public:
     if (!file) {
       return;
     }
+    // A compiler-forced include originates in <built-in>, which has no
+    // physical source location. Its target is still part of the TU's input
+    // closure and must be registered before facts extraction.
+    auto destination = pathOf(*file);
+    facts_.visitedSources.push_back(destination);
     auto source = extractFilePath(
         sourceManager_,
         sourceManager_.getFileID(sourceManager_.getExpansionLoc(hashLocation)));
     if (!source) {
       return;
     }
-    auto destination = pathOf(*file);
     facts_.visitedSources.push_back(*source);
-    facts_.visitedSources.push_back(destination);
     facts_.edges.push_back({std::move(*source), std::move(destination)});
   }
 

@@ -1,9 +1,20 @@
 #include "apis/http/Resources.h"
 #include "apis/http/Access.h"
 #include "apis/runtime/Service.h"
+#include "apis/v2/http/Dispatch.h"
 
 namespace facts::apis {
 void Router::handle(const Request &request, Reply reply) {
+  if (request.target().starts_with("/api/v2/")) {
+    const auto started = std::chrono::steady_clock::now();
+    v2::http::handle(*this, request, [this, started, reply = std::move(reply)](Response response) mutable {
+      if (logger) logger->write(logging::Level::debug, "http.response",
+          {{"route", "/api/v2"}, {"status", response.result_int()},
+           {"duration_ms", std::chrono::duration<double, std::milli>(
+               std::chrono::steady_clock::now() - started).count()}});
+      reply(std::move(response));
+    }); return;
+  }
   const auto method = request.method_string(), target = request.target();
   auto route = authorize(request, settings).and_then([&] {
     return matchRoute({method.data(), method.size()}, {target.data(), target.size()});

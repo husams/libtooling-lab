@@ -1,0 +1,25 @@
+type: object
+required: []
+additionalProperties: false
+properties:
+  name:
+    type: string
+    minLength: 1
+    maxLength: 4096
+  remote_url:
+    anyOf:
+    - type: string
+    - type: 'null'
+  active_clone_id:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: Opaque server resource identifier. Do not infer database row numbers.
+  clones:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2CloneUpdate'
+    minItems: 1
+description: Omitted fields remain unchanged. A supplied clones array replaces registrations
+  atomically. Removing the active clone requires selecting another clone in the same
+  update; source directories are never deleted.
