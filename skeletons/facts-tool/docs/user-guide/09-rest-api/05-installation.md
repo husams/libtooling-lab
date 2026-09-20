@@ -123,3 +123,6 @@ Use [Deployment and operation](06-deployment.md) to start the server. Read its
 allocated port from the startup message or server YAML, then call `/health` or
 run the [Python REST client example](../05-python-sdk/11-rest-client.md).
 Installing the SDK does not start a server.
+Server logging uses the native binary's existing dependencies. Configure its
+destination and level using [Logging and verbosity](09-logging.md), then restart
+the server for saved YAML changes to take effect.

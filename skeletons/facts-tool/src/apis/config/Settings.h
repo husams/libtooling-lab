@@ -1,4 +1,5 @@
 #pragma once
+#include "apis/logging/Options.h"
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -13,6 +14,7 @@ struct Settings {
   std::uint16_t port = 0;
   bool explicitPort = false;
   bool daemon = false;
+  logging::Options logging;
   std::string token;
   std::vector<std::string> defaults;
 #ifdef __linux__

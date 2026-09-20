@@ -9,11 +9,13 @@
 #include <vector>
 
 namespace facts::apis {
+namespace logging { class Logger; }
 using Json = nlohmann::json;
 using JobCallback = std::function<void(bool)>;
 class Queue {
 public:
-  Queue(boost::asio::io_context &io, const Settings &settings);
+  Queue(boost::asio::io_context &io, const Settings &settings,
+        logging::Logger *logger = nullptr);
   ~Queue();
   // Call from the owning io_context thread; arguments are used exactly as given.
   // At most 64 waiting jobs and 128 retained records, with 4 MiB per output stream.

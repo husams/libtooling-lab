@@ -1,4 +1,5 @@
 #include "apis/daemon/Process.h"
+#include "apis/logging/Sink.h"
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
@@ -13,12 +14,13 @@ std::expected<void, std::string> redirectDaemon(const std::filesystem::path &log
     return std::unexpected("cannot detach server: " + std::string(std::strerror(errno)));
   const int input = ::open("/dev/null", O_RDONLY | O_CLOEXEC);
   if (input < 0) return std::unexpected("cannot open daemon input");
-  const int output = ::open(log.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0600);
-  if (output < 0) {
+  auto sink = logging::openSink(log);
+  if (!sink) {
     ::close(input);
-    return std::unexpected("cannot open daemon log: " + std::string(std::strerror(errno)));
+    return std::unexpected("cannot open daemon log: " + sink.error());
   }
-  const bool success = ::fchmod(output, 0600) == 0 &&
+  const int output = *sink;
+  const bool success =
       ::dup2(input, STDIN_FILENO) >= 0 && ::dup2(output, STDOUT_FILENO) >= 0 &&
       ::dup2(output, STDERR_FILENO) >= 0;
   if (input > STDERR_FILENO) ::close(input);

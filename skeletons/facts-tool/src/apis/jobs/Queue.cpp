@@ -2,8 +2,10 @@
 
 namespace facts::apis {
 struct Queue::Impl { std::shared_ptr<QueueState> state; };
-Queue::Queue(boost::asio::io_context &io, const Settings &settings)
-    : impl_(std::make_unique<Impl>(Impl{std::make_shared<QueueState>(io, settings)})) {}
+Queue::Queue(boost::asio::io_context &io, const Settings &settings,
+             logging::Logger *logger)
+    : impl_(std::make_unique<Impl>(
+          Impl{std::make_shared<QueueState>(io, settings, logger)})) {}
 Queue::~Queue() { stop(); }
 std::optional<std::string> Queue::submit(std::vector<std::string> arguments,
                                        JobCallback completion) {

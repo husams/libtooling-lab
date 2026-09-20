@@ -7,6 +7,15 @@ void configureOptions(CLI::App &app, Arguments &arguments) {
   app.add_option("--port", settings.port, "TCP port; 0 allocates an available port")
       ->check(CLI::Range(0, 65535));
   app.add_flag("--daemon", settings.daemon, "Run in the background after readiness");
+  app.add_option("--log-file", arguments.logFile,
+                 "Server log file; foreground defaults to stderr");
+  auto *level = app.add_option("--log-level", arguments.logLevel,
+      "Server log level: off, error, warning, info, debug, trace")
+      ->check(CLI::IsMember({"off", "error", "warning", "info", "debug", "trace"}));
+  auto *verbosity = app.add_option("-v,--verbose", arguments.verbosity,
+      "Server verbosity: 0 errors, 1 info, 2 debug, 3 trace")
+      ->check(CLI::Range(0, 3));
+  level->excludes(verbosity);
   app.add_option("--server-config", arguments.serverConfig,
                  "Server settings file, created or updated after binding");
   app.add_option("--config", arguments.configuration, "Default CLI YAML configuration");

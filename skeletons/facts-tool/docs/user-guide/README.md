@@ -31,3 +31,6 @@ CLI commands, await results, cancel jobs, and inspect the server.
 The [OpenAPI YAML contract](09-rest-api/08-openapi-contract.md) defines the REST
 interface and generates native routes and Python operation bindings. Download
 the live contract from `/openapi.yaml` or `/openapi.json`.
+
+[Logging and verbosity](09-rest-api/09-logging.md) explains independent log-file
+paths, YAML and CLI severity settings, and structured server events.

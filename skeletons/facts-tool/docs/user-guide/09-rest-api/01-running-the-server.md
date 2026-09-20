@@ -15,7 +15,7 @@ facts-tool serve --server-config /workspace/server.yaml \
 ```
 
 `--config` is the usual CLI defaults YAML. `--server-config` is a separate file
-for listener, watcher and worker settings. Both project options are optional:
+for listener, logging, watcher and worker settings. Both project options are optional:
 ordinary CLI configuration discovery still applies to jobs.
 
 Port `0` asks the operating system to allocate an available port. After binding,
@@ -32,8 +32,10 @@ facts-tool serve --server-config /workspace/server.yaml --daemon
 ```
 
 The parent exits successfully only after the listener, watcher and saved settings
-are ready. Logs go to `/workspace/server.yaml.log`; the PID and instance lock use
-`/workspace/server.yaml.pid`. The same configuration cannot start a second server
+are ready. Without a configured log file, daemon logs go to
+`/workspace/server.yaml.log`; `--log-file` or `logging.file` selects another path.
+The PID and instance lock use `/workspace/server.yaml.pid`.
+The same configuration cannot start a second server
 while its lock is held. The PID file is left empty after shutdown.
 
 Stop with `POST /v1/shutdown`, `SIGTERM` or `SIGINT`. Shutdown stops watching,
@@ -48,6 +50,9 @@ not persisted; omit it on a later invocation to run in the foreground.
 | `--host IP` | Numeric IPv4 or IPv6 address; initially `127.0.0.1` |
 | `--port N` | Listener port; initially `0` for automatic allocation |
 | `--daemon` | Run in the background and wait for startup readiness |
+| `--log-file FILE` | Append structured server logs to this file in foreground or daemon mode |
+| `--log-level LEVEL` | Server logging: `off`, `error`, `warning`, `info`, `debug`, `trace`; default `info` |
+| `-v N`, `--verbose N` | Server verbosity: `0` error, `1` info, `2` debug, `3` trace |
 | `--working-directory DIR` | Working directory for all CLI jobs |
 | `--conf FILE`, `-c FILE` | Default project database for jobs |
 | `--config FILE` | Default CLI YAML for jobs |
@@ -74,6 +79,9 @@ schema_version: 1
 host: 127.0.0.1
 port: 42817
 working_directory: /workspace/project
+logging:
+  file: /workspace/logs/facts-tool.jsonl
+  level: info
 watch:
   enabled: true
   exclude_repositories: []
@@ -93,6 +101,9 @@ timeout_seconds: 3600
 
 The port above is illustrative. Settings are atomically rewritten after successful
 startup. Changes to this file take effect on restart. Tokens are never saved.
+Logging paths and levels are independent of the server configuration filename.
+See [Logging and verbosity](09-logging.md) for relative paths, precedence,
+structured events and the distinction between server and command verbosity.
 The former `watch_directories` setting is ignored and removed when settings are
 saved; register repositories in the project database instead. Repository and
 active-clone changes are detected while the server runs.

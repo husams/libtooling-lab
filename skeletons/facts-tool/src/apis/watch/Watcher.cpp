@@ -7,12 +7,12 @@
 
 namespace facts::apis {
 Watcher::Impl::Impl(boost::asio::io_context &io, Queue &jobs,
-                    const Settings &configuration)
+                    const Settings &configuration, logging::Logger *log)
     :
 #ifdef __linux__
       descriptor(io),
 #endif
-      queue(jobs), io(io), settings(configuration), debounce(io), recovery(io) {}
+      queue(jobs), io(io), settings(configuration), logger(log), debounce(io), recovery(io) {}
 
 std::expected<void, std::string> Watcher::Impl::start() {
   if (running || !settings.watchEnabled) return {};
@@ -28,6 +28,8 @@ std::expected<void, std::string> Watcher::Impl::start() {
   snapshot = std::move(initial->snapshot);
   running = true;
   ready = snapshot->notices.empty();
+  if (logger) logger->write(logging::Level::info, "watch.started",
+      {{"roots", snapshot->roots.size()}, {"directories", watches.size()}, {"ready", ready}});
   read();
   poll();
   return {};
@@ -37,6 +39,8 @@ std::expected<void, std::string> Watcher::Impl::start() {
 }
 
 void Watcher::Impl::stop() {
+  if (running && logger) logger->write(logging::Level::info, "watch.stopped",
+      {{"cycles", cycles}, {"failures", failures}});
   running = false;
   cancelled = true;
   ready = false;
@@ -54,8 +58,8 @@ void Watcher::Impl::stop() {
 }
 
 Watcher::Watcher(boost::asio::io_context &io, Queue &queue,
-                 const Settings &settings)
-    : impl_(std::make_shared<Impl>(io, queue, settings)) {}
+                 const Settings &settings, logging::Logger *logger)
+    : impl_(std::make_shared<Impl>(io, queue, settings, logger)) {}
 Watcher::~Watcher() { stop(); impl_->scanner.join(); }
 std::expected<void, std::string> Watcher::start() { return impl_->start(); }
 void Watcher::stop() { impl_->stop(); }

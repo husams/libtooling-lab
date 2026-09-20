@@ -46,8 +46,12 @@ curl --fail --silent --show-error \
 ```
 
 All endpoints, including health checks, require the token when configured.
-Tokens are not written into the server YAML. Foreground logs go to the terminal.
-Press Control-C for graceful shutdown.
+Tokens are not written into the server YAML. Foreground logs default to stderr
+at `info` level. Set `logging.file` in the server YAML or pass `--log-file FILE`
+to write to a file; `--log-level debug` or `-v 2` increases server detail.
+These settings are saved independently of the configuration filename. See
+[Logging and verbosity](09-logging.md) for configuration and structured events.
+Press Control-C for graceful shutdown and draining of queued log records.
 
 ## Run as a daemon
 
@@ -59,7 +63,21 @@ After the initial configuration has been saved, use the same token and settings:
 tail -f "$HOME/.config/facts-tool/server.yaml.log"
 ```
 
-Startup returns only after readiness. The adjacent `server.yaml.pid` file holds
+The example uses the default daemon log destination. To choose an independent
+path and level, start with these options; the same destination also works when
+running in the foreground:
+
+```bash
+mkdir -p "$HOME/.local/state/facts-tool"
+"$HOME/.local/bin/facts-tool" serve \
+  --server-config "$HOME/.config/facts-tool/server.yaml" --daemon \
+  --log-file "$HOME/.local/state/facts-tool/server.jsonl" --log-level info
+tail -f "$HOME/.local/state/facts-tool/server.jsonl"
+```
+
+The parent prints the listener address after successful startup, including when
+logging is off. An unusable log destination fails startup without reporting
+readiness. The adjacent `server.yaml.pid` file holds
 the instance PID and lock. A second server cannot use that same configuration
 while the lock is held. Stop it through the API:
 
@@ -106,8 +124,11 @@ TimeoutStopSec=30
 WantedBy=default.target
 ```
 
-The service runs the foreground process, so omit `--daemon`. Systemd collects
-its output and owns its lifecycle. `Type=simple` reports the process started;
+The service runs the foreground process, so omit `--daemon`. Without a configured
+`logging.file`, structured events go to stderr and systemd collects them in the
+journal. If the saved YAML specifies a log file, events go there; remove that key
+to use the journal. Startup readiness still goes to stdout.
+Systemd owns the process lifecycle. `Type=simple` reports the process started;
 verify HTTP readiness separately; see the official
 [systemd service reference](https://github.com/systemd/systemd/blob/main/man/systemd.service.xml).
 The unit reuses saved host, port and watch
@@ -124,7 +145,8 @@ journalctl --user -u facts-tool.service -f
 
 Use `systemctl --user stop facts-tool.service` to stop, and
 `systemctl --user restart facts-tool.service` after a configuration or token
-change. After editing the unit itself, run `daemon-reload` before restarting.
+change, including changes to `logging.level` or `logging.file`. After editing the
+unit itself, run `daemon-reload` before restarting.
 If the service must start at boot and continue after logout, enable user lingering
 with `loginctl enable-linger "$USER"`; local policy may require an administrator.
 

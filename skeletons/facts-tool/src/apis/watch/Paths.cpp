@@ -20,6 +20,7 @@ bool ignored(const std::filesystem::path &path, const Settings &settings) {
       name.ends_with("-shm") || name.ends_with("-journal")) return true;
   const auto config = absolute(settings.serverConfig, settings).string();
   const auto candidate = absolute(path, settings).string();
+  if (!settings.logging.file.empty() && candidate == settings.logging.file.string()) return true;
   return !settings.serverConfig.empty() &&
          (candidate == config || candidate.starts_with(config + "."));
 }

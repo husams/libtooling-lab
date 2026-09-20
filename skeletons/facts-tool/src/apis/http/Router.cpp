@@ -1,14 +1,25 @@
 #include "apis/http/Router.h"
 #include "apis/http/Access.h"
+#include <chrono>
 
 namespace facts::apis {
 Response Router::operator()(const Request &request) {
+  const auto started = std::chrono::steady_clock::now();
   const auto method = request.method_string(), path = request.target();
   const auto route = authorize(request, settings).and_then([&] {
     return matchRoute({method.data(), method.size()}, {path.data(), path.size()});
   });
-  if (!route) return error(route.error().status, route.error().message);
-  return dispatch(request, *route);
+  auto reply = route ? dispatch(request, *route)
+                     : error(route.error().status, route.error().message);
+  const auto elapsed = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - started).count();
+  const auto safeMethod = request.method() == boost::beast::http::verb::unknown
+      ? "UNKNOWN" : boost::beast::http::to_string(request.method());
+  if (logger) logger->write(logging::Level::debug, "http.response",
+      {{"method", std::string(safeMethod)}, {"status", reply.result_int()},
+       {"route", route ? operationRoute(route->operation).path : "unmatched"},
+       {"duration_ms", elapsed}});
+  return reply;
 }
 Response Router::dispatch(const Request &request, const MatchedRoute &route) {
   using enum generated::Operation;

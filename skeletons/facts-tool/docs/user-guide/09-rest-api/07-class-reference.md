@@ -2,7 +2,7 @@
 
 ← [User guide index](../README.md) · [Table of contents](../toc.md)
 
-The REST server and Python wrapper include 34 C++ classes/structs and eight
+The REST server and Python wrapper include 38 C++ classes/structs and eight
 Python classes. This inventory includes internal implementation types; only the
 Python classes below form the public Python REST interface.
 
@@ -15,6 +15,10 @@ Names are relative to `facts::apis`; names prefixed with `watch::` belong to
 |---|---|---|
 | `Arguments` | Collect server CLI arguments before merging saved settings. | [config/Options.h](../../../src/apis/config/Options.h) |
 | `Settings` | Hold resolved address, port, authentication, job and watch settings. | [config/Settings.h](../../../src/apis/config/Settings.h) |
+| `logging::Options` | Hold the independently configured log destination and severity. | [logging/Options.h](../../../src/apis/logging/Options.h) |
+| `logging::Logger` | Filter structured events, queue writes and drain the worker on shutdown. | [logging/Logger.h](../../../src/apis/logging/Logger.h) |
+| `logging::State` | Own the bounded record queue, worker thread and synchronization state. | [logging/State.h](../../../src/apis/logging/State.h) |
+| `logging::Descriptor` | Own and close the logging file descriptor. | [logging/Descriptor.h](../../../src/apis/logging/Descriptor.h) |
 | `Lifecycle` | Own instance locking, daemon startup, readiness and cleanup. | [daemon/Lifecycle.h](../../../src/apis/daemon/Lifecycle.h) |
 | `Listener` | Bind the TCP endpoint and accept connections asynchronously. | [http/Listener.h](../../../src/apis/http/Listener.h) |
 | `Session` | Read, parse and answer one HTTP request asynchronously. | [http/Session.h](../../../src/apis/http/Session.h) |
@@ -50,6 +54,7 @@ Names are relative to `facts::apis`; names prefixed with `watch::` belong to
 
 `Pipes` and `SpawnOptions` belong to an anonymous namespace inside `facts::apis`.
 The forward declarations of implementation structs are not additional types.
+`logging::Level` is an enumeration, not an additional class or struct.
 The existing `facts::cli::ImportOptions` and `facts::cli::ExtractOptions`
 each have `noAstCache` to support watcher refreshes of uncommitted edits.
 `ImportOptions` also has `existingClone` to preserve clone identity during

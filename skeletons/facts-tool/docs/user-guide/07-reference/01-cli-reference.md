@@ -36,14 +36,20 @@ repository registrations, removals and active-clone switches while running.
 | `--debounce-ms N` | Coalesce filesystem events before refresh; default `500` |
 | `--import-arg=VALUE` | Pass an argument token to automatic reimport |
 | `--extract-arg=VALUE` | Pass an argument token to automatic extraction |
+| `--log-file FILE` | Append server events to this file in foreground or daemon mode |
+| `--log-level LEVEL` | `off`, `error`, `warning`, `info`, `debug`, `trace`; default `info` |
+| `-v N`, `--verbose N` | Server level: `0` error, `1` info, `2` debug, `3` trace |
 
-The flags override and persist `watch.enabled` in the server YAML. Use its
+`--watch` and `--no-watch` override and persist `watch.enabled` in the server YAML. Use its
 `watch.exclude_repositories`, `watch.exclude_clones`, `watch.exclude_directories`
 and `watch.exclude_patterns` lists to narrow monitoring and automatic source
 processing. Git ignore rules apply separately for each clone. The old
 `--watch DIR` syntax and saved `watch_directories` list are no longer used.
 See [Repository monitoring](../09-rest-api/03-watching-directories.md) for examples
 and [Running the server](../09-rest-api/01-running-the-server.md) for all options.
+Logging settings use `logging.file` and `logging.level` in that same server YAML.
+CLI values override saved values. Server verbosity and submitted command verbosity
+are separate; see [Logging and verbosity](../09-rest-api/09-logging.md).
 
 ## Exit-code contract
 

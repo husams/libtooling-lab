@@ -13,6 +13,8 @@ void QueueState::pump() {
   pending.pop_front();
   active->record["state"] = "running";
   active->record["started_at"] = jobTimestamp();
+  if (logger) logger->write(logging::Level::info, "job.started",
+                           {{"job_id", active->record["id"]}});
   process = std::make_shared<Process>(io, settings.executable,
       active->record["arguments"].get<std::vector<std::string>>(),
       settings.timeoutSeconds, [weak = weak_from_this(), job = active](auto result) {
@@ -32,6 +34,12 @@ void QueueState::complete(const std::shared_ptr<Job> &job, ProcessResult result)
   job->record["timed_out"] = result.timedOut;
   job->record["finished_at"] = jobTimestamp();
   job->finished = true;
+  const auto level = result.timedOut ? logging::Level::warning :
+      (success || result.cancelled) ? logging::Level::info : logging::Level::error;
+  if (logger) logger->write(level, "job.completed",
+      {{"job_id", job->record["id"]}, {"state", job->record["state"]},
+       {"exit_code", result.exitCode}, {"timed_out", result.timedOut},
+       {"truncated", result.truncated}});
   if (active == job) { active.reset(); process.reset(); }
   auto completion = std::move(job->completion);
   schedule();

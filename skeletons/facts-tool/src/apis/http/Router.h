@@ -2,6 +2,7 @@
 #include "apis/jobs/Queue.h"
 #include "apis/http/OpenApi.h"
 #include "apis/http/Routing.h"
+#include "apis/logging/Logger.h"
 #include <boost/beast/http.hpp>
 #include <functional>
 
@@ -15,6 +16,7 @@ struct Router {
   const OpenApiDocuments &documents;
   std::function<Json()> watchStatus;
   std::function<void()> shutdown;
+  logging::Logger *logger = nullptr;
   Response operator()(const Request &request);
   Response submit(const Request &request, std::string path);
   Response dispatch(const Request &request, const MatchedRoute &route);

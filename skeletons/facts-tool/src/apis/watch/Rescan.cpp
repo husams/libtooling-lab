@@ -11,6 +11,8 @@ void Watcher::Impl::scan() {
   dirty = false;
   auto changes = std::exchange(pendingEvents, {});
   const bool force = std::exchange(needsScan, false);
+  if (logger) logger->write(logging::Level::trace, "watch.scan",
+      {{"changes", changes.size()}, {"forced", force}});
   boost::asio::post(scanner, [weak = weak_from_this(), previous = snapshot,
                               changes = std::move(changes), force]() mutable {
     auto self = weak.lock();
@@ -30,8 +32,11 @@ void Watcher::Impl::scanned(std::expected<watch::Update, std::string> result) {
     return update.snapshot == snapshot ? std::expected<void, std::string>{}
                                        : applyScan(*update.snapshot);
   });
+  const bool previouslyReady = ready;
   ready = applied.has_value();
   if (!applied) {
+    if (logger && (previouslyReady || error != applied.error()))
+      logger->write(logging::Level::warning, "watch.failed", {{"stage", "scan"}});
     error = applied.error();
     ++failures;
     needsScan = true;
@@ -40,6 +45,9 @@ void Watcher::Impl::scanned(std::expected<watch::Update, std::string> result) {
   snapshot = std::move(result->snapshot);
   ready = snapshot->notices.empty();
   events += result->events;
+  if (logger) logger->write(logging::Level::debug, "watch.scanned",
+      {{"ready", ready}, {"notices", snapshot->notices.size()},
+       {"events", result->events}, {"refresh", result->refresh}});
   if (result->refresh) {
     active = true;
     ++cycles;
@@ -47,6 +55,8 @@ void Watcher::Impl::scanned(std::expected<watch::Update, std::string> result) {
     latestJobs.clear();
     for (auto &command : result->plan.imports) commands.push_back(std::move(command));
     for (auto &command : result->plan.extracts) commands.push_back(std::move(command));
+    if (logger) logger->write(logging::Level::debug, "watch.cycle.started",
+        {{"cycle", cycles}, {"commands", commands.size()}});
     nextCommand();
   } else if (dirty) {
     changed();

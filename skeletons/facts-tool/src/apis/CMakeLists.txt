@@ -7,6 +7,8 @@ add_library(facts-apis STATIC
   Server.cpp
   config/Defaults.cpp
   config/Encode.cpp
+  config/Logging.cpp
+  config/LogPaths.cpp
   config/Merge.cpp
   config/Options.cpp
   config/Parse.cpp
@@ -38,6 +40,11 @@ add_library(facts-apis STATIC
   jobs/QueueRecords.cpp
   jobs/QueueRun.cpp
   jobs/Spawn.cpp
+  logging/Level.cpp
+  logging/Sink.cpp
+  logging/Record.cpp
+  logging/Logger.cpp
+  logging/Worker.cpp
   watch/Apply.cpp
   watch/Events.cpp
   watch/Filter.cpp

@@ -164,8 +164,10 @@ and `exit_code`; HTTP remains available. Inotify overflow requests a rescan and
 refresh. Source deletion triggers refresh, but removal of stale compilation
 commands and catalog entries follows the existing CLI semantics.
 
-Database, AST-cache and object outputs, SQLite sidecar files, server configuration
-and its sibling log/PID files are excluded to prevent feedback loops. `.git`
+Database, AST-cache and object outputs, SQLite sidecar files, server configuration,
+its sibling log/PID files and the configured `logging.file` are excluded to prevent
+feedback loops. This applies even when a custom log filename has a source-code
+extension. See [Logging and verbosity](09-logging.md) for watcher event levels. `.git`
 directories are excluded from source traversal; specific Git control files are
 still watched to reload ignore rules and tracked-file state. Other directory
 names, including `.cache`, `.facts`, `.facts-tool`, `.deps` and `node_modules`,

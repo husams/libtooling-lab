@@ -1,4 +1,5 @@
 #include "apis/config/Encode.h"
+#include "apis/config/Logging.h"
 #include <yaml-cpp/yaml.h>
 
 namespace facts::apis {
@@ -13,6 +14,7 @@ std::string encodeSettings(const Settings &settings) {
   root["host"] = settings.host;
   root["port"] = settings.port;
   root["working_directory"] = settings.workingDirectory.string();
+  writeLogging(root, settings.logging);
   auto watch = root["watch"];
   watch["enabled"] = settings.watchEnabled;
   watch["exclude_repositories"] = settings.excludedRepositories;

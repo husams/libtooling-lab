@@ -5,9 +5,11 @@
 #include <memory>
 
 namespace facts::apis {
+namespace logging { class Logger; }
 class Watcher {
 public:
-  Watcher(boost::asio::io_context &io, Queue &queue, const Settings &settings);
+  Watcher(boost::asio::io_context &io, Queue &queue, const Settings &settings,
+          logging::Logger *logger = nullptr);
   ~Watcher();
   std::expected<void, std::string> start();
   void stop();

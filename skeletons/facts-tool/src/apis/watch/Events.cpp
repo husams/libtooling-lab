@@ -11,7 +11,13 @@ void Watcher::Impl::read() {
       [weak = weak_from_this()](boost::system::error_code result, std::size_t bytes) {
         auto self = weak.lock();
         if (!self || !self->running) return;
-        if (result) { self->error = result.message(); self->stop(); return; }
+        if (result) {
+          self->error = result.message();
+          if (self->logger) self->logger->write(logging::Level::warning, "watch.failed",
+                                               {{"stage", "read"}});
+          self->stop();
+          return;
+        }
         self->consume(bytes);
         if (self->running) self->read();
       });
@@ -32,6 +38,8 @@ void Watcher::Impl::consume(std::size_t bytes) {
 void Watcher::Impl::event(int handle, unsigned mask, const std::string &name) {
   if (mask & IN_Q_OVERFLOW) {
     ++overflows;
+    if (logger) logger->write(logging::Level::warning, "watch.overflow",
+                              {{"overflows", overflows}});
     needsScan = true;
     changed();
     return;
@@ -39,6 +47,8 @@ void Watcher::Impl::event(int handle, unsigned mask, const std::string &name) {
   const auto found = watches.find(handle);
   if (found == watches.end()) return;
   const auto path = name.empty() ? found->second : found->second / name;
+  if (!settings.logging.file.empty() &&
+      watch::absolute(path, settings) == settings.logging.file) return;
   if (mask & IN_IGNORED) {
     watches.erase(found);
     needsScan = true;
@@ -60,6 +70,8 @@ void Watcher::Impl::event(int handle, unsigned mask, const std::string &name) {
     pendingEvents.clear();
     needsScan = true;
   } else pendingEvents.push_back({path, directory, control});
+  if (logger) logger->write(logging::Level::trace, "watch.event",
+      {{"directory", directory}, {"control", control}, {"pending", pendingEvents.size()}});
   changed();
 }
 }

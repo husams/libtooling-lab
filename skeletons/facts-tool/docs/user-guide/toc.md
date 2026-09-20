@@ -54,3 +54,4 @@
 | 9.6 | REST API | [Deployment and operation](09-rest-api/06-deployment.md) |
 | 9.7 | REST API | [REST implementation classes](09-rest-api/07-class-reference.md) |
 | 9.8 | REST API | [OpenAPI contract and generated code](09-rest-api/08-openapi-contract.md) |
+| 9.9 | REST API | [Logging and verbosity](09-rest-api/09-logging.md) |
