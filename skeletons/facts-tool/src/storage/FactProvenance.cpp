@@ -70,7 +70,9 @@ registerFactProvenance(Database &database, std::span<const FactProvenance> rows,
         file);
     try {
       for (const auto &value : existing)
-        if (value.first != row->path || value.second != row->universe)
+        if ((value.first != row->path &&
+             !std::ranges::contains(row->aliases, value.first)) ||
+            value.second != row->universe)
           return std::unexpected(
               std::make_error_code(std::errc::invalid_argument));
     } catch (const QueryError &error) {

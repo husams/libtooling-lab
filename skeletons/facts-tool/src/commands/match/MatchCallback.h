@@ -3,6 +3,8 @@
 #include "cli/Options.h"
 #include "model/MatchedSymbol.h"
 #include "commands/match/ExpressionEvidence.h"
+#include "commands/match/MatchOutput.h"
+#include "commands/match/BindingPolicy.h"
 
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <llvm/Support/JSON.h>
@@ -24,7 +26,8 @@ class MatchCallback final
 public:
   MatchCallback(const cli::MatchOptions &options, FileManager &files,
                 FactStore &store, bool rejectLegacyWrites = false,
-                std::string implicitRootBinding = {});
+                BindingPolicy policy = BindingPolicy::Contract,
+                std::string internalRoot = {});
   void onStartOfTranslationUnit() override { fingerprints_.clear(); }
   std::optional<clang::TraversalKind> getCheckTraversalKind() const override;
   void
@@ -33,15 +36,15 @@ public:
   const std::optional<std::string> &error() const { return error_; }
 
   const std::vector<MatchedSymbol> &matchedSymbols() const { return matches_; }
-  void writeResults(const std::vector<std::string> &sources,
-                    std::ostream &output);
+  MatchOutput takeOutput(const std::vector<std::string> &sources);
 
 private:
   const cli::MatchOptions &options_;
   FileManager &files_;
   FactStore &store_;
   bool rejectLegacyWrites_ = false;
-  std::string implicitRootBinding_;
+  BindingPolicy policy_;
+  std::string internalRoot_;
   std::optional<std::string> error_;
   std::vector<MatchedSymbol> matches_;
   llvm::json::Array results_;

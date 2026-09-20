@@ -1,4 +1,5 @@
 #include "storage/FileDatabase.h"
+#include "storage/ActiveClone.h"
 
 #include "storage/FileIdentity.h"
 #include "storage/FilePersistence.h"
@@ -24,6 +25,17 @@ namespace {
 std::expected<std::int64_t, std::error_code>
 currentUpsertRepository(storage::Database &database,
                         const ProjectConfiguration &configuration) {
+  // Watch refreshes preserve catalog identity and cannot reactivate a clone
+  // that the user switched while this import was queued.
+  if (configuration.activeClone.id != 0) {
+    auto ids = storage::detail::toItlibGenerator(database.query(
+        "SELECT r.id FROM repository r JOIN clone c ON c.id=r.active_clone_id "
+        "WHERE c.id=?1 AND c.path=?2 AND c.repository_id=r.id AND r.id=?3",
+        [](const storage::Row &row) { return row.get<std::int64_t>(0); },
+        configuration.activeClone.id, configuration.activeClone.path,
+        configuration.activeClone.repositoryId));
+    return storage::detail::collectOne(std::move(ids));
+  }
   // A checkout already belongs to one repository even if its imported name
   // changes (for example, a directory fallback becomes a git remote name).
   // Reuse that identity so the component/directory/file upserts below retain
@@ -46,6 +58,7 @@ currentUpsertRepository(storage::Database &database,
 std::expected<std::int64_t, std::error_code>
 currentUpsertClone(storage::Database &database, std::int64_t repositoryId,
                    const ProjectClone &clone) {
+  if (clone.id != 0) return clone.id;
   auto ids = storage::detail::toItlibGenerator(database.query(
       "INSERT INTO clone(repository_id,path,label) VALUES(?1,?2,?3) "
       "ON CONFLICT(path) DO UPDATE SET label=excluded.label RETURNING id",
@@ -86,13 +99,8 @@ struct PriorCompileOptions {
   std::string compileOptions;
 };
 
-// Snapshots this repository's registered compile-relevant columns before a
-// reimport's reset (see storeProjectConfiguration) clears
-// them, so the file upsert further down can compare what this reimport is
-// about to write against what was actually there beforehand -- the wipe
-// would otherwise make every reimported file look "changed" from NULL,
-// even one whose driver/working directory/compile options are identical to
-// last time.
+// Snapshot the stored compilation context so each incoming source can retain
+// its index state when its command is unchanged. Omitted sources are preserved.
 std::expected<std::map<ProjectFileKey, PriorCompileOptions>, std::error_code>
 loadPriorCompileOptions(storage::Database &database,
                         std::int64_t repositoryId) {
@@ -123,19 +131,20 @@ loadPriorCompileOptions(storage::Database &database,
 }
 
 std::expected<storage::Database, std::string>
-openReadOnlyFileDatabase(const std::string &path) {
-  constexpr int flags = storage::Database::readOnly | SQLITE_OPEN_FULLMUTEX;
+openExistingFileDatabase(const std::string &path, bool writable) {
+  const int flags = (writable ? SQLITE_OPEN_READWRITE : SQLITE_OPEN_READONLY) |
+                    SQLITE_OPEN_FULLMUTEX;
+  const std::string failure = std::string{"cannot open project configuration "} +
+                              (writable ? "read-write: " : "read-only: ");
   return storage::Database::open(path, flags)
-      .transform_error([](std::error_code error) {
-        return "cannot open project configuration read-only: " +
-               error.message();
+      .transform_error([&](std::error_code error) {
+        return failure + error.message();
       })
-      .and_then([](storage::Database database)
+      .and_then([&](storage::Database database)
                     -> std::expected<storage::Database, std::string> {
         return database.executeScript("PRAGMA foreign_keys=ON")
-            .transform_error([](std::error_code error) {
-              return "cannot open project configuration read-only: " +
-                     error.message();
+            .transform_error([&](std::error_code error) {
+              return failure + error.message();
             })
             .and_then([&] {
               return requireCurrentFileSchema(database.nativeHandle());
@@ -183,14 +192,15 @@ FileDatabase::FileDatabase(storage::Database database)
 
 std::expected<std::unique_ptr<FileDatabase>, std::string>
 FileDatabase::openReadOnly(const std::string &path) {
-  return openReadOnlyFileDatabase(path).transform([](storage::Database opened) {
-    return std::unique_ptr<FileDatabase>(new FileDatabase(std::move(opened)));
-  });
+  return openExistingFileDatabase(path, false)
+      .transform([](storage::Database opened) {
+        return std::unique_ptr<FileDatabase>(new FileDatabase(std::move(opened)));
+      });
 }
 
 std::expected<std::unique_ptr<FileDatabase>, std::string>
-FileDatabase::openImportedReadOnly(const std::string &path) {
-  return openReadOnlyFileDatabase(path)
+FileDatabase::openImported(const std::string &path, bool writable) {
+  return openExistingFileDatabase(path, writable)
       .and_then([](storage::Database opened)
                     -> std::expected<storage::Database, std::string> {
         return requireImportedProjectConfiguration(opened.nativeHandle())
@@ -257,26 +267,9 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
               return currentSetActiveClone(database_, repositoryId, cloneId);
             })
             .and_then([&] {
-              // Captured before the wipe below clears this repository's
-              // non-overridden driver/working directory/compile options, so the
-              // file upsert further down can still tell an unchanged
-              // reimport from a real edit.
               return loadPriorCompileOptions(database_, repositoryId)
                   .transform(
                       [&](auto loaded) { priorOptions = std::move(loaded); });
-            })
-            .and_then([&] {
-              return database_.executeBulk(
-                  "UPDATE file SET compile_options=NULL,driver=NULL,"
-                  "working_directory=NULL WHERE args_overridden=0 "
-                  "AND directory_id IN (SELECT d.id FROM directory d "
-                  "JOIN component c ON c.id=d.component_id "
-                  "WHERE c.repository_id=?1)", std::array{repositoryId},
-                  [](sqlite3_stmt *statement, std::int64_t id) {
-                    return storage::bindParameters(statement, id);
-                  },
-                  {.atomic = false})
-                  .transform([](const storage::BulkResult &) {});
             })
             .and_then([&] {
               return database_.execute(
@@ -342,13 +335,9 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
               // real edit to the file itself would, so the next plain
               // extract re-extracts exactly the files this reimport
               // actually changed, not every registered file. Whether a
-              // file is unchanged is decided in C++ against `priorOptions`
-              // (captured above, before the wipe) rather than compared in
-              // SQL against this row's own current driver/working
-              // directory/compile options: the wipe already cleared those
-              // to NULL for this repository's non-overridden rows, so a
-              // same-statement SQL comparison would find every reimported
-              // file "changed" from NULL, forced or not.
+              // file is unchanged is decided against `priorOptions`.
+              // Only incoming commands are upserted: a source omitted from
+              // this import keeps its command, overrides, and index state.
               struct FileUpsertInput {
                 const ProjectFile *file;
                 bool unchanged;
@@ -409,32 +398,18 @@ std::expected<void, std::error_code> FileDatabase::storeProjectConfiguration(
 std::expected<void, std::error_code>
 FileDatabase::switchActiveClone(std::string_view repositoryName,
                                 std::string_view clonePathOrLabel) {
-  auto transaction = database_.write();
-  if (!transaction) {
-    return std::unexpected(transaction.error());
-  }
   constexpr auto sql =
-      "UPDATE repository SET active_clone_id=(SELECT id FROM clone "
-      "WHERE repository_id=repository.id AND (path=?2 OR label=?2)) "
-      "WHERE name=?1 AND EXISTS(SELECT 1 FROM clone "
-      "WHERE repository_id=repository.id AND (path=?2 OR label=?2))";
-  const std::array rows{std::string{repositoryName}};
-  return database_
-      .executeBulk(
-          sql, rows,
-          [clonePathOrLabel](sqlite3_stmt *statement, const std::string &name) {
-            return storage::bindParameters(statement, name, clonePathOrLabel);
-          },
-          {.atomic = false})
-      .and_then([](const storage::BulkResult &result)
-                    -> std::expected<void, std::error_code> {
-        return result.changes == 1
-                   ? std::expected<void, std::error_code>{}
-                   : std::expected<void, std::error_code>{
-                         std::unexpected(std::make_error_code(
-                             std::errc::no_such_file_or_directory))};
-      })
-      .and_then([&] { return transaction->commit(); });
+      "SELECT r.id,c.id FROM repository r JOIN clone c ON c.repository_id=r.id "
+      "WHERE r.name=?1 AND (c.path=?2 OR c.label=?2)";
+  auto selected = storage::detail::toItlibGenerator(database_.query(
+      sql, [](const storage::Row &row) {
+        return std::pair{row.integer(0), row.integer(1)};
+      }, std::string(repositoryName), std::string(clonePathOrLabel)));
+  return storage::detail::collectOne(std::move(selected))
+      .and_then([&](const auto &selection) {
+        return storage::activateRegisteredClone(database_, selection.first,
+                                                selection.second);
+      });
 }
 
 std::expected<void, std::error_code>

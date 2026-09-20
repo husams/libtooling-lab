@@ -1,9 +1,15 @@
 # Error handling
 
-The SDK exposes exactly **one** exception type. Every documented failure -
-schema mismatches, bad refs, invalid plans, exhausted budgets - is a
-`FactsToolError` distinguished by a stable string `.code`, never a
-subclass hierarchy.
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
+The SDK's local database query layer exposes **one** exception type. Query
+failures, such as schema mismatches, bad refs and invalid plans, use
+`FactsToolError`, distinguished by a stable string `.code`.
+
+The optional REST client has separate HTTP, transport and job exceptions. See
+[REST error handling](11-rest-client.md#errors-deadlines-and-cancellation) for
+`ApiError`, `TransportError`, `ProtocolError`, `JobFailedError` and
+`JobTimeoutError`.
 
 ## `FactsToolError`
 
@@ -16,8 +22,8 @@ class FactsToolError(Exception):
 ```
 
 `str(exc) == f"{code}: {message}"`. Internally, every raise site in the
-package goes through a single helper, `errors.fail(code, message) -> Never`
-- there is exactly one exception type exported; callers distinguish
+database query layer goes through a single helper,
+`errors.fail(code, message) -> Never`. Query callers distinguish these
 failures by `.code`, not by `isinstance` on a subclass.
 
 ```python
@@ -65,6 +71,25 @@ which is what an uncaught traceback shows.
 Every one of these was reproduced live, in this session, against a real or
 hand-built database.
 
+## When an error is raised
+
+`open_codebase(...)` validates the database pair immediately. Constructing
+a query only builds its plan. `Executor.run(...)` validates that plan and
+checks the execution budget and result cap before returning a `Result`,
+including in lazy mode.
+
+Data-dependent errors occur when the lazy result is consumed. For
+example, a missing symbol raises `E_SOURCE` during iteration or
+materialization, and `unknown="error"` can raise `E_UNKNOWN` after earlier
+rows have already been yielded. Keep both result creation and consumption
+inside the `try` block, and consume while the codebase is open.
+
+Use `cb.executor.run(query.plan, lazy=False)` or
+`cb.query(...).run(lazy=False)` to complete execution and surface these
+errors before `run` returns. `open_codebase(..., lazy=False)` applies that
+default to the session. List-returning helpers such as `.all()` and
+`cb.graph.callees(...)` already consume their results before returning.
+
 ## Reading a failure defensively
 
 ```python
@@ -73,6 +98,8 @@ from facts_tool import FactsToolError, open_codebase
 try:
     with open_codebase(facts_db=facts_path, project_db=project_path) as cb:
         result = cb.executor.run(query.plan)
+        for row in result:
+            print(row)
 except FactsToolError as exc:
     match exc.code:
         case "E_SCHEMA":
@@ -102,6 +129,13 @@ couldn't be proven under the `"include"` unknown policy. Only the
 `E_UNKNOWN` exception. Treat a truncated or unknown result as "the answer
 is incomplete," never as "the answer is false" - a truncated empty result
 is not proof of absence.
+
+For a lazy result, read completeness metadata after exhausting the
+iterator. Accessing `truncated`, `partial`, `unknown`, `cursor`, or `scalar`
+before completion materializes the result to compute a final answer.
+After an interrupted iteration this executes the query again from the
+start. See [query performance](10-query-performance.md) for result
+lifetime and materialization details.
 
 Continue to [08-api-reference.md](08-api-reference.md) for a compact,
 per-module index of every public name in the package.

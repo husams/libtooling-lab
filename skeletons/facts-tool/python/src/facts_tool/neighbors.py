@@ -4,6 +4,7 @@ from .catalog_relations import relation_id, relation_name
 from .ids import SymbolId
 from .rows import Row, row_key
 from .view_loader import ViewLoader
+from .view_symbols import load_symbols
 
 
 class Neighbors:
@@ -18,8 +19,6 @@ class Neighbors:
         return self._pseudo(rows, name, inbound)
 
     def _stored(self, rows: list[Row], kind: int, inbound: bool) -> list[Row]:
-        symbols = {int(row["id"]): row for row in self.loader.load("symbol")}
-        result: list[Row] = []
         column, target = (
             ("destination_id", "source_id")
             if inbound
@@ -29,14 +28,17 @@ class Neighbors:
             f"SELECT {target} FROM relation WHERE {column}=? AND kind=? "
             "ORDER BY position," + target
         )
-        for row in rows:
-            if row.get("_view") != "symbol":
-                continue
-            for edge in self.facts.execute(sql, (row["_db_id"], kind)):
-                key = SymbolId.unpack(int(edge[0])).packed
-                if key in symbols:
-                    result.append(symbols[key])
-        return _unique(result)
+        targets = dict.fromkeys(
+            SymbolId.unpack(int(edge[0])).packed
+            for row in rows
+            if row.get("_view") == "symbol"
+            for edge in self.facts.execute(sql, (row["_db_id"], kind))
+        )
+        symbols = {
+            int(row["id"]): row
+            for row in load_symbols(self.facts, self.loader.files, set(targets))
+        }
+        return [symbols[key] for key in targets if key in symbols]
 
     def _pseudo(self, rows: list[Row], name: str, inbound: bool) -> list[Row]:
         mapping = {
@@ -52,22 +54,25 @@ class Neighbors:
         return self._owned(rows, mapping[name], inbound)
 
     def _owned(self, rows: list[Row], view: str, inbound: bool) -> list[Row]:
-        details = self.loader.load(view)
-        symbols = {int(row["id"]): row for row in self.loader.load("symbol")}
-        result: list[Row] = []
+        owner_ids = dict.fromkeys(
+            int(owner)
+            for row in rows
+            if (owner := row.get("owner_id", row.get("symbol_id"))) is not None
+        )
         if inbound:
-            for row in rows:
-                owner = row.get("owner_id", row.get("symbol_id"))
-                if owner in symbols:
-                    result.append(symbols[int(owner)])
-        else:
-            owners = {int(row["id"]) for row in rows if row.get("_view") == "symbol"}
-            result.extend(
+            symbols = {
+                int(row["id"]): row
+                for row in load_symbols(self.facts, self.loader.files, set(owner_ids))
+            }
+            return [symbols[owner] for owner in owner_ids if owner in symbols]
+        owners = {int(row["id"]) for row in rows if row.get("_view") == "symbol"}
+        return _unique(
+            [
                 row
-                for row in details
+                for row in self.loader.load(view)
                 if row.get("owner_id", row.get("symbol_id")) in owners
-            )
-        return _unique(result)
+            ]
+        )
 
     def _includes(self, rows: list[Row], inbound: bool) -> list[Row]:
         files = {int(row["id"]): row for row in self.loader.load("file")}

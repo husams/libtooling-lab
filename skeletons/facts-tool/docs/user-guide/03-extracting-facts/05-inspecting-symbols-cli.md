@@ -1,5 +1,7 @@
 # Inspecting Symbols, Files, and Directories from the CLI
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Once a project has been imported and extracted, three command groups let
 you inspect what was found without writing any Python: `symbol` reads the
 facts database (plus, optionally, the project database for extra columns);

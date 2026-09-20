@@ -1,5 +1,7 @@
 # Workflow: Large Codebases and Batching
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 You need to extract facts from a codebase too large to comfortably run as
@@ -154,6 +156,21 @@ working command from `import`. Here the project's `.facts-tool.yaml`
 baked in and broke `extract`. Keep `--extra-arg` consistent across
 `import` and every later `extract`/`dependency`/`match` invocation on the
 same sources, or keep the flag in YAML instead of on the command line.
+
+## Query large result sets with the Python SDK
+
+After extraction, iterate query results inside the `open_codebase` context
+to process rows incrementally. Lazy mode is the default; `run(lazy=False)`
+collects results immediately when eager execution is needed. Avoid `.all()`,
+`.nodes`, `list(result)`, or serialization when the goal is streaming.
+
+The default enumeration and result caps remain 10,000 and 1,000. Increase
+both relevant budgets for larger scans, then inspect `result.truncated`
+after iteration. Lazy mode preserves these bounds. Graph/path/set queries
+still buffer bounded results. See
+[Lazy queries and performance](../05-python-sdk/10-query-performance.md)
+for a complete example, iterator cleanup, pagination references, and
+measurements from the facts-tool source corpus.
 
 ## Pitfalls
 

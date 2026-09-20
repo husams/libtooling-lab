@@ -1,0 +1,13 @@
+get:
+  operationId: indexStatus
+  tags: [symbols]
+  summary: Inspect the background global symbol index
+  responses:
+    '200':
+      description: Index refresh state and last completed totals.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/IndexStatus'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

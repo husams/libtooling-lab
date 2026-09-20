@@ -1,5 +1,7 @@
 # Workflow: Custom Matchers
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 The stored relations that `extract` already gives you don't cover the

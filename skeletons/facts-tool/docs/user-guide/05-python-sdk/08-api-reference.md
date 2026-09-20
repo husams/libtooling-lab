@@ -1,7 +1,10 @@
 # API reference
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 A compact index of every public name. `facts_tool` (the top-level package)
-and `facts_tool.queryplan` are the two public import surfaces; nothing
+and `facts_tool.queryplan` provide the local query surfaces. The optional
+`facts_tool.rest` module provides HTTP clients; see its reference below. Nothing
 under `facts_tool.budgets`, `facts_tool.ids`, `facts_tool.errors`, or any
 other submodule is meant to be imported directly except where noted below
 (`Budgets`, `SymbolId`, and `FactsToolError` are re-exported at the top
@@ -11,22 +14,22 @@ level for convenience).
 
 | Name | Signature | Purpose | Chapter |
 |---|---|---|---|
-| `open_codebase` | `(*, facts_db, project_db, budgets=None) -> CodeBase` | Open a paired facts/project database read-only | [02](02-opening-databases.md) |
+| `open_codebase` | `(*, facts_db, project_db, budgets=None, lazy=True) -> CodeBase` | Open a paired facts/project database read-only | [02](02-opening-databases.md) |
 | `open_variable_flow` | `(path) -> VariableFlowReader` | Open a standalone variable-flow artifact read-only | [09](09-variable-flow.md) |
 | `VariableFlowReader` | `.get(run_id)`, `.runs()`, context manager, `.close()` | Read exact persisted variable-flow runs | [09](09-variable-flow.md) |
 | `VariableFlowRun` | `.nodes/.edges/.boundaries/.graph`, `.status/.assumptions/.root_variable`, `.to_dict()` | Immutable local-variable or parameter-flow evidence | [09](09-variable-flow.md) |
 | `VariableFlowGraph` | `.node/.nodes/.reads/.writes/.incoming/.outgoing/.boundaries` | Query occurrences, exact identities, and callsite-preserving links | [09](09-variable-flow.md) |
 | `CodeBase` | `.executor`, `.provenance`, `.graph`, `.callgraphs`, `.get/.find/.query`, context manager, `.close()` | The session object returned by `open_codebase` | [02](02-opening-databases.md) |
-| `Executor` | `(loader, provenance, budgets=None)`; `.run(plan, after_id=None, result_cap=None) -> Result`; `.explain(plan) -> dict` | Runs a frozen `Plan` against a paired database | [03](03-query-model.md) |
-| `Result` | `.shape/.view/.values/.scalar/.truncated/.partial/.unknown/.cursor/.provenance`; `.nodes/.rows/.paths`; `.to_dict()/.to_json()` | The outcome of running a plan | [03](03-query-model.md) |
-| `Budgets` | `enumeration=10_000, traversal=10_000, result_cap=1_000, max_depth=32, path_expansion=10_000, witness_reconstruction=200_000` | Explicit, opt-in limits on every executor operation | [03](03-query-model.md) |
+| `Executor` | `(loader, provenance, budgets=None, *, lazy=True)`; `.run(plan, after_id=None, result_cap=None, *, lazy=None) -> Result`; `.explain(plan) -> dict` | Validates a frozen `Plan`; returns a lazy result by default | [03](03-query-model.md) |
+| `Result` | `.shape/.view/.values/.scalar/.truncated/.partial/.unknown/.cursor/.provenance`; `.nodes/.rows/.paths`; iterable; `.materialize()/.to_dict()/.to_json()` | Lazy iteration or explicitly materialized query results | [03](03-query-model.md) |
+| `Budgets` | `enumeration=10_000, traversal=10_000, result_cap=1_000, max_depth=32, path_expansion=10_000, witness_reconstruction=200_000` | Default limits, configurable for each session | [03](03-query-model.md) |
 | `GraphQuery` | `.get/.find/.query/.neighbors/.reaches/.callers/.callees/.bases/.subclasses/.members/.parameters/.definitions/.references` | Typed graph navigation | [05](05-relations-and-graph-queries.md) |
 | `Entity` | row-proxying `__getattr__`; `.to_dict()/.outgoing()/.incoming()/.definitions()/.references()` | Base typed wrapper over a symbol row | [05](05-relations-and-graph-queries.md) |
 | `Callable` | `Entity` + `.callers()/.callees()/.parameters()` | Typed wrapper for a function/method symbol | [05](05-relations-and-graph-queries.md) |
 | `Method` | `Callable` + `.record()` | Typed wrapper for a method symbol | [05](05-relations-and-graph-queries.md) |
 | `Record` | `Entity` + `.bases()/.subclasses()/.methods()/.fields()` | Typed wrapper for a struct/class symbol | [05](05-relations-and-graph-queries.md) |
 | `SymbolId` | `(file_id: int, index: int)`; `.packed/.sqlite/.to_dict()`; `SymbolId.unpack(value)` | Two-half packed symbol identity | [02](02-opening-databases.md) |
-| `FactsToolError` | `(code: str, message: str)`; `.code/.message` | The single public exception type | [07](07-error-handling.md) |
+| `FactsToolError` | `(code: str, message: str)`; `.code/.message` | The local query layer's public exception type | [07](07-error-handling.md) |
 | `CallGraphRun` | see [06](06-persisted-callgraph-runs.md) field table | One persisted `analyse call-graph` invocation | [06](06-persisted-callgraph-runs.md) |
 | `CallGraphPage[T]` | `.items/.total/.next_cursor/.complete/.truncated`; iterable/sized/indexable | One bounded page of a run's child collection | [06](06-persisted-callgraph-runs.md) |
 | `CallGraphEdge` | `source, target, kind_id, kind, semantic_kind, position, file_id, file, line, column, offset, depth, cycle, site` | One persisted call-graph edge | [06](06-persisted-callgraph-runs.md) |
@@ -163,7 +166,8 @@ Every one of these is worked through in [03](03-query-model.md).
 | `EntityQuery.limit` | `(value: int) -> EntityQuery` | Truncate output |
 | `EntityQuery.filter` | `(callback: Callable[[Row], bool]) -> EntityQuery` | Local, never serialized |
 | `EntityQuery.plan` / `.to_plan()` | `-> Plan` | Expose the frozen plan |
-| `EntityQuery.run` | `() -> Result` | Execute |
+| `EntityQuery.run` | `(*, lazy: bool \| None = None) -> Result` | Return raw rows; inherit session mode unless overridden |
+| `EntityQuery.__iter__` | `() -> Iterator[object]` | Iterate typed entities or selected row dictionaries; inherit session mode |
 | `EntityQuery.all` | `() -> list[object]` | Execute; upgrade node rows to typed `Entity` objects |
 | `EntityQuery.names` | `() -> list[str]` | Execute; project `name` field |
 | `EntityQuery.count` | `() -> int \| None` | Execute as a scalar count |
@@ -176,5 +180,40 @@ query), [02](02-opening-databases.md) (`open_codebase`/`CodeBase`/
 `Result`, `Budgets`, `EntityQuery`), [04](04-views-and-catalog.md) (views/
 kinds/relations), [05](05-relations-and-graph-queries.md) (`GraphQuery`/
 `Entity`/`Callable`/`Method`/`Record`), [06](06-persisted-callgraph-runs.md)
-(`CallGraphReader` and every `CallGraph*` model), and
-[07](07-error-handling.md) (`FactsToolError` and every code).
+(`CallGraphReader` and every `CallGraph*` model),
+[07](07-error-handling.md) (`FactsToolError` and every code), and
+[10](10-query-performance.md) (lazy/eager execution, indexed queries, and
+large results).
+
+## `facts_tool.rest` (optional `rest` extra)
+
+The [REST client chapter](11-rest-client.md) contains complete examples and
+job/error semantics. `AsyncClient` uses the same methods with `await`.
+
+| Name or method | Signature | Purpose |
+|---|---|---|
+| `Client`, `AsyncClient` | `(base_url, *, token=None, timeout=10.0, transport=None)` | Synchronous/asynchronous HTTP clients |
+| `FileSelector` | `(path, repo=None, clone=None, component=None)` | Registered server-side source identity |
+| `.find_symbols` | `(qualified_name, *, kind=None, usr=None, repo=None, component=None, limit=50, cursor=None) -> SymbolPage` | Search the global symbol index |
+| `.extract` | `(file, *, force=False) -> DomainJob` | Queue native extraction |
+| `.match` | `(file, query, *, traversal="AsIs", relation_kind=None, capture_source=False) -> DomainJob` | Queue a Clang DSL match |
+| `.dependencies` | `(file) -> DomainJob` | Queue dependency analysis |
+| `.index_status` | `() -> IndexStatus` | Inspect background global-index readiness and failures |
+| `.wait` | `(job_id, *, timeout=None, poll_interval=0.1) -> DomainJob \| Job` | Poll to completion; call `.raise_for_status()` to require success |
+| `.get_job`, `.cancel_job` | `(job_id) -> DomainJob \| Job` | Read a job or cancel queued native work; running native cancellation returns `409` |
+| `.list_jobs` | `() -> list[DomainJob \| Job]` | Retrieve retained job metadata |
+| `.health`, `.openapi`, `.watch_status`, `.shutdown` | `() -> dict` | Inspect or stop the server |
+| `.openapi_yaml` | `() -> str` | Read the live YAML contract |
+| `Symbol`, `SymbolPage` | Immutable symbol records and paginated results | Qualified name, kind, USR and defining-file identity |
+| `DomainJob`, `OperationError` | Immutable operation snapshots and structured errors | Native result data, state and failure details |
+| `IndexStatus` | Immutable state, counts, error and timestamp | Startup/refresh progress, separate from job completion |
+| `ApiError`, `TransportError`, `ProtocolError` | See [errors](11-rest-client.md#errors-deadlines-and-cancellation) | HTTP rejection, request failure or invalid response |
+| `JobFailedError`, `JobTimeoutError` | `.job_id`; failed error has `.job`, timeout error has `.timeout` | Completed failure or expired polling budget |
+
+Deprecated compatibility methods remain: `.submit(*arguments)`,
+`.command(path, *arguments)`, `.run(*arguments, timeout=None, poll_interval=0.1,
+check=True)`, and `.commands()`. They expose CLI tokens and legacy `Job` records;
+use the resource methods above for new symbol and analysis clients.
+
+Use `with Client(...)` / `async with AsyncClient(...)`, or close explicitly with
+`.close()` / `await .aclose()`. REST clients do not change the database query API.

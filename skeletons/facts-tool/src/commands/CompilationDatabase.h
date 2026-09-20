@@ -1,4 +1,5 @@
 #pragma once
+#include "tooling/CommandArguments.h"
 
 #include <clang/Tooling/ArgumentsAdjusters.h>
 #include <clang/Tooling/CommonOptionsParser.h>
@@ -41,8 +42,11 @@ appendExtraArguments(CompilationDatabasePtr database,
   auto adjusted =
       std::make_unique<clang::tooling::ArgumentsAdjustingCompilations>(
           std::move(database));
-  adjusted->appendArgumentsAdjuster(clang::tooling::getInsertArgumentAdjuster(
-      extraArguments, clang::tooling::ArgumentInsertPosition::END));
+  adjusted->appendArgumentsAdjuster([extraArguments](const auto &arguments, auto) {
+    auto result = arguments;
+    appendCommandOptions(result, extraArguments);
+    return result;
+  });
   return adjusted;
 }
 

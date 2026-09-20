@@ -1,5 +1,7 @@
 # Generating a Call Graph
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 This chapter documents every option of `analyse call-graph`, plus the two
 companion commands that read a single function's evidence
 (`analyse call-graph-entry`) and build the include-dependency graph

@@ -1,5 +1,7 @@
 # Extracting Facts
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `facts-tool extract` walks the Clang AST of already-imported translation
 units and writes symbols, relations, and call evidence into a facts
 database. It never parses a file that has not first been registered by
@@ -71,7 +73,7 @@ your checkout. `-o` always overrides the template explicitly.
 |---|---|
 | 0 | quiet - suppresses the `facts-tool: extract:` stage lines only |
 | 1 | stages - one line per pipeline stage (`starting`, `validate database paths`, ..., `complete`), including the `up_to_date=N stale=M` freshness summary |
-| 2 | details - adds extra stage lines: `configuration=...`, `selected_sources=N`, and one `skip up-to-date source=<path>` line per source the freshness check skipped |
+| 2 | details - adds `configuration=...`, `selected_sources=N`, and per-source `extraction skipped`, `extraction required` (with a reason), or `extraction started` lines |
 | 3 | trace - adds low-level trace detail (thousands of lines on a small project) |
 
 Verbosity controls the `facts-tool: extract:` stage lines and nothing else.
@@ -80,6 +82,36 @@ Clang's own `[N/M] Processing file ...` progress lines, the
 `N symbol(s) recorded from M file(s)` summary print at **every** level,
 including `-v 0`. All of this goes to standard error, not standard output;
 `extract` writes nothing to standard output at all.
+
+At level 2, an unchanged second extraction into the same facts database
+reports each skipped source explicitly:
+
+```text
+facts-tool: extract: extraction skipped source=/project/main.cpp reason=up-to-date
+facts-tool: extract: up_to_date=1 stale=0
+facts-tool: 1 source(s) up to date; nothing to extract
+```
+
+When extraction is needed, the freshness check names the first source or
+included header that made the translation unit stale. The start message
+appears only when fact traversal actually begins:
+
+```text
+facts-tool: extract: extraction required source=/project/main.cpp reason=mtime-changed file=/project/widget.h
+facts-tool: extract: extraction started source=/project/main.cpp
+```
+
+Reasons are `not-indexed`, `facts-database-changed`, `git-commit-changed`,
+`mtime-changed`, `mtime-unavailable`, `index-state-unavailable`, or `forced`
+for `--force`. A previous warning that index state was not recorded can
+therefore explain why the next run still requires extraction.
+
+`prepare extraction` describes setup before the freshness decision. Dependency
+discovery can still preprocess sources at that point. An AST-cache hit or
+`AST parsing skipped` message only describes parsing: if facts need refreshing,
+the cached AST is still traversed and `extraction started` is printed. A fresh
+facts index produces `extraction skipped` and no traversal-start message.
+These per-source messages are suppressed at levels 0 and 1.
 
 A historical run, captured before the bodyless-constructor cleanup fix, at
 `-v 2` against a 2-file, 2-header C++17 project (abstract

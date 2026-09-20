@@ -1,0 +1,6 @@
+type: object
+required: [file]
+additionalProperties: false
+properties:
+  file:
+    $ref: '../openapi.yaml#/components/schemas/FileSelector'

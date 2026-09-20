@@ -1,5 +1,7 @@
 # Persisted call-graph runs
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `analyse call-graph` is a separate, explicit native command that reads the
 `calls`/`overrides`/`dispatch_calls` relations recorded by an ordinary
 `extract` and performs a traversal. As of the schema-12 rewrite, it prints

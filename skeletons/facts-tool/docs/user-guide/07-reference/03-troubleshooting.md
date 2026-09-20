@@ -1,5 +1,7 @@
 # Troubleshooting
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Symptom -> cause -> fix, for every error message captured while researching
 this guide. Native CLI errors always follow the
 [global exit-code contract](01-cli-reference.md#exit-code-contract). SDK

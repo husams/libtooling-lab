@@ -1,5 +1,7 @@
 # Matching with Dynamic Matchers
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `facts-tool match` runs a Clang **dynamic AST matcher expression** - the
 same matcher language used by `clang-query` - against one or more
 translation units, returns all bound nodes, and persists supported facts. Unlike

@@ -1,0 +1,40 @@
+parameters:
+  - name: commandPath
+    in: path
+    required: true
+    description: |
+      A registered path from GET /v1/commands. Percent-encode embedded slashes
+      as %2F, for example repo%2Fadd. Existing catalog endpoints with literal
+      slash-separated command components remain supported for compatibility.
+    schema: {type: string, minLength: 1}
+    example: repo/list
+post:
+  deprecated: true
+  operationId: command
+  tags: [jobs]
+  summary: Submit a registered CLI command asynchronously
+  description: |
+    The path supplies the CLI command prefix; arguments supplies remaining
+    arguments. The combined prefix and supplied arguments may contain at most
+    4096 items, before server defaults are inserted. The terminal symbol browser
+    maps to symbol list. Returns a queued job immediately; completion is reported
+    by polling the Location URL, not by the initial HTTP status.
+  x-facts-command-expansion: registered-cli-commands
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/Arguments'
+        example: {arguments: ['--help']}
+  responses:
+    '202':
+      $ref: '../openapi.yaml#/components/responses/AcceptedJob'
+    '400':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    '413':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    '429':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

@@ -1,4 +1,5 @@
 #include "commands/Import.h"
+#include "storage/astcache/Database.h"
 
 #include "commands/CallGraphInvalidation.h"
 #include "commands/CompilationDatabase.h"
@@ -13,6 +14,7 @@
 #include "storage/FileManager.h"
 #include "tooling/CompilationFiles.h"
 #include "tooling/ProjectImport.h"
+#include "tooling/import/Identity.h"
 #include "tooling/StoredCompilationDatabase.h"
 
 #include <clang/Tooling/CommonOptionsParser.h>
@@ -107,7 +109,12 @@ registeredFileCount(FileManager &files) {
 std::expected<std::vector<std::string>, std::string>
 discoverRegistryFiles(const CompilationDatabase &stored,
                       const std::vector<std::string> &sources,
-                      const astcache::Options &cache) {
+                      const astcache::Options &cache, bool scoped) {
+  // Guarded watch imports must not enumerate unrelated neighbouring files.
+  // The selected TUs and their actual include closures are sufficient for
+  // extraction, while excluded new sources never enter the registry.
+  if (scoped)
+    return discoverIncludedFiles(stored, sources, cache, IncludeDiscovery::PrepareAST);
   return discoverCompilationFiles(stored, sources)
       .and_then([&](CompilationFiles discovered) {
         reportDiagnostics(discovered.diagnostics);
@@ -146,8 +153,8 @@ requireResolvableIdentities(FileManager &files,
 std::expected<std::size_t, std::string>
 registerFiles(FileManager &files, const CompilationDatabase &stored,
               const std::vector<std::string> &sources,
-              const astcache::Options &cache) {
-  return discoverRegistryFiles(stored, sources, cache)
+              const astcache::Options &cache, bool scoped) {
+  return discoverRegistryFiles(stored, sources, cache, scoped)
       .and_then([&](std::vector<std::string> identities) {
         return files.addBulk(identities)
             .transform_error([](std::error_code error) {
@@ -173,7 +180,8 @@ registerImportedFiles(FileManager &files, const CompilationDatabase &applied,
                       const std::vector<std::string> &sources,
                       const cli::ImportOptions &options) {
   if (!options.astCache.enabled)
-    return registerFiles(files, applied, sources, options.astCache);
+    return registerFiles(files, applied, sources, options.astCache,
+                         options.existingClone != 0);
   // Warm the exact command later consumers read: import normalizes arguments
   // and selects one deterministic command per source. Scope this read to the
   // incoming sources so another repository in the same database is untouched.
@@ -194,7 +202,7 @@ registerImportedFiles(FileManager &files, const CompilationDatabase &applied,
       })
       .and_then([&](CompilationDatabasePtr stored) {
         return registerFiles(files, *stored, stored->getAllFiles(),
-                             options.astCache);
+                             options.astCache, options.existingClone != 0);
       });
 }
 
@@ -211,6 +219,13 @@ std::expected<int, std::string> import(const cli::ImportOptions &options,
   FileManager files(options.configuration);
   ProjectImportOptions importOptions;
   importOptions.components = std::move(components);
+  if (options.existingClone != 0) {
+    if (!importOptions.components.empty())
+      return std::unexpected("--existing-clone cannot override project components");
+    auto identity = readImportIdentity(options.configuration, options.existingClone);
+    if (!identity) return std::unexpected(identity.error());
+    importOptions.identity = std::move(*identity);
+  }
   // Storing the compile commands registers the sources themselves, so the
   // reported figure is what the whole import added to the registry: a repeated
   // import of an unchanged project adds nothing and says so.
@@ -267,6 +282,10 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
                                     options.configurationFile, false, true);
   if (!resolved)
     return std::unexpected(resolved.error());
+  if (options.noAstCache) {
+    auto cleared = storage::astcache::clearSnapshots(resolved->database);
+    if (!cleared) return std::unexpected(cleared.error());
+  }
   if (options.factsProvided && options.facts.empty())
     return std::unexpected(
         "facts-tool: usage error: --facts must not be empty");
@@ -281,6 +300,7 @@ std::expected<int, std::string> runImport(const cli::ImportOptions &options) {
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = resolved->extraArguments;
   configured.astCache = resolved->astCache;
+  if (options.noAstCache) configured.astCache.enabled = false;
   configured.astCache.verbosity = options.verbosity;
   configured.sources = normalizeSourceSelectors(options.sources);
   const bool sourceTemplate =

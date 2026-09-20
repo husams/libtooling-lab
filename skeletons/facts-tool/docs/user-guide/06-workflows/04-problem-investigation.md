@@ -1,5 +1,7 @@
 # Workflow: Problem Investigation
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 Use the Python SDK to answer the questions that come up while debugging or
@@ -89,14 +91,14 @@ Ask for the fields you want with `select(...)`. A relation query without a
 is indistinguishable from "no matches" if you only look at `.rows`:
 
 ```python
-cb.query("facts::storage::Database").relation("uses", inbound=True).select(("name","file","line")).run()
+cb.query("facts::storage::Database").relation("uses", inbound=True).select(("name","file","line")).run().rows
 # 0 rows  (a class-type target has no incoming 'uses' edges: 'uses' is about
 #          referencing an existing declaration's value, not declaring a variable of that type)
-cb.query("facts::storage::Database").relation("of_type", inbound=True).select(("name","file","line")).run()
+cb.query("facts::storage::Database").relation("of_type", inbound=True).select(("name","file","line")).run().rows
 # database_   src/storage/FileDatabase.h:69
 # database_   src/storage/SqliteDatabase.h:316
 # database_   src/storage/Storage.h:233
-cb.query("facts::storage::Database").relation("return_type", inbound=True).select(("name","file","line")).run()
+cb.query("facts::storage::Database").relation("return_type", inbound=True).select(("name","file","line")).run().rows
 # openWritableFileDatabase   src/storage/FileDatabase.cpp:108
 # openDatabase               src/storage/Storage.cpp:15
 # operator=                  src/storage/SqliteDatabase.h:200

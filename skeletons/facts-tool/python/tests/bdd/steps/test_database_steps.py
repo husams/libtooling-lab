@@ -21,9 +21,11 @@ def read_only_queries(cb, world):
         facts = Path(database.provenance.facts.path)
         project = Path(database.provenance.project.path)
         before = (facts.read_bytes(), project.read_bytes(), set(facts.parent.iterdir()))
-        database.executor.run((start(codebase()) | nodes()).plan)
+        database.executor.run((start(codebase()) | nodes()).plan).materialize()
         with pytest.raises(FactsToolError):
-            database.executor.run((start(symbol("missing")) | out("calls")).plan)
+            database.executor.run(
+                (start(symbol("missing")) | out("calls")).plan, lazy=False
+            )
         after = (facts.read_bytes(), project.read_bytes(), set(facts.parent.iterdir()))
         results.append((before, after))
     world["preserved"] = results

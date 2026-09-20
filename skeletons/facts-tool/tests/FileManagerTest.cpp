@@ -101,10 +101,58 @@ int main(int argc, char **argv) {
   sqlite3_close(database);
 
   const auto sourceOnly =
-      facts::FileManager::openReadOnly(databasePath.string());
+      facts::FileManager::openImported(databasePath.string());
   assert(!sourceOnly);
   assert(sourceOnly.error().contains("project configuration is incomplete"));
   assert(sourceOnly.error().contains("facts-tool import"));
+
+  // A parsing connection must validate an existing import in either mode;
+  // requesting write access must not create or repair the registry.
+  for (const bool writable : {false, true}) {
+    const auto incomplete =
+        facts::FileManager::openImported(databasePath.string(), writable);
+    assert(!incomplete);
+    assert(incomplete.error().contains("project configuration is incomplete"));
+    const auto missing = databasePath.string() + ".missing";
+    std::filesystem::remove(missing);
+    assert(!facts::FileManager::openImported(missing, writable));
+    assert(!std::filesystem::exists(missing));
+  }
+
+  assert(sqlite3_open(databasePath.c_str(), &database) == SQLITE_OK);
+  assert(sqlite3_exec(database,
+                      "UPDATE file SET driver='clang++', compile_options='[]'",
+                      nullptr, nullptr, nullptr) == SQLITE_OK);
+  sqlite3_close(database);
+  assert(first.markRegistryComplete("imported"));
+  {
+    auto readOnly = facts::FileManager::openImported(databasePath.string());
+    auto writable = facts::FileManager::openImported(databasePath.string(), true);
+    assert(readOnly && writable);
+    assert((*readOnly)->getId(header.string()) == firstHeader);
+    assert((*writable)->getId(header.string()) == firstHeader);
+    const auto rejected = (*readOnly)->markRegistryComplete("must-not-write");
+    assert(!rejected && rejected.error().value() == SQLITE_READONLY);
+    assert((*writable)->markRegistryComplete("cache-enabled"));
+  }
+  const auto storedRegistry = first.registryStatus();
+  assert(storedRegistry && storedRegistry->fingerprint == "cache-enabled");
+  assert(first.fileCount() == 2);
+
+  const auto outdatedPath = databasePath.string() + ".outdated";
+  std::filesystem::copy_file(databasePath, outdatedPath,
+                             std::filesystem::copy_options::overwrite_existing);
+  assert(sqlite3_open(outdatedPath.c_str(), &database) == SQLITE_OK);
+  assert(sqlite3_exec(database,
+                      "UPDATE project_registry SET schema_version=1 WHERE id=1",
+                      nullptr, nullptr, nullptr) == SQLITE_OK);
+  for (const bool writable : {false, true}) {
+    const auto outdated =
+        facts::FileManager::openImported(outdatedPath, writable);
+    assert(!outdated && outdated.error().contains("outdated"));
+  }
+  assert(scalar(database, "SELECT schema_version FROM project_registry") == 1);
+  sqlite3_close(database);
 
   const auto additivePath = databasePath.string() + ".working-directory";
   std::filesystem::remove(additivePath);
@@ -140,6 +188,17 @@ int main(int argc, char **argv) {
                            SQLITE_TRANSIENT) == SQLITE_OK);
   assert(sqlite3_step(legacyInsert) == SQLITE_DONE);
   sqlite3_finalize(legacyInsert);
+  sqlite3_close(legacyDatabase);
+
+  for (const bool writable : {false, true}) {
+    const auto invalid =
+        facts::FileManager::openImported(legacyPath, writable);
+    assert(!invalid && invalid.error().contains("not a project configuration"));
+  }
+  assert(sqlite3_open(legacyPath.c_str(), &legacyDatabase) == SQLITE_OK);
+  assert(scalar(legacyDatabase,
+                "SELECT COUNT(*) FROM pragma_table_info('file') "
+                "WHERE name='path'") == 1);
   sqlite3_close(legacyDatabase);
 
   facts::FileManager migrated(legacyPath);

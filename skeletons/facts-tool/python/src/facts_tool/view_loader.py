@@ -1,24 +1,25 @@
 import sqlite3
+from collections.abc import Callable, Iterator
 
 from .errors import fail
 from .paths import FileResolver
 from .rows import Row
 from .view_details import (
-    load_definitions,
-    load_enumerations,
-    load_enumerators,
-    load_initializers,
-    load_return_types,
+    iter_definitions,
+    iter_enumerations,
+    iter_enumerators,
+    iter_initializers,
+    iter_return_types,
 )
-from .view_edges import load_edges, load_sites
-from .view_evidence import load_expression_occurrences, load_source_regions
+from .view_edges import iter_edges, iter_sites
+from .view_evidence import iter_expression_occurrences, iter_source_regions
 from .view_parameters import (
-    load_parameters,
-    load_template_arguments,
-    load_template_parameters,
+    iter_parameters,
+    iter_template_arguments,
+    iter_template_parameters,
 )
-from .view_project import load_project
-from .view_symbols import load_symbols
+from .view_project import iter_project
+from .view_symbols import iter_symbols
 
 
 class ViewLoader:
@@ -27,30 +28,33 @@ class ViewLoader:
         self.files = FileResolver(project)
 
     def load(self, view: str) -> list[Row]:
+        return list(self.iter(view))
+
+    def iter(self, view: str) -> Iterator[Row]:
         if (
             view in {"expression_occurrence", "source_region"}
             and self.facts.execute("PRAGMA user_version").fetchone()[0] < 13
         ):
             fail("E_CAPABILITY", f"{view} requires facts schema 13")
-        functions = {
-            "symbol": lambda: load_symbols(self.facts, self.files),
-            "parameter": lambda: load_parameters(self.facts, self.files),
-            "template_parameter": lambda: load_template_parameters(self.facts),
-            "template_argument": lambda: load_template_arguments(self.facts),
-            "edge": lambda: load_edges(self.facts),
-            "site": lambda: load_sites(self.facts, self.files),
-            "definition": lambda: load_definitions(self.facts, self.files),
-            "enumeration": lambda: load_enumerations(self.facts),
-            "enumerator": lambda: load_enumerators(self.facts),
-            "initializer": lambda: load_initializers(self.facts),
-            "return_type": lambda: load_return_types(self.facts),
-            "expression_occurrence": lambda: load_expression_occurrences(
+        functions: dict[str, Callable[[], Iterator[Row]]] = {
+            "symbol": lambda: iter_symbols(self.facts, self.files),
+            "parameter": lambda: iter_parameters(self.facts, self.files),
+            "template_parameter": lambda: iter_template_parameters(self.facts),
+            "template_argument": lambda: iter_template_arguments(self.facts),
+            "edge": lambda: iter_edges(self.facts),
+            "site": lambda: iter_sites(self.facts, self.files),
+            "definition": lambda: iter_definitions(self.facts, self.files),
+            "enumeration": lambda: iter_enumerations(self.facts),
+            "enumerator": lambda: iter_enumerators(self.facts),
+            "initializer": lambda: iter_initializers(self.facts),
+            "return_type": lambda: iter_return_types(self.facts),
+            "expression_occurrence": lambda: iter_expression_occurrences(
                 self.facts, self.files
             ),
-            "source_region": lambda: load_source_regions(self.facts, self.files),
+            "source_region": lambda: iter_source_regions(self.facts, self.files),
         }
         if view in {"repository", "clone", "component", "directory", "file"}:
-            return load_project(self.project, view, self.files)
+            return iter_project(self.project, view, self.files)
         if view not in functions:
             fail("E_VIEW", f"unsupported view {view!r}")
         return functions[view]()

@@ -1,0 +1,46 @@
+parameters:
+  - name: id
+    in: path
+    required: true
+    description: Server-local job identifier returned by submission.
+    schema: {type: string, minLength: 1}
+    example: '1'
+get:
+  operationId: getJob
+  tags: [jobs]
+  summary: Read job state and structured result
+  description: |
+    Poll until state is succeeded, failed, or cancelled. Domain operations expose
+    a structured result or error. Deprecated CLI jobs retain captured stdout,
+    stderr and exit_code. Job failures remain successful HTTP reads.
+  responses:
+    '200':
+      description: Current state and output of a retained job.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/JobSnapshot'
+    '404':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'
+delete:
+  operationId: cancelJob
+  tags: [jobs]
+  summary: Request cancellation of a retained job
+  description: |
+    Queued jobs become cancelled immediately. Running domain operations return
+    HTTP 409 cannot_cancel_running and finish safely. Running legacy CLI jobs
+    receive process-group termination and may remain running until reaped.
+    Completed jobs return unchanged. This retains rather than deletes records.
+  responses:
+    '200':
+      description: Current job state after the cancellation request.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/JobSnapshot'
+    '404':
+      $ref: '../openapi.yaml#/components/responses/Error'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

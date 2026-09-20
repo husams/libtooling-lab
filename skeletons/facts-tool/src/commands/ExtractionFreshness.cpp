@@ -18,7 +18,7 @@ std::string normalizedPath(std::string_view path) {
 // partitionSources can hand that same observation to the marking stage
 // instead of stat'ing the file a second time later.
 struct FileObservation {
-  bool upToDate;
+  std::optional<std::string_view> reason;
   std::optional<double> mtime;
 };
 
@@ -33,15 +33,16 @@ FileObservation checkFile(FileManager &files,
     // ends up stale regardless), so skip the registry lookup and git commit
     // resolution that only exist to compute it; only the mtime is needed,
     // to record what this run actually observed on disk.
-    return {false, mtime};
+    return {"forced", mtime};
   }
   auto state = files.indexState(file);
+  if (!state)
+    return {"index-state-unavailable", mtime};
   FreshnessObservation observation;
   observation.factsDb = normalizedOutput;
   observation.mtime = mtime;
   observation.gitCommit = resolver.commitFor(absoluteFile);
-  const bool upToDate = state && isUpToDate(*state, observation);
-  return {upToDate, mtime};
+  return {staleReason(*state, observation), mtime};
 }
 
 } // namespace
@@ -58,14 +59,20 @@ std::optional<double> currentMtime(const std::filesystem::path &file) {
 
 bool isUpToDate(const FileIndexState &state,
                 const FreshnessObservation &observation) {
+  return !staleReason(state, observation);
+}
+
+std::optional<std::string_view>
+staleReason(const FileIndexState &state,
+            const FreshnessObservation &observation) {
   // Rule 1: indexed, into the same facts database this run would write.
-  if (!state.indexed || state.factsDb.empty() ||
-      state.factsDb != observation.factsDb) {
-    return false;
-  }
+  if (!state.indexed || state.factsDb.empty())
+    return "not-indexed";
+  if (state.factsDb != observation.factsDb)
+    return "facts-database-changed";
   // Rule 2: the same git commit, where "both NULL" counts as the same.
   if (state.gitCommit != observation.gitCommit) {
-    return false;
+    return "git-commit-changed";
   }
   // Rule 3: the current mtime exactly matches the recorded one.
   // indexed_at is recorded metadata only and plays no part in this
@@ -74,9 +81,11 @@ bool isUpToDate(const FileIndexState &state,
   // same-second edit on a coarse-timestamp filesystem is still caught
   // because the comparison is exact equality, not merely "not older".
   if (!observation.mtime || !state.mtime) {
-    return false;
+    return "mtime-unavailable";
   }
-  return *observation.mtime == *state.mtime;
+  if (*observation.mtime != *state.mtime)
+    return "mtime-changed";
+  return std::nullopt;
 }
 
 PartitionedSources
@@ -111,7 +120,7 @@ partitionSources(FileManager &files, config::GitCommitResolver &resolver,
         included != includedBySource.end() ? included->second : singleton;
     // --force still observes every file's mtime below (so the index state
     // this run records afterwards reflects reality rather than a stale
-    // pre-parse stat); checkFile itself already returns upToDate=false for
+    // pre-parse stat); checkFile itself already returns reason="forced" for
     // every file once force is set, without doing the registry/git lookups
     // that verdict would otherwise need, so the fold below needs no special
     // case of its own.
@@ -121,7 +130,11 @@ partitionSources(FileManager &files, config::GitCommitResolver &resolver,
       if (observation.mtime) {
         result.observedMtime[file] = *observation.mtime;
       }
-      upToDate = upToDate && observation.upToDate;
+      if (upToDate && observation.reason) {
+        result.staleReasons.emplace(
+            source, SourceStaleness{file, *observation.reason});
+        upToDate = false;
+      }
     }
     if (upToDate) {
       result.upToDate.push_back(source);

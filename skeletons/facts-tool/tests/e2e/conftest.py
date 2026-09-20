@@ -1,13 +1,44 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
 from support.scenario import FactsToolContext
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 pytest_plugins = (
+    "steps.rest_domain_setup_steps",
+    "steps.rest_domain_symbol_steps",
+    "steps.rest_domain_extraction_steps",
+    "steps.rest_domain_analysis_steps",
+    "steps.rest_domain_async_steps",
+    "steps.rest_domain_clone_steps",
+    "steps.rest_domain_diagnostics_steps",
+    "steps.rest_domain_cancel_steps",
+    "steps.rest_domain_matcher_steps",
+    "steps.rest_domain_clone_identity_steps",
+    "steps.rest_domain_header_steps",
+    "steps.watch_catalog_setup_steps",
+    "steps.watch_catalog_assert_steps",
+    "steps.watch_catalog_git_steps",
+    "steps.watch_catalog_changes_steps",
+    "steps.watch_catalog_registration_steps",
+    "steps.watch_catalog_recovery_steps",
+    "steps.watch_catalog_provenance_steps",
+    "steps.rest_setup_steps",
+    "steps.rest_access_steps",
+    "steps.rest_openapi_steps",
+    "steps.rest_logging_steps",
+    "steps.rest_logging_options_steps",
+    "steps.rest_job_steps",
+    "steps.rest_cancel_steps",
+    "steps.rest_lifecycle_steps",
+    "steps.rest_watch_steps",
     "steps.ast_cache_steps",
+    "steps.ast_cache_project_access_steps",
     "steps.ast_cache_import_commands_steps",
     "steps.ast_cache_selector_steps",
     "steps.ast_cache_relative_command_steps",
@@ -113,6 +144,7 @@ pytest_plugins = (
     "steps.catalog_registration_steps",
     "steps.catalog_file_symbol_steps",
     "steps.project_import_steps",
+    "steps.import_incremental_sources_steps",
     "steps.import_colliding_relative_sources_steps",
     "steps.import_multiple_repositories_steps",
     "steps.import_shared_clones_steps",

@@ -31,6 +31,7 @@ struct PersistedSymbol {
 
 void appendMatchedIndex(std::vector<MatchedSymbol> &matched,
                         PersistedSymbol symbol);
+bool supportsSymbol(const clang::NamedDecl &node);
 
 std::expected<PersistedSymbol, std::string>
 persistSymbol(const clang::NamedDecl &node, clang::ASTContext &context,

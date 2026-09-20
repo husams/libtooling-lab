@@ -1,5 +1,7 @@
 # Importing compile commands
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `import` is how compile commands - the exact compiler, flags, and working
 directory used to build each source file - get into the project database.
 Every later `extract`, `match`, or `analyse` run against a source file
@@ -123,6 +125,17 @@ their paths are unchanged; each source keeps one compile-command entry,
 with the latest imported compiler options replacing the previous options.
 A repository-name change that conflicts with another registered repository
 is rejected without changing the project records.
+
+Imports are additive within a repository too. Importing one source updates
+only that source's command; previously imported sources keep their compiler,
+working directory, options, and index state. This applies to source selectors,
+fixed-command imports, and separate compilation databases containing subsets
+of the repository. Omitting a source from a later compilation database does
+not remove its stored command. Reimporting a listed source replaces its
+command in place and invalidates its index state only if that command changed.
+
+If an older version cleared commands during partial imports, reimport the
+affected sources or their compilation database once to restore those commands.
 
 `-f`/`--facts` on `import` exists specifically for **re-import** of an
 existing, non-empty project: an existing non-empty project without an

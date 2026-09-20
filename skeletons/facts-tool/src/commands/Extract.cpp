@@ -1,4 +1,6 @@
+#include "model/AnalysisDiagnostic.h"
 #include "commands/Extract.h"
+#include "storage/astcache/Database.h"
 
 #include "commands/CompilationDatabase.h"
 #include "commands/ConfigurationSupport.h"
@@ -8,6 +10,7 @@
 #include "commands/ExtractionSetup.h"
 #include "commands/ExtractTranslationUnits.h"
 #include "commands/FactPairValidation.h"
+#include "commands/RefreshCloneFacts.h"
 
 #include "ast/Indexing.h"
 #include "cli/Verbose.h"
@@ -47,7 +50,7 @@ bool timingsEnabled() {
 }
 
 void reportTiming(std::string_view phase, TimingClock::time_point started) {
-  if (!timingsEnabled()) {
+  if (!timingsEnabled() || embeddedAnalysis()) {
     return;
   }
   const auto elapsed =
@@ -58,7 +61,7 @@ void reportTiming(std::string_view phase, TimingClock::time_point started) {
 
 template <typename Operation>
 decltype(auto) timePhase(std::string_view phase, Operation &&operation) {
-  if (!timingsEnabled()) {
+  if (!timingsEnabled() || embeddedAnalysis()) {
     return std::invoke(std::forward<Operation>(operation));
   }
 
@@ -174,9 +177,10 @@ recordIndexState(const cli::ExtractOptions &options,
 }
 
 std::expected<int, std::string> extract(const cli::ExtractOptions &options,
-                                        CompilationDatabasePtr database) {
+                                        CompilationDatabasePtr database, bool reportProgress) {
   auto opened = runExtractStage(options, "open project database", [&] {
-    return FileManager::openReadOnly(options.configuration, options.verbosity);
+    return FileManager::openImported(options.configuration,
+                                     options.astCache.enabled, options.verbosity);
   });
   if (!opened) {
     return std::expected<int, std::string>{std::unexpected(opened.error())};
@@ -210,14 +214,23 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
             });
         for (const auto &source : partitioned.upToDate) {
           cli::logVerbose(options.verbosity, 2,
-                          "facts-tool: extract: skip up-to-date source={}",
+                          "facts-tool: extract: extraction skipped source={} "
+                          "reason=up-to-date",
                           source);
+        }
+        for (const auto &source : partitioned.stale) {
+          const auto &stale = partitioned.staleReasons.at(source);
+          cli::logVerbose(options.verbosity, 2,
+                          "facts-tool: extract: extraction required source={} "
+                          "reason={} file={}",
+                          source, stale.reason, stale.file);
         }
         cli::logVerbose(options.verbosity, 1,
                         "facts-tool: extract: up_to_date={} stale={}",
                         partitioned.upToDate.size(), partitioned.stale.size());
         if (partitioned.stale.empty()) {
-          std::cerr << "facts-tool: " << sources.size()
+          if (reportProgress)
+            std::cerr << "facts-tool: " << sources.size()
                     << " source(s) up to date; nothing to extract\n";
           return std::expected<int, std::string>{0};
         }
@@ -257,6 +270,29 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
           return std::expected<int, std::string>{std::unexpected(
               "cannot begin output transaction: " + started.error().message())};
         }
+        auto refreshed = refreshCloneFacts(
+            store, *pairing, files, filesToMark(stale, discovered.perSource));
+        if (!refreshed) {
+          (void)store.rollback();
+          return std::expected<int, std::string>{std::unexpected(refreshed.error())};
+        }
+        std::vector<FileId> selected;
+        selected.reserve(stale.size());
+        for (const auto &source : stale) {
+          auto id = files.getId(source);
+          if (!id) {
+            (void)store.rollback();
+            return std::expected<int, std::string>{std::unexpected(
+                "cannot resolve extracted source: " + id.error().message())};
+          }
+          selected.push_back(*id);
+        }
+        auto replacing = store.beginSymbolRefresh(selected);
+        if (!replacing) {
+          (void)store.rollback();
+          return std::expected<int, std::string>{std::unexpected(
+              "cannot start symbol refresh: " + replacing.error().message())};
+        }
         const auto toolResult =
             runExtractStage(options, "extract facts from AST", [&] {
               return extractTranslationUnits(**configured, stale, files, store,
@@ -266,16 +302,11 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
                             : indexing.complete() ? 0
                                                   : 1;
         if (result == 0) {
-          std::vector<FileId> selected;
-          selected.reserve(stale.size());
-          for (const auto &source : stale) {
-            auto id = files.getId(source);
-            if (!id) {
-              (void)store.rollback();
-              return std::expected<int, std::string>{std::unexpected(
-                  "cannot resolve extracted source: " + id.error().message())};
-            }
-            selected.push_back(*id);
+          auto replaced = store.finishSymbolRefresh();
+          if (!replaced) {
+            (void)store.rollback();
+            return std::expected<int, std::string>{std::unexpected(
+                "cannot finish symbol refresh: " + replaced.error().message())};
           }
           auto registered =
               registerFactPairProvenance(store, *pairing, selected);
@@ -305,6 +336,10 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
                                   commitResolver);
         });
         if (!recorded) {
+          collectDiagnostic({"warning", "index state not recorded: " +
+                                        recorded.error().message, ""});
+        }
+        if (!recorded && reportProgress) {
           // The facts are already committed at this point; recording is
           // purely an optimization for a later extract, so any failure --
           // including a transient SQLITE_BUSY -- is a warning, not a
@@ -319,7 +354,7 @@ std::expected<int, std::string> extract(const cli::ExtractOptions &options,
 } // namespace
 
 std::expected<int, std::string>
-runExtractResolved(const cli::ExtractOptions &options) {
+runExtractResolved(const cli::ExtractOptions &options, bool reportProgress) {
   return runExtractStage(options, "validate database paths",
                          [&] {
                            return validateDatabasePaths(options.output,
@@ -345,10 +380,10 @@ runExtractResolved(const cli::ExtractOptions &options) {
         });
       })
       .and_then([&](CompilationDatabasePtr database) {
-        return cli::runStage(options.verbosity, "extract", "extract facts",
+        return cli::runStage(options.verbosity, "extract", "prepare extraction",
                              [&] {
                                return timePhase("extract total", [&] {
-                                 return extract(options, std::move(database));
+                                 return extract(options, std::move(database), reportProgress);
                                });
                              });
       });
@@ -359,6 +394,10 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
                                     options.configurationFile, false, true);
   if (!resolved)
     return std::unexpected(resolved.error());
+  if (options.noAstCache) {
+    auto cleared = storage::astcache::clearSnapshots(resolved->database);
+    if (!cleared) return std::unexpected(cleared.error());
+  }
   auto configured = options;
   if (!configured.outputProvided) {
     auto output = resolveFactsOutput(*resolved, options.sources);
@@ -373,6 +412,7 @@ std::expected<int, std::string> runExtract(const cli::ExtractOptions &options) {
   configured.configuration = resolved->database.string();
   configured.defaultExtraArguments = std::move(resolved->extraArguments);
   configured.astCache = resolved->astCache;
+  if (options.noAstCache) configured.astCache.enabled = false;
   configured.astCache.verbosity = options.verbosity;
   return runExtractResolved(configured);
 }

@@ -1,5 +1,7 @@
 # Concepts and glossary
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 This chapter introduces the vocabulary the rest of the guide assumes.
 Read it once before the extraction and call-graph chapters - several terms
 here (freshness, coverage, completeness, pairing) look like synonyms but are

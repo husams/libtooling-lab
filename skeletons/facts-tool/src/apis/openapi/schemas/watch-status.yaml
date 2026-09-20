@@ -1,0 +1,80 @@
+type: object
+required:
+  - enabled
+  - running
+  - active
+  - pending
+  - scanning
+  - ready
+  - source
+  - project_database
+  - clones
+  - notices
+  - directories
+  - events
+  - cycles
+  - failures
+  - overflows
+  - last_error
+  - latest_jobs
+  - import_mode
+  - backend
+  - watched_directories
+additionalProperties: false
+properties:
+  enabled:
+    type: boolean
+    description: Monitoring was enabled in server configuration.
+  running:
+    type: boolean
+    description: The filesystem monitor is running.
+  active:
+    type: boolean
+    description: A reimport or extraction cycle is in progress.
+  pending:
+    type: boolean
+    description: Changes are waiting for processing.
+  scanning:
+    type: boolean
+    description: A background catalog or filesystem scan is in progress.
+  ready:
+    type: boolean
+    description: The latest scan succeeded without catalog notices.
+  source: {type: string, const: project_database}
+  project_database:
+    type: string
+    description: Resolved project database path; empty before the first snapshot.
+  clones:
+    type: array
+    items:
+      $ref: '../openapi.yaml#/components/schemas/WatchClone'
+  notices:
+    type: array
+    items: {type: string}
+    description: Catalog or filesystem issues that prevent a fully ready snapshot.
+  directories:
+    type: array
+    items: {type: string}
+    description: Eligible clone root directories from the latest catalog snapshot.
+  events: {type: integer, minimum: 0}
+  cycles: {type: integer, minimum: 0}
+  failures: {type: integer, minimum: 0}
+  overflows: {type: integer, minimum: 0}
+  last_error:
+    type: string
+    description: Latest scan or job error, or an empty string.
+  latest_jobs:
+    type: array
+    items: {type: string}
+    description: Job identifiers submitted by the most recent monitor cycle.
+  import_mode:
+    type: string
+    enum: [stored_commands, reimport]
+  backend: {type: string, enum: [inotify, unsupported]}
+  watched_directories:
+    type: integer
+    minimum: 0
+    description: Number of installed inotify directory watches.
+  notice:
+    type: string
+    description: Optional explanation when stored commands replace reimport.

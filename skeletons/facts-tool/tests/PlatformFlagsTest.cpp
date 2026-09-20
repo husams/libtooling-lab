@@ -154,6 +154,7 @@ void testGnuDriverConfiguration(const std::filesystem::path &root) {
        "--gcc-toolchain=/toolchain", "--sysroot=/sysroot", "-stdlib=libstdc++",
        "-isystem", existing.string(), source.string(), "-Werror"},
       "");
+  command = clang::tooling::transferCompileCommand(command, (root / "header.hpp").string());
   auto configured =
       facts::platform::configureCommand(command, resource, std::nullopt);
   assert(configured);
@@ -168,6 +169,11 @@ void testGnuDriverConfiguration(const std::filesystem::path &root) {
   assert(count(arguments, discovered.string()) == 1);
   assert(count(arguments, "-resource-dir") == 1);
   assert(count(arguments, resource.string()) == 1);
+  const auto separator = std::ranges::find(arguments, "--");
+  assert(separator != arguments.end());
+  assert(std::ranges::find(arguments, "-resource-dir") < separator);
+  assert(std::ranges::find(arguments, discovered.string()) < separator);
+  assert(arguments.back() == (root / "header.hpp").string());
 
   std::ofstream(driver, std::ios::trunc) << "#!/bin/sh\nexit 42\n";
   auto changed =

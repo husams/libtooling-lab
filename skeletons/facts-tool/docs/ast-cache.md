@@ -74,6 +74,14 @@ selected by `--conf`, `FACTS_TOOL_CONF`, or the existing configuration rules.
 The facts database keeps its existing role. No JSON metadata file is written
 or parsed.
 
+With caching enabled, extraction, matching, and call-graph recovery open the
+existing imported project registry for read-write access automatically. With
+caching disabled, those registry connections stay read-only. Opening a registry
+for parsing never creates or migrates it: missing, incomplete, or outdated
+registries still require import. Cache metadata uses separate, short read-write
+transactions in the same project database, including for dependency and
+variable-flow analysis. Queries and configuration inspection remain read-only.
+
 Project schema version 2 adds five tables: `ast_cache_snapshot`,
 `ast_cache_input`, `ast_cache_include`, `ast_cache_revision`, and
 `ast_cache_artifact`. They record the compile fingerprint, input paths,

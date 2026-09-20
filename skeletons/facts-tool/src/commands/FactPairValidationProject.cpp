@@ -1,4 +1,5 @@
 #include "commands/FactPairValidationInternal.h"
+#include "commands/FactPairCloneAliases.h"
 
 #include "storage/catalog/File.h"
 
@@ -20,6 +21,8 @@ loadProjectProvenance(const std::string &path) {
     return std::unexpected("cannot read project file registry: " +
                            files.error());
   }
+  auto aliases = loadCloneAliases(*database, *files);
+  if (!aliases) return std::unexpected(aliases.error());
   auto keys = catalog::query(
       *database,
       "SELECT c.id,coalesce(su.key,'legacy') FROM component c LEFT JOIN "
@@ -50,7 +53,8 @@ loadProjectProvenance(const std::string &path) {
     auto key = universes.find(static_cast<FileId>(file.component.id));
     result.emplace(static_cast<FileId>(file.id),
                    Provenance{canonical.string(),
-                              key == universes.end() ? "legacy" : key->second});
+                              key == universes.end() ? "legacy" : key->second,
+                              std::move((*aliases)[static_cast<FileId>(file.id)])});
   }
   return result;
 }

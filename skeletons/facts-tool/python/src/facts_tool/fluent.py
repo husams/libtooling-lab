@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 
 from . import fluent_results
 from .executor import Executor
@@ -61,8 +61,11 @@ class EntityQuery:
     def filter(self, callback: Callable[[Row], bool]) -> "EntityQuery":
         return EntityQuery(self.executor, self._query, (*self._callbacks, callback))
 
-    def run(self) -> Result:
-        return fluent_results.run(self)
+    def run(self, *, lazy: bool | None = None) -> Result:
+        return fluent_results.run(self, lazy=lazy)
+
+    def __iter__(self) -> Iterator[object]:
+        return fluent_results.iter_rows(self)
 
     def all(self) -> list[object]:
         return fluent_results.all_rows(self)

@@ -1,5 +1,7 @@
 # CLI reference
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 Reference for every `facts-tool` subcommand: synopsis, positionals, options,
 exit codes, and one example. All output shown was captured from a real run
 against `$FT/build/facts-tool` (never `~/.local/bin/facts-tool`), trimmed for
@@ -9,10 +11,45 @@ length but not invented. For narrative walkthroughs, see
 [matchers](../03-extracting-facts/03-match-dynamic-matchers.md), and
 [call graphs](../04-call-graphs/01-overview.md).
 
-`facts-tool` has 10 top-level subcommands: `extract`, `import`, `match`,
-`analyse` (3 leaves), `repo` (7 leaves), `component` (6 leaves), `dir` (2
+`facts-tool` provides `extract`, `import`, `match`,
+`analyse` (4 leaves), `repo` (7 leaves), `component` (6 leaves), `dir` (2
 leaves), `file` (6 leaves), `symbol` (5 leaves, one of which - `index` - has
-its own leaf `clear`), and `config` (1 leaf `show`).
+its own leaf `clear`), `config` (1 leaf `show`), and `serve` for the REST server.
+See [Tracing variables](../08-variable-flow/01-tracing-variables.md) for
+`analyse variable-flow` and [Running the server](../09-rest-api/01-running-the-server.md)
+for the complete `serve` options and persistence rules.
+
+## `serve` — REST server and repository monitoring
+
+```sh
+facts-tool serve --server-config /workspace/server.yaml --conf /workspace/project.db
+```
+
+On Linux the server monitors every registered repository's active clone by
+default. The project database supplies the roots and the watcher follows
+repository registrations, removals and active-clone switches while running.
+
+| Flag | Meaning |
+|---|---|
+| `--watch` | Enable database-driven monitoring; takes no directory argument |
+| `--no-watch` | Disable monitoring and preserve configured exclusions |
+| `--debounce-ms N` | Coalesce filesystem events before refresh; default `500` |
+| `--import-arg=VALUE` | Pass an argument token to automatic reimport |
+| `--extract-arg=VALUE` | Pass an argument token to automatic extraction |
+| `--log-file FILE` | Append server events to this file in foreground or daemon mode |
+| `--log-level LEVEL` | `off`, `error`, `warning`, `info`, `debug`, `trace`; default `info` |
+| `-v N`, `--verbose N` | Server level: `0` error, `1` info, `2` debug, `3` trace |
+
+`--watch` and `--no-watch` override and persist `watch.enabled` in the server YAML. Use its
+`watch.exclude_repositories`, `watch.exclude_clones`, `watch.exclude_directories`
+and `watch.exclude_patterns` lists to narrow monitoring and automatic source
+processing. Git ignore rules apply separately for each clone. The old
+`--watch DIR` syntax and saved `watch_directories` list are no longer used.
+See [Repository monitoring](../09-rest-api/03-watching-directories.md) for examples
+and [Running the server](../09-rest-api/01-running-the-server.md) for all options.
+Logging settings use `logging.file` and `logging.level` in that same server YAML.
+CLI values override saved values. Server verbosity and submitted command verbosity
+are separate; see [Logging and verbosity](../09-rest-api/09-logging.md).
 
 ## Exit-code contract
 
@@ -113,6 +150,7 @@ facts-tool extract [OPTIONS] [sources...]
 | `-v`, `--verbose` | `INT [0-3]` | `1` | Verbosity |
 | `--extra-arg` | `ARG` (repeatable) | YAML `extra_args` | Compiler argument, overrides matching YAML options at runtime |
 | `--force` | flag | off | Re-extract sources whose recorded index state is still up to date |
+| `--no-ast-cache` | flag | off | Discard prior project cache metadata and bypass AST/dependency caching; used by directory monitoring for uncommitted edits |
 
 **Exit codes**: standard contract above.
 
@@ -194,7 +232,9 @@ facts-tool import [OPTIONS] [sources...]
 | `-v`, `--verbose` | `INT [0-3]` | `1` | Verbosity |
 | `-p`, `--compilation-database` | `DIR` | none | Directory containing `compile_commands.json` |
 | `--component` | `NAME=PATH` (repeatable) | none | Project component as `name=path` |
+| `--existing-clone` | positive clone ID | none | Reimport into an existing active clone, preserving its repository, label and components; rejects missing/inactive clones and `--component` |
 | `--extra-arg` | `ARG` (repeatable) | YAML `extra_args` | Compiler argument for fixed-command or `compile_commands.json` imports |
+| `--no-ast-cache` | flag | off | Discard prior project cache metadata and bypass AST/dependency caching for this import |
 
 **Exit codes**: standard contract above.
 

@@ -1,4 +1,5 @@
 #include "cli/CommandLine.h"
+#include "cli/CommandCatalog.h"
 #include "cli/CallGraphCommandLine.h"
 #include "cli/ConfigurationOptions.h"
 #include "cli/Dispatch.h"
@@ -56,6 +57,13 @@ public:
         "show",
         "Show resolved YAML defaults (yaml-cpp 0.9.0) and ordered discovery");
     configurationOptions(show, config_.direct, config_.configurationFile);
+    app_.add_subcommand("serve", "Run the asynchronous REST API (see serve --help)");
+  }
+
+  std::vector<std::string> commandPaths() const {
+    std::vector<std::string> result;
+    collectCommandPaths(app_, "", result);
+    return result;
   }
 
   std::expected<Command, int> parse(int argc, char **argv) {
@@ -130,6 +138,8 @@ private:
     command.add_flag(
         "--force", extract_.force,
         "Re-extract sources whose recorded index state is still up to date");
+    command.add_flag("--no-ast-cache", extract_.noAstCache,
+                     "Discard project cache metadata and parse current working-tree files");
     command.add_option(
         "sources", extract_.sources,
         "Source files to extract; defaults to all imported files");
@@ -137,6 +147,11 @@ private:
 
   void configureImport(CLI::App &command) {
     importCommand_ = &command;
+    command.add_option("--existing-clone", import_.existingClone,
+                       "Reimport into this active clone without changing its identity")
+        ->check(CLI::PositiveNumber);
+    command.add_flag("--no-ast-cache", import_.noAstCache,
+                     "Discard project cache metadata and discover current working-tree files");
     configureVerbosity(command, import_.verbosity);
     command
         .add_option_function<std::string>(
@@ -320,5 +335,7 @@ int run(int argc, char **argv) {
   auto command = Parser{}.parse(argc, argv);
   return command ? dispatch(std::move(*command)) : command.error();
 }
+
+std::vector<std::string> commandPaths() { return Parser{}.commandPaths(); }
 
 } // namespace facts::cli

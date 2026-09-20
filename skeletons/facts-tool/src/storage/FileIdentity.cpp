@@ -1,4 +1,5 @@
 #include "storage/FileIdentity.h"
+#include "storage/CloneContext.h"
 
 #include "storage/Sqlite.h"
 
@@ -50,7 +51,8 @@ std::optional<ProjectClone> readClone(sqlite3_stmt *statement) {
 
 ProjectComponent materializeComponentRoot(sqlite3_stmt *statement) {
   auto component = readComponent(statement);
-  component.path = effectiveComponentRoot(component, readClone(statement));
+  component.path = effectiveComponentRoot(
+      component, invocationClone(component.repositoryId, readClone(statement)));
   component.version.reset();
   component.repositoryId.reset();
   return component;

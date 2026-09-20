@@ -25,13 +25,24 @@ with open_codebase(facts_db=facts, project_db=project) as cb:
 
 `EntityQuery` is lazy and immutable. Its `nodes`, `where`, `view`, `relation`,
 `select`, `order_by`, and `limit` methods add portable stages; `plan` and
-`to_plan()` expose the same `QueryPlan`. `run`, `all`, `names`, `count`, and
-`first` execute it.
+`to_plan()` expose the same `QueryPlan`. `run(lazy=None)` inherits the codebase's
+lazy default and accepts an explicit override. Iterating the query yields typed
+entities for node results and dictionaries for projected rows. `all()` and
+`names()` eagerly return lists; `count()` returns a scalar and `first()` returns
+one item or `None`.
+
+```python
+with open_codebase(facts_db=facts, project_db=project) as cb:
+    for callee in cb.query("app::run").relation("calls"):
+        print(callee.name)
+    saved = cb.query("app::run").relation("calls").run(lazy=False)
+```
 
 `filter(callable)` is explicitly local Python behavior. The callback is stored
 outside the plan, runs after the shared executor, and never appears in
-canonical JSON or a portable IR. Use predicate constructors for serializable
-behavior.
+canonical JSON or a portable IR. In lazy mode it runs one row at a time as the
+result is consumed. Use predicate constructors for serializable behavior and
+available SQL filtering optimizations.
 
 Schema13 expression and bounded source APIs are described in
 [evidence-api.md](evidence-api.md); they preserve immutable `Result`

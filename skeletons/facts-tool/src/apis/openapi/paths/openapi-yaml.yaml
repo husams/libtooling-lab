@@ -1,0 +1,16 @@
+get:
+  operationId: openapiYaml
+  tags: [discovery]
+  summary: Download the active OpenAPI contract as YAML
+  description: |
+    Readable, self-contained YAML equivalent to GET /openapi.json. Download
+    it for Swagger-compatible editors and generators. Browser-origin requests
+    to this server are rejected even when a Swagger page displays the contract.
+  responses:
+    '200':
+      description: The active OpenAPI document serialized as YAML.
+      content:
+        application/yaml:
+          schema: {type: string}
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

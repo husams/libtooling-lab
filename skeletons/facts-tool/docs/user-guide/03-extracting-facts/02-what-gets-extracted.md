@@ -1,5 +1,7 @@
 # What Gets Extracted
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `extract` records symbols, their qualifiers, and the relations between them.
 This chapter describes exactly what shows up in the facts database, how
 identity works across translation units, and what is deliberately left out.

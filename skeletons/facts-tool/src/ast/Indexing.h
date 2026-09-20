@@ -1,3 +1,4 @@
+#include "model/AnalysisDiagnostic.h"
 #ifndef FACTS_TOOL_AST_INDEXING_H
 #define FACTS_TOOL_AST_INDEXING_H
 
@@ -73,7 +74,8 @@ public:
     ++failureCount_;
     const auto &error = result.error();
     const auto &key = error.category.empty() ? error.message : error.category;
-    if (reported_.insert(key).second && report_) {
+    if (reported_.insert(key).second && report_ &&
+        !collectDiagnostic({"error", "indexing incomplete: " + error.message, ""})) {
       llvm::errs() << "facts-tool: indexing incomplete: " << error.message
                    << '\n';
     }

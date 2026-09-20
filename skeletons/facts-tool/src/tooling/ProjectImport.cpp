@@ -346,32 +346,44 @@ prepareCommands(const clang::tooling::CompilationDatabase &database,
     return std::unexpected("compilation database contains no commands");
   }
 
-  ProjectConfiguration configuration;
-  const auto root = selectProjectRoot(commands);
-  configuration.activeClone.path = root.canonical.string();
-  // The active clone's own git identity (origin remote, or the
-  // alphabetically-first remote) wins over the directory-basename fallback,
-  // but an explicit option always wins over both.
-  const auto identity = config::repositoryIdentity(configuration.activeClone.path);
-  configuration.repositoryName =
-      !options.repositoryName.empty() ? options.repositoryName
-      : identity                     ? identity->name
-                                      : cloneBasename(configuration.activeClone.path);
-  configuration.remoteUrl = !options.remoteUrl.empty() ? options.remoteUrl
-                            : identity                 ? identity->remoteUrl
-                                                        : std::string{};
-  configuration.activeClone.label =
-      !options.cloneLabel.empty() ? options.cloneLabel
-                                  : cloneBasename(configuration.activeClone.path);
-  configuration.components = options.components;
+  ProjectConfiguration configuration = options.identity.value_or(ProjectConfiguration{});
+  const auto root = options.identity
+      ? ProjectRoot{configuration.activeClone.path,
+                    normalizeCompilationPath(configuration.activeClone.path)}
+      : selectProjectRoot(commands);
+  if (!options.identity) {
+    configuration.activeClone.path = root.canonical.string();
+    // The active clone's own git identity (origin remote, or the
+    // alphabetically-first remote) wins over the directory-basename fallback,
+    // but an explicit option always wins over both.
+    const auto identity = config::repositoryIdentity(configuration.activeClone.path);
+    configuration.repositoryName =
+        !options.repositoryName.empty() ? options.repositoryName
+        : identity                     ? identity->name
+                                        : cloneBasename(configuration.activeClone.path);
+    configuration.remoteUrl = !options.remoteUrl.empty() ? options.remoteUrl
+                              : identity                 ? identity->remoteUrl
+                                                          : std::string{};
+    configuration.activeClone.label =
+        !options.cloneLabel.empty() ? options.cloneLabel
+                                    : cloneBasename(configuration.activeClone.path);
+    configuration.components = options.components;
+    if (configuration.components.empty()) {
+      configuration.components.push_back(ProjectComponent{
+          .name = configuration.repositoryName, .path = ".", .kind = "repo"});
+    }
+    for (auto &component : configuration.components) {
+      component =
+          normalizeComponent(std::move(component), configuration.activeClone);
+      component.repositoryId = 1;
+    }
+  }
+  // A repository may be registered before its first compilation import.
+  // Preserve its identity while creating the normal root component once.
   if (configuration.components.empty()) {
     configuration.components.push_back(ProjectComponent{
-        .name = configuration.repositoryName, .path = ".", .kind = "repo"});
-  }
-  for (auto &component : configuration.components) {
-    component =
-        normalizeComponent(std::move(component), configuration.activeClone);
-    component.repositoryId = 1;
+        .name = configuration.repositoryName, .path = ".", .kind = "repo",
+        .repositoryId = configuration.activeClone.repositoryId});
   }
 
   std::map<std::string, PreparedCommand> selected;

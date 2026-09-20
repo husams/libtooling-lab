@@ -1,6 +1,7 @@
 #include "tooling/StoredCompilationReader.h"
 
 #include "storage/ProjectConfiguration.h"
+#include "storage/CloneContext.h"
 #include "storage/Sqlite.h"
 #include "tooling/CompilationCommandCodec.h"
 
@@ -42,11 +43,17 @@ std::filesystem::path componentRoot(sqlite3_stmt *statement) {
       clonePath.empty()
           ? std::optional<ProjectClone>{}
           : std::optional<ProjectClone>{ProjectClone{.path = clonePath}};
-  return effectiveComponentRoot(component, clone);
+  return effectiveComponentRoot(
+      component, invocationClone(component.repositoryId, clone));
 }
 
 StoredCompileFile storedCompileFile(sqlite3_stmt *statement) {
   auto root = componentRoot(statement);
+  const auto selected = invocationClone(
+      sqlite3_column_type(statement, 4) == SQLITE_NULL
+          ? std::nullopt
+          : std::optional<std::int64_t>{sqlite3_column_int64(statement, 4)},
+      std::nullopt);
   return {root,
           (root / storage::columnText(statement, 6) /
            storage::columnText(statement, 7))
@@ -55,7 +62,10 @@ StoredCompileFile storedCompileFile(sqlite3_stmt *statement) {
           storage::columnText(statement, 8),
           storage::columnText(statement, 9),
           storage::columnText(statement, 10),
-          static_cast<FileId>(sqlite3_column_int64(statement, 11))};
+          static_cast<FileId>(sqlite3_column_int64(statement, 11)),
+          selected ? CompilePathRemapping{storage::columnText(statement, 5),
+                                         selected->path}
+                   : CompilePathRemapping{}};
 }
 
 std::expected<std::vector<StoredCompilationComponent>, std::string>

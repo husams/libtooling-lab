@@ -1,0 +1,23 @@
+type: object
+required: [operation, file, complete, facts_committed, edge_count, edges]
+additionalProperties: false
+properties:
+  operation: {type: string, const: dependencies}
+  file:
+    $ref: resolved-file.yaml
+  diagnostics:
+    $ref: diagnostics.yaml
+  complete: {type: boolean}
+  facts_committed: {type: boolean}
+  edge_count: {type: integer, minimum: 0}
+  edges:
+    type: array
+    items:
+      type: object
+      required: [source_file_id, destination_file_id, source_path, destination_path]
+      additionalProperties: false
+      properties:
+        source_file_id: {type: integer, format: int64}
+        destination_file_id: {type: integer, format: int64}
+        source_path: {type: string}
+        destination_path: {type: string}

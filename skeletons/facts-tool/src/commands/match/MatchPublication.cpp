@@ -16,13 +16,26 @@ bool combined(const cli::MatchOptions &options) {
 }
 
 catalog::Result<void> publish(const std::string &path,
-                              std::span<const MatchedSymbol> symbols) {
+                              std::span<const MatchedSymbol> symbols,
+                              const std::string &facts,
+                              std::span<const FileId> selected) {
   return catalog::open(path, true).and_then([&](catalog::Database database) {
     return database.write()
         .transform_error([](auto error) { return error.message(); })
         .and_then([&](storage::Transaction transaction) {
           return storage::upsertMatchedSymbols(database, symbols)
               .transform_error([](auto error) { return error.message(); })
+              .and_then([&] {
+                return database.executeBulk(
+                    "UPDATE file SET indexed=CASE WHEN facts_db=?1 THEN indexed ELSE 0 END, "
+                    "facts_db=?1 WHERE id=?2", selected,
+                    [&](sqlite3_stmt *statement, FileId id) {
+                      return storage::bindText(statement, 1,
+                          std::filesystem::absolute(facts).lexically_normal().string()) &&
+                             storage::bindInteger(statement, 2, id);
+                    }).transform_error([](auto error) { return error.message(); })
+                      .transform([](auto) {});
+              })
               .and_then([&] {
                 return transaction.commit().transform_error(
                     [](auto error) { return error.message(); });
@@ -65,7 +78,8 @@ Result finishMatch(FactStore &store, const cli::MatchOptions &options,
     return std::unexpected("cannot finish facts transaction: " +
                            finished.error().message());
   if (!combined(options) && !symbols.empty()) {
-    if (auto indexed = publish(options.configuration, symbols); !indexed)
+    if (auto indexed = publish(options.configuration, symbols, options.facts, selected);
+        !indexed)
       return std::unexpected("match-index-write-failed "
                              "{facts_committed:true,index_committed:false}: " +
                              indexed.error());

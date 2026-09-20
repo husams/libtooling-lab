@@ -1,0 +1,70 @@
+get:
+  operationId: findSymbols
+  tags:
+  - symbols
+  summary: Find a symbol by its exact fully qualified name
+  description: |
+    Searches the server's persistent project-wide index across all repositories
+    and source files. Optional filters narrow the result. Overloads and symbols
+    defined in several files remain distinct. Database paths are server owned.
+    Reuse the same filters and limit when following next_cursor.
+  parameters:
+  - name: qualified_name
+    in: query
+    required: true
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+      x-max-utf8-bytes: 4096
+  - name: kind
+    in: query
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+      x-max-utf8-bytes: 4096
+  - name: usr
+    in: query
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+      x-max-utf8-bytes: 4096
+  - name: repo
+    in: query
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+      x-max-utf8-bytes: 4096
+  - name: component
+    in: query
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+      x-max-utf8-bytes: 4096
+  - name: limit
+    in: query
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 500
+      default: 50
+  - name: cursor
+    in: query
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 256
+      x-max-utf8-bytes: 256
+  responses:
+    '200':
+      description: One page from the last completed global index.
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/SymbolPage
+    default:
+      $ref: ../openapi.yaml#/components/responses/Error

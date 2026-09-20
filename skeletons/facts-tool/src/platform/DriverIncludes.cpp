@@ -2,6 +2,7 @@
 #include "platform/DriverProbeKey.h"
 #include "storage/driverprobe/Database.h"
 #include "tooling/FrontendActivity.h"
+#include "tooling/CommandArguments.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -316,8 +317,7 @@ appendIncludes(clang::tooling::CompileCommand command,
   for (const auto &include : includes) {
     const auto value = include.string();
     if (std::ranges::find(existing, value) == existing.end()) {
-      command.CommandLine.insert(command.CommandLine.end(),
-                                 {"-isystem", value});
+      appendCommandOptions(command.CommandLine, {"-isystem", value});
       existing.push_back(value);
     }
   }
@@ -335,11 +335,9 @@ configureCommand(clang::tooling::CompileCommand command,
     return std::unexpected("compile command has no target driver: " +
                            command.Filename);
   removeResourceDirectory(command.CommandLine);
-  command.CommandLine.insert(command.CommandLine.end(),
-                             {"-resource-dir", resourceDirectory.string()});
+  appendCommandOptions(command.CommandLine, {"-resource-dir", resourceDirectory.string()});
   if (sdkRoot && !hasSysroot(command.CommandLine))
-    command.CommandLine.insert(command.CommandLine.end(),
-                               {"-isysroot", sdkRoot->string()});
+    appendCommandOptions(command.CommandLine, {"-isysroot", sdkRoot->string()});
   if (!isGnuCxxDriver(command.CommandLine.front()))
     return command;
   return discoverIncludes(command, cache).transform(

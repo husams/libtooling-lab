@@ -1,3 +1,4 @@
+#include "tooling/DiagnosticScope.h"
 #include "tooling/astcache/Cache.h"
 
 #include "storage/astcache/Database.h"
@@ -34,6 +35,7 @@ int parse(const clang::tooling::CompilationDatabase &database,
           detail::RevisionObservations *observations = nullptr) {
   reportFrontendActivity(options.verbosity, "ast-parse", source);
   clang::tooling::ClangTool tool(database, {source});
+  configureDiagnostics(tool);
   if (clearAdjusters)
     tool.clearArgumentsAdjusters();
   if (diagnostics)

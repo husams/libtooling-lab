@@ -1,5 +1,7 @@
 # Workflow: Architecture Analysis
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 ## Goal
 
 Use the Python SDK to build an architecture overview of a codebase you've

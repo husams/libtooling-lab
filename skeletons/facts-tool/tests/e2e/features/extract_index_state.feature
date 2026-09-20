@@ -6,6 +6,9 @@ Feature: Per-file index state recorded by extract
     Given a project with two freshly imported, non-git sources
     When the real facts-tool extracts every source
     Then every extracted file row records indexed=1 with a non-empty timestamp
+    And extraction starts for "alpha.cpp"
+    And extraction starts for "beta.cpp"
+    And extraction is required for "alpha.cpp" because "alpha.cpp" is "not-indexed"
     And every extracted file's facts_db matches the facts database path
     And every extracted file's git_commit is NULL
     And "file show" prints the index state for the first source
@@ -17,6 +20,37 @@ Feature: Per-file index state recorded by extract
     Then the extract exits 0
     And the extract reports up to date with nothing to extract
     And the symbol count is unchanged
+    And extraction is skipped for "alpha.cpp"
+    And extraction is skipped for "beta.cpp"
+    And the extract reports preparation without claiming extraction started
+
+  Scenario: Repeating one explicitly selected source reports its skipped extraction
+    Given a project with two freshly imported, non-git sources
+    When the real facts-tool explicitly extracts "alpha.cpp" at verbosity 2
+    Then extraction starts for "alpha.cpp"
+    And extraction is required for "alpha.cpp" because "alpha.cpp" is "not-indexed"
+    And no extraction decision is logged for "beta.cpp"
+    When the real facts-tool explicitly extracts "alpha.cpp" at verbosity 2
+    Then the extract exits 0
+    And extraction is skipped for "alpha.cpp"
+    And no extraction decision is logged for "beta.cpp"
+    And the extract reports preparation without claiming extraction started
+    And the symbol count is unchanged
+
+  Scenario Outline: Lower verbosity omits per-source extraction decisions
+    Given a project with two freshly imported, non-git sources
+    When the real facts-tool explicitly extracts "alpha.cpp" at verbosity <level>
+    Then the extract exits 0
+    And no per-source extraction decisions are logged
+    When the real facts-tool explicitly extracts "alpha.cpp" at verbosity <level>
+    Then the extract exits 0
+    And no per-source extraction decisions are logged
+    And the symbol count is unchanged
+
+    Examples:
+      | level |
+      | 0     |
+      | 1     |
 
   Scenario: Only the source whose mtime moved is re-extracted
     Given a project with two freshly imported, non-git sources
@@ -24,12 +58,19 @@ Feature: Per-file index state recorded by extract
     And the first source's mtime moves into the future
     And the real facts-tool extracts every source again
     Then the extract reports 1 stale source(s) and 1 up-to-date source(s)
+    And extraction starts for "alpha.cpp"
+    And extraction is required for "alpha.cpp" because "alpha.cpp" is "mtime-changed"
+    And extraction is skipped for "beta.cpp"
 
   Scenario: --force re-extracts every source regardless of index state
     Given a project with two freshly imported, non-git sources
     When the real facts-tool extracts every source
     And the real facts-tool force-extracts every source again
     Then the extract reports 2 stale source(s) and 0 up-to-date source(s)
+    And extraction starts for "alpha.cpp"
+    And extraction starts for "beta.cpp"
+    And extraction is forced for "alpha.cpp"
+    And extraction is forced for "beta.cpp"
 
   Scenario: A git-rooted project records the tracked commit
     Given a git-rooted project with one committed source
@@ -39,6 +80,8 @@ Feature: Per-file index state recorded by extract
     And the real facts-tool extracts the git-rooted project again
     Then the extract reports 1 stale source(s) and 0 up-to-date source(s)
     And the extracted file's git_commit equals the repository's HEAD
+    And extraction starts for "tracked.cpp"
+    And extraction is required for "tracked.cpp" because "tracked.cpp" is "git-commit-changed"
 
   Scenario: Editing an included header re-extracts the including source
     Given a project with a source that includes a header
@@ -47,6 +90,17 @@ Feature: Per-file index state recorded by extract
     And the real facts-tool extracts that source again
     Then the extract reports 1 stale source(s) and 0 up-to-date source(s)
     And the header row's index state is updated too
+    And extraction starts for "gamma.cpp"
+    And extraction is required for "gamma.cpp" because "gamma.h" is "mtime-changed"
+
+  Scenario: Selecting another facts database explains the required extraction
+    Given a project with two freshly imported, non-git sources
+    When the real facts-tool extracts every source
+    And extraction selects another facts database
+    And the real facts-tool explicitly extracts "alpha.cpp" at verbosity 2
+    Then the extract exits 0
+    And extraction starts for "alpha.cpp"
+    And extraction is required for "alpha.cpp" because "alpha.cpp" is "facts-database-changed"
 
   Scenario: A file extracted only into another facts database is still a recovery candidate
     Given an app that calls into a library extracted into one facts database

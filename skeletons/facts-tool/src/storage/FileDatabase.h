@@ -28,9 +28,10 @@ public:
   static std::expected<std::unique_ptr<FileDatabase>, std::string>
   openReadOnly(const std::string &path);
 
-  // Extraction additionally requires at least one stored compile command.
+  // Open an existing, current registry with at least one stored compile
+  // command. Writable access never creates or migrates a database.
   static std::expected<std::unique_ptr<FileDatabase>, std::string>
-  openImportedReadOnly(const std::string &path);
+  openImported(const std::string &path, bool writable = false);
 
   ~FileDatabase();
 
@@ -45,6 +46,7 @@ public:
   addBulk(std::span<const std::string> identities);
   // Refuses with the name of the offending repository, clone, component or
   // file field; storage failures come back as their own message.
+  // Replaces commands for supplied sources; preserves all omitted sources.
   std::expected<void, std::string>
   replaceProjectConfiguration(const ProjectConfiguration &configuration);
   std::expected<void, std::error_code>

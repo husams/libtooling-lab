@@ -1,0 +1,37 @@
+type: object
+required:
+- path
+additionalProperties: false
+description: |
+  Identify a registered source file. Absolute paths may stand alone; relative
+  paths resolve from the clone root, or component root when supplied. Omitted
+  clone selects the repository's active clone. Ambiguous files are rejected.
+  Parent traversal (..) is rejected. Clone accepts a label, directory path,
+  or registered decimal ID string.
+  Database paths and CLI options are never accepted here.
+properties:
+  path:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    x-max-utf8-bytes: 4096
+    description: Absolute source path or a path relative to the selected clone.
+  repo:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    x-max-utf8-bytes: 4096
+    description: Registered repository name.
+  clone:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    x-max-utf8-bytes: 4096
+    description: Registered clone label
+    directory path or decimal ID string.: null
+  component:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    x-max-utf8-bytes: 4096
+    description: Registered component name.

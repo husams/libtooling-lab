@@ -1,5 +1,7 @@
 # Quick start: a ten-minute tour
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 This chapter takes a tiny, real C++ project from nothing through import,
 extraction, a symbol lookup, a call-graph run, and one query from Python.
 Every command and every line of output below was actually run; only long

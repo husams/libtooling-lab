@@ -7,12 +7,14 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace facts::commands::detail {
 
 struct Provenance {
   std::string path;
   std::string universe;
+  std::vector<std::string> aliases;
 };
 
 using ProvenanceSnapshot = std::map<FileId, Provenance>;

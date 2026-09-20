@@ -1,0 +1,16 @@
+get:
+  operationId: openapi
+  tags: [discovery]
+  summary: Download the active OpenAPI contract as JSON
+  description: |
+    Self-contained OpenAPI 3.1 document, with local component references,
+    concrete routes for the registered CLI commands, and the server's active
+    authentication requirement. Generated from the maintained YAML contract.
+  responses:
+    '200':
+      description: The active OpenAPI document.
+      content:
+        application/json:
+          schema: {type: object}
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

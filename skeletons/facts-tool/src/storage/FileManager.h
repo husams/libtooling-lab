@@ -23,10 +23,12 @@ public:
   // Read-write: creates and migrates the registry; throws when it cannot.
   explicit FileManager(std::string databasePath, int verbosity = 0);
 
-  // Read-only: never throws. An unreadable, incomplete or outdated registry
-  // comes back as a message the calling command can report.
+  // Opens an existing imported registry without creating or migrating it.
+  // Parsing commands request writable access when AST caching is enabled.
+  // An unreadable, incomplete or outdated registry returns a diagnostic.
   static std::expected<std::unique_ptr<FileManager>, std::string>
-  openReadOnly(std::string databasePath, int verbosity = 0);
+  openImported(std::string databasePath, bool writable = false,
+               int verbosity = 0);
 
   ~FileManager();
 
@@ -42,6 +44,7 @@ public:
   addBulk(std::span<const std::string> paths);
   // Refuses with the name of the offending repository, clone, component or
   // file field; storage failures come back as their own message.
+  // Replaces commands for supplied sources; preserves all omitted sources.
   std::expected<void, std::string>
   replaceProjectConfiguration(const ProjectConfiguration &configuration);
   std::expected<void, std::error_code>
@@ -73,6 +76,7 @@ private:
   std::string databasePath_;
   std::unique_ptr<FileDatabase> database_;
   std::unordered_map<std::string, FileId> fileIds_;
+  std::uint64_t cloneContextRevision_ = 0;
   int verbosity_ = 0;
 };
 

@@ -1,4 +1,5 @@
 #include "storage/catalog/Component.h"
+#include "storage/CloneContext.h"
 #include <algorithm>
 
 namespace facts::catalog {
@@ -39,6 +40,7 @@ Result<std::vector<Component>> components(Database &database) {
           value.clone = ProjectClone{row.integer(6), row.integer(7),
                                      row.string(8), row.string(9)};
         }
+        value.clone = invocationClone(value.value.repositoryId, value.clone);
         value.repository = row.string(10);
         value.files = row.integer(11);
         return value;

@@ -6,6 +6,7 @@
 #include <clang/Tooling/CompilationDatabase.h>
 
 #include <expected>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@ namespace facts {
 class FileManager;
 
 struct ProjectImportOptions {
+  std::optional<ProjectConfiguration> identity;
   std::string repositoryName;
   std::string remoteUrl;
   // Empty = derived from the active clone directory's basename.

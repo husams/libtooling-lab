@@ -1,11 +1,29 @@
 # Relations and graph queries
 
+← [User guide index](../README.md) · [Table of contents](../toc.md)
+
 `CodeBase.graph` is a `GraphQuery` - a typed facade over the same
 `Executor`/`Plan` machinery from
 [03-query-model.md](03-query-model.md), returning `Entity` objects (and
 subtypes `Callable`, `Method`, `Record`) instead of raw rows wherever a
 query result is itself a node. `CodeBase.get`/`.find`/`.query` delegate
 straight to `cb.graph.get`/`.find`/`.query`.
+
+## Execution and buffering
+
+Methods that return a list, such as `callees`, `parameters`, and
+`definitions`, still complete their work before returning. `get` and
+`find` also resolve the reference immediately. A fluent query returned by
+`cb.query(...)` executes when consumed; iterate it directly for lazy
+results, or use `.run(lazy=False)`, `.all()`, or `.names()` to materialize.
+
+Lazy mode defers graph execution, but traversal (`out`/`in_`), `sites`,
+paths, reverse type use, and set operations still buffer intermediate
+results before yielding. Exact symbol references use indexed lookup, and
+relation traversal loads reached symbol rows by ID instead of loading
+every symbol. These improvements do not make graph traversal a streaming
+algorithm. See [query performance](10-query-performance.md) for the
+streaming stages and benchmark results.
 
 ## `Entity`, `Callable`, `Method`, `Record`
 
@@ -221,6 +239,7 @@ sites in the database), not indexed - fine for a demo database, but a real
 cost to be aware of before calling it inside a loop over many symbols in a
 large codebase:
 
+Lazy mode does not remove this scan or the graph stage's buffering.
 The rows are `site` rows, so the column field is spelled `col`, not
 `column`:
 
@@ -255,7 +274,7 @@ witness = (
 )
 result = cb.executor.run(witness.plan)
 
-found = result.paths[0]
+found = result.paths[0]  # materializes the path result
 print(result.shape, result.truncated, found["length"])
 print(found["start"]["qualified_name"], "->", found["end"]["qualified_name"])
 for step in found["steps"]:
@@ -368,9 +387,10 @@ path search, and `witness_reconstruction` bounds how much work
 reconstructing a concrete path's node sequence and sites may do. All are
 overridable via `open_codebase(budgets=Budgets(...))`; hitting any of them
 degrades a result to `partial=True`/`truncated=True` rather than raising,
-except where a stage's own validation catches an impossible request first
-(as with a depth window over `Budgets.max_depth`, which raises `E_DEPTH`
-before any traversal starts).
+except where validation catches an impossible request first. A depth
+window over the hard ceiling of 32 raises `E_DEPTH`; a depth above the
+session's `Budgets.max_depth` raises `E_BUDGET` from `run`, before any
+traversal starts in either lazy or eager mode.
 
 Continue to
 [06-persisted-callgraph-runs.md](06-persisted-callgraph-runs.md) for the

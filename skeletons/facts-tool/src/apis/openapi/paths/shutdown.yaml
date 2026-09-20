@@ -1,0 +1,18 @@
+post:
+  operationId: shutdown
+  tags: [server]
+  summary: Request graceful server shutdown
+  description: |
+    Stops filesystem monitoring and requests cancellation of unfinished jobs.
+    Returns before shutdown completes. The server closes its listener and exits;
+    clients should not expect subsequent polling requests to succeed.
+  responses:
+    '202':
+      description: Shutdown has been requested.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/Shutdown'
+          example: {status: stopping}
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'

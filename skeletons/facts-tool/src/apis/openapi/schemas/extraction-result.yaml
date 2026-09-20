@@ -1,0 +1,12 @@
+type: object
+required: [operation, file, complete, facts_committed, symbol_count]
+additionalProperties: false
+properties:
+  operation: {type: string, const: extract}
+  file:
+    $ref: resolved-file.yaml
+  diagnostics:
+    $ref: diagnostics.yaml
+  complete: {type: boolean}
+  facts_committed: {type: boolean}
+  symbol_count: {type: integer, minimum: 0}

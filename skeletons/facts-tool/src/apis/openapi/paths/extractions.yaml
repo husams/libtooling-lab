@@ -1,0 +1,19 @@
+post:
+  operationId: extract
+  tags: [analysis]
+  summary: Extract facts for a registered source file
+  description: |
+    Resolves repository metadata, compilation options and databases internally.
+    Returns HTTP 202 before analysis begins. Poll the Location URL for a typed
+    result or error; no CLI argument arrays or database paths are accepted.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ExtractionRequest'
+  responses:
+    '202':
+      $ref: '../openapi.yaml#/components/responses/AcceptedDomainJob'
+    default:
+      $ref: '../openapi.yaml#/components/responses/Error'
