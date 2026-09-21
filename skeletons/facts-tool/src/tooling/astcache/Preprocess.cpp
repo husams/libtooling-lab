@@ -10,6 +10,7 @@
 #include "tooling/astcache/Snapshot.h"
 
 #include <clang/Tooling/Tooling.h>
+#include <llvm/Support/VirtualFileSystem.h>
 #include <llvm/Support/raw_ostream.h>
 
 namespace facts::astcache {
@@ -48,7 +49,9 @@ int preprocess(const clang::tooling::CompilationDatabase &database,
   reportFrontendActivity(options.verbosity, "dependency-scan", source);
   // A separate Clang FileManager prevents relative names in different
   // compilation directories from sharing stale file information.
-  clang::tooling::ClangTool tool(database, {source});
+  clang::tooling::ClangTool tool(database, {source},
+      std::make_shared<clang::PCHContainerOperations>(),
+      llvm::vfs::createPhysicalFileSystem());
   configureDiagnostics(tool);
   if (!options.enabled)
     return tool.run(createIncludeVisitorFactory(includes).get());

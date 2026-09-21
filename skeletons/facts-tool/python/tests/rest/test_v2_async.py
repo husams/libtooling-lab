@@ -83,3 +83,33 @@ def test_cancel_local_async_iteration_stops_fetch_and_preserves_connection():
             assert await api.health() == {"status": "ok"}
 
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("from_handle", [True, False])
+def test_async_retry_creates_new_attempt_and_preserves_original_handle(from_handle):
+    requests = []
+
+    async def handle(request):
+        requests.append(request)
+        body = job("cancelled") if request.method == "GET" else {
+            **job(), "id": "job-2", "retry_of": "job-1",
+        }
+        return httpx.Response(200 if request.method == "GET" else 202, json=body)
+
+    async def exercise():
+        async with AsyncClient(
+            "http://test", transport=httpx.MockTransport(handle)
+        ) as api:
+            original = await api.extractions.get("job-1")
+            retried = (
+                await original.retry() if from_handle
+                else await api.extractions.retry(original.id)
+            )
+            assert retried.id == "job-2" and retried.state == "queued"
+            assert retried.metadata.retry_of == original.id
+            assert original.id == "job-1" and original.state == "cancelled"
+
+    asyncio.run(exercise())
+    assert requests[-1].method == "POST"
+    assert requests[-1].url.path == "/api/v2/extract/job"
+    assert json.loads(requests[-1].content) == {"retry_of": "job-1"}

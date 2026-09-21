@@ -56,6 +56,9 @@ void Service::perform(ResourceWork work, ResourceCompletion completion) {
 domain::Result<Json> Service::submit(Request request) {
   return state_->submit(std::move(request));
 }
+domain::Result<Json> Service::retry(const std::string &id, const std::string &operation) {
+  return state_->retryJob(id, operation);
+}
 void Service::search(index::Query query, Completion completion) {
   state_->search(std::move(query), std::move(completion));
 }

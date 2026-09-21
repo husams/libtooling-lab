@@ -1,0 +1,30 @@
+type: object
+required:
+- source_file
+- driver
+- working_directory
+- arguments
+additionalProperties: false
+properties:
+  source_file:
+    type: string
+    description: Source file or header selected for this input compilation command.
+  driver:
+    type: string
+    description: Compiler driver, also present as arguments[0].
+  working_directory:
+    type: string
+    description: Server filesystem directory used to resolve relative compiler options.
+  arguments:
+    type: array
+    items:
+      type: string
+    description: >-
+      Full input argv including compiler driver and source filename, with configured
+      extra arguments applied. Unlike file-resource compilation_command.arguments,
+      this is a complete input command, not only compiler options.
+description: >-
+  The selected stored compilation command, remapped into the selected clone or
+  borrowed header context, with configured extra arguments applied. This describes
+  input to analysis, before platform probing and internal Clang argument adjustments;
+  it does not claim to be the final compiler frontend invocation.

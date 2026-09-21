@@ -22,6 +22,7 @@ class JobMetadata:
     started_at: int | None = None
     finished_at: int | None = None
     error: OperationError | None = None
+    retry_of: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

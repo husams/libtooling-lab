@@ -9,6 +9,7 @@
 #include <clang/Lex/PPCallbacks.h>
 #include <clang/Lex/Preprocessor.h>
 #include <clang/Tooling/Tooling.h>
+#include <llvm/ADT/SmallString.h>
 
 #include <filesystem>
 #include <optional>
@@ -17,10 +18,11 @@
 namespace facts {
 namespace {
 
-std::string pathOf(clang::FileEntryRef file) {
+std::string pathOf(const clang::SourceManager &manager, clang::FileEntryRef file) {
   const auto realPath = file.getFileEntry().tryGetRealPathName();
-  const auto path = realPath.empty() ? file.getName() : realPath;
-  return std::filesystem::canonical(path.str()).lexically_normal().string();
+  llvm::SmallString<256> path(realPath.empty() ? file.getName() : realPath);
+  manager.getFileManager().makeAbsolutePath(path);
+  return std::filesystem::canonical(path.str().str()).lexically_normal().string();
 }
 
 class IncludeVisitor final : public clang::PPCallbacks {
@@ -40,7 +42,7 @@ public:
     // A compiler-forced include originates in <built-in>, which has no
     // physical source location. Its target is still part of the TU's input
     // closure and must be registered before facts extraction.
-    auto destination = pathOf(*file);
+    auto destination = pathOf(sourceManager_, *file);
     facts_.visitedSources.push_back(destination);
     auto source = extractFilePath(
         sourceManager_,

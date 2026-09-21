@@ -22,6 +22,7 @@ public:
   void inspect(const std::string &id, JobReader work, ResourceCompletion completion);
   void updateSettings(const Settings &settings);
   domain::Result<Json> submit(Request request);
+  domain::Result<Json> retry(const std::string &id, const std::string &operation);
   void search(index::Query query, Completion completion);
   Json list() const;
   bool contains(const std::string &id) const;

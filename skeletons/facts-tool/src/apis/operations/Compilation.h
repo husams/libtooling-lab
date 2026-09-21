@@ -5,4 +5,6 @@
 namespace facts::apis::operations {
 domain::Result<CompilationContext> prepareCompilation(
     const domain::Context &context, const domain::ResolvedFile &file);
+domain::Error compilationFailure(const domain::Context &context,
+    const domain::ResolvedFile &file, domain::Error error);
 }

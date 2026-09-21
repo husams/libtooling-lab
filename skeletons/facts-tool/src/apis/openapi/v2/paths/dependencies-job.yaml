@@ -42,7 +42,9 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../../openapi.yaml#/components/schemas/V2DependenciesRequest'
+          oneOf:
+          - $ref: '../../openapi.yaml#/components/schemas/V2DependenciesRequest'
+          - $ref: '../../openapi.yaml#/components/schemas/V2JobRetryRequest'
 get:
   operationId: v2ListDependenciesJobs
   tags:

@@ -282,6 +282,7 @@ target_link_libraries(facts-diagnostics PRIVATE facts-clang)
 add_library(facts-tooling STATIC
   src/tooling/CompilationFiles.cpp
   src/tooling/CompilationCommandCodec.cpp
+  src/tooling/ImportCompilationDatabase.cpp
   src/tooling/ProjectImport.cpp
   src/tooling/import/Identity.cpp
   src/tooling/StoredCompilationDatabase.cpp
@@ -761,6 +762,14 @@ if(BUILD_TESTING)
   )
   add_executable(stored-compilation-database-test
                  tests/StoredCompilationDatabaseTest.cpp)
+  add_executable(import-compilation-database-test tests/ImportCompilationDatabaseTest.cpp)
+  target_link_libraries(import-compilation-database-test PRIVATE facts-tooling facts-clang)
+  add_test(NAME import-compilation-database COMMAND import-compilation-database-test
+           ${CMAKE_CURRENT_BINARY_DIR}/import-compilation-scratch)
+  add_executable(frontend-working-directory-test tests/FrontendWorkingDirectoryTest.cpp)
+  target_link_libraries(frontend-working-directory-test PRIVATE facts-commands facts-ast-cache facts-clang)
+  add_test(NAME frontend-working-directory COMMAND frontend-working-directory-test
+           ${CMAKE_CURRENT_BINARY_DIR}/frontend-working-directory-scratch)
   add_executable(clone-context-test tests/CloneContextTest.cpp)
   add_executable(active-clone-test tests/ActiveCloneTest.cpp)
   target_link_libraries(active-clone-test PRIVATE facts-storage facts-clang)

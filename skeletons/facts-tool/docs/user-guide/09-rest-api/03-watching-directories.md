@@ -185,9 +185,19 @@ curl -sS "$API/api/v2/watcher"
 directory. Other available clones continue to be monitored and HTTP remains
 available. The watcher retries unavailable paths without requiring a restart.
 
-A failed import or extraction is visible in `last_error` and its job's `stderr`
-and `exit_code`; HTTP remains available. Inotify overflow requests a rescan and
-refresh. Source deletion triggers refresh, but removal of stale compilation
+A failed import or extraction is visible in `last_error`, including the job ID,
+active clone paths, command arguments and a bounded excerpt of compiler diagnostics.
+The job retains its `stderr` and `exit_code`; HTTP remains available. Unchanged
+failed inputs are not resubmitted on every recovery poll. Fixing a source, header
+or compilation database, changing repository/compiler configuration, or updating
+watcher settings schedules another attempt. Newly discovered directories
+remain monitored even when their compilation database is malformed, so generated
+headers and repaired commands are picked up without a restart or CLI import.
+To retry unchanged inputs explicitly, update `PATCH /api/v2/watcher/settings`
+(for example, its `debounce_ms` value) or submit a new v2 import/extraction job.
+
+Inotify overflow requests a rescan and refresh. Source deletion triggers refresh,
+but removal of stale compilation
 commands and catalog entries follows the existing CLI semantics.
 
 Database, AST-cache and object outputs, SQLite sidecar files, server configuration,

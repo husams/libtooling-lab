@@ -8,6 +8,7 @@
 
 #include <clang/Frontend/ASTUnit.h>
 #include <clang/Tooling/Tooling.h>
+#include <llvm/Support/VirtualFileSystem.h>
 
 namespace facts::commands {
 int extractTranslationUnits(const clang::tooling::CompilationDatabase &database,
@@ -18,7 +19,9 @@ int extractTranslationUnits(const clang::tooling::CompilationDatabase &database,
   if (!cache.enabled) {
     for (const auto &source : sources)
       reportFrontendActivity(cache.verbosity, "ast-parse", source);
-    clang::tooling::ClangTool tool(database, sources);
+    clang::tooling::ClangTool tool(database, sources,
+        std::make_shared<clang::PCHContainerOperations>(),
+        llvm::vfs::createPhysicalFileSystem());
     configureDiagnostics(tool);
     return tool.run(createFactExtractorFactory(files, store, status).get());
   }

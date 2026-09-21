@@ -42,7 +42,9 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../../openapi.yaml#/components/schemas/V2CallGraphRequest'
+          oneOf:
+          - $ref: '../../openapi.yaml#/components/schemas/V2CallGraphRequest'
+          - $ref: '../../openapi.yaml#/components/schemas/V2JobRetryRequest'
 get:
   operationId: v2ListCallGraphJobs
   tags:

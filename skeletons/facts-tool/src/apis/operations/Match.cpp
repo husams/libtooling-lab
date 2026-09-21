@@ -32,7 +32,9 @@ Result match(const domain::Context &context, const domain::ResolvedFile &file,
           return result;
         });
       });
-  });
+  }).transform_error([&](domain::Error error) {
+        return compilationFailure(context, file, std::move(error));
+      });
   });
   });
 }

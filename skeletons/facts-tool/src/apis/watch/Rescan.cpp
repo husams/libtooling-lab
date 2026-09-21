@@ -37,10 +37,12 @@ void Watcher::Impl::scanned(std::expected<watch::Update, std::string> result) {
   ready = applied.has_value();
   if (!applied) {
     checkpointPending = false;
-    if (logger && (previouslyReady || error != applied.error()))
-      logger->write(logging::Level::warning, "watch.failed", {{"stage", "scan"}});
+    if (previouslyReady || error != applied.error()) {
+      ++failures;
+      if (logger) logger->write(logging::Level::warning, "watch.failed",
+          {{"stage", "scan"}, {"message", applied.error()}});
+    }
     error = applied.error();
-    ++failures;
     needsScan = true;
     return;
   }
@@ -52,6 +54,14 @@ void Watcher::Impl::scanned(std::expected<watch::Update, std::string> result) {
        {"events", result->events}, {"refresh", result->refresh}});
   if (result->refresh) {
     checkpointPending = false;
+    if (!result->plan) {
+      error = result->plan.error();
+      ++failures;
+      if (logger) logger->write(logging::Level::warning, "watch.failed",
+          {{"stage", "plan"}, {"message", error}});
+      if (dirty) changed();
+      return;
+    }
     auto invalidated = watch::forget(settings);
     if (!invalidated) {
       error = invalidated.error();
@@ -65,8 +75,8 @@ void Watcher::Impl::scanned(std::expected<watch::Update, std::string> result) {
     ++cycles;
     error.clear();
     latestJobs.clear();
-    for (auto &command : result->plan.imports) commands.push_back(std::move(command));
-    for (auto &command : result->plan.extracts) commands.push_back(std::move(command));
+    for (auto &command : result->plan->imports) commands.push_back(std::move(command));
+    for (auto &command : result->plan->extracts) commands.push_back(std::move(command));
     if (logger) logger->write(logging::Level::debug, "watch.cycle.started",
         {{"cycle", cycles}, {"commands", commands.size()}});
     nextCommand();

@@ -2,6 +2,14 @@
 #include <boost/asio/post.hpp>
 
 namespace facts::apis::runtime {
+namespace {
+std::string logText(std::string value, std::size_t bytes) {
+  // Bound serialized size, since quotes/control characters can expand sixfold.
+  while (Json(value).dump(-1, ' ', false, Json::error_handler_t::replace).size() > bytes)
+    value = value.substr(0, value.size() / 2) + "...";
+  return value;
+}
+}
 void State::run(std::string id, Request request, domain::Context context) {
   if (!jobs.contains(id) || jobs.at(id)["state"] == "cancelled") return;
   enqueue([weak = weak_from_this(), id, request = std::move(request), context] {
@@ -48,6 +56,35 @@ void State::run(std::string id, Request request, domain::Context context) {
     }
     const bool success = result.has_value();
     Json failure = result ? Json(nullptr) : encodeError(result.error());
+    if (!result) {
+      // Log the failure context and each bounded compiler diagnostic separately
+      // so a large compiler report does not discard the entire log record.
+      Json fields{{"job_id", id}, {"operation", request.operation},
+          {"code", result.error().code}, {"message", logText(result.error().message, 4096)}};
+      const auto &details = result.error().details;
+      if (details.is_object()) {
+        for (const auto *key : {"path", "repository", "clone_path", "project_root"})
+          if (details.contains(key) && details.at(key).is_string())
+            fields[key] = logText(details.at(key).get<std::string>(), 1024);
+        if (details.contains("compilation_commands")) {
+          Json directories = Json::array();
+          for (const auto &command : details.at("compilation_commands")) {
+            if (directories.size() == 8) break;
+            directories.push_back(logText(command.value("working_directory", ""), 512));
+          }
+          fields["working_directories"] = std::move(directories);
+        }
+        if (details.contains("diagnostics"))
+          for (auto diagnostic : details.at("diagnostics")) {
+            diagnostic["job_id"] = id;
+            for (const auto *key : {"message", "file"})
+              if (diagnostic.contains(key) && diagnostic.at(key).is_string())
+                diagnostic[key] = logText(diagnostic.at(key).get<std::string>(), 4096);
+            self->log(logging::Level::error, "job.diagnostic", std::move(diagnostic));
+          }
+      }
+      self->log(logging::Level::error, "job.failed", std::move(fields));
+    }
     Json document{{"result", result ? std::move(*result) : Json(nullptr)},
                   {"error", std::move(failure)}};
     const bool nativeV2 = request.operation.starts_with("v2.");

@@ -42,7 +42,9 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../../openapi.yaml#/components/schemas/V2VariableFlowRequest'
+          oneOf:
+          - $ref: '../../openapi.yaml#/components/schemas/V2VariableFlowRequest'
+          - $ref: '../../openapi.yaml#/components/schemas/V2JobRetryRequest'
 get:
   operationId: v2ListVariableFlowJobs
   tags:

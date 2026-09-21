@@ -8,6 +8,7 @@
 #include <clang/AST/Decl.h>
 #include <clang/AST/Stmt.h>
 #include <clang/Basic/SourceManager.h>
+#include <llvm/ADT/SmallString.h>
 
 #include <filesystem>
 
@@ -56,10 +57,9 @@ std::string sourcePath(const clang::SourceManager &source,
   if (!entry)
     return {};
   const auto real = entry->getFileEntry().tryGetRealPathName();
-  return real.empty()
-             ? std::filesystem::absolute(entry->getName().str())
-                   .lexically_normal().string()
-             : real.str();
+  llvm::SmallString<256> path(real.empty() ? entry->getName() : real);
+  source.getFileManager().makeAbsolutePath(path);
+  return std::filesystem::path(path.str().str()).lexically_normal().string();
 }
 
 llvm::json::Object describeBinding(const clang::DynTypedNode &node,

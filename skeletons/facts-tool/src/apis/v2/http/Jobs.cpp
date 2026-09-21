@@ -2,6 +2,7 @@
 #include "apis/v2/Jobs.h"
 #include "apis/http/Resources.h"
 #include "apis/runtime/Service.h"
+#include "apis/runtime/Validation.h"
 #include <set>
 
 namespace facts::apis::v2::http {
@@ -67,9 +68,18 @@ void jobs(Router &router, const Request &request, const Route &route, Reply repl
     }
   if (route.id.empty() && request.method() == post) {
     if (!route.query.empty()) { reply(resourceError({400, "invalid_query", "Job creation has no query parameters"})); return; }
-    auto submitted = body(request).and_then([&](const Json &value) {
-      return parseJobRequest(route.resource, value);
-    }).and_then([&](auto value) { return router.resources->submit(std::move(value)); });
+    auto submitted = body(request).and_then([&](const Json &value) -> domain::Result<Json> {
+      if (value.contains("retry_of")) {
+        return runtime::keys(value, {"retry_of"}).and_then([&] {
+          return runtime::text(value.at("retry_of"), "retry_of");
+        }).and_then([&](const auto &id) {
+          return router.resources->retry(id, "v2." + route.resource);
+        });
+      }
+      return parseJobRequest(route.resource, value).and_then([&](auto parsed) {
+        return router.resources->submit(std::move(parsed));
+      });
+    });
     if (!submitted) { reply(resourceError(submitted.error())); return; }
     auto response = facts::apis::response(202, publicJob(*submitted));
     response.set(boost::beast::http::field::location, "/api/v2/" + route.resource + "/job/" + submitted->at("id").get<std::string>());

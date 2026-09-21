@@ -20,6 +20,13 @@ public:
 
   std::vector<clang::tooling::CompileCommand>
   getCompileCommands(llvm::StringRef filePath) const override {
+    const auto logical = logicalCompilationPath(filePath.str());
+    auto exact = commands_ | std::views::filter([&](const auto &command) {
+      return logicalCompilationPath(command.Filename) == logical;
+    }) | std::ranges::to<CompileCommands>();
+    // Distinct logical paths can share a physical file and still carry
+    // different build options. Only use physical identity as a fallback.
+    if (!exact.empty()) return exact;
     const auto identity = normalizeCompilationPath(filePath.str()).string();
     auto matching =
         commands_ | std::views::filter([&](const auto &command) {

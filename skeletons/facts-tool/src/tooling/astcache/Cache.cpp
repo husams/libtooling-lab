@@ -14,6 +14,7 @@
 
 #include <clang/Frontend/ASTUnit.h>
 #include <clang/Tooling/Tooling.h>
+#include <llvm/Support/VirtualFileSystem.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include <iterator>
@@ -34,7 +35,9 @@ int parse(const clang::tooling::CompilationDatabase &database,
           bool clearAdjusters,
           detail::RevisionObservations *observations = nullptr) {
   reportFrontendActivity(options.verbosity, "ast-parse", source);
-  clang::tooling::ClangTool tool(database, {source});
+  clang::tooling::ClangTool tool(database, {source},
+      std::make_shared<clang::PCHContainerOperations>(),
+      llvm::vfs::createPhysicalFileSystem());
   configureDiagnostics(tool);
   if (clearAdjusters)
     tool.clearArgumentsAdjusters();

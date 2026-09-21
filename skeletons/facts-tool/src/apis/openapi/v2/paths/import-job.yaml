@@ -42,7 +42,9 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../../openapi.yaml#/components/schemas/V2ImportRequest'
+          oneOf:
+          - $ref: '../../openapi.yaml#/components/schemas/V2ImportRequest'
+          - $ref: '../../openapi.yaml#/components/schemas/V2JobRetryRequest'
 get:
   operationId: v2ListImportJobs
   tags:

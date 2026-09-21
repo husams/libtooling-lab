@@ -21,7 +21,8 @@ struct State : std::enable_shared_from_this<State> {
   void pump();
   void refresh();
   void indexed(domain::Result<index::RefreshResult> result);
-  domain::Result<Json> submit(Request request);
+  domain::Result<Json> submit(Request request, std::optional<std::string> retryOf = std::nullopt);
+  domain::Result<Json> retryJob(const std::string &id, const std::string &operation);
   void run(std::string id, Request request, domain::Context context);
   void complete(std::string id, bool success, Json error,
                 std::shared_ptr<const std::string> payload,
@@ -40,6 +41,7 @@ struct State : std::enable_shared_from_this<State> {
   std::optional<domain::Context> context;
   std::deque<Task> work;
   std::unordered_map<std::string, Json> jobs;
+  std::unordered_map<std::string, Request> requests;
   std::unordered_map<std::string, std::shared_ptr<std::atomic_bool>> cancellations;
   std::unordered_map<std::string, std::shared_ptr<const std::string>> payloads;
   std::unordered_map<std::string, std::shared_ptr<const Json>> documents;

@@ -62,6 +62,16 @@ class AsyncAnalysisJob[T]:
         )
         return self
 
+    async def retry(self) -> "AsyncAnalysisJob[T]":
+        """Create a fresh attempt of this failed/cancelled job, preserving history."""
+        body = await async_call(
+            self._http, "POST", path(self._family + "/job"), {"retry_of": self.id}
+        )
+        return AsyncAnalysisJob(
+            self._http, self._family, self._model,
+            snapshot(self._model, body, self._family),
+        )
+
     async def wait(
         self, *, timeout: float | None = None, poll_interval: float = 0.1
     ) -> T:

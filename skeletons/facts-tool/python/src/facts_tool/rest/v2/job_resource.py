@@ -47,6 +47,10 @@ class JobResource[T, R]:
             call(self._http, "GET", path(self._family + "/job", identifier))
         )
 
+    def retry(self, identifier: str) -> AnalysisJob[T]:
+        """Resubmit a retained failed/cancelled job using its original request."""
+        return self._create({"retry_of": identifier})
+
     def list(self, *, limit: int = 50) -> Collection[AnalysisJob[T]]:
         route = path(self._family + "/job")
         if validate_limit(limit) > 500:

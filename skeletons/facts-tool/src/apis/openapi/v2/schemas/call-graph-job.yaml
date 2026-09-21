@@ -13,6 +13,11 @@ properties:
     minLength: 1
     maxLength: 4096
     description: Opaque server resource identifier. Do not infer database row numbers.
+  retry_of:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: ID of the failed or cancelled job this attempt retries.
   operation:
     type: string
     const: callgraphs
