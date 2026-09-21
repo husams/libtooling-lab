@@ -1,0 +1,16 @@
+type: object
+required:
+- retry_of
+additionalProperties: false
+properties:
+  retry_of:
+    type: string
+    minLength: 1
+    maxLength: 4096
+    description: ID of a retained failed or cancelled job in this analysis family.
+description: >-
+  Create a new job from a retained failed or cancelled job's original request.
+  The new attempt uses current server settings and catalog data, receives a new
+  ID and preserves the previous attempt until normal retention evicts it.
+  Request overrides cannot be combined with retry_of. Unknown, expired and
+  different-family job IDs return 404; other job states return 409.

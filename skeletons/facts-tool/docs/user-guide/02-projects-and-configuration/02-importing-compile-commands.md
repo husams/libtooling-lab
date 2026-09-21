@@ -53,6 +53,39 @@ the `sources` positional arguments plus `--extra-arg`/the resolved YAML
 `extra_args` - no JSON file needed at all. This is useful for a single
 ad-hoc source you want indexed without setting up a build system.
 
+## Server imports and build directories
+
+The server imports from registered active clones. For a repository named
+`alpha` whose active clone is `/workspace/alpha`, this request loads
+`/workspace/alpha/build/compile_commands.json`, regardless of the daemon's
+startup directory:
+
+```http
+POST /api/v2/import/job
+Content-Type: application/json
+
+{"repository":"alpha","compilation_database":"build/compile_commands.json"}
+```
+
+Omitting `compilation_database` discovers databases below the selected active
+clone. A relative database path requires one selected repository.
+
+Each compile command retains its own build context. An absolute `directory`
+is used as written; a relative `directory` is resolved against the directory
+containing `compile_commands.json`. Its relative `file`, include paths, forced
+includes, compiler paths and `@response` files are interpreted from that
+command directory. For example, `"directory":"../src/one"` in the database
+above means `/workspace/alpha/src/one`; `-Iinclude` searches
+`/workspace/alpha/src/one/include`. Another entry can use `../src/two` and
+its own `include` directory, even if both source files are named `main.cpp`.
+Import, automatic watching and later extraction use the same normalized
+source identities. They do not need the server to start inside the clone.
+
+If import fails, the job error includes the compilation database path,
+repository, clone path and compiler diagnostics with source locations.
+Fix the reported command/header problem, then rerun the import job through
+the API; see [Requests and jobs](../09-rest-api/02-requests-and-jobs.md).
+
 ## A verified run
 
 ```console

@@ -11,7 +11,9 @@ struct Event {
 };
 struct Update {
   std::shared_ptr<const Scan> snapshot;
-  Plan plan;
+  // Planning failure must not discard newly discovered directories or the
+  // catalog baseline: those watches are needed to observe repaired inputs.
+  std::expected<Plan, std::string> plan;
   std::size_t events = 0;
   bool refresh = false;
 };

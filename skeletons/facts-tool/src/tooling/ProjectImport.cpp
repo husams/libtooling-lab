@@ -95,7 +95,8 @@ std::string compilerDriver(const clang::tooling::CompileCommand &command,
       (name.starts_with("clang-") && name != "clang-tool") || name == "gcc" ||
       name.starts_with("gcc-") || name == "cc" || name == "c++" || gnuCxx;
   const auto usablePath =
-      !candidate.contains('/') || std::filesystem::exists(candidate);
+      !candidate.contains('/') ||
+      std::filesystem::exists(resolveCommandPath(command, candidate));
   return compilerName && usablePath ? candidate : defaultCompilerDriver(source);
 }
 

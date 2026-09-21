@@ -96,3 +96,29 @@ def test_custom_match_bindings_preserved_without_cli_translation():
     assert body["expression"] == 'functionDecl().bind("myMethod")'
     assert body["bindings"] == {"source": "myMethod"}
     assert "arguments" not in body
+
+
+@pytest.mark.parametrize("from_handle", [True, False])
+def test_retry_creates_a_new_typed_job_and_preserves_original_handle(from_handle):
+    requests = []
+
+    def handle(request):
+        requests.append(request)
+        body = job("failed") if request.method == "GET" else {
+            **job(), "id": "job-2", "retry_of": "job-1",
+        }
+        return httpx.Response(200 if request.method == "GET" else 202, json=body)
+
+    with httpx.Client(
+        base_url="http://test", transport=httpx.MockTransport(handle)
+    ) as http:
+        resource = Extractions(http)
+        original = resource.get("job-1")
+        retried = original.retry() if from_handle else resource.retry(original.id)
+        assert retried.id == "job-2" and retried.state == "queued"
+        assert retried.metadata.retry_of == original.id
+        assert original.id == "job-1" and original.state == "failed"
+        assert original.metadata.retry_of is None
+    assert requests[-1].method == "POST"
+    assert requests[-1].url.path == "/api/v2/extract/job"
+    assert json.loads(requests[-1].content) == {"retry_of": "job-1"}

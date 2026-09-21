@@ -149,7 +149,7 @@ Registered headers use an including translation unit's compilation context.
 Conflicting includer settings or missing context produce a structured analysis
 error; clients do not supply an ad hoc database or guessed compiler flags.
 
-## Create, read and cancel jobs
+## Create, read, cancel and retry jobs
 
 Each analysis has its own job collection and operation-specific OpenAPI request
 and result schemas:
@@ -183,15 +183,48 @@ curl -i -X POST "$API/api/v2/extract/job" \
 
 The response is `202 Accepted` with a `Location` header pointing to the job.
 Poll that URL until the state is terminal. Queued and running jobs have no final
-result yet. Errors contain a stable code and message. Compiler diagnostics are retrieved
-through the typed `diagnostics` result collection where available. Extracted facts are published to the global index before a
-successful extraction job reports completion.
+result yet. Errors contain a stable code and message. A failed job retains compiler
+diagnostics in `error.details.diagnostics`, including the source file, line,
+column and compiler message. Import errors identify the compilation database and
+active clone. Analysis errors identify the source, repository, clone path and
+the selected input compilation command's `source_file`, `working_directory` and
+full `arguments` vector, including the compiler driver and configured extra
+arguments. This is the stored command before platform probing and internal
+Clang adjustments; file-resource compiler options keep the driver separate.
+These details also cover errors during dependency preparation. Read them from the job itself;
+failed jobs do not have a successful results collection. Server logs include
+`job.failed` context and individual `job.diagnostic` records.
+
+For successful jobs, compiler diagnostics are available through the typed
+`diagnostics` result collection. Extracted facts are published to the global
+index before a successful extraction job reports completion.
 
 Cancellation uses `DELETE`, not a `/cancel` command. Jobs remain readable for
 retained history. Cancellation must not corrupt an in-progress native database
 transaction; inspect the returned state or conflict error rather than assuming
 that HTTP cancellation killed the underlying Clang operation. Job retention is
 bounded and job records are not durable across restart; facts and indexes are.
+
+After correcting a failed job's input or compilation settings, create a new
+attempt from its retained request:
+
+```sh
+curl -i -X POST "$API/api/v2/import/job" \
+  -H 'Content-Type: application/json' \
+  -d '{"retry_of":"d123"}'
+```
+
+Replace `d123` with the failed or cancelled job ID and use its original analysis
+collection. This works for all eight job families. The response contains a new
+job ID, `retry_of` and a new `Location`; the original job and its diagnostics stay
+readable until normal retention removes them. The server reuses the original
+request with current settings and catalog data, including the current active
+clone for selections without an explicit clone. Cancellation state is reset for
+the new attempt. Queued, running, cancelling or successful jobs return
+`409 job_not_retryable`. Unknown, expired and different-family IDs return `404`.
+The retry body contains only `retry_of`; submit a normal job when changing
+selection or analysis options. Jobs cannot be retried after a server restart or
+retention eviction, but a normal job can still be submitted.
 
 ## Match the AST
 

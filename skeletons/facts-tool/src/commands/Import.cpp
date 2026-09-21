@@ -13,6 +13,7 @@
 #include "platform/PlatformFlags.h"
 #include "storage/FileManager.h"
 #include "tooling/CompilationFiles.h"
+#include "tooling/ImportCompilationDatabase.h"
 #include "tooling/ProjectImport.h"
 #include "tooling/import/Identity.h"
 #include "tooling/StoredCompilationDatabase.h"
@@ -38,17 +39,6 @@ namespace {
 
 using CompilationDatabase = clang::tooling::CompilationDatabase;
 using CompilationDatabasePtr = std::unique_ptr<CompilationDatabase>;
-
-std::expected<CompilationDatabasePtr, std::string>
-loadJsonCompilationDatabase(const std::string &directory) {
-  std::string error;
-  auto database = CompilationDatabase::loadFromDirectory(directory, error);
-  if (!database) {
-    return std::unexpected("cannot load compilation database from " +
-                           directory + ": " + error);
-  }
-  return database;
-}
 
 std::expected<ProjectComponent, std::string>
 parseComponent(const std::string &specification) {
@@ -86,7 +76,7 @@ loadCompilationDatabase(const cli::ImportOptions &options,
     return std::make_unique<clang::tooling::FixedCompilationDatabase>(
         std::filesystem::current_path().string(), arguments);
   }
-  return loadJsonCompilationDatabase(options.compilationDatabase)
+  return loadImportCompilationDatabase(options.compilationDatabase)
       .transform([&](CompilationDatabasePtr database) {
         return appendExtraArguments(std::move(database), arguments);
       });

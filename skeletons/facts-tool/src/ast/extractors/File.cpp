@@ -4,6 +4,7 @@
 
 #include <clang/Basic/FileEntry.h>
 #include <clang/Basic/SourceManager.h>
+#include <llvm/ADT/SmallString.h>
 
 #include <filesystem>
 #include <optional>
@@ -35,15 +36,19 @@ extractFilePath(const clang::SourceManager &sourceManager, clang::FileID file) {
   }
 
   const auto realPath = entry->getFileEntry().tryGetRealPathName();
-  const auto path = realPath.empty() ? entry->getName() : realPath;
-  return absoluteIdentity(path.str());
+  llvm::SmallString<256> path(realPath.empty() ? entry->getName() : realPath);
+  sourceManager.getFileManager().makeAbsolutePath(path);
+  return absoluteIdentity(path.str().str());
 }
 
 // The name the translation unit reached the file by, left unresolved. A
 // generated source symlinked into the project is registered where the project
 // puts it, so that spelling has to survive as far as the registry lookup.
-std::optional<std::string> requestedPath(clang::FileEntryRef entry) {
-  const std::filesystem::path path(entry.getName().str());
+std::optional<std::string> requestedPath(const clang::SourceManager &manager,
+                                        clang::FileEntryRef entry) {
+  llvm::SmallString<256> spelling(entry.getName());
+  manager.getFileManager().makeAbsolutePath(spelling);
+  const std::filesystem::path path(spelling.str().str());
   if (!path.is_absolute()) {
     return std::nullopt;
   }
@@ -63,7 +68,7 @@ resolveFile(const clang::SourceManager &sourceManager,
 
   const auto file = sourceManager.getFileID(expansion);
   if (auto entry = sourceManager.getFileEntryRefForID(file)) {
-    if (auto requested = requestedPath(*entry)) {
+    if (auto requested = requestedPath(sourceManager, *entry)) {
       // FileManager falls back to the symlink-resolved identity itself, so a
       // spelling the registry does not know still resolves.
       return files.getId(*requested);

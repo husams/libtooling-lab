@@ -42,7 +42,9 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../../openapi.yaml#/components/schemas/V2MatchRequest'
+          oneOf:
+          - $ref: '../../openapi.yaml#/components/schemas/V2MatchRequest'
+          - $ref: '../../openapi.yaml#/components/schemas/V2JobRetryRequest'
 get:
   operationId: v2ListMatchJobs
   tags:

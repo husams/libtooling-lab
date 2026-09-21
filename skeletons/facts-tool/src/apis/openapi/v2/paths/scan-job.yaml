@@ -42,7 +42,9 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../../openapi.yaml#/components/schemas/V2ScanRequest'
+          oneOf:
+          - $ref: '../../openapi.yaml#/components/schemas/V2ScanRequest'
+          - $ref: '../../openapi.yaml#/components/schemas/V2JobRetryRequest'
 get:
   operationId: v2ListScanJobs
   tags:

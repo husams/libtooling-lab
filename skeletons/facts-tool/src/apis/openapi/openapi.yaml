@@ -220,6 +220,8 @@ components:
       $ref: v2/schemas/error-response.yaml
     V2CompilationCommand:
       $ref: v2/schemas/compilation-command.yaml
+    V2DiagnosticCompilationCommand:
+      $ref: v2/schemas/diagnostic-compilation-command.yaml
     V2Clone:
       $ref: v2/schemas/clone.yaml
     V2NewClone:
@@ -282,6 +284,8 @@ components:
       $ref: v2/schemas/match-bindings.yaml
     V2ExtractionRequest:
       $ref: v2/schemas/extraction-request.yaml
+    V2JobRetryRequest:
+      $ref: v2/schemas/job-retry-request.yaml
     V2MatchRequest:
       $ref: v2/schemas/match-request.yaml
     V2DependenciesRequest:

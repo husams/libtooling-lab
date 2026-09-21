@@ -12,6 +12,16 @@ properties:
       $ref: '../../openapi.yaml#/components/schemas/V2ErrorCandidate'
   path:
     type: string
+  repository:
+    type: string
+  clone_path:
+    type: string
+  project_root:
+    type: string
+  compilation_commands:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2DiagnosticCompilationCommand'
   field:
     type: string
   reason:

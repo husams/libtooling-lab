@@ -2,7 +2,7 @@
 #include "apis/watch/CompilationValidation.h"
 #include <map>
 #include "tooling/StoredCompilationReader.h"
-#include <clang/Tooling/JSONCompilationDatabase.h>
+#include "tooling/ImportCompilationDatabase.h"
 
 namespace facts::apis::watch::plan {
 std::expected<std::vector<Compilation>, std::string>
@@ -11,19 +11,13 @@ compilations(const std::vector<std::filesystem::path> &directories) {
   using Signatures = std::set<std::vector<std::string>>;
   std::map<std::filesystem::path, std::pair<std::filesystem::path, Signatures>> owners;
   for (const auto &directory : std::set(directories.begin(), directories.end())) {
-    std::string error;
-    auto database = clang::tooling::JSONCompilationDatabase::loadFromFile(
-        (directory / "compile_commands.json").string(), error,
-        clang::tooling::JSONCommandLineSyntax::AutoDetect);
-    if (!database) return std::unexpected("watch cannot load compilation database: " + error);
+    auto database = loadImportCompilationDatabase(directory);
+    if (!database) return std::unexpected(database.error());
     Compilation compilation{directory, {}};
     std::map<std::filesystem::path, Signatures> signatures;
-    for (const auto &command : database->getAllCompileCommands()) {
-      auto working = std::filesystem::path(command.Directory);
-      if (working.is_relative()) working = directory / working;
-      auto source = std::filesystem::path(command.Filename);
-      if (source.is_relative()) source = working / source;
-      source = source.lexically_normal();
+    for (const auto &command : (*database)->getAllCompileCommands()) {
+      const auto working = std::filesystem::path(command.Directory);
+      const auto source = std::filesystem::path(command.Filename);
       compilation.sources.push_back(source.string());
       std::error_code identityError;
       auto identity = std::filesystem::canonical(source, identityError);

@@ -56,6 +56,16 @@ class AnalysisJob[T]:
         )
         return self
 
+    def retry(self) -> "AnalysisJob[T]":
+        """Create a fresh attempt of this failed/cancelled job, preserving history."""
+        body = call(
+            self._http, "POST", path(self._family + "/job"), {"retry_of": self.id}
+        )
+        return AnalysisJob(
+            self._http, self._family, self._model,
+            snapshot(self._model, body, self._family),
+        )
+
     def wait(self, *, timeout: float | None = None, poll_interval: float = 0.1) -> T:
         validate_wait(timeout, poll_interval)
         stop = None if timeout is None else time.monotonic() + timeout

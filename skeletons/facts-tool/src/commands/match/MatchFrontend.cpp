@@ -9,6 +9,7 @@
 #include <clang/Frontend/FrontendAction.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
+#include <llvm/Support/VirtualFileSystem.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include <memory>
@@ -91,7 +92,9 @@ MatchFrontendResult runTranslationUnit(
     return matchCachedTranslationUnit(database, finder, source, astCache);
   reportFrontendActivity(astCache.verbosity, "ast-parse", source);
   IncludeGraphFacts includes;
-  clang::tooling::ClangTool tool(database, std::vector<std::string>{source});
+  clang::tooling::ClangTool tool(database, std::vector<std::string>{source},
+      std::make_shared<clang::PCHContainerOperations>(),
+      llvm::vfs::createPhysicalFileSystem());
   configureDiagnostics(tool);
   auto factory = std::make_unique<MatchActionFactory>(finder, includes);
   return {.status = tool.run(factory.get()), .includes = std::move(includes)};

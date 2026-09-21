@@ -4,6 +4,7 @@
 #include "apis/watch/CompilationValidation.h"
 #include "commands/Import.h"
 #include "tooling/import/Identity.h"
+#include "tooling/ImportCompilationDatabase.h"
 #include "model/AnalysisDiagnostic.h"
 #include "storage/catalog/Database.h"
 #include <atomic>
@@ -43,10 +44,9 @@ Result<std::size_t> importOne(const domain::Context &context, const std::filesys
   options.compilationDatabase = path.string();
   options.defaultExtraArguments = context.configuration.extraArguments;
   options.astCache = context.configuration.astCache;
-  std::string error;
-  auto compilation = clang::tooling::CompilationDatabase::loadFromDirectory(path.string(), error);
-  if (!compilation) return std::unexpected(failed(error));
-  options.sources = compilation->getAllFiles();
+  auto compilation = loadImportCompilationDatabase(path);
+  if (!compilation) return std::unexpected(failed(compilation.error()));
+  options.sources = (*compilation)->getAllFiles();
   auto configuration = context.configuration;
   auto identity = readImportIdentity(configuration.database, clone.cloneId);
   if (!identity) return std::unexpected(failed(identity.error()));
@@ -57,6 +57,15 @@ Result<std::size_t> importOne(const domain::Context &context, const std::filesys
           if (status != 0) return std::unexpected(failed("Compilation import failed"));
           return fileCount(context).transform([&](std::size_t after) { return after - before; });
         });
+  }).transform_error([&](domain::Error error) {
+    Json commands = Json::array();
+    for (const auto &command : (*compilation)->getAllCompileCommands()) {
+      if (!error.message.contains(command.Filename) || command.CommandLine.empty()) continue;
+      commands.push_back({{"source_file", command.Filename}, {"driver", command.CommandLine.front()},
+          {"working_directory", command.Directory}, {"arguments", command.CommandLine}});
+    }
+    if (!commands.empty()) error.details["compilation_commands"] = std::move(commands);
+    return error;
   });
 }
 }
@@ -95,7 +104,12 @@ Result<Json> importCompilation(const domain::Context &context, const runtime::Re
         if (path.is_relative()) {
           if (scan.catalog.clones.size() != 1)
             return std::unexpected(invalid("relative compilation_database requires one repository"));
-          path = scan.catalog.clones.front().path / path;
+          // A directory selection narrows discovery, not the clone-relative
+          // meaning of an explicit compilation database path.
+          auto identity = readImportIdentity(context.configuration.database,
+                                             scan.catalog.clones.front().cloneId);
+          if (!identity) return std::unexpected(failed(identity.error()));
+          path = std::filesystem::path(identity->activeClone.path) / path;
         }
         if (path.filename() == "compile_commands.json") path = path.parent_path();
         scan.databases = {path.lexically_normal()};
@@ -113,7 +127,16 @@ Result<Json> importCompilation(const domain::Context &context, const runtime::Re
         const auto *clone = watch::owner(path, scan.catalog);
         if (!clone) return std::unexpected(invalid("Compilation database is outside the selected registered clones"));
         auto imported = importOne(context, path, *clone, request);
-        if (!imported) return std::unexpected(imported.error());
+        if (!imported) {
+          auto error = std::move(imported.error());
+          const auto identity = readImportIdentity(context.configuration.database, clone->cloneId);
+          const auto root = identity ? identity->activeClone.path : clone->path.string();
+          error.details["path"] = (path / "compile_commands.json").string();
+          error.details["repository"] = clone->repository;
+          error.details["clone_path"] = root;
+          error.details["project_root"] = root;
+          return std::unexpected(std::move(error));
+        }
         registered += *imported;
         databases.push_back({{"path", (path / "compile_commands.json").string()}, {"files_registered", *imported}});
       }

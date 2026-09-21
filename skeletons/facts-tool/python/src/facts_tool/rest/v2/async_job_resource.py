@@ -47,6 +47,10 @@ class JobResource[T, R]:
             await async_call(self._http, "GET", path(self._family + "/job", identifier))
         )
 
+    async def retry(self, identifier: str) -> AsyncAnalysisJob[T]:
+        """Resubmit a retained failed/cancelled job using its original request."""
+        return await self._create({"retry_of": identifier})
+
     def list(self, *, limit: int = 50) -> AsyncCollection[AsyncAnalysisJob[T]]:
         route = path(self._family + "/job")
         if validate_limit(limit) > 500:

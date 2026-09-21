@@ -45,7 +45,10 @@ Result dependencies(const domain::Context &context,
       .and_then(completed)
       .and_then([&] { return recordFacts(context, file, refresh, scope.refreshedFiles()); })
       .and_then([&] { return dependencyResult(file); });
-  });
+  })
+      .transform_error([&](domain::Error error) {
+        return compilationFailure(context, file, std::move(error));
+      });
   });
   });
 }

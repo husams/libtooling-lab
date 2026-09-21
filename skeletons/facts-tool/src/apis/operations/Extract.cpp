@@ -30,7 +30,10 @@ Result extract(const domain::Context &context, const domain::ResolvedFile &file,
       })
       .and_then(completed)
       .and_then([&] { return recordFacts(context, file); })
-      .and_then([&] { return extractionResult(file); });
+      .and_then([&] { return extractionResult(file); })
+      .transform_error([&](domain::Error error) {
+        return compilationFailure(context, file, std::move(error));
+      });
   });
   });
 }

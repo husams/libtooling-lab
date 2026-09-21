@@ -39,9 +39,7 @@ std::expected<Update, std::string> update(const Settings &settings,
   if (result.refresh) {
     std::vector<std::filesystem::path> databases(snapshot->databases.begin(),
                                                 snapshot->databases.end());
-    auto plan = buildPlan(settings, snapshot->catalog, databases);
-    if (!plan) return std::unexpected(plan.error());
-    result.plan = std::move(*plan);
+    result.plan = buildPlan(settings, snapshot->catalog, databases);
   }
   return result;
 }

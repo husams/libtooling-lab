@@ -25,7 +25,26 @@ Result withDiagnostics(Work work) {
   }();
   auto diagnostics = diagnosticResults(scope);
   if (result) (*result)["diagnostics"] = std::move(diagnostics);
-  else result.error().details = {{"diagnostics", std::move(diagnostics)}};
+  else {
+    auto &error = result.error();
+    if (!error.details.is_object()) error.details = nlohmann::json::object();
+    auto &messages = error.details["diagnostics"];
+    if (!messages.is_array()) messages = nlohmann::json::array();
+    for (auto &diagnostic : diagnostics) messages.push_back(std::move(diagnostic));
+    // Keep context supplied by inner operations, including candidate commands
+    // and the compilation database path, when attaching compiler diagnostics.
+    for (const auto &diagnostic : messages) {
+      const auto severity = diagnostic.value("severity", "");
+      if (severity != "error" && severity != "fatal") continue;
+      const auto message = diagnostic.value("message", "");
+      if (error.message.find(message) != std::string::npos) break;
+      const auto file = diagnostic.value("file", "");
+      error.message += ": " + (file.empty() ? std::string{} : file + ":" +
+          std::to_string(diagnostic.value("line", 0)) + ":" +
+          std::to_string(diagnostic.value("column", 0)) + ": ") + message;
+      break;
+    }
+  }
   return result;
 }
 }

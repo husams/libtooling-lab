@@ -119,6 +119,27 @@ state, `job.wait()` polls until a terminal state and returns the operation's
 result model, and `job.cancel()` requests cancellation with HTTP `DELETE`.
 Cancellation errors do not imply that the underlying analysis was stopped.
 
+Retry a failed or cancelled job after fixing its inputs or compiler settings:
+
+```python
+failed = client.imports.get(failed_job_id)
+retry = failed.retry()
+result = retry.wait()
+print(retry.id, retry.metadata.retry_of)
+
+# Or resubmit directly through the matching analysis collection:
+retry = client.extractions.retry(failed_extraction_job_id)
+```
+
+`retry()` creates a new typed handle from the server's retained request. The
+original handle, job state and diagnostics remain unchanged. Every analysis
+collection supports it. The server uses current settings and catalog data;
+provide a normal `.create(...)` request to change analysis options. Only retained
+failed or cancelled jobs can be retried. Non-retryable states return a conflict;
+expired or different-family job IDs return not found. Retained jobs do not
+survive a server restart. Async clients provide `await job.retry()` and
+`await client.extractions.retry(job_id)` with the same behavior.
+
 `ExtractionResult`, matcher results, dependency results, call-graph results and
 variable-flow results are separate types rather than dictionaries. Collections
 of result records can be iterated lazily through the analysis resource, such as
