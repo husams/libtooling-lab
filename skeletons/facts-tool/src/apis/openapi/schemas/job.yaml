@@ -51,3 +51,6 @@ properties:
     type: [integer, 'null']
     format: int64
     description: Completion time in Unix epoch milliseconds; absent until terminal.
+  working_directory:
+    type: string
+    description: Effective child working directory; watcher jobs use the owning active clone.

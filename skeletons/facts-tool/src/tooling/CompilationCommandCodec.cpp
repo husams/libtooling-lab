@@ -293,7 +293,8 @@ assembleCompileCommand(const StoredCompileFile &file,
           ? file.root
           : std::filesystem::path(remapCompilePath(
                 resolvePath(file.workingDirectory, aliases), file.remapping));
-  return {directory.string(), file.path.string(), std::move(arguments), ""};
+  const auto absoluteDirectory = directory.is_absolute() ? directory : file.root / directory;
+  return {absoluteDirectory.lexically_normal().string(), file.path.string(), std::move(arguments), ""};
 }
 
 std::string jsonQuote(std::string_view value) {

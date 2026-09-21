@@ -9,7 +9,7 @@
 namespace facts::apis::operations {
 Result match(const domain::Context &context, const domain::ResolvedFile &file,
              const MatchRequest &request) {
-  return withDiagnostics([&]() -> Result {
+  return withFileContext(context, file, [&](const domain::Context &context) -> Result {
   if (request.query.empty())
     return std::unexpected(domain::Error{400, "invalid_request", "query is required"});
   ScopedCloneContext scope(file.clone);

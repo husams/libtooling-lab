@@ -68,7 +68,8 @@ struct SpawnOptions {
 }
 std::expected<Child, std::string> spawnChild(
     const std::filesystem::path &executable,
-    const std::vector<std::string> &arguments) {
+    const std::vector<std::string> &arguments,
+    const std::filesystem::path &workingDirectory) {
   Pipes pipes;
   int error = createPipe(pipes.descriptors.data());
   if (!error) error = createPipe(pipes.descriptors.data() + 2);
@@ -76,6 +77,9 @@ std::expected<Child, std::string> spawnChild(
   SpawnOptions options;
   if ((error = options.initialize(pipes)))
     return std::unexpected(std::strerror(error));
+  if (!workingDirectory.empty() &&
+      (error = posix_spawn_file_actions_addchdir_np(&options.actions, workingDirectory.c_str())))
+    return std::unexpected("cannot set child working directory " + workingDirectory.string() + ": " + std::strerror(error));
   std::string command = executable.string();
   std::vector<char *> argv{command.data()};
   for (const auto &argument : arguments)

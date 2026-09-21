@@ -56,3 +56,20 @@ def test_preparation_failure_reports_compiler_context_and_logs(
     assert "missing-build-header.hpp" in failure["message"]
     assert any(r["event"] == "job.diagnostic" and
                r["fields"].get("file") == str(source) for r in records(log))
+
+    assert details["stage"]
+    assert details["expected"] and "retry" in details["action"]
+    assert details["server_working_directory"] == str(server.root)
+    assert details["project_database"] == str(project.database)
+    assert isinstance(details["environment"], dict)
+    effective = details["effective_compilation_commands"]
+    assert effective and any("resource-dir" in arg for c in effective for arg in c["arguments"])
+    _, listing = server.api.request("GET", "/api/v2/extract/job")
+    listed = next(item for item in listing["items"] if item["id"] == job["id"])
+    assert listed["error"] == error
+    context_records = [r["fields"] for r in records(log)
+                       if r["event"] == "job.context" and r["fields"]["job_id"] == job["id"]]
+    parts = sorted((r for r in context_records if r["key"] == "effective_compilation_commands"),
+                   key=lambda r: r["part"])
+    import json
+    assert json.loads("".join(r["value"] for r in parts)) == effective

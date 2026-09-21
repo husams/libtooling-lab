@@ -27,7 +27,8 @@ options(const Settings &settings, bool importing) {
     else if (index + 1 < input.size()) value = input[++index];
     if (value.empty()) return std::unexpected("missing watch option value: " + key);
     if (database) result.databases.push_back(watch::absolute(value, settings));
-    else { result.arguments.push_back(key); result.arguments.push_back(value); }
+    else { result.arguments.push_back(key); result.arguments.push_back(
+        key == "--config" ? watch::absolute(value, settings).string() : value); }
   }
   return result;
 }

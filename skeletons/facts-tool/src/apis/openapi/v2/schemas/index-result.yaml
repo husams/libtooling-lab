@@ -5,3 +5,18 @@ additionalProperties: false
 properties:
   index_revision:
     type: string
+  sources_processed:
+    type: integer
+    minimum: 0
+  sources_skipped:
+    type: integer
+    minimum: 0
+  sources_removed:
+    type: integer
+    minimum: 0
+  sources_missing:
+    type: integer
+    minimum: 0
+  symbol_count:
+    type: integer
+    minimum: 0

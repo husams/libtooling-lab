@@ -14,12 +14,12 @@ void QueueState::pump() {
   active->record["state"] = "running";
   active->record["started_at"] = jobTimestamp();
   if (logger) logger->write(logging::Level::info, "job.started",
-                           {{"job_id", active->record["id"]}});
+                           {{"job_id", active->record["id"]}, {"working_directory", active->record["working_directory"]}});
   process = std::make_shared<Process>(io, settings.executable,
       active->record["arguments"].get<std::vector<std::string>>(),
       settings.timeoutSeconds, [weak = weak_from_this(), job = active](auto result) {
     if (auto state = weak.lock()) state->complete(job, std::move(result));
-  });
+  }, std::filesystem::path(active->record.value("working_directory", "")));
   auto running = process;
   running->start();
 }

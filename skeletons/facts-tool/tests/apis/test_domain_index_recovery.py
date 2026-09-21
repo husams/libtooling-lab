@@ -9,7 +9,7 @@ def refresh(api):
     completed(api, job)
 
 
-def test_malformed_and_reused_cursors_report_conflicts(domain_server):
+def test_malformed_and_reused_cursors_report_conflicts(domain_server, domain_project):
     api = domain_server.api
     first = symbols(api, "shared::same", limit=1)
     for name, cursor in (("shared::same", "invalid"), ("alpha::answer", first["next_cursor"])):
@@ -19,6 +19,11 @@ def test_malformed_and_reused_cursors_report_conflicts(domain_server):
     refresh(api)
     index_ready(api)
     query = urlencode({"qualified_name": "shared::same", "cursor": first["next_cursor"]})
+    status, unchanged = api.request("GET", "/v1/symbols?" + query)
+    assert status == 200, unchanged  # A no-op refresh preserves the cursor.
+    domain_project.write_source(domain_project.sources["alpha"], "alpha", "changed")
+    refresh(api)
+    index_ready(api)
     status, error = api.request("GET", "/v1/symbols?" + query)
     assert status == 409, error
 

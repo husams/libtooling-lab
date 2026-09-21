@@ -36,6 +36,9 @@ Result<std::size_t> fileCount(const domain::Context &context) {
 }
 Result<std::size_t> importOne(const domain::Context &context, const std::filesystem::path &path,
                                const watch::Clone &clone, const runtime::Request &request) {
+  auto identity = readImportIdentity(context.configuration.database, clone.cloneId);
+  if (!identity) return std::unexpected(failed(identity.error()));
+  return domain::workspaceContext(context, identity->activeClone.path).and_then([&](const domain::Context &context) -> Result<std::size_t> {
   cli::ImportOptions options;
   options.configuration = context.configuration.database.string();
   for (std::size_t i = 0; i + 1 < request.settings.defaults.size(); i += 2)
@@ -48,8 +51,6 @@ Result<std::size_t> importOne(const domain::Context &context, const std::filesys
   if (!compilation) return std::unexpected(failed(compilation.error()));
   options.sources = (*compilation)->getAllFiles();
   auto configuration = context.configuration;
-  auto identity = readImportIdentity(configuration.database, clone.cloneId);
-  if (!identity) return std::unexpected(failed(identity.error()));
   configuration.projectRoot = identity->activeClone.path;
   return fileCount(context).and_then([&](std::size_t before) {
     return commands::runImportResolved(options, configuration).transform_error(failed)
@@ -58,6 +59,10 @@ Result<std::size_t> importOne(const domain::Context &context, const std::filesys
           return fileCount(context).transform([&](std::size_t after) { return after - before; });
         });
   }).transform_error([&](domain::Error error) {
+    error.details["configuration_discovery"] = context.configuration.discovery;
+    error.details["extra_arguments"] = context.configuration.extraArguments;
+    error.details["expected"] = "Compile commands and headers accessible from each command working directory in the active clone";
+    error.details["action"] = "Correct the compilation database or missing build headers and retry the import job";
     Json commands = Json::array();
     for (const auto &command : (*compilation)->getAllCompileCommands()) {
       if (!error.message.contains(command.Filename) || command.CommandLine.empty()) continue;
@@ -66,6 +71,7 @@ Result<std::size_t> importOne(const domain::Context &context, const std::filesys
     }
     if (!commands.empty()) error.details["compilation_commands"] = std::move(commands);
     return error;
+  });
   });
 }
 }

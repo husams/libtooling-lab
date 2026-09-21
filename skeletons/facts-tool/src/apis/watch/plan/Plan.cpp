@@ -10,6 +10,8 @@ std::expected<void, std::string> appendExtractions(Plan &result, const Settings 
   auto base = plan::arguments(settings, catalog, options, false);
   config::Request request;
   request.direct = catalog.database.string();
+  request.workingDirectory = clone.path;
+  request.workspaceRoot = true;
   for (std::size_t i = 0; i + 1 < base.size(); ++i) {
     if (base[i] == "-o" || base[i] == "--output")
       return plan::appendBatches(result.extracts, std::move(base), sources);

@@ -13,5 +13,6 @@ struct Child {
 };
 std::expected<Child, std::string> spawnChild(
     const std::filesystem::path &executable,
-    const std::vector<std::string> &arguments);
+    const std::vector<std::string> &arguments,
+    const std::filesystem::path &workingDirectory = {});
 }

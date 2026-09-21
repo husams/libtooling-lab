@@ -26,3 +26,42 @@ properties:
     type: string
   reason:
     type: string
+  facts_database:
+    type: string
+  project_database:
+    type: string
+  extra_arguments_source:
+    type: string
+  ast_cache_directory:
+    type: string
+  stage:
+    type: string
+  expected:
+    type: string
+  action:
+    type: string
+  operation:
+    type: string
+  server_working_directory:
+    type: string
+  configuration_discovery:
+    type: array
+    items:
+      type: string
+  extra_arguments:
+    type: array
+    items:
+      type: string
+  effective_compilation_commands:
+    type: array
+    description: Platform-adjusted compiler commands, including resource and system include options.
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2DiagnosticCompilationCommand'
+  environment:
+    type: object
+    description: Build-related environment variables visible to the server.
+    additionalProperties:
+      type: string
+  request:
+    type: object
+    additionalProperties: true

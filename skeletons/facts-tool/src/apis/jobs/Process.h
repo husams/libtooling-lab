@@ -21,7 +21,7 @@ public:
   using Completion = std::function<void(ProcessResult)>;
   Process(boost::asio::io_context &io, std::filesystem::path executable,
           std::vector<std::string> arguments, unsigned timeout,
-          Completion completion);
+          Completion completion, std::filesystem::path workingDirectory = {});
   void start();
   void cancel(bool force = false);
 private:
@@ -38,7 +38,7 @@ private:
   void reaped(int status);
   void terminate();
   void finish();
-  std::filesystem::path executable_;
+  std::filesystem::path executable_, workingDirectory_;
   std::vector<std::string> arguments_;
   unsigned timeout_;
   Completion completion_;

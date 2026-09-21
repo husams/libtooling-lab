@@ -9,11 +9,13 @@ namespace {
 thread_local DiagnosticScope *active = nullptr;
 }
 DiagnosticScope::DiagnosticScope()
-    : previous_(active), previousMessages_(detail::analysisDiagnostics) {
+    : previousTrace_(executionTrace), previous_(active), previousMessages_(detail::analysisDiagnostics) {
+  executionTrace = &trace_;
   active = this;
   detail::analysisDiagnostics = &messages_;
 }
 DiagnosticScope::~DiagnosticScope() {
+  executionTrace = previousTrace_;
   active = previous_;
   detail::analysisDiagnostics = previousMessages_;
 }

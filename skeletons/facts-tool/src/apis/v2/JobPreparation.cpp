@@ -6,7 +6,7 @@
 
 namespace facts::apis::v2::jobs {
 Result<void> prepareFile(const domain::Context &context, const domain::ResolvedFile &file) {
-  return operations::withDiagnostics([&]() -> Result<Json> {
+  return operations::withFileContext(context, file, [&](const domain::Context &context) -> Result<Json> {
   ScopedCloneContext clone(file.clone);
   return operations::prepareCompilation(context, file)
       .transform_error([&](domain::Error error) {

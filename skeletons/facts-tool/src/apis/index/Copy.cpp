@@ -1,4 +1,7 @@
 #include "apis/index/Internal.h"
+#include <sys/stat.h>
+#include <cerrno>
+#include <cstring>
 
 namespace facts::apis::index {
 namespace {
@@ -8,7 +11,13 @@ Result<void> copy(Database &target, Database &source, const std::string &path) {
       "s.kind,(d.file_id IS NOT NULL OR s.is_definition=1),coalesce(p.path,'') "
       "FROM symbol s LEFT JOIN definition d ON d.symbol_id=s.id "
       "LEFT JOIN facts_project_provenance p ON p.file_id=coalesce(d.file_id,s.id>>32)";
-  return storage::prepare(target.nativeHandle(), stageInsert)
+  constexpr auto cacheInsert =
+      "INSERT INTO api_index_symbol(usr,qualified_name,file_id,kind,is_definition,path,source) "
+      "VALUES(?1,?2,?3,?4,?5,?6,?7) ON CONFLICT(source,usr,file_id) DO UPDATE SET "
+      "qualified_name=excluded.qualified_name,kind=excluded.kind,"
+      "path=CASE WHEN excluded.is_definition>=is_definition THEN excluded.path ELSE path END,"
+      "is_definition=max(is_definition,excluded.is_definition)";
+  return storage::prepare(target.nativeHandle(), cacheInsert)
       .transform_error([&](auto) { return catalog::databaseError(target); })
       .and_then([&](storage::Statement insert) -> Result<void> {
         try {
@@ -19,7 +28,7 @@ Result<void> copy(Database &target, Database &source, const std::string &path) {
           }
           return {};
         } catch (const storage::QueryError &error) {
-          return std::unexpected(error.what());
+          return std::unexpected(path + ": " + error.what());
         }
       });
 }
@@ -27,10 +36,10 @@ Result<void> copy(Database &target, Database &source, const std::string &path) {
 Result<bool> copySource(Database &database, const std::filesystem::path &path) {
   std::error_code error;
   const bool exists = std::filesystem::exists(path, error);
-  if (error) return std::unexpected("cannot inspect facts database: " + error.message());
+  if (error) return std::unexpected("cannot inspect facts database " + path.string() + ": " + error.message());
   if (!exists) return false;
   if (!std::filesystem::is_regular_file(path, error) || error)
-    return std::unexpected("facts database is not a regular file");
+    return std::unexpected("facts database is not a regular file: " + path.string());
   return catalog::query(database,
       "SELECT EXISTS(SELECT 1 FROM temp.api_symbol_owner o WHERE o.facts_db=?1) "
       "AND NOT EXISTS(SELECT 1 FROM temp.api_symbol_owner o "
@@ -40,10 +49,49 @@ Result<bool> copySource(Database &database, const std::filesystem::path &path) {
       .and_then([&](const auto &blocked) -> Result<bool> {
         if (blocked.at(0)) return true;
         return Database::open(path.string(), Database::readOnly)
-            .transform_error([](auto error) { return error.message(); })
+            .transform_error([&](auto error) { return path.string() + ": " + error.message(); })
             .and_then([&](Database source) {
               return copy(database, source, path.string()).transform([] { return true; });
             });
       });
 }
+Result<std::string> sourceFingerprint(const std::filesystem::path &path) {
+  // Include WAL and inode/main-file ctime so committed writes and replacements
+  // are detected even when callers preserve the main database's mtime.
+  std::string fingerprint;
+  for (const auto &name : {path.string(), path.string() + "-wal"}) {
+    struct stat info{};
+    if (::stat(name.c_str(), &info) != 0) {
+      if (errno != ENOENT) return std::unexpected("cannot inspect " + name + ": " + std::strerror(errno));
+      fingerprint += "missing;";
+      continue;
+    }
+#ifdef __APPLE__
+    const auto modified = info.st_mtimespec, changed = info.st_ctimespec;
+#else
+    const auto modified = info.st_mtim, changed = info.st_ctim;
+#endif
+    fingerprint += std::to_string(info.st_dev) + ":" + std::to_string(info.st_ino) + ":" +
+        std::to_string(info.st_size) + ":" + std::to_string(modified.tv_sec) + ":" +
+        std::to_string(modified.tv_nsec) + ":";
+    // SQLite may chown an existing WAL on every read-only open, changing only
+    // its ctime. That metadata change must not make every refresh fail or rescan.
+    if (name == path.string())
+      fingerprint += std::to_string(changed.tv_sec) + ":" + std::to_string(changed.tv_nsec);
+    fingerprint += ";";
+  }
+  return fingerprint;
+}
+Result<void> stageCachedSources(Database &database) {
+  return catalog::execute(database, R"sql(
+INSERT INTO temp.api_symbol_stage(usr,qualified_name,file_id,kind,is_definition,path)
+SELECT usr,qualified_name,file_id,kind,is_definition,path FROM api_index_symbol s
+WHERE NOT EXISTS (SELECT 1 FROM temp.api_symbol_owner o WHERE o.file_id=s.file_id AND o.facts_db<>s.source)
+ORDER BY source,usr,file_id
+ON CONFLICT(usr,file_id) DO UPDATE SET qualified_name=excluded.qualified_name,kind=excluded.kind,
+path=CASE WHEN excluded.is_definition>=is_definition THEN excluded.path ELSE path END,
+is_definition=max(is_definition,excluded.is_definition)
+)sql");
+}
+
 }

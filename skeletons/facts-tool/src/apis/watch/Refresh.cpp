@@ -1,5 +1,6 @@
 #include "apis/watch/State.h"
 #include "apis/watch/Snapshot.h"
+#include "apis/watch/catalog/Ownership.h"
 #include <chrono>
 
 namespace facts::apis {
@@ -21,6 +22,7 @@ std::string failureDetails(const std::string &name, const Json &job,
                           {"path", clone.path.string()}});
     message += "; active_clones=" + excerpt(clones.dump(), 2048);
   }
+  message += "; working_directory=" + job.value("working_directory", "unknown");
   message += "; arguments=" + excerpt(job.value("arguments", Json::array()).dump(), 4096);
   const auto diagnostics = job.value("stderr", "");
   message += "\n" + excerpt(diagnostics.empty() ? job.value("stdout", "") : diagnostics, 8192);
@@ -50,6 +52,10 @@ void Watcher::Impl::nextCommand() {
   auto command = std::move(commands.front());
   commands.pop_front();
   const auto name = command.front();
+  // Watch batches always end with an absolute source path after "--".
+  const auto *clone = snapshot ? watch::owner(command.back(), snapshot->catalog) : nullptr;
+  if (!clone) { error = "cannot resolve active clone for watched command"; finished(false); return; }
+  const auto workingDirectory = clone->path;
   auto id = queue.submit(std::move(command), [weak = weak_from_this(), name](bool ok) {
     if (auto self = weak.lock(); self && self->running) {
       if (ok) self->nextCommand();
@@ -60,7 +66,7 @@ void Watcher::Impl::nextCommand() {
         self->finished(false);
       }
     }
-  });
+  }, workingDirectory);
   if (id) latestJobs.push_back(*id);
   else { error = "job queue is full or stopped"; finished(false); }
 }

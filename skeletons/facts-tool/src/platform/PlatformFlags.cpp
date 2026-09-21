@@ -1,4 +1,5 @@
 #include "platform/PlatformFlags.h"
+#include "tooling/ExecutionTrace.h"
 
 #include "platform/DriverIncludes.h"
 #include "platform/ResourceDirectory.h"
@@ -141,6 +142,7 @@ configureCommands(Commands commands,
                                              resourceDirectory, sdkRoot, cache);
     if (!result)
       return std::unexpected(result.error());
+    traceCommand(result->Filename, result->Directory, result->CommandLine);
     configured.push_back(std::move(*result));
   }
   return configured;

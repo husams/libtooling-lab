@@ -236,9 +236,14 @@ by kind, USR and file ID. Cursor pagination uses the published generation, page
 position and a query fingerprint, so long USRs do not inflate request URLs.
 `file_id` references the existing project file identity, with cascading deletion.
 `is_definition` distinguishes known definitions from declaration-only fallbacks.
-These rows are derived from known facts files; the server rebuilds them in a
-background task at startup and after extraction or matching. Replacement is
-transactional, so a failed refresh does not replace the previous completed index.
+These rows are derived from known facts files. Background refreshes at startup
+and after extraction or matching read only new or changed databases. The
+`api_index_source` table stores file and WAL fingerprints; `api_index_symbol`
+caches unsuppressed rows per facts database, and `api_index_catalog` tracks the
+catalog context used to publish symbol identities. Cache updates and index
+replacement share a transaction, so a failed refresh preserves the previous
+completed index. An explicit `/api/v2/index/job` also picks up manual CLI
+extractions. No-op refreshes keep the published generation unchanged.
 
 Use the public [REST symbol API](../09-rest-api/02-requests-and-jobs.md) or
 [Python REST client](../05-python-sdk/11-rest-client.md) to query this index.
