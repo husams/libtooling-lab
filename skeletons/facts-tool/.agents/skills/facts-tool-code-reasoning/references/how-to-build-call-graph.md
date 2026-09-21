@@ -1,89 +1,80 @@
-# How to build a call graph
+# Build or reuse a call graph through Python
 
-Use the selected native facts-tool executable. Confirm its configuration
-with `facts-tool config show`, and use `symbol find` to disambiguate the exact
-qualified name or USR (see [symbol search](how-to-search-symbol.md)).
+Resolve the intended function using [global lookup](how-to-search-symbol.md).
+Pass a `SymbolReference` containing a returned symbol ID, exact USR, or exact
+qualified name. Analysis roots/targets are exact identities; prefix search
+defaults do not make an analysis root a prefix. Disambiguate overloads or
+cross-repository names rather than taking the first candidate.
 
-Let YAML configuration resolve the database pair; explicit paths are not
-required for normal CLI use. Add `--config FILE` only when selecting a
-particular YAML file. Keep the same configuration and invocation directory
-throughout the workflow.
+## Submit the graph
 
-## Run the graph
-
-```sh
-facts-tool analyse call-graph --function main
-```
-
-This reads existing facts and traverses. It prints exactly one completion line
-on stdout:
-
-```text
-facts-tool: call graph run <run_id> <status>
-```
-
-`<status>` is `complete`, `truncated`, `cancelled`, `recovery-failed`, or
-`failed`. No text listing, JSON, or diagram file is produced; the traversal is
-persisted as one append-only run identified by `<run_id>`. A qualified-name
-collision is a usage error; select the reported exact USR instead. A missing
-root writes no run.
-
-## Recover missing evidence explicitly
-
-```sh
-facts-tool analyse call-graph --function main --recover-missing
-```
-
-Recovery can write facts using imported translation-unit commands. A failure
-completes the run with status `recovery-failed`, prints one stderr summary line,
-and exits 1, while keeping the edges reached before the failure. See
-[recovery](../../../../docs/call-graph-recovery.md) for the outcome table.
-
-Default traversal is forward across all registered components with no
-automatic limits. Explicit options include `--component NAME`, `--calls-scope
-all|project|library`, `--max-depth N`, `--max-nodes N`, `--max-edges N`, and
-`--time-limit-ms N`. Reverse queries use `--direction callers`; paths use
-`--to TARGET --path-mode shortest|all-simple`. Use the SDK's `target_reached`,
-`self_path`, and `path_found` properties for path outcomes.
-
-## Fixture-backed recipe
-
-This isolated fixture deliberately overrides configured paths. From the
-facts-tool project directory, after building `build/facts-tool`:
-
-```sh
-mkdir -p build/graph-recipe
-build/facts-tool import --conf build/graph-recipe/project.db \
-  --extra-arg=-std=c++23 tests/fixtures/e2e/s025_workflow.cpp
-build/facts-tool extract --conf build/graph-recipe/project.db \
-  --output build/graph-recipe/facts.db tests/fixtures/e2e/s025_workflow.cpp
-build/facts-tool analyse call-graph --conf build/graph-recipe/project.db \
-  --facts build/graph-recipe/facts.db --function main --recover-missing
-```
-
-Read the exact persisted run with the installed public SDK:
+Inside an open client context:
 
 ```python
-from facts_tool import open_codebase
+from facts_tool.rest import SymbolReference
 
-with open_codebase(
-    facts_db="build/graph-recipe/facts.db",
-    project_db="build/graph-recipe/project.db",
-) as cb:
-    run_id = 1  # parsed from the native completion line
-    run = cb.callgraphs.get(run_id)
-    assert run.status == "complete"
-    for edge in run.edges:
-        print(edge.source.qualified_name, "->", edge.target.qualified_name)
+job = client.callgraphs.create(
+    root=SymbolReference(qualified_name="example::Service::run"),
+    direction="callees",
+)
+summary = job.wait(timeout=120)
+print(job.id, summary.coverage, summary.truncated, summary.truncation_reason)
+for node in client.callgraphs.nodes(job.id):
+    print(node.symbol_id, node.qualified_name, node.external,
+          node.unresolved_calls, node.pointer_calls)
+for edge in client.callgraphs.edges(job.id):
+    print(edge.source, edge.target, edge.file_id, edge.line, edge.column)
+for boundary in client.callgraphs.frontier(job.id):
+    print(boundary.symbol_id, boundary.reason)
+for diagnostic in client.callgraphs.diagnostics(job.id):
+    print(diagnostic.severity, diagnostic.message)
 ```
 
-A matched symbol is discovery evidence, not proof that its body or calls were
-extracted. Stored traversal completion, extraction coverage, freshness,
-unresolved calls, and recovery failures remain separate statements. A budget
-stop is a truncated run, recorded with its reason; external boundaries are not
-fabricated callees.
+Use `direction="callers"` for incoming traversal. The default traversal has
+no requested cap; supply `max_depth`, `max_nodes`, `max_edges`, or
+`time_limit_ms` when a bounded investigation is intended, and disclose those
+limits. `wait(timeout=...)` limits client waiting, not server traversal.
 
-If configuration or pair validation fails, correct the selected project/facts
-paths first. If recovery cannot find or compile a definition, inspect the SDK
-run's `recovery` entries and diagnostic; retain the partial run rather than
-claiming complete source coverage.
+Job summaries contain counts and coverage; fetch nodes/edges/frontier separately
+and lazily. Resolve an edge's symbol IDs against nodes from the same job and
+its file ID through `client.files.get(...)` when a path is needed. Preserve
+edge direction, depth, cycles, implicit sites, external/definition boundaries,
+and unresolved/pointer-call counts.
+
+## Ask for a path
+
+```python
+path_job = client.callgraphs.create(
+    root=SymbolReference(qualified_name="example::Service::run"),
+    target=SymbolReference(qualified_name="example::save"),
+    direction="callees",
+    path_mode="shortest",
+)
+path_summary = path_job.wait(timeout=120)
+for path in client.callgraphs.paths(path_job.id):
+    print(path.nodes)
+```
+
+Use `path_mode="all_simple"` for all simple paths when required. Inspect the
+actual paths collection, coverage, truncation, frontier, and diagnostics.
+A nonempty edge collection alone does not prove the requested target was
+reached; an empty path collection with limits or unresolved boundaries does
+not prove source-level unreachability. Do not read local-reader-only
+`path_outcome`/`target_reached` attributes from the REST summary.
+
+## Refresh evidence and reuse jobs
+
+Use `client.callgraphs.get(job_id)` to reuse a retained job matching the
+requested scope and source state. Keep the server job ID; do not parse native
+stdout, assume a run ID of 1, open a graph database, or duplicate the traversal
+through ad hoc relation queries.
+
+If the root or required body evidence is missing/stale, inspect the catalog,
+import real compilation commands when needed, run targeted
+`client.extractions.create(...)`, and then submit the graph. The v2 callgraph
+wrapper does not accept the CLI's `recover_missing`, `calls_scope`, or
+database options; do not invent them.
+
+A successful traversal is not proof of complete extraction or external behavior.
+Report partial coverage, recovery/definition gaps, and retained boundary
+evidence with the result.

@@ -1,97 +1,121 @@
-# Installed agent workflows
+# Server-backed agent workflows
 
-Use YAML-resolved paired paths and verify the selected executable and Python
-environment. Start by checking `facts-tool config show` and the relevant command
-help, then reuse the
-same project/facts pair for native and SDK calls. Do not require explicit
-database-path flags; use `--config FILE` to select another YAML file when needed. Keep temporary acceptance
-stores outside the checkout; do not set `PYTHONPATH`, mutate global stores, or
-read SQLite directly.
+Contents: [connection](#connect-and-check-readiness),
+[jobs and results](#submit-targeted-work-and-consume-results),
+[failures](#failures-and-evidence-limits), [async](#asynchronous-execution).
 
-## Build or reuse facts
+## Connect and check readiness
 
-```sh
-facts-tool import -p build
-facts-tool extract
-facts-tool analyse call-graph \
-  --function app::run  # capture the printed run_id
-```
-
-The native command output identifies the persisted graph run. The SDK reads
-that exact run without replaying traversal. Obtain `facts_path` and
-`project_path` from the configured pair as described in the
-[SDK query guide](query-cpp.md); the SDK still takes concrete path arguments:
+Install the distribution `facts-tool-query[rest]` in the execution environment
+(Python 3.12 or later). Import from `facts_tool.rest`, not a legacy client.
+Reuse the configured listener URL and credentials; the URL below is an example,
+not a fixed port. Use the actual bound port if the server started with port zero.
 
 ```python
-from facts_tool import open_codebase
+from facts_tool.rest import Client
 
-with open_codebase(facts_db=facts_path, project_db=project_path) as cb:
-    run_id = 1  # parsed from the native completion line
-    run = cb.callgraphs.get(run_id)
-    edges = run.edges
-    print("graph: " + ", ".join(
-        f"{edge.source.qualified_name}->{edge.target.qualified_name}"
-        for edge in edges
-    ))
+with Client("http://127.0.0.1:42817", token=None) as client:
+    print(client.server.health().status)
+    print(client.server.readiness())
+    print(client.index.status())
 ```
 
-## Answer focused questions
+Keep the client open while creating jobs, polling, and consuming collections.
+Supply `token=` from the existing credential configuration when authentication
+is enabled; never print it. Inspect the installed wrapper and the served OpenAPI
+contract if capabilities differ from checkout documentation.
 
-Use native symbol discovery first, selecting an exact USR when a name is
-ambiguous; use `match` for requested AST predicates or missing/refreshed symbol
-evidence. Use the SDK for typed
-navigation (`callees`, `callers`, `bases`), schema13 expressions and field
-effects, and exact bounded definition regions:
+Reuse catalog resources via `client.repositories.list()`. After registration,
+clone switching, or awaiting automatic processing, use
+`client.repositories.wait_until_ready(repo.id, timeout=120)`. This checks
+watcher processing, compilation configuration, indexed source counts, and index
+publication. It can raise `RepositoryNotReady` for disabled monitoring, missing
+configuration, or processing failure. A `RepositoryTimeout` only stops waiting.
+Use [manual import/extraction](rest-api.md) if monitoring is intentionally disabled.
+
+The global index covers registered facts across repositories. Startup indexing,
+watcher activity, and a ready listener are different states. Inspect watcher
+errors/exclusions and the index state before interpreting an empty lookup.
+A completed scan or import alone does not prove facts have been extracted.
+
+## Submit targeted work and consume results
 
 ```python
-with open_codebase(facts_db=facts_path, project_db=project_path) as cb:
-    print("symbols: " + cb.find("app::run").name)
-    print("writers: " + str(len(cb.field_writers("app::Box::value").rows)))
-    print("ancestors: " + ", ".join(
-        item.qualified_name for item in cb.ancestors("app::Box")
-    ))
-    region = cb.definition_regions(
-        "app::run", include_text=True, max_bytes=32_000
-    )
-    print("source: " + region.rows[0]["freshness"])
+from facts_tool.rest import FileReference, FileSelection
+
+# Continue inside the open client context.
+selection = FileSelection(files=[
+    FileReference(path="src/Widget.cpp", repository="example"),
+])
+job = client.extractions.create(selection=selection, force=False)
+summary = job.wait(timeout=120)
+print(job.id, summary.coverage, summary.files_processed, summary.files_skipped)
+for diagnostic in client.extractions.diagnostics(job.id):
+    print(diagnostic.severity, diagnostic.message)
+for result in client.extractions.results(job.id):
+    print(result.path, result.symbol_count)
 ```
 
-Check `truncated`, `partial`, `unknown`, `provenance`, and each row's
-`freshness` before stating a conclusion. A complete stored graph is not proof
-of complete source extraction; a limited match is not proof of full-file
-coverage. Changed, missing, invalid, cross-checkout, macro, dependent, and
-unavailable regions stay typed and reasoned.
+Use real registered files and their compiler commands. `force=False` permits
+freshness-based skips; force reprocessing only when needed. Successful extraction
+includes global-index publication. Re-query after refresh and retain remaining
+coverage gaps. See [resource APIs](rest-api.md) for other selections and jobs.
 
-## Process one match invocation
+`create()` accepts work and returns a handle; `refresh()` reads current state,
+`wait()` returns its typed summary after success, and `cancel()` requests
+cancellation. Retrieve an existing handle with the correct resource's
+`get(job_id)`. IDs are opaque strings; do not hard-code a numeric run ID or
+reuse an ID across analysis families.
 
-When the question requires a new AST predicate or refreshed source evidence,
-match only the selected registered TUs. Capture `--format json` and process it
-with `load_match_results` or `MatchResults.from_json`, using the
-[match results recipe](match-results.md). This reader needs no `CodeBase` or
-database paths. Keep each row's binding names and TU, including repeated header
-occurrences, and report unavailable coordinates rather than inventing them.
-Check command success and result publication flags before using the collection.
-Its `complete` flag describes the selected TUs, not full-project or body coverage.
+A summary's `matches`, `nodes`, `edges`, or `diagnostics` can be `None`
+because records were not fetched. Fetch them using the resource's separate
+iterators. Collections issue requests as iteration advances; `limit` is a
+**page size**, not an overall result cap. Use `itertools.islice` for a bounded
+preview and disclose omitted output. Call `.collect()` only when a full
+in-memory list is wanted. Page size defaults to 50; use at most 500.
 
-For a later persisted-store query, reopen `CodeBase` after native writes. The
-saved JSON remains the snapshot of its invocation and does not refresh itself
-when source changes. Parse structured results with the SDK; ordinary text is
-for display, and the matched-symbol index is a separate discovery view.
+## Failures and evidence limits
 
-## Track local variables and parameters
+Handle `ApiError` (including typed validation, ambiguity, and conflict errors),
+`TransportError`, `ProtocolError`, `JobFailed`, and `JobTimeoutError` at
+their respective boundaries. Report the job ID and structured error code/message
+when available; never read an older job as though it were the failed operation.
+A local timeout or cancelled coroutine leaves server work running. Cancel
+explicitly through `job.cancel()` when requested, then inspect the returned
+state; a cancellation conflict does not mean analysis stopped.
 
-For reads, writes, argument passing, or captured return values, follow the
-[variable-flow workflow](variable-flow.md). Generate the run with native
-`analyse variable-flow`, then open its standalone artifact with public
-`open_variable_flow` and query `run.graph`. Keep the actual run ID, declaration
-identity, source locations, call-site links, and boundary reasons. Parameters
-use the same command; omit `--max-depth` unless a cap is requested.
+A 503 `index_not_ready` means wait for index readiness, not zero symbols.
+An expired symbol cursor produces a conflict: restart that query from its first
+page and discard the earlier partial collection rather than mixing revisions.
+Do not blindly resubmit a mutating request after an uncertain transport failure;
+inspect retained jobs/resources first.
 
-## Acceptance discipline
+Check each operation's actual coverage fields, diagnostic collections, and
+truncation/boundary records. Matcher completion covers only the selected TUs;
+graph completion is not proof of all source behavior. Preserve nullable
+coordinates and unavailable-location reasons. Job history is bounded and does
+not survive server restart; facts/indexes persist. Record needed evidence
+before retention expires.
 
-An isolated acceptance harness should invoke each requested query once, reuse
-the open SDK session, and report one concise sentence per query. Record native
-tool-call count, captured output characters, and an approximate output-token
-count when available. Run both wheel and source-distribution installs in clean
-environments and verify imports resolve from the environment, not the
-checkout. S-028 remains the owner of its skill-refinement acceptance.
+## Asynchronous execution
+
+```python
+from facts_tool.rest import AsyncClient, SymbolReference
+
+async def inspect_callers(base_url: str):
+    async with AsyncClient(base_url) as client:
+        async for symbol in client.symbols.find(qualified_name="example::"):
+            print(symbol.symbol_id, symbol.qualified_name)
+        job = await client.callgraphs.create(
+            root=SymbolReference(qualified_name="example::Service::run"),
+            direction="callers",
+        )
+        summary = await job.wait(timeout=120)
+        print(summary.coverage, summary.truncated)
+        async for edge in client.callgraphs.edges(job.id):
+            print(edge.source, edge.target)
+```
+
+Await create/get/update/delete, readiness waits, refresh/cancel/wait, and
+`.collect()`. Collection factories (`find`, `list`, `results`, `nodes`,
+`edges`) return async iterables without being awaited. Use `async for`.
