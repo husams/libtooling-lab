@@ -35,7 +35,7 @@ Result dependencyResult(const domain::ResolvedFile &file) {
 }
 Result dependencies(const domain::Context &context,
                     const domain::ResolvedFile &file) {
-  return withDiagnostics([&]() -> Result {
+  return withFileContext(context, file, [&](const domain::Context &context) -> Result {
   ScopedCloneContext scope(file.clone);
   return prepareCompilation(context, file).and_then([&](CompilationContext compilation) {
   ScopedCompilationContext selected(compilation);

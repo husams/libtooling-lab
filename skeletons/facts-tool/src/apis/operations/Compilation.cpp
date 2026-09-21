@@ -9,12 +9,24 @@ domain::Error compilationFailure(const domain::Context &context,
     const domain::ResolvedFile &file, domain::Error error) {
   if (!error.details.is_object()) error.details = nlohmann::json::object();
   error.details["path"] = file.path.string();
+  error.details["facts_database"] = file.facts.string();
+  error.details["project_database"] = context.configuration.database.string();
+  error.details["configuration_discovery"] = context.configuration.discovery;
+  error.details["extra_arguments"] = context.configuration.extraArguments;
+  error.details["extra_arguments_source"] = context.configuration.extraArgumentsSource;
+  error.details["ast_cache_directory"] = context.configuration.astCache.directory.string();
+  if (!error.details.contains("stage")) error.details["stage"] = "prepare compilation";
+  if (!error.details.contains("expected"))
+    error.details["expected"] = "A valid compile command whose working directory, source, and headers are accessible in the selected clone";
+  if (!error.details.contains("action"))
+    error.details["action"] = "Check the reported working directory, compiler arguments and diagnostic; correct the build configuration or missing headers, then retry the job using retry_of";
   error.details["repository"] = file.repository;
   error.details["project_root"] = file.clone ? file.clone->path :
       context.configuration.projectRoot.string();
   if (file.clone) error.details["clone_path"] = file.clone->path;
   // Report the input command in the selected clone/header context. Do not
   // repeat driver probing or internal Clang adjustments while handling errors.
+  if (error.details.contains("compilation_commands")) return error;
   try {
     const std::vector<std::string> sources{file.path.string()};
     auto compilation = loadStoredCompilationDatabase(context.configuration.database.string(), sources);

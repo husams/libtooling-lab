@@ -3,7 +3,7 @@
 
 namespace facts::apis {
 std::optional<std::string> QueueState::submit(std::vector<std::string> arguments,
-                                            JobCallback completion) {
+                                            JobCallback completion, std::filesystem::path workingDirectory) {
   if (stopped || pending.size() >= 64 || arguments.empty()) {
     if (logger) logger->write(logging::Level::warning, "queue.rejected",
         {{"reason", stopped ? "stopping" : arguments.empty() ? "empty" : "capacity"}});
@@ -24,10 +24,12 @@ std::optional<std::string> QueueState::submit(std::vector<std::string> arguments
     jobs.erase(*oldest);
     order.erase(oldest);
   }
+  if (workingDirectory.empty()) workingDirectory = settings.workingDirectory;
+  if (workingDirectory.empty()) workingDirectory = std::filesystem::current_path();
   auto id = std::to_string(nextId++);
   auto job = std::make_shared<Job>(Job{
       {{"id", id}, {"state", "queued"}, {"arguments", std::move(arguments)},
-       {"exit_code", nullptr}, {"stdout", ""}, {"stderr", ""},
+       {"working_directory", workingDirectory.string()}, {"exit_code", nullptr}, {"stdout", ""}, {"stderr", ""},
        {"truncated", false}, {"timed_out", false}, {"created_at", jobTimestamp()}},
       std::move(completion)});
   jobs.emplace(id, job);

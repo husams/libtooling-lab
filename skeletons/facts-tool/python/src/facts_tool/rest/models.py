@@ -27,6 +27,7 @@ class Job:
     created_at: int
     started_at: int | None = None
     finished_at: int | None = None
+    working_directory: str | None = None
 
     @property
     def done(self) -> bool:

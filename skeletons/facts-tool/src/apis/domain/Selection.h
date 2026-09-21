@@ -22,6 +22,7 @@ struct FileSelector {
 };
 struct Context {
   config::Resolved configuration;
+  std::string configurationFile;
 };
 struct ResolvedFile {
   std::int64_t fileId = 0;
@@ -33,6 +34,7 @@ struct ResolvedFile {
   bool activeClone = true;
 };
 Result<Context> resolveContext(const Settings &settings);
+Result<Context> workspaceContext(const Context &context, const std::filesystem::path &root);
 Result<ResolvedFile> resolveFile(const Context &context,
                                  const FileSelector &selector);
 Result<std::vector<std::filesystem::path>> factSources(const Context &context);

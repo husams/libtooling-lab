@@ -54,6 +54,7 @@ def job(value: object, *, metadata: bool = False) -> Job:
         created_at=cast(int, field(body, "created_at", int)),
         started_at=cast(int | None, field(body, "started_at", int, optional=True)),
         finished_at=cast(int | None, field(body, "finished_at", int, optional=True)),
+        working_directory=cast(str | None, field(body, "working_directory", str, optional=True)),
     )
 
 

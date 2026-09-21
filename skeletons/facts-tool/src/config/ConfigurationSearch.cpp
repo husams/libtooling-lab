@@ -30,7 +30,9 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
   const auto direct = !request.direct.empty() ? request.direct : detail::env("FACTS_TOOL_CONF");
   if (request.direct.empty() && detail::present("FACTS_TOOL_CONF") && direct.empty())
     return std::unexpected("FACTS_TOOL_CONF must not be empty");
-  Resolved value{.projectRoot = detail::cwd(),
+  const auto workingDirectory = request.workingDirectory.empty() ? detail::cwd()
+      : std::filesystem::weakly_canonical(request.workingDirectory);
+  Resolved value{.projectRoot = workingDirectory,
                  .templateText = "{relative_path}/{filename}.db",
                  .source = direct.empty() ? "generated" : "direct",
                  .generated = direct.empty(),
@@ -42,7 +44,7 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
                  .astCacheDirectorySource = "built-in"};
   if (partial) *partial = value;
   const auto useDirect = [&](Resolved resolved) {
-    resolved.database = (detail::cwd() / direct).lexically_normal();
+    resolved.database = (workingDirectory / direct).lexically_normal();
     resolved.astCache.database = resolved.database;
     resolved.source = request.direct.empty() ? "FACTS_TOOL_CONF" : "--conf";
     return resolved;
@@ -51,7 +53,7 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
   if (request.selector.empty() && detail::present("FACTS_TOOL_CONFIG") &&
       detail::env("FACTS_TOOL_CONFIG").empty())
     return std::unexpected("FACTS_TOOL_CONFIG must not be empty");
-  value.projectRoot = detail::projectRoot(value.projectRoot);
+  if (!request.workspaceRoot) value.projectRoot = detail::projectRoot(value.projectRoot);
   const auto selector = !request.selector.empty() ? request.selector
                                                  : detail::env("FACTS_TOOL_CONFIG");
   const auto xdgConfig = detail::env("XDG_CONFIG_HOME");
@@ -69,7 +71,7 @@ std::expected<Resolved, std::string> resolve(const Request &request, Resolved *p
     else if (firstError.empty()) firstError = result.error();
   };
   if (!selector.empty())
-    record(detail::readCandidate((detail::cwd() / selector).lexically_normal(), value.generated,
+    record(detail::readCandidate((workingDirectory / selector).lexically_normal(), value.generated,
                                  detail::Presence::Required, value),
           context.configFile);
   record(detail::readCandidate(detail::projectConfigPath(value.projectRoot), value.generated,

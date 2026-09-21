@@ -15,6 +15,8 @@ struct Request {
   std::string direct;
   bool create = false;
   bool loadDefaults = true;
+  std::filesystem::path workingDirectory;
+  bool workspaceRoot = false;
 };
 
 struct Resolved {

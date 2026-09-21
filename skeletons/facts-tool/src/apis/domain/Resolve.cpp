@@ -34,7 +34,10 @@ Result<ResolvedFile> resolve(const Context &context,
         std::error_code error;
         if (!std::filesystem::is_regular_file(path, error))
           return std::unexpected(Error{404, "file_unavailable",
-                                       "registered source file is unavailable"});
+                                       "registered source file is unavailable: " + path.string(),
+              {{"path", path.string()}, {"project_root", file.clone ? file.clone->path : context.configuration.projectRoot.string()},
+               {"stage", "resolve source"}, {"expected", "A readable source file in the selected clone"},
+               {"action", "Restore the source file or select the correct active clone, then retry"}}});
         return detail::factsPath(context, candidate, path).transform(
             [&](std::filesystem::path facts) {
               return ResolvedFile{file.id, path, std::move(facts),

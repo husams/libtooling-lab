@@ -16,6 +16,8 @@ Result<void> prepareStage(Database &database);
 Result<void> prepareOwners(Database &database, const std::filesystem::path &base);
 Result<std::vector<std::filesystem::path>> sources(
     Database &database, const std::filesystem::path &project);
+Result<std::string> sourceFingerprint(const std::filesystem::path &path);
+Result<void> stageCachedSources(Database &database);
 Result<bool> copySource(Database &database, const std::filesystem::path &path);
 Result<RefreshResult> publish(Database &database, std::size_t sources,
                               std::size_t missing);
@@ -29,12 +31,4 @@ Result<void> stage(Database &database, storage::Statement &statement,
                    const std::string &usr, const std::string &name,
                    std::int64_t file, std::int64_t kind, bool definition,
                    const std::string &path, const std::string &source);
-inline constexpr std::string_view stageInsert =
-    "INSERT INTO temp.api_symbol_stage(usr,qualified_name,file_id,kind,"
-    "is_definition,path) SELECT ?1,?2,?3,?4,?5,?6 WHERE NOT EXISTS "
-    "(SELECT 1 FROM temp.api_symbol_owner WHERE file_id=?3 AND facts_db<>?7) "
-    "ON CONFLICT(usr,file_id) DO UPDATE SET "
-    "qualified_name=excluded.qualified_name,kind=excluded.kind,"
-    "path=CASE WHEN excluded.is_definition>=is_definition THEN excluded.path "
-    "ELSE path END,is_definition=max(is_definition,excluded.is_definition)";
 }

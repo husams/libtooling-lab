@@ -8,8 +8,8 @@ Queue::Queue(boost::asio::io_context &io, const Settings &settings,
           Impl{std::make_shared<QueueState>(io, settings, logger)})) {}
 Queue::~Queue() { stop(); }
 std::optional<std::string> Queue::submit(std::vector<std::string> arguments,
-                                       JobCallback completion) {
-  return impl_->state->submit(std::move(arguments), std::move(completion));
+                                       JobCallback completion, std::filesystem::path workingDirectory) {
+  return impl_->state->submit(std::move(arguments), std::move(completion), std::move(workingDirectory));
 }
 Json Queue::list() const { return impl_->state->list(); }
 std::optional<Json> Queue::get(const std::string &id) const {

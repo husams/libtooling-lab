@@ -7,13 +7,13 @@
 namespace facts::apis {
 Process::Process(boost::asio::io_context &io, std::filesystem::path executable,
                  std::vector<std::string> arguments, unsigned timeout,
-                 Completion completion)
-    : executable_(std::move(executable)), arguments_(std::move(arguments)),
+                 Completion completion, std::filesystem::path workingDirectory)
+    : executable_(std::move(executable)), workingDirectory_(std::move(workingDirectory)), arguments_(std::move(arguments)),
       timeout_(timeout), completion_(std::move(completion)), output_(io),
       error_(io), pollTimer_(io), deadline_(io), killTimer_(io), drainTimer_(io) {}
 
 void Process::start() {
-  auto child = spawnChild(executable_, arguments_);
+  auto child = spawnChild(executable_, arguments_, workingDirectory_);
   if (!child) {
     error_.text = "Cannot start command: " + child.error();
     exited_ = true;

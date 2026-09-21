@@ -1,5 +1,6 @@
 #include "apis/runtime/State.h"
 #include <boost/asio/post.hpp>
+#include <cstdlib>
 
 namespace facts::apis::runtime {
 namespace {
@@ -31,7 +32,16 @@ void State::run(std::string id, Request request, domain::Context context) {
         });
       });
       if (published) {
-        if (result) (*result)["index_revision"] = std::to_string(published->generation);
+        if (result) {
+          (*result)["index_revision"] = std::to_string(published->generation);
+          if (request.operation == "v2.index") {
+            (*result)["sources_processed"] = published->processedSources;
+            (*result)["sources_skipped"] = published->skippedSources;
+            (*result)["sources_removed"] = published->removedSources;
+            (*result)["sources_missing"] = published->missingSources;
+            (*result)["symbol_count"] = published->symbols;
+          }
+        }
         boost::asio::post(self->io, [weak, published = std::move(published)]() mutable {
           if (auto state = weak.lock()) state->indexed(std::move(published));
         });
@@ -54,6 +64,25 @@ void State::run(std::string id, Request request, domain::Context context) {
             self->log(logging::Level::warning, "import.warning", std::move(diagnostic));
           }
     }
+    if (!result) {
+      auto &details = result.error().details;
+      if (!details.is_object()) details = Json::object();
+      details["operation"] = request.operation;
+      details["request"] = request.options;
+      details["server_working_directory"] = request.settings.workingDirectory.string();
+      details["project_database"] = context.configuration.database.string();
+      if (!details.contains("stage")) details["stage"] = request.operation;
+      if (!details.contains("expected")) details["expected"] = request.operation == "v2.index"
+          ? "Readable facts databases with a valid facts-tool schema for registered files"
+          : "A valid request and accessible registered workspace with the required build inputs";
+      if (!details.contains("action")) details["action"] =
+          "Correct the reported error and resubmit this operation with retry_of set to this job ID";
+      Json environment = Json::object();
+      for (const auto *key : {"PATH", "CPATH", "CPLUS_INCLUDE_PATH", "C_INCLUDE_PATH",
+                              "SDKROOT", "MACOSX_DEPLOYMENT_TARGET", "FACTS_TOOL_CONFIG"})
+        if (const auto *value = std::getenv(key)) environment[key] = value;
+      details["environment"] = std::move(environment);
+    }
     const bool success = result.has_value();
     Json failure = result ? Json(nullptr) : encodeError(result.error());
     if (!result) {
@@ -63,7 +92,7 @@ void State::run(std::string id, Request request, domain::Context context) {
           {"code", result.error().code}, {"message", logText(result.error().message, 4096)}};
       const auto &details = result.error().details;
       if (details.is_object()) {
-        for (const auto *key : {"path", "repository", "clone_path", "project_root"})
+        for (const auto *key : {"path", "repository", "clone_path", "project_root", "stage", "expected", "action"})
           if (details.contains(key) && details.at(key).is_string())
             fields[key] = logText(details.at(key).get<std::string>(), 1024);
         if (details.contains("compilation_commands")) {
@@ -84,14 +113,24 @@ void State::run(std::string id, Request request, domain::Context context) {
           }
       }
       self->log(logging::Level::error, "job.failed", std::move(fields));
+      // Preserve full context in bounded records, including every compiler option.
+      // Parts are JSON string fragments in order, not silently truncated values.
+      if (details.is_object()) for (const auto &[key, value] : details.items()) {
+        if (key == "diagnostics") continue;
+        const auto serialized = value.dump(-1, ' ', true, Json::error_handler_t::replace);
+        constexpr std::size_t partSize = 1024;
+        for (std::size_t offset = 0; offset < serialized.size(); offset += partSize)
+          self->log(logging::Level::error, "job.context", {{"job_id", id}, {"key", key},
+              {"part", offset / partSize}, {"parts", (serialized.size() + partSize - 1) / partSize},
+              {"value", serialized.substr(offset, partSize)}});
+      }
     }
     Json document{{"result", result ? std::move(*result) : Json(nullptr)},
                   {"error", std::move(failure)}};
     const bool nativeV2 = request.operation.starts_with("v2.");
     auto payload = nativeV2 ? nullptr : std::make_shared<const std::string>(serialize(document));
     auto retained = nativeV2 ? std::make_shared<const Json>(std::move(document)) : nullptr;
-    Json summary = success ? Json(nullptr) : Json{
-        {"code", result.error().code}, {"message", result.error().message}};
+    Json summary = success ? Json(nullptr) : encodeError(result.error());
     boost::asio::post(self->io, [weak, id, success, error = std::move(summary),
                                 payload = std::move(payload), retained = std::move(retained)]() mutable {
       if (auto self = weak.lock())

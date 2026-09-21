@@ -20,7 +20,8 @@ public:
   // Call from the owning io_context thread; arguments are used exactly as given.
   // At most 64 waiting jobs and 128 retained records, with 4 MiB per output stream.
   std::optional<std::string> submit(std::vector<std::string> arguments,
-                                  JobCallback completion = {});
+                                  JobCallback completion = {},
+                                  std::filesystem::path workingDirectory = {});
   Json list() const; // Metadata only; get() includes the completed captured output.
   std::optional<Json> get(const std::string &id) const;
   bool cancel(const std::string &id);

@@ -3,6 +3,8 @@
 #include "analysis/variableflow/Engine.h"
 #include "commands/CompilationDatabase.h"
 #include "tooling/StoredCompilationDatabase.h"
+#include <map>
+#include <algorithm>
 
 namespace facts::apis::v2::jobs {
 namespace {
@@ -26,6 +28,24 @@ Json encode(const variableflow::Graph &graph) {
   result["node_count"] = graph.nodes.size();
   result["edge_count"] = graph.edges.size();
   return result;
+}
+Result<commands::CompilationDatabasePtr> workspaceCompilation(const domain::Context &context,
+    const std::vector<domain::ResolvedFile> &files, commands::CompilationDatabasePtr database) {
+  std::map<std::string, std::vector<std::string>> arguments;
+  for (const auto &file : files) {
+    const auto root = file.clone ? std::filesystem::path(file.clone->path) : context.configuration.projectRoot;
+    auto workspace = domain::workspaceContext(context, root);
+    if (!workspace) return std::unexpected(workspace.error());
+    arguments.emplace(file.path.string(), workspace->configuration.extraArguments);
+  }
+  auto adjusted = std::make_unique<clang::tooling::ArgumentsAdjustingCompilations>(std::move(database));
+  adjusted->appendArgumentsAdjuster([arguments = std::move(arguments)](const auto &input, auto source) {
+    auto result = input;
+    if (const auto found = arguments.find(source.str()); found != arguments.end())
+      appendCommandOptions(result, found->second);
+    return result;
+  });
+  return commands::CompilationDatabasePtr(std::move(adjusted));
 }
 Result<variableflow::Request> flowRequest(const domain::Context &context,
     const runtime::Request &request, const index::Symbol &function) {
@@ -59,18 +79,26 @@ Result<Json> variableFlow(const domain::Context &context, const runtime::Request
             for (const auto &file : files) sources.push_back(file.path.string());
             auto controls = flowRequest(context, request, function);
             if (!controls) return std::unexpected(controls.error());
-            return loadStoredCompilationDatabase(context.configuration.database.string(), sources)
-                .transform_error(failed).and_then([&](auto database) -> Result<Json> {
-                  auto adjusted = commands::appendExtraArguments(std::move(database),
-                      context.configuration.extraArguments);
+            const auto owner = std::ranges::find(files, function.fileId, &domain::ResolvedFile::fileId);
+            const auto &selected = owner == files.end() ? files.front() : *owner;
+            const auto root = selected.clone ? std::filesystem::path(selected.clone->path)
+                                             : context.configuration.projectRoot;
+            return domain::workspaceContext(context, root).and_then([&](const auto &workspace) {
+              return loadStoredCompilationDatabase(context.configuration.database.string(), sources)
+                .transform_error(failed)
+                .and_then([&](auto database) { return workspaceCompilation(context, files, std::move(database)); })
+                .and_then([&](auto adjusted) -> Result<Json> {
                   auto allowed = checkpoint(request);
                   if (!allowed) return std::unexpected(allowed.error());
-                  return variableflow::analyse(*adjusted, sources, *controls, context.configuration.astCache)
+                  return variableflow::analyse(*adjusted, sources, *controls, workspace.configuration.astCache)
                       .transform_error([&](std::string message) {
                         return message == "variable-flow cancelled"
                             ? domain::Error{409, "cancelled", std::move(message)} : failed(std::move(message));
                       }).transform(encode);
+                }).transform_error([&](domain::Error error) {
+                  return operations::compilationFailure(workspace, selected, std::move(error));
                 });
+            });
           });
         });
   });

@@ -10,7 +10,7 @@ struct QueueState : std::enable_shared_from_this<QueueState> {
   QueueState(boost::asio::io_context &context, const Settings &configuration,
              logging::Logger *logger)
       : io(context), settings(configuration), logger(logger) {}
-  std::optional<std::string> submit(std::vector<std::string>, JobCallback);
+  std::optional<std::string> submit(std::vector<std::string>, JobCallback, std::filesystem::path);
   Json list() const;
   std::optional<Json> get(const std::string &) const;
   bool cancel(const std::string &);

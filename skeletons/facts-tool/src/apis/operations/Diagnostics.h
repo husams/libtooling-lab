@@ -2,6 +2,8 @@
 #include "apis/operations/Operations.h"
 #include "tooling/DiagnosticScope.h"
 #include "storage/SqliteQuery.h"
+#include "apis/operations/Compilation.h"
+#include "storage/CloneContext.h"
 
 namespace facts::apis::operations {
 inline nlohmann::json diagnosticResults(const DiagnosticScope &scope) {
@@ -28,6 +30,14 @@ Result withDiagnostics(Work work) {
   else {
     auto &error = result.error();
     if (!error.details.is_object()) error.details = nlohmann::json::object();
+    if (!scope.trace().stage.empty()) error.details["stage"] = scope.trace().stage;
+    if (!scope.trace().commands.empty()) {
+      auto commands = nlohmann::json::array();
+      for (const auto &command : scope.trace().commands)
+        commands.push_back({{"source_file", command.source}, {"working_directory", command.directory},
+            {"arguments", command.arguments}, {"driver", command.arguments.empty() ? "" : command.arguments.front()}});
+      error.details["effective_compilation_commands"] = std::move(commands);
+    }
     auto &messages = error.details["diagnostics"];
     if (!messages.is_array()) messages = nlohmann::json::array();
     for (auto &diagnostic : diagnostics) messages.push_back(std::move(diagnostic));
@@ -47,4 +57,17 @@ Result withDiagnostics(Work work) {
   }
   return result;
 }
+template <typename Work>
+Result withFileContext(const domain::Context &server, const domain::ResolvedFile &file, Work work) {
+  ScopedCloneContext clone(file.clone);
+  const auto root = file.clone ? std::filesystem::path(file.clone->path)
+                               : server.configuration.projectRoot;
+  return domain::workspaceContext(server, root).and_then([&](const domain::Context &context) {
+    return withDiagnostics([&] { return work(context); })
+        .transform_error([&](domain::Error error) {
+          return compilationFailure(context, file, std::move(error));
+        });
+  });
+}
+
 }

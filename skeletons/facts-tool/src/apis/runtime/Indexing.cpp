@@ -44,7 +44,9 @@ void State::indexed(domain::Result<index::RefreshResult> result) {
   }
   log(result ? logging::Level::info : logging::Level::error,
       result ? "index.completed" : "index.failed",
-      {{"files", indexStatus["files"]}, {"symbols", indexStatus["symbols"]}});
+      {{"files", indexStatus["files"]}, {"symbols", indexStatus["symbols"]},
+       {"project_database", context ? context->configuration.database.string() : ""},
+       {"error", result ? Json(nullptr) : encodeError(result.error())}});
 }
 Json encode(const index::Page &page) {
   Json items = Json::array();

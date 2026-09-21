@@ -18,7 +18,7 @@ Result extractionResult(const domain::ResolvedFile &file) {
 }
 Result extract(const domain::Context &context, const domain::ResolvedFile &file,
                const ExtractRequest &request) {
-  return withDiagnostics([&]() -> Result {
+  return withFileContext(context, file, [&](const domain::Context &context) -> Result {
   ScopedCloneContext scope(file.clone);
   return prepareCompilation(context, file).and_then([&](CompilationContext compilation) {
   ScopedCompilationContext selected(compilation);

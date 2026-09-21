@@ -19,8 +19,17 @@ void verifySnapshot(Fixture &fixture) {
   assert(next->items[0].fileId == 2 && next->items[0].repository == "beta");
   auto rebuilt = index::refresh(fixture.project);
   assert(rebuilt && rebuilt->symbols == first->symbols);
-  assert(rebuilt->generation > first->generation);
+  assert(first->processedSources == 2);
+  assert(rebuilt->processedSources == 0 && rebuilt->skippedSources == 2);
+  assert(rebuilt->generation == first->generation);
+  assert(index::search(fixture.project, query));
+  execute(fixture.first, "UPDATE symbol SET qualified_name='shared::changed' WHERE usr='shared'");
+  auto modified = index::refresh(fixture.project);
+  assert(modified && modified->processedSources == 1 && modified->skippedSources == 1);
+  assert(modified->generation > rebuilt->generation);
   assert(!index::search(fixture.project, query));
+  execute(fixture.first, "UPDATE symbol SET qualified_name='shared::same' WHERE usr='shared'");
+  assert(index::refresh(fixture.project));
   const auto defined = index::search(fixture.project, {.qualifiedName = "alpha::defined"});
   assert(defined && defined->items.size() == 1);
   assert(defined->items[0].fileId == 1 && defined->items[0].definition);
@@ -38,6 +47,7 @@ void verifySnapshot(Fixture &fixture) {
   const auto base = fixture.root / "configured";
   fs::create_directory(base);
   fs::create_symlink(fixture.first, base / "relative.db");
+  execute(fixture.project, "UPDATE clone SET path='" + base.string() + "' WHERE id=1");
   execute(fixture.project, "UPDATE file SET facts_db='relative.db' WHERE id=1");
   execute(fixture.root / "relative.db", "CREATE TABLE unrelated(value)");
   const auto configured = index::refresh(fixture.project, {fixture.first, fixture.second}, base);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tooling/ExecutionTrace.h"
 #include <format>
 #include <functional>
 #include <iostream>
@@ -24,6 +25,7 @@ void logVerbose(int configuredLevel, int requiredLevel,
 template <typename Operation>
 decltype(auto) runStage(int verbosity, std::string_view command,
                         std::string_view stage, Operation &&operation) {
+  traceStage(command, stage);
   logVerbose(verbosity, 1, "facts-tool: {}: {}", command, stage);
   return std::invoke(std::forward<Operation>(operation));
 }

@@ -1,4 +1,4 @@
-"""Global index status and explicitly requested rebuild jobs."""
+"""Global index status and incremental refresh jobs."""
 
 from dataclasses import dataclass
 
@@ -19,6 +19,11 @@ class IndexStatus(LegacyIndexStatus):
 @dataclass(frozen=True, slots=True)
 class IndexResult:
     index_revision: str
+    sources_processed: int = 0
+    sources_skipped: int = 0
+    sources_removed: int = 0
+    sources_missing: int = 0
+    symbol_count: int = 0
 
 
 class Index(JobResource[IndexResult, IndexResult]):

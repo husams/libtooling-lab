@@ -31,7 +31,7 @@ bool relevant(const std::filesystem::path &path) {
       ".h", ".H", ".hh", ".hpp", ".hxx", ".h++", ".inc", ".ipp",
       ".inl", ".def", ".icc", ".tcc", ".txx", ".i", ".ii", ".tpp",
       ".ixx", ".cppm", ".cu", ".cuh"};
-  return path.filename() == "compile_commands.json" ||
+  return path.filename() == "compile_commands.json" || path.filename() == ".facts-tool.yaml" ||
          path.extension().empty() ||
          extensions.contains(path.extension().string());
 }

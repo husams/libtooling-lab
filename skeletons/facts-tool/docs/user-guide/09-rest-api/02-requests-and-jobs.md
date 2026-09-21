@@ -307,3 +307,50 @@ credentials. HTTP bodies are limited to 1 MiB.
 The deprecated `/v1/commands` and generic `/v1/jobs` compatibility operations
 still accept CLI token arrays and captured process output. No `/api/v2` endpoint
 uses that command-wrapper contract. See [Python REST client](../05-python-sdk/11-rest-client.md).
+
+### Workspace and failure context
+
+Import, extraction, matching and dependency jobs discover `.facts-tool.yaml` in
+the selected clone. The server's explicit `--config` remains the highest
+configuration tier, and its `--conf` still selects the shared project database.
+Relative saved facts-database paths resolve from the active clone; relative stored
+compiler working directories resolve from their owning component. Include flags
+retain the compilation command's working-directory semantics. The server does
+not change its process working directory while analyzing files. Automatic watcher
+CLI jobs start their child process in the owning active clone; their job metadata
+reports `working_directory`. Editing the clone’s `.facts-tool.yaml` triggers a
+new watcher cycle, including recovery after configuration errors.
+
+A failed job's `error.details` is retained in both individual job responses and
+job listings. It includes the operation and original request, stage, source and
+workspace paths, expected inputs, recovery action, compiler diagnostics, input
+compiler commands, platform-adjusted compiler commands when available, and
+configuration discovery. `server_working_directory` distinguishes the daemon's
+location from the compilation command's working directory. `environment` reports
+build-related variables such as `CPATH`, `CPLUS_INCLUDE_PATH`, `PATH` and `SDKROOT`.
+
+Structured logs retain `job.failed` and `job.diagnostic` records. Full context is
+also emitted as `job.context` records keyed by job ID and field name. Concatenate
+`value` fragments in `part` order (zero-based, `parts` total) and parse the result
+as JSON to recover a field, including long compiler argument lists.
+
+### Index manually extracted facts
+
+After extracting with the CLI into a registered file's facts database, submit:
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/v2/index/job \
+  -H 'Content-Type: application/json' -d '{}'
+```
+
+This job refreshes the global symbol index without extracting sources. It reads
+new or modified facts databases, including committed SQLite WAL changes, and
+reuses cached rows for unchanged databases. Removed databases lose their cached
+rows. An unchanged index retains its revision. A failed refresh leaves the
+previous index and cache intact; correct the reported database error and retry.
+
+The result includes `index_revision`, `sources_processed`, `sources_skipped`,
+`sources_removed`, `sources_missing` and `symbol_count`. Use the existing
+`client.index.create()` and await the job in the Python SDK. The facts database
+must be registered as a file's `facts_db` or resolve through its facts template;
+index jobs do not discover arbitrary databases elsewhere on disk.

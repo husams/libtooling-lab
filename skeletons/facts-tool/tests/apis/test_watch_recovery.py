@@ -96,3 +96,23 @@ def test_malformed_database_waits_for_repair(recovery_project):
     recovered = wait_cycle(server.api, failed["cycles"])
     assert recovered["failures"] == failed["failures"], recovered
     assert "main" in symbols(server.api)
+
+
+def test_watcher_uses_clone_configuration_and_child_directory(recovery_project):
+    server, root, source = recovery_project
+    before = watch_status(server.api)["cycles"]
+    configuration = root / ".facts-tool.yaml"
+    configuration.write_text("extra_args: [-DWATCH_WORKSPACE=42]\n")
+    source.write_text("static_assert(WATCH_WORKSPACE == 42);\nint watched_workspace() { return WATCH_WORKSPACE; }\n")
+    state = wait_cycle(server.api, before)
+    assert "watched_workspace" in symbols(server.api)
+    for identifier in state["latest_jobs"]:
+        status, job = server.api.request("GET", f"/v1/jobs/{identifier}")
+        assert status == 200 and job["working_directory"] == str(root), job
+    # Project configuration edits alone trigger repair/retry in the same clone.
+    configuration.write_text("extra_args: [-DWATCH_WORKSPACE=0]\n")
+    failed = failed_cycle(server.api, state["failures"])
+    assert "working_directory=" + str(root) in failed["last_error"]
+    configuration.write_text("extra_args: [-DWATCH_WORKSPACE=42]\n")
+    recovered = wait_cycle(server.api, failed["cycles"])
+    assert not recovered["last_error"]

@@ -38,6 +38,7 @@ struct RefreshResult {
   std::int64_t symbols = 0;
   std::size_t sources = 0;
   std::size_t missingSources = 0;
+  std::size_t processedSources = 0, skippedSources = 0, removedSources = 0;
 };
 // Blocking database work: invoke on the server's background executor.
 // A nonempty configuredSources list supplies all configuration-resolved paths.
