@@ -1,96 +1,80 @@
-# How to query C++ code
+# Query C++ evidence through Python
 
-The distribution is `facts-tool-query`; the import namespace is `facts_tool`.
-The SDK reads a facts database and its separate project database, and can read
-native match-result JSON without opening either store. It never imports,
-extracts, migrates, or writes either database.
+Use the typed REST wrapper for all operations it exposes. The distribution is
+`facts-tool-query[rest]`; import `Client`/`AsyncClient` from
+`facts_tool.rest`. The server resolves stores and the global index.
 
-## Required access boundary
+## Start from an identity
 
-Always query persisted evidence through the public `facts_tool` Python SDK.
-Never open either database with `sqlite3`, another database driver, SQL,
-private SDK connections, or direct table inspection, even for diagnostics.
-Use `open_codebase` and public query, model, project-view, and callgraph APIs.
-If a public API is missing or rejects the store, report the capability or
-schema error; do not bypass it.
+Inside an open client context:
 
-To search **source code**, use native `facts-tool match --matcher` with the
-Clang dynamic AST matcher DSL, following
-[Source-symbol search](how-to-search-symbol.md). The SDK queries persisted
-evidence; it does not run Clang matchers or extract missing source facts.
+```python
+candidates = client.symbols.find(
+    qualified_name="example::Service::run", match="exact",
+).collect()
+if len(candidates) != 1:
+    raise ValueError("Resolve the intended overload/repository before continuing")
+symbol = candidates[0]
+for occurrence in client.symbols.occurrences(symbol.symbol_id):
+    print(occurrence.kind, occurrence.path, occurrence.line, occurrence.column)
+for relation in client.symbols.relations(
+    symbol.symbol_id, kind="Calls", direction="outgoing",
+):
+    print(relation.source.qualified_name, relation.target.qualified_name,
+          relation.count)
+```
 
-For the exact bindings returned by one native invocation, use
-`load_match_results("matches.json")` or `MatchResults.from_json(stdout)` after
-checking command success. Follow [match result processing](match-results.md)
-for capability checks, physical coordinates, byte ranges, and publication
-semantics. Do not reconstruct the invocation by querying a persistent index or
-guessing that `cb.match()` exists; the result reader does not execute matchers.
+The small exact-identity candidate collection is deliberately eager; use lazy
+iteration for broad lookup/results. Prefix matching remains the default for
+normal discovery. Relation records provide endpoint identities/counts, not
+individual call-site coordinates; use graph edges or matcher rows for sites.
+Do not infer a direct occurrence from a relationship count alone.
 
-## Start with a concrete symbol
+## Select the evidence API
 
-Resolve the database pair from the existing YAML configuration using native
-`facts-tool config show` and the
-[configuration guide](../../../../docs/user-guide/02-projects-and-configuration/03-configuration-files.md);
-do not ask the user to supply paths already configured. Native commands use
-these defaults without database-path flags. The current `open_codebase`
-Python signature still requires `facts_db` and `project_db`: pass the
-resolved concrete paths as `facts_path` and `project_path` below, not raw
-templates. Do not invent an `open_codebase(config=...)` parameter or assume
-that omitting its required arguments loads YAML.
+| Question | API and recipe |
+| --- | --- |
+| Names, kinds, definitions, overload candidates | `client.symbols.find/get`; [lookup](how-to-search-symbol.md) |
+| Declaration/definition locations | `client.symbols.occurrences` |
+| Stored incoming/outgoing relationships | `client.symbols.relations` |
+| Requested AST shape or exact occurrence | `client.matches`; [match results](match-results.md) |
+| Callers, callees, reachability paths | `client.callgraphs`; [call graphs](how-to-build-call-graph.md) |
+| Local/parameter reads, writes, value flow | `client.variable_flow`; [variable flow](variable-flow.md) |
+| File ownership and compiler settings | `client.files/components/directories/repositories`; [resources](rest-api.md) |
+| Missing facts or include dependencies | `client.extractions/dependencies`; [resources](rest-api.md) |
+
+Ground answers in returned identities, sites, directions, job scope, and
+coverage. Use typed diagnostics/errors to identify gaps. Re-query after
+targeted extraction rather than assuming refreshed evidence has a particular
+value. Do not scan source or infer absent edges as confirmed behavior.
+
+## Evidence not yet exposed by REST
+
+The local read-only SDK remains available for features such as declarative
+query plans, expression details, field effects, ancestors, and bounded source
+regions that do not have equivalent v2 resource methods. Do not invent remote
+`client.field_writers`, `client.definition_regions`, or a generic SQL API.
+
+If the task requires such evidence and an existing local paired artifact is
+already accessible, use the public local reader explicitly:
 
 ```python
 from facts_tool import open_codebase
-from facts_tool.queryplan import in_, select, start, symbol
 
+# Existing, resolved local artifact paths; never send these to the server.
 with open_codebase(facts_db=facts_path, project_db=project_path) as cb:
-    query = start(symbol("app::save")) | in_("calls")
-    query |= select(("name", "kind", "file", "line"))
-    result = cb.executor.run(query.plan)
-    print(result.to_json())
+    evidence = cb.field_writers("example::Box::value")
+    print(evidence.truncated, evidence.partial, evidence.unknown)
 ```
 
-Prefer a USR or exact qualified name. An ambiguous unqualified spelling raises
-an error instead of choosing an arbitrary declaration.
+Keep this fallback separate from normal server workflows. Do not demand the
+server's database paths, copy its live stores, or replace supported REST
+operations with CLI/local access. If no suitable artifact exists, report the
+REST capability gap. Never use SQL, `sqlite3`, database drivers, or private
+connections, including for diagnostics.
 
-## Choose the API for the question
-
-For a saved local-variable or parameter-flow graph, use `open_variable_flow`
-and `run.graph`, following [variable-flow queries](variable-flow.md). Its
-standalone artifact is not a paired `CodeBase` database. Generate or refresh
-that artifact with native `analyse variable-flow`; keep its status, source
-scope, callsite IDs, and boundaries with the query results.
-
-- Declarative plans: compose `start`, `nodes`, `where`, `out`, `in_`, `path`,
-  `select`, `order_by`, `distinct`, `count`, and `limit`.
-- Typed navigation: use `cb.get(ref)` and methods such as `callers`, `callees`,
-  `bases`, `subclasses`, `members`, `parameters`, `definitions`, and
-  `references`.
-- Fluent navigation: use `cb.query(ref).relation(...).select(...).run()`.
-- Project context: select `view("file")`, `view("component")`, or another
-  project view to inspect paths, drivers, compile options, and ownership.
-
-```python
-with open_codebase(facts_db=facts_path, project_db=project_path) as cb:
-    run = cb.get("app::run")
-    for callee in run.callees(max_depth=3):
-        print(callee.name, callee.file, callee.line)
-```
-
-## Build an evidence-backed answer
-
-Record the exact query, matching qualified names or USRs, source locations,
-relation direction and depth, and relevant call/reference sites. Check
-`result.truncated`, `result.partial`, `result.unknown`, and
-`result.provenance` before drawing a conclusion. Report `FactsToolError.code`
-when stored facts cannot answer the question, then narrow the claim or use
-the public SDK's bounded source-region APIs at the returned identity. For
-missing facts, run targeted native extraction and re-query through the SDK.
-
-Use the maintained [relation](../../../../python/docs/relations.md),
-[view](../../../../python/docs/views.md), [symbol kind](../../../../python/docs/symbol-kinds.md),
-[predicate](../../../../python/docs/language-predicates.md), and
-[stage](../../../../python/docs/language-stages.md) catalogs. The
-[model API](../../../../python/docs/model-api.md),
+Consult the local [model API](../../../../python/docs/model-api.md),
 [results](../../../../python/docs/results.md), and
-[troubleshooting](../../../../python/docs/troubleshooting.md) guides define
-typed navigation and confidence limits.
+[troubleshooting](../../../../python/docs/troubleshooting.md) only for this
+fallback. Check freshness/provenance and reopen the local reader after external
+writes when necessary. An old local snapshot is not current server evidence.

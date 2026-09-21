@@ -1,124 +1,138 @@
-# How to search source code with the Clang matcher DSL
+# Global symbol lookup and flexible AST matching
 
-Use `facts-tool match` to parse registered C++ translation units and find
-declarations with Clang's dynamic AST matcher language, the same DSL used
-by `clang-query`. Pass only the expression to `--matcher`, without the
-interactive `clang-query` prefix `match` or `m`.
+Contents: [lookup](#find-existing-evidence),
+[matcher scope and bindings](#match-the-smallest-useful-source-scope),
+[relation roles](#map-semantic-roles-only-for-relation-persistence).
 
-Check the selected executable's `match --help` before choosing traversal:
-`--traversal AsIs` includes implicit AST nodes and is the unchanged default;
-`--traversal IgnoreUnlessSpelledInSource` skips nodes not spelled in source.
-Pass the option only when that executable supports it, and retain the selected
-mode with the matcher when recording a reproducible command.
+## Find existing evidence
 
-## 1. Select the project and source files
+Use the server's global index before reparsing source. Within an open
+`facts_tool.rest.Client` context:
 
-Confirm the executable and effective configuration with
-`facts-tool config show`. Let the discovered YAML configuration resolve the
-project database and its paired facts database; neither path needs to be
-supplied on each command. Use `--config ./team.yaml` on commands only when
-selecting a specific YAML file. Source paths are relative to the invocation
-directory; replace the example source paths and names below for the task.
+```python
+from facts_tool.rest import SymbolKind
 
-If the source is not registered, first
-[import its real compile commands](../../../../docs/user-guide/02-projects-and-configuration/02-importing-compile-commands.md).
-Search headers through a registered translation unit that includes them;
-do not invent a header's compiler flags or ownership.
-
-## 2. Write and run a declaration matcher
-
-For a simple name or USR lookup, query the existing matched-symbol index first:
-
-```sh
-facts-tool symbol find --name main
-facts-tool symbol find --usr 'EXACT_USR'
+for symbol in client.symbols.find(
+    qualified_name="example::Widget", kind=SymbolKind.CLASS,
+):
+    print(symbol.symbol_id, symbol.qualified_name, symbol.usr, symbol.definition)
 ```
 
-If the index has the required candidate, use that identity with the public SDK
-without reparsing. A miss is only a gap in match history, so an explicit AST
-predicate, or a lookup that needs fresh occurrence evidence, still uses `match`
-over the smallest registered translation-unit set that can answer it.
+Names default to case-sensitive literal prefixes: `example::Widget` can also
+find `example::WidgetFactory`. Percent and underscore characters are literals.
+Set `match="exact"` for name equality. Use `usr=...` for an exact USR.
+Repository/component filters are optional; normal discovery is global.
+This is the server's extracted-facts index, not the old CLI's match-only index.
 
-Find declarations named `main` in a selected source:
+Preserve all overload/repository candidates and select the intended identity.
+Use `client.symbols.get(symbol_id)`, `.occurrences(symbol_id)`, and
+`.relations(symbol_id, direction="outgoing")` for resource evidence. An
+index miss does not establish absence; check readiness, registration, freshness,
+and source scope. A symbol alone does not establish body/call coverage.
 
-```sh
-facts-tool match \
-  --matcher 'functionDecl(hasName("main")).bind("symbol")' src/main.cpp
+## Match the smallest useful source scope
+
+Use typed source selections from [resource APIs](rest-api.md). Registered
+headers can use an including TU's compiler context; missing or conflicting
+contexts are analysis errors. Never guess header compiler flags.
+
+```python
+from facts_tool.rest import FileReference, FileSelection
+
+selection = FileSelection(files=[
+    FileReference(path="src/Widget.cpp", repository="example"),
+])
+job = client.matches.create(
+    selection=selection,
+    expression='cxxMethodDecl(hasName("run"), ofClass(hasName("Widget"))).bind("method")',
+    traversal="IgnoreUnlessSpelledInSource",
+    capture_source=True,
+)
+summary = job.wait(timeout=120)
+for row in client.matches.results(job.id):
+    method = row.bindings["method"]
+    print(row.translation_unit, method.name, method.location)
 ```
 
-`functionDecl(...)` selects function declarations (including methods),
-`hasName(...)` narrows the name, and `.bind("symbol")` tells facts-tool which
-declaration to record. Bind exactly `symbol`, not an arbitrary name. Quote
-the expression with shell single quotes and matcher strings with double
-quotes. If an explicit facts-path override is needed, use `--facts ./facts.db`
-or an absolute path, as described in the
-[match guide](../../../../docs/user-guide/03-extracting-facts/03-match-dynamic-matchers.md).
-The default text result includes the bound node's source path, line, and
-column; use the [structured match-results reference](match-results.md) when
-the exact invocation result must be retained.
+Pass only the Clang expression, without `match` or `m` prefixes.
+`AsIs` is the default traversal and includes implicit AST nodes;
+`IgnoreUnlessSpelledInSource` skips nodes not spelled in source. Add
+`isDefinition()` when definitions are required. Prefix lookup defaults do
+not change Clang's `hasName` semantics. Each new match parses selected TUs;
+narrowing a name does not turn matching into an index lookup.
 
-To find only definitions, add `isDefinition()`:
+Use arbitrary binding names, multiple bindings, helper bindings,
+`equalsBoundNode`, `anyOf`, and `forEachDescendant`. Do not rename user
+bindings to `symbol`, reject them, or restrict the Clang DSL to fixed shapes.
+Examples of valid expressions:
 
-```sh
-facts-tool match \
-  --matcher 'functionDecl(hasName("main"), isDefinition()).bind("symbol")' src/main.cpp
+```python
+expression = 'functionDecl(hasName("main")).bind("entry")'
+expression = 'returnStmt()'
+expression = (
+    'functionDecl(hasParameter(0, parmVarDecl().bind("parameter")))'
+    '.bind("function")'
+)
 ```
 
-To find a method on a specific class, combine `cxxMethodDecl`, `hasName`,
-and `ofClass`:
+An expression with no explicit bindings returns the matched top-level node as
+`root`. If it has explicit bindings, only those user bindings appear; an
+explicit user binding named `root` is preserved. Inspect the actual binding
+map rather than assuming a `symbol` key exists.
 
-```sh
-facts-tool match \
-  --matcher 'cxxMethodDecl(hasName("area"), ofClass(hasName("Circle"))).bind("symbol")' src/shapes.cpp
+Without a relation kind, eligible named declarations can be persisted regardless
+of binding name, including namespaces and aliases. Set `capture_source=True`
+to capture supported expression/source evidence. Other nodes remain visible in
+results even when they have no corresponding persistent fact. Preserve repeated
+bindings in the result; storage eligibility does not restrict the binding map.
+Storage errors still fail the operation; inspect the job and diagnostics.
+
+## Map semantic roles only for relation persistence
+
+`MatcherBindings` maps roles to the names already chosen in the expression.
+It is not a whitelist of allowed bindings. For explicit relation persistence,
+provide `relation_kind` and map any non-default role names:
+
+```python
+from facts_tool.rest import MatcherBindings
+
+job = client.matches.create(
+    selection=selection,
+    expression=(
+        'callExpr(hasAncestor(functionDecl(hasName("example::Service::run"))),'
+        'callee(functionDecl().bind("destination"))).bind("invocation")'
+    ),
+    relation_kind="Calls",
+    bindings=MatcherBindings(call="invocation", callee="destination"),
+)
+summary = job.wait(timeout=120)
 ```
 
-Add `isDefinition()` inside `cxxMethodDecl(...)` when only method bodies
-are wanted. Multiple predicates in one matcher must all match. Supply more
-source paths when needed; omitting source paths searches every imported
-translation unit, so prefer a bounded candidate set first.
+The call role must resolve to a call expression and the callee to a function
+declaration. For REST matching, explicitly set `relation_kind="Calls"` even
+with the default `call`/`callee` names. The native CLI's implicit Calls shorthand
+does not apply to the server's generic binding mode: without a relation kind,
+the returned bindings alone do not request relationship persistence.
 
-## 3. Resolve or reuse a discovered symbol identity
-
-When identity lookup or reuse is useful, query the discovery index through the
-native CLI:
-
-```sh
-facts-tool symbol find --name main
-facts-tool symbol find --usr 'EXACT_USR'
+```python
+job = client.matches.create(
+    selection=selection,
+    expression=(
+        'cxxRecordDecl(hasName("example::Widget"), isDefinition(),'
+        'isDerivedFrom(cxxRecordDecl().bind("baseClass"))).bind("derivedClass")'
+    ),
+    relation_kind="Inherits",
+    bindings=MatcherBindings(source="derivedClass", target="baseClass"),
+)
+summary = job.wait(timeout=120)
 ```
 
-Retain USR, qualified name, kind, and source path for every candidate. A
-name can match multiple overloads; select the intended exact USR instead
-of choosing the first row. A declaration and definition may produce
-different file rows for the same USR.
+Other relation kinds use declaration `source`/`target` roles and, where
+required, an occurrence `site`. Map it with `MatcherBindings(site="use")`
+when the expression binds that name. Extra helper bindings are allowed and
+returned; relation mode persists endpoints and evidence rather than all helpers.
+Names such as `source` alone do not reserve node types in ordinary matching.
+Supply the intended relation kind when using role mappings to persist a relation.
 
-`symbol find` searches the matched-symbol index; it does not parse source.
-Only successful `match` populates that index. Ordinary `extract` does not.
-A miss is not proof the symbol is absent everywhere; check the source scope,
-matcher, and diagnostics.
-
-An exact JSON result already records the invocation's bound identities and
-coordinates; it does not require a follow-up index query unless you need an
-index candidate for later reuse or overload disambiguation.
-
-## 4. Obtain additional evidence through supported interfaces
-
-A `symbol` binding establishes identity and location, not complete body,
-outgoing-call, or freshness coverage. Extract the required registered
-translation units when that evidence is missing, then use the
-[Python SDK query guide](query-cpp.md) for persisted evidence and bounded
-source regions. Never query either database directly, including through SQL,
-`sqlite3`, another database driver, or private SDK connections.
-
-For call occurrences, use the separate `call` + `callee` binding contract;
-for arbitrary relations, bind declaration `source` + `target`, optional
-expression `site`, and supply `--relation-kind`. Follow the scoped examples
-in [Custom matchers](../../../../docs/user-guide/06-workflows/06-custom-matchers.md)
-instead of treating a symbol search as relation extraction. Broad matchers
-can encounter unpersistable implicit nodes; inspect the exit status and
-diagnostics, and treat a failed invocation as an evidence gap. See
-[match-results.md](match-results.md) for the successful JSON contract and
-Python reader.
-
-Use the resolved name or USR in the
-[call-graph workflow](how-to-build-call-graph.md) when a graph is needed.
+Use [match result processing](match-results.md) for provenance and coverage;
+use [call graphs](how-to-build-call-graph.md) when traversal is required.

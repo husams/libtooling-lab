@@ -1,136 +1,98 @@
-# Track a local variable or parameter
+# Track a local variable or parameter through Python
 
-Use this workflow for a variable's reads, writes, updates, copied values,
-arguments passed into callees, or values returned by called functions.
-The native command performs the Clang AST/CFG and interprocedural analysis;
-the Python SDK queries its saved graph. Do not recreate the analysis in
-Python or query SQLite directly.
+Use `client.variable_flow` for reads, writes, updates, copied values,
+arguments, and captured returns. The server performs AST/CFG and interprocedural
+analysis; do not recreate it in Python or query its database.
 
-## Select the declaration and input scope
+## Select the function and declaration
 
-Check the selected executable and Python environment first:
+Find the enclosing function through [global symbols](how-to-search-symbol.md).
+Use an exact returned symbol ID or USR to resolve overloads; the function
+`SymbolReference` also accepts an unambiguous exact qualified name.
+Use a scoped matcher when the variable's declaration location is needed.
 
-```sh
-facts-tool config show
-facts-tool analyse variable-flow --help
-python -c 'from facts_tool import open_variable_flow, VariableFlowGraph'
-```
-
-If using IPython-MCP, run the Python import in its existing runtime instead.
-An older installed executable or wheel may lack these capabilities even when
-checkout documentation describes them; report or repair the actual gap within
-the authorized task.
-
-Use `symbol find` for an existing function identity, or a scoped native matcher
-when discovery evidence is missing. An absent index entry does not establish
-that a local variable is absent. The flow command resolves the local or
-parameter declaration within the selected function from the AST.
-
-Import real compilation commands if the project is not registered:
-
-```sh
-facts-tool import -p build
-facts-tool analyse variable-flow --function 'example::process' --variable value
-```
-
-Replace the example selectors with the requested function and variable.
-For an overload, include the function's parameter types in the quoted selector:
-
-```sh
-facts-tool analyse variable-flow --function 'example::process(bool, int)' --variable value
-facts-tool analyse variable-flow --function 'example::Worker::process(int) const &' --variable value
-```
-
-Use types without parameter names, default arguments, or a return type; `()`
-selects zero parameters. Include member `const`/`volatile` and `&`/`&&`
-qualifiers where applicable. Whitespace between signature tokens is ignored.
-An ambiguity diagnostic lists candidate signatures and USRs; use one of those
-exact selectors instead of guessing which overload was selected. Qualified
-names without signatures and exact USRs remain supported.
-Matching uses Clang's declared or canonical type spellings; copy a candidate
-signature when an equivalent C++ spelling does not match.
-
-The variable accepts a name or exact USR; parameters use the same `--variable`
-selector. Use `--line DECLARATION_LINE` to distinguish shadowed locals; a
-use-site line does not select the declaration.
-
-The command parses the imported source inputs; a prior `extract` or
-`analyse call-graph` run is not required. Omit source arguments to make all
-imported translation units available. Supplying sources restricts available
-definitions, so include the caller and relevant callee TUs together.
-
-Default depth is unlimited. Add `--max-depth 0` for only the selected function,
-or a positive limit when requested. Recursion terminates using shared function
-summaries; unlimited depth does not enumerate every runtime call stack.
-
-## Save and open the exact run
-
-YAML resolves the project path and, when configured, the facts path. The
-default flow artifact replaces the configured facts path's extension with
-`.variable-flow.db`. It is a separate SQLite file: do not open it with
-`open_codebase` or use the facts database as the flow output.
-
-Use an intentional `--output flow.db` when choosing an artifact location, when
-no `facts_template` exists, or when a per-source template would produce
-multiple facts paths. Use `--config FILE` to select another YAML configuration.
-Existing runs append; capture the run ID from a successful completion line:
-
-```text
-facts-tool: variable flow run 1 complete
-```
-
-The number is an example, not a fixed ID. A failed command publishes no new
-successful run; do not silently read an older run after failure. A saved run
-is a snapshot, not automatic freshness evidence for subsequently edited code.
-Regenerate it when current-source analysis is required.
+Inside an open client context:
 
 ```python
-from facts_tool import open_variable_flow
+from facts_tool.rest import DeclarationLocation, SymbolReference, VariableReference
 
-flow_path = "flow.db"  # Actual resolved artifact or intentional --output path.
-run_id = 1  # Actual ID from this command's successful completion line.
-with open_variable_flow(flow_path) as flows:
-    run = flows.get(run_id)
-graph = run.graph
-print(run.status, run.max_depth, run.assumptions)
-for access in graph.reads(variable_usr=run.root_variable):
-    print(access.kind, access.location.file, access.location.line)
-for access in graph.writes(variable_usr=run.root_variable):
-    print(access.kind, access.location.file, access.location.line)
+job = client.variable_flow.create(
+    function=SymbolReference(qualified_name="example::Service::run"),
+    variable=VariableReference(
+        name="request",
+        declaration=DeclarationLocation(
+            path="src/Service.cpp", line=42, column=9,
+        ),
+    ),
+    direction="forward",
+    interprocedural=True,
+)
+summary = job.wait(timeout=120)
+print(job.id, summary.root_function, summary.root_variable,
+      summary.status, summary.coverage)
 ```
 
-The loaded run is immutable and remains usable after closing the reader.
-`reads()` and `writes()` both include updates. A possible call-side effect is
-not proof that a write executes on every path. Filter by exact `variable_usr`
-and optionally `function_usr`; repeated names in other scopes are distinct.
-Omit filters to inspect the whole retained dependency slice, including callee
-parameters and derived local values. That slice does not include unrelated
-statements simply because they share a function.
+Replace the example coordinates with the actual declaration, not a use site.
+A declaration location distinguishes shadowed locals; omit it for an
+unambiguous name. Parameters use the same `VariableReference`.
+The REST variable model takes a name and optional declaration location;
+do not copy the CLI's signature-selector or `--line` syntax into the request.
 
-## Explain the links and limits
+Use real registered compiler commands. Variable flow parses source and does
+not require a previous callgraph run. Optional `selection=` restricts source
+inputs; include relevant caller/callee TUs together so definitions remain
+available. Omit selection when all imported inputs should be available.
 
-Use `graph.incoming(node_id)` and `graph.outgoing(node_id)` for adjacent edges,
-then `graph.node(edge.source)` and `graph.node(edge.target)` for occurrences.
-Preserve `edge.kind` and `edge.callsite`; a nonzero callsite identifies the
-originating call node. Shared callee summaries do not provide separate nodes
-for every invocation. Node IDs are local to a run; never join different runs
-by a bare node ID. Node-object arguments must come from that loaded run.
+Only forward tracking is supported; do not submit backward requests.
+Interprocedural tracking is enabled by default, with no requested call-depth
+cap. Set `interprocedural=False` to stay in the starting function, or
+`max_call_depth=N` for an intended bound. Recursion uses shared summaries,
+not an enumeration of every runtime call stack.
 
-- `data` links reaching definitions to reads or updates; `value` links
-  expression dependencies. Branch joins and loops can retain multiple writers.
-- `argument-copy` passes a value without implying mutation of the caller.
-  `argument-ref`, `argument-pointer`, and `argument-pointee` describe reference
-  or pointer flow. `reference-effect` and `effect` connect callee writes to
-  caller-side effects. Pointer binding and `#pointee` storage are distinct.
-- `return` and `call-result` trace the production of a captured return value.
-  Follow the stored edges, including local copies, rather than matching names.
-- Inspect `run.boundaries` and `run.status` before drawing conclusions.
-  External/unavailable definitions and `depth-limit` can accompany `complete`;
-  this does not prove complete external behavior or unrestricted depth.
-  Indirect calls, virtual dispatch, unsupported syntax, and ambiguous aliases
-  can make the run `partial`. Report their reason and location instead of
-  interpreting a missing edge as proof of no read or write.
+## Read the exact job's evidence
 
-Report the selected declaration, source locations of relevant accesses,
-call-site evidence, run ID, input scope, and any limiting boundaries. Keep the
-answer focused on the requested variable; do not dump the entire graph.
+```python
+for node in client.variable_flow.nodes(job.id):
+    print(node.id, node.kind, node.function_usr, node.variable_usr,
+          node.name, node.location.path, node.location.line)
+for edge in client.variable_flow.edges(job.id):
+    print(edge.source, edge.target, edge.kind, edge.callsite)
+for boundary in client.variable_flow.boundaries(job.id):
+    print(boundary.node, boundary.reason, boundary.detail, boundary.depth)
+for diagnostic in client.variable_flow.diagnostics(job.id):
+    print(diagnostic.severity, diagnostic.message)
+```
+
+These collections are lazy. Summary `nodes`/`edges`/`boundaries` fields
+may be `None` until fetched; never interpret that as zero accesses.
+Use `client.variable_flow.get(job_id)` for a retained run instead of opening
+a local artifact. Keep node IDs within their job; never join runs by a bare
+integer node ID.
+
+Identify accesses by `variable_usr` and `function_usr`, not name alone.
+Retain the full dependency slice when it includes callee parameters or copied
+locals; filtering every node to the root variable can hide downstream flow.
+For adjacency or labels, use the returned edge/node identities from that run.
+
+## Explain flow and limits
+
+Preserve node kinds, edge kinds, locations, and call-site links:
+
+- `data` links reaching definitions to reads/updates; `value` links
+  expression dependencies. Joins and loops can have multiple writers.
+- `argument-copy` passes a value without proving mutation of the caller.
+  `argument-ref`, `argument-pointer`, and `argument-pointee` describe
+  reference/pointer flow. `reference-effect` and `effect` connect callee
+  writes to caller-side effects; pointer binding and pointee storage differ.
+- `return` and `call-result` describe captured return flow. A nonzero
+  `callsite` points to the originating call node in that run; shared callee
+  summaries do not create a separate graph for every invocation.
+- External/unavailable definitions and depth limits remain boundaries even
+  when analysis completes. Indirect calls, virtual dispatch, unsupported
+  syntax, and uncertain aliases can produce partial evidence.
+
+An update can both read and write. A possible call-side effect is not proof of
+a write on every path. A missing edge is not proof of no access across an
+unresolved boundary. Report the selected declaration, relevant access sites,
+job ID, input scope, and any limits. Re-run when the stored job predates
+relevant source changes.

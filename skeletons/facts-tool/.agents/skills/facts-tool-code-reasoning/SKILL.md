@@ -1,114 +1,81 @@
 ---
 name: facts-tool-code-reasoning
-description: Use facts-tool and its public Python SDK to search C++ code, trace local variables and parameters through read/write graphs, and reason from persisted evidence or native AST match results.
+description: Use the facts-tool Python REST wrapper to search the server's global C++ symbol index, extract facts, run flexible Clang AST matchers, build call graphs, track variables across functions, and manage registered repositories and analysis jobs.
 ---
 
 # Facts-tool code reasoning
 
-For every C++ reasoning task in this project, use facts-tool before drawing
-conclusions. If valid facts cannot be produced, state the evidence gap and do
-not present code-structure conclusions as confirmed.
+For C++ reasoning tasks, obtain facts-tool evidence before drawing conclusions.
+If valid evidence cannot be produced, report the gap and qualify the answer.
 
-**Never query either database directly.** All programmatic reads must use
-the public Python SDK (`facts_tool`); never use SQL, `sqlite3`, database
-drivers, private connections, or a diagnostic bypass. Native facts-tool
-commands remain the interface for source matching, extraction, and graph
-generation. If the SDK cannot expose evidence, report the capability gap.
+Use `facts_tool.rest.Client` or `AsyncClient` and their typed **v2 resource
+namespaces** for extraction, matching, discovery, analysis, and administration.
+The server owns project/facts databases, caches, and the global index. Clients
+supply a server URL and optional token, then resource identities or selections;
+never ask for database paths for a REST operation.
 
-1. Verify the executable and resolved configuration with `config show`; use
-   native `symbol`, `match`, and `analyse call-graph` commands first so the
-   project database and facts database remain a validated pair. Let YAML
-   configuration resolve both paths by default; do not require the user to
-   supply them or add `--conf`, `--facts`, or `--output` unnecessarily.
-   Use `--config FILE` only to select a specific YAML file, and explicit
-   database paths only for intentional overrides or isolated fixtures.
-2. Reuse existing facts, identify missing evidence, and refresh only the
-   smallest required translation units with native `import`/`extract` or
-   `match`; do not use SQL, database drivers, or duplicate SDK callgraph
-   traversal.
-3. For an existing name or USR, try `symbol find` before parsing source;
-   an index miss is not proof of source absence. Use `match` for requested AST
-   predicates or missing/refreshed evidence, scoped to candidate registered
-   TUs. Every invocation parses those TUs; narrowing a name does not avoid
-   parsing. Use `match --matcher '...bind("symbol")'` for symbols and exact
-   `call`/`callee` bindings for direct Calls; `source`/`target`/`site` are
-   relation bindings and require `--relation-kind`.
-4. Ground conclusions in native names, kinds, locations, relations, sites, and
-   explicit boundary or failure diagnostics; symbol-only matching does not
-   establish outgoing call coverage.
-5. Use the installed Python SDK for persisted graph runs, expressions, field
-   effects, ancestors, and bounded source regions; do not scan source files or
-   replace a missing fact with an inferred answer.
-6. For the exact result collection from a match invocation, use `--format json`
-   and public `MatchResults`/`load_match_results`, following
-   [match result processing](references/match-results.md). Verify these
-   capabilities in the selected executable and Python environment; checkout
-   documentation does not establish that an installed release provides them.
-   Preserve binding names, TU provenance, optional coordinates, and publication
-   flags; a later discovery-index lookup is not the invocation result set.
-7. For local-variable or parameter reads, updates, argument flow, and returned
-   values, use `analyse variable-flow` and the public `open_variable_flow`
-   reader. Follow [tracking a local variable](references/variable-flow.md);
-   its standalone artifact is separate from the paired facts databases.
+Do not shell out to analysis commands, parse CLI output, construct CLI argument
+arrays, or use the legacy flat v1 methods for these workflows. Reserve the
+native executable for starting/deploying the server when needed. Never query
+SQLite directly, use database drivers/private SDK connections, or infer missing
+facts by scanning source. The local read-only SDK is an explicit fallback only
+for evidence unavailable through REST and accessible in an existing local
+artifact; see [querying evidence](references/query-cpp.md).
 
-## Agent workflow
+## Workflow
 
-Use the paired-store workflow in [agent workflows](references/agent-workflows.md).
-It covers native symbol/match/call-graph commands, SDK evidence queries,
-freshness and coverage flags, bounded paging, and clean installed-package
-acceptance. Keep one concise sentence per query and record tool-call/output
-metrics when an acceptance harness provides them.
+1. Verify the installed `facts-tool-query[rest]` package and server connection.
+   Inspect `client.server.health()`, `client.server.readiness()`, and
+   `client.index.status()`. Listener health alone does not establish index or
+   repository readiness. Follow [agent workflows](references/agent-workflows.md).
+2. Reuse registered repositories. Registration and server startup schedule
+   discovery, import, extraction, and index publication when monitoring is
+   enabled. Await `client.repositories.wait_until_ready(repo.id, timeout=...)`
+   before relying on automatic processing. Compilation databases come from the
+   real build system; do not invent compiler settings. Use typed import/scan
+   jobs when manual processing is needed.
+3. Start name lookup with `client.symbols.find(qualified_name=...)`. Search is
+   global across registered repositories, with optional kind/repository/component
+   filters. Names use case-sensitive literal **prefix** matching by default;
+   use `match="exact"` only for equality. USRs are exact. Resolve ambiguous
+   candidates with returned IDs or USRs, never by taking the first row.
+4. Refresh only missing/stale evidence with `client.extractions.create(...)`;
+   use `client.matches.create(...)` for AST predicates and exact occurrences.
+   Select the smallest sufficient registered source set. Use explicit
+   `AllSelection()` only when all sources are intended. Index misses are not
+   proof of source absence.
+5. Pass Clang matcher expressions unchanged. Arbitrary names, multiple/helper
+   bindings, and unbound roots are supported. No `.bind("symbol")` requirement
+   exists. Use `MatcherBindings` only to map semantic relation roles when
+   needed; see [symbol search and bindings](references/how-to-search-symbol.md).
+6. Wait for the actual job, retain its ID, and read its typed result collections
+   lazily. `.wait()` returns a summary; `None` collections mean not fetched,
+   not empty. Inspect diagnostics, coverage, and boundaries before answering.
+   Process the exact match job's rows, not a later index lookup; see
+   [match results](references/match-results.md).
+7. Use `client.callgraphs` for callers, callees, and paths, and
+   `client.variable_flow` for local/parameter reads, writes, and cross-function
+   value flow. Reuse a suitable retained job rather than recomputing traversal.
+   A successful job or matched declaration does not establish full source or
+   outgoing-call coverage.
+8. Report concise findings with identities, locations, job IDs, scope, and
+   relevant limits. Do not dump full result collections or compiler traces.
 
-The S-028 skill refinement remains separately owned; this skill links its
-native-first disposition and does not claim S-028 acceptance.
+## Task references
 
-## How to
+Read only what the task needs:
 
-Use the [user guide](../../../docs/user-guide/toc.md) for command options
-and worked examples; read the relevant workflow before running commands.
+- [Connection, freshness, lazy results, async clients, and failures](references/agent-workflows.md)
+- [Repository/file management, import, scan, extraction, dependencies, and server APIs](references/rest-api.md)
+- [Global lookup and flexible Clang matchers](references/how-to-search-symbol.md)
+- [Typed matcher results and provenance](references/match-results.md)
+- [Call graphs and paths](references/how-to-build-call-graph.md)
+- [Local variables and parameters](references/variable-flow.md)
+- [Evidence queries and limited local SDK fallback](references/query-cpp.md)
+- [IPython-MCP sessions](references/ipython-mcp.md)
 
-1. **Build a call graph:** follow
-   [Generating a call graph](../../../docs/user-guide/04-call-graphs/02-generating-a-call-graph.md)
-   to run `analyse call-graph` with the YAML-resolved project and facts databases
-   and an exact function name or USR. Read the persisted SQLite run through
-   the [public SDK reader](../../../docs/user-guide/05-python-sdk/06-persisted-callgraph-runs.md)
-   and distinguish traversal completion from source coverage; see also the
-   [agent call-graph workflow](references/how-to-build-call-graph.md).
-2. **Search source code with the Clang matcher DSL:** follow the
-   [step-by-step source-symbol search](references/how-to-search-symbol.md)
-   and
-   [Matching with dynamic matchers](../../../docs/user-guide/03-extracting-facts/03-match-dynamic-matchers.md)
-   and bind the requested declaration as `symbol`, for example
-   `functionDecl(hasName("main")).bind("symbol")`. Target registered source
-   candidates and retain the returned identity and location; a symbol match
-   does not establish body or outgoing-call coverage. Use the
-   [symbol-search workflow](references/how-to-search-symbol.md) to query the
-   matched-symbol index and resolve ambiguous names by USR.
-3. **Extract facts for missing information:** follow
-   [Extracting facts](../../../docs/user-guide/03-extracting-facts/01-extract.md)
-   to refresh the smallest required set of translation units with
-   `extract SOURCE...` using the configured database paths; first
-   [import their real compile commands](../../../docs/user-guide/02-projects-and-configuration/02-importing-compile-commands.md)
-   if they are not registered. Include related sources together when their
-   caller entries must remain available, as described under re-extraction.
-   For missing graph evidence during traversal, follow
-   [Recovery and boundaries](../../../docs/user-guide/04-call-graphs/04-recovery-and-boundaries.md)
-   for `--recover-missing`. Re-query the evidence after extraction or recovery
-   and report any remaining stale, missing, or unsupported information.
-4. **Track a local variable or parameter:** follow
-   [the variable-flow workflow](references/variable-flow.md) to select its
-   declaration, generate a CFG/call-flow run, and query reads, writes, and
-   call-site edges with Python. Keep traversal uncapped unless requested;
-   preserve external, depth-limit, and unsupported boundaries in the answer.
-
-Read only the guide needed for the task:
-
-- [Query C++ with Python](references/query-cpp.md)
-- [Process native match results with Python](references/match-results.md)
-- [Track local variables and parameters](references/variable-flow.md)
-- [Deploy in IPython-MCP](references/ipython-mcp.md)
-- [Create and inspect databases with the native CLI](references/native-cli.md)
-
-For the complete API, follow the links in
-[`python/README.md`](../../../python/README.md), especially the language,
-relations, views, model API, results, database, and troubleshooting pages.
+Verify installed capabilities against the [Python REST guide](../../../python/docs/rest-v2.md),
+[resource contract](../../../docs/user-guide/09-rest-api/02-requests-and-jobs.md),
+and [OpenAPI guide](../../../docs/user-guide/09-rest-api/08-openapi-contract.md).
+Use current wrapper signatures and typed results; do not invent a REST method
+from a similarly named local SDK or CLI feature.

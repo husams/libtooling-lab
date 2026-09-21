@@ -1,58 +1,70 @@
-# How to deploy in IPython-MCP
+# Use the REST wrapper in IPython-MCP
 
-Use the installed `ipython-mcp` skill for the runtime contract. Do all Python
-execution through IPython-MCP; do not invoke Python, pip, or subprocesses from a
-shell.
+When IPython-MCP is available, follow its installed runtime skill. Check
+`runtime_status`, then use runtime `search`/`inspect` to reuse an existing
+client. Execute Python in that runtime; do not create a separate shell Python
+session to stand in for it.
 
-## Install the package
+## Install in the actual runtime
 
-1. Call `runtime_status` and continue only when the runtime is ready.
-2. Use `search` or `inspect` to check for an existing `facts_tool` session.
-3. Have the project's UV workflow produce the wheel, then install that artifact
-   in `execute` with IPython's pip magic:
+Install a compatible wheel with the REST extra, or the distribution:
 
 ```python
-%pip install "/absolute/path/to/facts_tool_query-0.1.0-py3-none-any.whl"
+%pip install "facts-tool-query[rest]"
 ```
 
-For active source development, `%pip install -e
-"/absolute/path/to/libtooling-lab/skeletons/facts-tool/python"` is also valid.
-Invalidate import caches and import `facts_tool`. An editable install may
-require a worker restart before its new path is visible; if import still fails,
-stop and report that requirement. Package locking, building, and validation
-remain defined in the [development guide](../../../../python/docs/development.md)
-and use UV.
+For authorized development, an editable installation of the repository's
+`skeletons/facts-tool/python[rest]` path is also valid. Check installed
+capabilities rather than using checkout documentation as proof.
+Use the project's [development workflow](../../../../python/docs/development.md)
+when building an artifact. Report import/version failures accurately.
 
-## Keep the paired databases open
+## Keep a client open
 
-Use the existing YAML configuration to resolve the pair, following the
-[SDK query guide](query-cpp.md); do not request paths already configured.
-Run this through `execute` with the resolved `facts_path` and `project_path`,
-replacing any previous session cleanly:
+Use the configured listener URL and optional token. Paths in requests belong
+to the server; the IPython runtime need not mount its databases or sources.
 
 ```python
-from facts_tool import open_codebase
+from facts_tool.rest import Client
+
 try:
-    ft_codebase.close()
+    ft_client.close()
 except NameError:
     pass
-ft_codebase = open_codebase(
-    facts_db=facts_path,
-    project_db=project_path,
-)
+ft_client = Client(base_url, token=api_token)
+print(ft_client.server.readiness())
 ```
 
-Define repeated investigations as typed functions, test them with
-`call_function`, and publish them with `register_tool`:
+Close the old client before replacing it, reloading the package, or ending the
+session. Consume lazy collections before closing the client.
+
+Define reusable investigations as typed functions and, when appropriate, test
+with `call_function` and publish with `register_tool`:
 
 ```python
-def facts_callers(symbol_ref: str, max_depth: int = 1) -> list[dict[str, object]]:
-    """Return stored callers with their declaration evidence."""
-    return [
-        caller.to_dict()
-        for caller in ft_codebase.get(symbol_ref).callers(max_depth=max_depth)
-    ]
+from dataclasses import asdict
+from itertools import islice
+from facts_tool.rest import SymbolReference
+
+def facts_callers(symbol_id: str, max_depth: int = 1) -> dict[str, object]:
+    """Return a bounded preview with job identity and coverage."""
+    job = ft_client.callgraphs.create(
+        root=SymbolReference(symbol_id=symbol_id),
+        direction="callers",
+        max_depth=max_depth,
+    )
+    summary = job.wait(timeout=120)
+    preview = list(islice(ft_client.callgraphs.edges(job.id), 20))
+    return {
+        "job_id": job.id,
+        "summary": asdict(summary),
+        "edges": [asdict(edge) for edge in preview],
+        "preview_limited": summary.edge_count > len(preview),
+    }
 ```
 
-Use the registered tool for later questions. Close `ft_codebase` before
-replacing databases, reloading the package, or ending the investigation.
+This preview is intentionally bounded; read frontier/diagnostic collections
+before claiming complete behavior. Reuse an existing suitable retained job
+when possible. Do not register a tool that hides truncation, boundaries, or
+ambiguity. See [agent workflows](agent-workflows.md) for `AsyncClient`;
+in an async runtime, await network operations and use `async for`.
