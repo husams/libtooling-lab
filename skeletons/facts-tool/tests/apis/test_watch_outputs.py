@@ -2,6 +2,7 @@
 import sys
 
 import pytest
+from domain_http import index_ready
 from project import create_project, write_commands
 from support import eventually
 from test_watch_symlinks import settled
@@ -49,6 +50,8 @@ def test_managed_default_storage_supports_subsequent_import_cycles(
     root = tmp_path / "managed"
     source, _ = create_project(root, compiler)
     server = server_factory("--watch", "--debounce-ms", "50")
+    # Listener readiness precedes asynchronous catalog initialization.
+    index_ready(server.api)
     status, repository = server.api.request("POST", "/api/v2/repositories", {
         "name": "managed", "clones": [{"label": "main", "path": str(root)}]})
     assert status == 201, repository

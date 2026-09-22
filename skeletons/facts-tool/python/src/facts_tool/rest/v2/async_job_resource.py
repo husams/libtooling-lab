@@ -4,7 +4,7 @@ from typing import TypeVar
 
 import httpx
 
-from .analysis_models import Diagnostic
+from .analysis_models import Diagnostic, FileFailure
 from .async_jobs import AsyncAnalysisJob
 from .codec import decode
 from .job_state import snapshot
@@ -48,7 +48,7 @@ class JobResource[T, R]:
         )
 
     async def retry(self, identifier: str) -> AsyncAnalysisJob[T]:
-        """Resubmit a retained failed/cancelled job using its original request."""
+        """Retry a retained failed, cancelled, or partially failed job."""
         return await self._create({"retry_of": identifier})
 
     def list(self, *, limit: int = 50) -> AsyncCollection[AsyncAnalysisJob[T]]:
@@ -74,6 +74,12 @@ class JobResource[T, R]:
 
     def results(self, identifier: str, *, limit: int = 50) -> AsyncCollection[R]:
         return self._results(identifier, self._row, limit)
+
+    def failed_files(
+        self, identifier: str, *, limit: int = 50
+    ) -> AsyncCollection[FileFailure]:
+        """Read retained per-file errors for extraction, matching, or dependencies."""
+        return self._results(identifier, FileFailure, limit, "failed_files")
 
     def diagnostics(
         self, identifier: str, *, limit: int = 50

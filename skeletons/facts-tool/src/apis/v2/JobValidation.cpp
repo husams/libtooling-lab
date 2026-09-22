@@ -74,9 +74,9 @@ domain::Result<runtime::Request> parseJobRequest(std::string operation,
   using namespace jobs;
   static const std::map<std::string, std::set<std::string>> fields{
       {"index", {}},
-      {"extract", {"selection", "force"}},
-      {"match", {"selection", "expression", "traversal", "capture_source", "relation_kind", "bindings"}},
-      {"dependencies", {"selection"}},
+      {"extract", {"selection", "force", "continue_on_error"}},
+      {"match", {"selection", "expression", "traversal", "capture_source", "relation_kind", "bindings", "continue_on_error"}},
+      {"dependencies", {"selection", "continue_on_error"}},
       {"import", {"selection", "repository", "compilation_database"}},
       {"scan", {"selection"}},
       {"callgraphs", {"root", "target", "direction", "max_depth", "max_nodes", "max_edges", "time_limit_ms", "path_mode"}},
@@ -86,7 +86,7 @@ domain::Result<runtime::Request> parseJobRequest(std::string operation,
     return std::unexpected(domain::Error{404, "resource_not_found", "Unknown analysis resource"});
   auto keys = runtime::keys(body, allowed->second);
   if (!keys) return std::unexpected(invalid(keys.error().message));
-  for (const auto *key : {"force", "capture_source", "interprocedural"})
+  for (const auto *key : {"force", "capture_source", "interprocedural", "continue_on_error"})
     if (body.contains(key) && !body[key].is_boolean())
       return std::unexpected(invalid(std::string(key) + " must be boolean"));
   for (const auto *key : {"max_depth", "max_call_depth", "max_nodes", "max_edges", "time_limit_ms"})

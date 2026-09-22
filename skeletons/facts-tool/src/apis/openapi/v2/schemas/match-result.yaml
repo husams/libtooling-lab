@@ -9,6 +9,13 @@ required:
 - index_revision
 additionalProperties: false
 properties:
+  files_not_attempted:
+    type: integer
+    minimum: 0
+  failed_files:
+    type: array
+    items:
+      $ref: '../../openapi.yaml#/components/schemas/V2FileFailure'
   files_selected: &id001
     type: integer
     minimum: 0
@@ -36,3 +43,6 @@ properties:
 description: Job reads return scalar summary fields. Record arrays are optional and
   are fetched lazily through the typed results endpoint with the appropriate collection
   query parameter.
+  A succeeded job with coverage=partial and files_failed greater than zero completed
+  its batch with per-file errors. If every selected file fails, the job is failed.
+  Failed and cancelled jobs may retain partial results.

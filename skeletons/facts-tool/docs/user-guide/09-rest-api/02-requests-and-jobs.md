@@ -191,8 +191,8 @@ the selected input compilation command's `source_file`, `working_directory` and
 full `arguments` vector, including the compiler driver and configured extra
 arguments. This is the stored command before platform probing and internal
 Clang adjustments; file-resource compiler options keep the driver separate.
-These details also cover errors during dependency preparation. Read them from the job itself;
-failed jobs do not have a successful results collection. Server logs include
+These details also cover errors during dependency preparation. Read them from the job itself. Extraction, matching and dependency batches also
+retain partial results when they fail or are cancelled after starting analysis. Server logs include
 `job.failed` context and individual `job.diagnostic` records.
 
 For successful jobs, compiler diagnostics are available through the typed
@@ -220,11 +220,62 @@ job ID, `retry_of` and a new `Location`; the original job and its diagnostics st
 readable until normal retention removes them. The server reuses the original
 request with current settings and catalog data, including the current active
 clone for selections without an explicit clone. Cancellation state is reset for
-the new attempt. Queued, running, cancelling or successful jobs return
+the new attempt. Completed batches with per-file failures can also be retried, using the same
+selection and continue-on-error setting. Queued, running, cancelling or fully successful jobs return
 `409 job_not_retryable`. Unknown, expired and different-family IDs return `404`.
 The retry body contains only `retry_of`; submit a normal job when changing
 selection or analysis options. Jobs cannot be retried after a server restart or
 retention eviction, but a normal job can still be submitted.
+
+## Continue after individual file errors
+
+Extraction, matching and dependency jobs accept `"continue_on_error": true`.
+The default is `false`, which stops at the first failed file. With continuation,
+the server records preparation and analysis failures, including missing registered
+source files, and attempts the remaining selected files. Invalid or ambiguous
+selections, cancellation and global index publication errors still stop the job.
+The option applies to these `/api/v2` jobs; legacy watcher command batches keep
+their existing stop-on-error behavior.
+
+A mixed batch finishes with `state: "succeeded"`, `coverage: "partial"`, and
+`files_failed > 0`. If every selected file fails, the state is `failed`. Inspect
+the counts as well as the state. `files_skipped` counts valid unchanged files;
+failed files are counted separately. `files_not_attempted` accounts for files
+remaining when a job stops. Their sum with `files_processed` and `files_failed`
+equals `files_selected`.
+
+```python
+from facts_tool.rest import Client, RepositorySelection
+
+with Client("http://127.0.0.1:42817", timeout=60) as client:
+    job = client.extractions.create(
+        selection=RepositorySelection("example"),
+        continue_on_error=True,
+    )
+    # wait() raises JobFailed for failed/cancelled jobs; get(job.id) still exposes
+    # their retained summary and result collections.
+    summary = job.wait(timeout=300)
+    print(job.id, job.state, summary.coverage, summary.files_failed)
+    for failure in client.extractions.failed_files(job.id, limit=50):
+        print(failure.file_id, failure.path, failure.error.message)
+        print(failure.error.details)
+```
+
+Read `GET /api/v2/extract/job/{id}` for scalar status and
+`GET /api/v2/extract/job/{id}/results?collection=failed_files&limit=50` for a bounded
+page of failures. Substitute `match` or `dependencies` for those analyses.
+Each record includes `file_id`, `path`, and a structured `error` with full retained
+diagnostics, input/effective commands, stage and repair guidance where available.
+The `diagnostics` collection includes diagnostics from both successful and failed
+files. Results remain readable for failed/cancelled batches when a partial result
+was retained; queued cancellation and selection failures may have no result.
+Successful file outputs remain queryable after the job publishes the global index.
+
+The synchronous and asynchronous SDKs both accept `continue_on_error` and expose
+`failed_files(job.id)`. After fixing inputs, use `job.retry()` to rerun the original
+selection, or create a new `FileSelection` from the failure IDs to retry only those
+files. The previous job's failure records remain immutable until retention eviction
+or server restart.
 
 ## Match the AST
 

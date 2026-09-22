@@ -22,16 +22,16 @@ std::string membership(const Json &items, const std::string &resource) {
       items.back().at("id").get<std::string>() + ":" + std::to_string(items.size());
 }
 domain::Result<Json> results(const Json &job, const Json &result, const Route &route) {
-  if (job["state"] != "succeeded") return std::unexpected(domain::Error{
-      409, "results_unavailable", "Results are available after the job succeeds"});
+  if (!result.is_object() || (job["state"] != "succeeded" && job["state"] != "failed" && job["state"] != "cancelled")) return std::unexpected(domain::Error{
+      409, "results_unavailable", "Results are available when a terminal job has retained results"});
   const std::string fallback = route.resource == "match" ? "matches" :
       route.resource == "scan" ? "warnings" :
       route.resource == "extract" ? "files" : route.resource == "import" ? "databases" : "edges";
   if (route.resource == "index") return page(Json::array({result}), route.query, route.id + ":index");
   const auto collection = route.query.value("collection", fallback);
   const std::map<std::string, std::set<std::string>> allowed{
-      {"extract", {"files", "diagnostics"}}, {"match", {"matches", "diagnostics"}},
-      {"dependencies", {"edges", "diagnostics"}}, {"import", {"databases", "diagnostics"}},
+      {"extract", {"files", "diagnostics", "failed_files"}}, {"match", {"matches", "diagnostics", "failed_files"}},
+      {"dependencies", {"edges", "diagnostics", "failed_files"}}, {"import", {"databases", "diagnostics"}},
       {"scan", {"warnings", "databases", "diagnostics"}},
       {"callgraphs", {"nodes", "edges", "paths", "frontier", "diagnostics"}},
       {"variable-flow", {"nodes", "edges", "boundaries", "diagnostics"}}};

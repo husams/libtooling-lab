@@ -48,9 +48,11 @@ domain::Result<Json> State::retryJob(const std::string &id, const std::string &o
   if (found == jobs.end() || found->second.at("operation") != operation)
     return std::unexpected(domain::Error{404, "job_not_found", "Unknown job for this analysis resource"});
   const auto &state = found->second.at("state");
-  if (state != "failed" && state != "cancelled")
+  const bool partial = documents.contains(id) && documents.at(id)->at("result").is_object() &&
+      documents.at(id)->at("result").value("files_failed", 0) > 0;
+  if (state != "failed" && state != "cancelled" && !partial)
     return std::unexpected(domain::Error{
-        409, "job_not_retryable", "Only failed or cancelled jobs can be retried"});
+        409, "job_not_retryable", "Only failed, cancelled, or partially failed jobs can be retried"});
   // Copy before admission can evict the oldest retained job. Submission resolves
   // current catalog data and replaces the old cancellation token and settings.
   return submit(requests.at(id), id);

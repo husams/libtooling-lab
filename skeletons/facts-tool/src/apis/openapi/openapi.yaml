@@ -336,6 +336,10 @@ components:
       $ref: v2/schemas/scan-warning.yaml
     V2ScanWarningPage:
       $ref: v2/schemas/scan-warning-page.yaml
+    V2FileFailure:
+      $ref: './v2/schemas/file-failure.yaml'
+    V2FileFailurePage:
+      $ref: './v2/schemas/file-failure-page.yaml'
     V2ExtractionFile:
       $ref: v2/schemas/extraction-file.yaml
     V2ExtractionResult:

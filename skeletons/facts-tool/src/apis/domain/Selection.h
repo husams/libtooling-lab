@@ -36,6 +36,6 @@ struct ResolvedFile {
 Result<Context> resolveContext(const Settings &settings);
 Result<Context> workspaceContext(const Context &context, const std::filesystem::path &root);
 Result<ResolvedFile> resolveFile(const Context &context,
-                                 const FileSelector &selector);
+                                 const FileSelector &selector, bool requireAvailable = true);
 Result<std::vector<std::filesystem::path>> factSources(const Context &context);
 } // namespace facts::apis::domain

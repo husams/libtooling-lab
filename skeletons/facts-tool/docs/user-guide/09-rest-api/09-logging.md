@@ -65,7 +65,10 @@ to retrieve the complete job through REST.
 | `server.ready`, `server.stopping`, `server.stopped` | info | Server lifecycle |
 | `server.failed` | error | Server failure |
 | `job.accepted`, `job.started` | info | Command queue and worker progress |
-| `job.completed` | info, warning or error | Completion; timeout warns, failure errors |
+| `job.completed` | info, warning or error | Completion; native batch summaries include coverage and file counts |
+| `job.file_failed` | error | Continued per-file failure with job ID, file ID and source context |
+| `job.failed` | error | Terminal job failure |
+| `job.diagnostic`, `job.context` | error | Compiler diagnostics and chunked full failure context |
 | `queue.rejected` | warning | Job queue refused submission |
 | `index.completed`, `index.failed` | info, error | Background global-index publication or failure |
 | `http.response` | debug | Method, route template, status and processing duration |
@@ -76,9 +79,15 @@ to retrieve the complete job through REST.
 | `watch.scan`, `watch.event` | trace | Scan triggers and filesystem event metadata |
 | `watch.failed`, `watch.overflow` | warning | Monitoring failure or inotify overflow |
 
-HTTP events use route templates. Tokens, authorization headers, request bodies,
-query values and raw CLI arguments are not logged. Inspect job output separately
-when diagnosing a command failure.
+HTTP events use route templates and omit authorization headers and request bodies.
+Native failure context does include analysis options, full compiler arguments and
+build-related environment variables. Correlate `job.diagnostic` and `job.context`
+using `job_id` and `file_id`; combine context `value` fragments in `part` order for
+each `key` and then decode the JSON. File IDs distinguish failures in the same batch.
+Job IDs can be reused after restart, so also constrain records by the job's creation
+timestamp. REST retains full structured errors; export them before restarting or
+retention eviction. Mixed batches log per-file errors even when their terminal
+state is succeeded with partial coverage.
 
 File writes run on a dedicated worker with a 4,096-record queue. Overflow drops
 new records and reports their count in `logger.dropped`. Oversized event fields

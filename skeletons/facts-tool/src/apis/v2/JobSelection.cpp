@@ -84,7 +84,7 @@ Result<std::vector<domain::ResolvedFile>> selectFiles(const domain::Context &con
         std::vector<domain::ResolvedFile> result;
         std::set<std::pair<std::int64_t, std::string>> seen;
         for (const auto &selected : selections) {
-          auto file = domain::resolveFile(context, selected);
+          auto file = domain::resolveFile(context, selected, false);
           if (!file) return std::unexpected(file.error());
           if (seen.emplace(file->fileId, file->path.string()).second)
             result.push_back(std::move(*file));

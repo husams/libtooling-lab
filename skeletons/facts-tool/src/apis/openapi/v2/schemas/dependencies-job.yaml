@@ -17,7 +17,7 @@ properties:
     type: string
     minLength: 1
     maxLength: 4096
-    description: ID of the failed or cancelled job this attempt retries.
+    description: ID of the failed, cancelled, or partially failed job this attempt retries.
   operation:
     type: string
     const: dependencies

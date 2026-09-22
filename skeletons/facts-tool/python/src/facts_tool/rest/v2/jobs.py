@@ -57,7 +57,7 @@ class AnalysisJob[T]:
         return self
 
     def retry(self) -> "AnalysisJob[T]":
-        """Create a fresh attempt of this failed/cancelled job, preserving history."""
+        """Retry a failed, cancelled, or partially failed job, preserving history."""
         body = call(
             self._http, "POST", path(self._family + "/job"), {"retry_of": self.id}
         )
