@@ -30,9 +30,9 @@ get:
       $ref: '../../openapi.yaml#/components/responses/V2Error503'
     default:
       $ref: '../../openapi.yaml#/components/responses/V2ErrorDefault'
-  description: Read a bounded page from a completed job. Not-yet-completed, failed
-    or cancelled jobs return a conflict. The cursor must be reused with the original
-    collection and job.
+  description: Read a bounded page from a terminal job with retained results, including
+    failed and cancelled batches. Jobs without retained results return a conflict.
+    Reuse the cursor with the original collection and job.
   parameters:
   - name: id
     in: path
@@ -50,6 +50,7 @@ get:
       enum:
       - matches
       - diagnostics
+      - failed_files
       default: matches
   - name: limit
     in: query

@@ -12,6 +12,7 @@ struct Request {
   domain::FileSelector file;
   Json options;
   Settings settings;
+  std::function<void(domain::Error &, const std::string &)> reportFileFailure;
   std::function<bool()> cancelled = [] { return false; };
 };
 domain::Result<Request> parseRequest(std::string operation, const Json &body);

@@ -4,3 +4,6 @@
 
 # Persistent ASTs are local build artifacts.
 .facts-tool/ast-cache/
+
+# Local daemon configuration, facts, logs and validation artifacts.
+/.server-runtime/

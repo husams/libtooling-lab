@@ -15,3 +15,8 @@ examples:
     - path: src/Widget.cpp
       repository: example
   force: false
+  continue_on_error:
+    type: boolean
+    default: false
+    description: Continue after per-file preparation or analysis errors and retain every
+      failure. Selection, cancellation, and global index publication errors still stop the job.

@@ -1,5 +1,6 @@
 anyOf:
 - $ref: '../../openapi.yaml#/components/schemas/V2MatchRecordPage'
 - $ref: '../../openapi.yaml#/components/schemas/V2DiagnosticPage'
+- $ref: '../../openapi.yaml#/components/schemas/V2FileFailurePage'
 description: The collection query parameter determines the record schema. Empty pages
   satisfy more than one alternative; each alternative is fully typed.

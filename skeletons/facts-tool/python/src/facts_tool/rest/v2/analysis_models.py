@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Literal
 
+from ..domain_models import OperationError
+
 
 @dataclass(frozen=True, slots=True)
 class Diagnostic:
@@ -21,6 +23,13 @@ class FileExtraction:
 
 
 @dataclass(frozen=True, slots=True)
+class FileFailure:
+    file_id: str
+    path: str
+    error: OperationError
+
+
+@dataclass(frozen=True, slots=True)
 class AnalysisSummary:
     files_selected: int
     files_processed: int
@@ -29,6 +38,8 @@ class AnalysisSummary:
     coverage: Literal["complete", "partial"]
     index_revision: str | None
     diagnostics: tuple[Diagnostic, ...] | None = field(default=None, kw_only=True)
+    failed_files: tuple[FileFailure, ...] | None = field(default=None, kw_only=True)
+    files_not_attempted: int = field(default=0, kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)

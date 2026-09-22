@@ -1,6 +1,6 @@
 """Public v2 value types; importing them performs no network I/O."""
 
-from .analysis_models import DependencyResult, ExtractionResult
+from .analysis_models import DependencyResult, ExtractionResult, FileFailure
 from .catalog_models import (
     Clone,
     CompilationCommand,
@@ -54,6 +54,7 @@ __all__ = [
     "ExtractionResult",
     "File",
     "FileIdentity",
+    "FileFailure",
     "FileReference",
     "FileSelection",
     "FlowBoundary",

@@ -21,9 +21,13 @@ class Extractions(JobResource[ExtractionResult, FileExtraction]):
         super().__init__(http, "extract", ExtractionResult, FileExtraction)
 
     async def create(
-        self, *, selection: Selection, force: bool = False
+        self, *, selection: Selection, force: bool = False,
+        continue_on_error: bool = False
     ) -> AsyncAnalysisJob[ExtractionResult]:
-        return await self._create({"selection": selection, "force": force})
+        return await self._create({
+            "selection": selection, "force": force,
+            "continue_on_error": continue_on_error or None,
+        })
 
 
 class Matches(JobResource[MatchResult, MatchRow]):
@@ -37,6 +41,7 @@ class Matches(JobResource[MatchResult, MatchRow]):
         expression: str,
         traversal: Literal["AsIs", "IgnoreUnlessSpelledInSource"] = "AsIs",
         capture_source: bool = False,
+        continue_on_error: bool = False,
         relation_kind: str | None = None,
         bindings: MatcherBindings | None = None,
     ) -> AsyncAnalysisJob[MatchResult]:
@@ -46,6 +51,7 @@ class Matches(JobResource[MatchResult, MatchRow]):
                 "expression": expression,
                 "traversal": traversal,
                 "capture_source": capture_source,
+                "continue_on_error": continue_on_error or None,
                 "relation_kind": relation_kind,
                 "bindings": bindings,
             }
@@ -57,6 +63,8 @@ class Dependencies(JobResource[DependencyResult, DependencyEdge]):
         super().__init__(http, "dependencies", DependencyResult, DependencyEdge)
 
     async def create(
-        self, *, selection: Selection
+        self, *, selection: Selection, continue_on_error: bool = False
     ) -> AsyncAnalysisJob[DependencyResult]:
-        return await self._create({"selection": selection})
+        return await self._create({
+            "selection": selection, "continue_on_error": continue_on_error or None,
+        })

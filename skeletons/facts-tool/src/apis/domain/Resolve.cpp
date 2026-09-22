@@ -24,7 +24,7 @@ Result<detail::Candidate> select(std::vector<detail::Candidate> candidates,
   return std::move(*selected);
 }
 Result<ResolvedFile> resolve(const Context &context,
-                             const detail::Candidate &candidate) {
+                             const detail::Candidate &candidate, bool requireAvailable) {
   const auto &file = candidate.file;
   return catalog::filePath(file)
       .transform_error([](const std::string &message) {
@@ -32,7 +32,7 @@ Result<ResolvedFile> resolve(const Context &context,
       })
       .and_then([&](const std::filesystem::path &path) -> Result<ResolvedFile> {
         std::error_code error;
-        if (!std::filesystem::is_regular_file(path, error))
+        if (requireAvailable && !std::filesystem::is_regular_file(path, error))
           return std::unexpected(Error{404, "file_unavailable",
                                        "registered source file is unavailable: " + path.string(),
               {{"path", path.string()}, {"project_root", file.clone ? file.clone->path : context.configuration.projectRoot.string()},
@@ -48,10 +48,10 @@ Result<ResolvedFile> resolve(const Context &context,
 }
 }
 Result<ResolvedFile> resolveFile(const Context &context,
-                                 const FileSelector &selector) {
+                                 const FileSelector &selector, bool requireAvailable) {
   return detail::validateSelector(selector)
       .and_then([&] { return detail::candidates(context, selector); })
       .and_then([&](auto candidates) { return select(std::move(candidates), selector); })
-      .and_then([&](const auto &candidate) { return resolve(context, candidate); });
+      .and_then([&](const auto &candidate) { return resolve(context, candidate, requireAvailable); });
 }
 } // namespace facts::apis::domain

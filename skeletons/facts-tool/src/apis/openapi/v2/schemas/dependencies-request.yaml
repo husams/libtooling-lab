@@ -5,3 +5,8 @@ additionalProperties: false
 properties:
   selection:
     $ref: '../../openapi.yaml#/components/schemas/V2Selection'
+  continue_on_error:
+    type: boolean
+    default: false
+    description: Continue after per-file preparation or analysis errors and retain every
+      failure. Selection, cancellation, and global index publication errors still stop the job.

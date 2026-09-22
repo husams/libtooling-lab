@@ -1,0 +1,10 @@
+type: object
+required: [file_id, path, error]
+additionalProperties: false
+properties:
+  file_id:
+    type: string
+  path:
+    type: string
+  error:
+    $ref: '../../openapi.yaml#/components/schemas/V2Error'
